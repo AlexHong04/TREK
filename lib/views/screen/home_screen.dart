@@ -1,0 +1,289 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../view_models/presentation_logic/home_view_model.dart';
+import '../theme/app_theme.dart';
+
+
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({super.key});
+
+  static Widget builder(BuildContext context) {
+    return ChangeNotifierProvider<HomeViewModel>(
+      create: (context) => HomeViewModel(),
+      child: const HomeScreen(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: appTheme.gray_50_02,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildTopBar(context),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 24.0),
+                      _buildPageIndicator(),
+                      const SizedBox(height: 20.0),
+                      _buildGreeting(context),
+                      const SizedBox(height: 32.0),
+                      _buildPlanCard(context),
+                      const SizedBox(height: 24.0),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            _buildBottomButtons(context),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopBar(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Logo + Explorer
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: appTheme.teal_A700, width: 2),
+                ),
+                child: Center(
+                  child: Icon(
+                    Icons.change_history_rounded,
+                    color: appTheme.teal_A700,
+                    size: 18,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'Trek',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, fontFamily: 'Afacad').copyWith(
+                  color: appTheme.teal_A700,
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+          // Profile avatar
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: appTheme.gray_200,
+              border: Border.all(color: appTheme.gray_100, width: 1),
+            ),
+            child: ClipOval(
+              child: Icon(
+                Icons.person,
+                color: appTheme.blue_gray_300,
+                size: 24,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPageIndicator() {
+    return Center(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: appTheme.teal_A700,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: appTheme.gray_200,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGreeting(BuildContext context) {
+    final viewModel = context.watch<HomeViewModel>();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Hi, ${viewModel.uiState.userName}',
+          style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, fontFamily: 'Inter', color: AppColors.gray900).copyWith(
+            fontSize: 28,
+            height: 1.2,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          "Here's your plan for today",
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400, fontFamily: 'Inter', color: AppColors.gray800).copyWith(
+            color: appTheme.blue_gray_300,
+            height: 1.4,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPlanCard(BuildContext context) {
+    final viewModel = context.watch<HomeViewModel>();
+    if (!viewModel.uiState.hasPlan) {
+      // Empty state placeholder
+      return Container(
+        width: double.infinity,
+        height: 260,
+        decoration: BoxDecoration(
+          color: appTheme.gray_100,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.map_outlined, size: 48, color: appTheme.blue_gray_300),
+              const SizedBox(height: 12),
+              Text(
+                'No plans yet',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400, fontFamily: 'Inter', color: AppColors.gray800).copyWith(
+                  color: appTheme.blue_gray_300,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    // TODO: Show existing plan card
+    return const SizedBox.shrink();
+  }
+
+  Widget _buildBottomButtons(BuildContext context) {
+    final viewModel = context.watch<HomeViewModel>();
+    return Padding(
+      padding: const EdgeInsets.only(
+        left: 24.0,
+        right: 24.0,
+        bottom: 28.0,
+        top: 12.0,
+      ),
+      child: Column(
+        children: [
+          // Start Plan button disabled when no plan
+          SizedBox(
+            width: double.infinity,
+            child: Container(
+              decoration: BoxDecoration(
+                color: viewModel.uiState.hasPlan
+                    ? appTheme.teal_A700
+                    : appTheme.gray_200,
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: viewModel.uiState.hasPlan
+                    ? [
+                        BoxShadow(
+                          color: appTheme.teal_50,
+                          offset: const Offset(0, 4),
+                          blurRadius: 8,
+                        ),
+                      ]
+                    : [],
+              ),
+              child: Material(
+                color: appTheme.transparentCustom,
+                borderRadius: BorderRadius.circular(14),
+                child: InkWell(
+                  onTap: viewModel.uiState.hasPlan
+                      ? () => viewModel.onStartPlan(context)
+                      : null,
+                  borderRadius: BorderRadius.circular(14),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Center(
+                      child: Text(
+                        'Start Plan',
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, fontFamily: 'Afacad').copyWith(
+                          color: viewModel.uiState.hasPlan
+                              ? appTheme.white_A700
+                              : appTheme.blue_gray_300,
+                          height: 22 / 18,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Plan New button 
+          SizedBox(
+            width: double.infinity,
+            child: Container(
+              decoration: BoxDecoration(
+                color: appTheme.teal_A700,
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: appTheme.teal_50,
+                    offset: const Offset(0, 4),
+                    blurRadius: 8,
+                  ),
+                ],
+              ),
+              child: Material(
+                color: appTheme.transparentCustom,
+                borderRadius: BorderRadius.circular(14),
+                child: InkWell(
+                  onTap: () => viewModel.onPlanNew(context),
+                  borderRadius: BorderRadius.circular(14),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Center(
+                      child: Text(
+                        'Plan New',
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, fontFamily: 'Afacad').copyWith(
+                          color: appTheme.white_A700,
+                          height: 22 / 18,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
