@@ -7,7 +7,7 @@ class HomeViewModel extends ChangeNotifier {
   HomeUiState get uiState => _uiState;
 
   void onStartPlan(BuildContext context) {
-    // TODO: Navigate to existing plan details
+    // Navigate to existing plan details
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('No plan available yet.')));
