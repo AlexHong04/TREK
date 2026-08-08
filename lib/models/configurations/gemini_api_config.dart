@@ -4,14 +4,14 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 
 class GeminiApiConfig {
   // Gemini API Key 
-  static const String _apiKey = ''; 
+  static const String _apiKey = 'AQ.Ab8RN6LBMqSFEdLyOqVG7NMIbAT1zEXJ-IqIwgivJRl0jndtOw';
   
   static late final GenerativeModel _model;
 
   /// Initialize Gemini model
   static void initialize() {
     _model = GenerativeModel(
-      model: '', 
+      model: 'Gemini 3 Flash',
       apiKey: _apiKey,
     );
   }
@@ -49,8 +49,7 @@ class GeminiApiConfig {
 
   /// Returns a Base64 encoded image string
   static Future<String?> generateLocationImage(String promptText) async {
-    final url = Uri.parse(
-        'https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict');
+    final url = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict');
 
     try {
       final response = await http.post(
