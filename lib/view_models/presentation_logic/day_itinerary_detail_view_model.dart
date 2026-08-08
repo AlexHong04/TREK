@@ -3,18 +3,15 @@ import 'package:flutter/material.dart';
 import '../../models/entities/day_itinerary_detail_model.dart';
 
 import '../ui_state/day_itinerary_ui_state.dart';
-import '../ui_state/ui_status.dart';
 
 class DayItineraryDetailViewModel extends ChangeNotifier {
   DayItineraryUiState _uiState = const DayItineraryUiState();
   DayItineraryUiState get uiState => _uiState;
 
   void initialize() {
-    _uiState = _uiState.copyWith(
-      status: UiStatus.loading,
-    );
+    _uiState = _uiState.copyWith(isLoading: true);
     notifyListeners();
-    
+
     // Simulate some loading or just directly load
     final newActivities = [
       ActivityItemModel(
@@ -38,18 +35,15 @@ class DayItineraryDetailViewModel extends ChangeNotifier {
         imagePath: '',
       ),
     ];
-    
-    _uiState = _uiState.copyWith(
-      status: UiStatus.success,
-      activities: newActivities,
-    );
+
+    _uiState = _uiState.copyWith(isLoading: false, activities: newActivities);
     notifyListeners();
   }
 
   void removeActivity(String id) {
     final updatedActivities = List<ActivityItemModel>.from(_uiState.activities)
       ..removeWhere((activity) => activity.id == id);
-      
+
     _uiState = _uiState.copyWith(activities: updatedActivities);
     notifyListeners();
   }

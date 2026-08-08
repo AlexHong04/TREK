@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 
 import '../../models/entities/day_itinerary_detail_model.dart';
 import '../../view_models/presentation_logic/day_itinerary_detail_view_model.dart';
-import '../../view_models/ui_state/ui_status.dart';
 
 import '../theme/app_theme.dart';
 // image_constant and size_utils removed per user request
@@ -75,10 +74,12 @@ class _DayItineraryDetailScreenState extends State<DayItineraryDetailScreen> {
           padding: EdgeInsets.only(left: 8.0),
           child: Text(
             'KYOTO, JAPAN',
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, fontFamily: 'Inter', color: AppColors.teal800).copyWith(
-              letterSpacing: 1,
-              height: 17 / 14,
-            ),
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              fontFamily: 'Inter',
+              color: AppColors.teal800,
+            ).copyWith(letterSpacing: 1, height: 17 / 14),
           ),
         ),
         SizedBox(height: 8.0),
@@ -86,9 +87,12 @@ class _DayItineraryDetailScreenState extends State<DayItineraryDetailScreen> {
           padding: EdgeInsets.only(left: 8.0),
           child: Text(
             'Day 1: Cultural\nImmersion',
-            style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, fontFamily: 'Inter', color: AppColors.gray900).copyWith(
-              height: 37 / 30,
-            ),
+            style: const TextStyle(
+              fontSize: 30,
+              fontWeight: FontWeight.w800,
+              fontFamily: 'Inter',
+              color: AppColors.gray900,
+            ).copyWith(height: 37 / 30),
           ),
         ),
         SizedBox(height: 18.0),
@@ -96,7 +100,12 @@ class _DayItineraryDetailScreenState extends State<DayItineraryDetailScreen> {
           padding: EdgeInsets.only(left: 8.0),
           child: Text(
             "Discover the spiritual heart and culinary\nexcellence of Japan's ancient capital.",
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400, fontFamily: 'Inter', color: AppColors.gray800).copyWith(height: 26 / 16),
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w400,
+              fontFamily: 'Inter',
+              color: AppColors.gray800,
+            ).copyWith(height: 26 / 16),
           ),
         ),
       ],
@@ -107,8 +116,10 @@ class _DayItineraryDetailScreenState extends State<DayItineraryDetailScreen> {
     BuildContext context,
     DayItineraryDetailViewModel viewModel,
   ) {
-    if (viewModel.uiState.status == UiStatus.loading) {
-      return Center(child: CircularProgressIndicator(color: appTheme.teal_A700));
+    if (viewModel.uiState.isLoading) {
+      return Center(
+        child: CircularProgressIndicator(color: appTheme.teal_A700),
+      );
     }
 
     final activities = viewModel.uiState.activities;
@@ -146,9 +157,12 @@ class _DayItineraryDetailScreenState extends State<DayItineraryDetailScreen> {
                 children: [
                   Text(
                     activity.time ?? '',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, fontFamily: 'Inter', color: AppColors.gray800).copyWith(
-                      height: 20 / 16,
-                    ),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      fontFamily: 'Inter',
+                      color: AppColors.gray800,
+                    ).copyWith(height: 20 / 16),
                   ),
                   GestureDetector(
                     onTap: onRemove,
@@ -238,9 +252,11 @@ class _DayItineraryDetailScreenState extends State<DayItineraryDetailScreen> {
                   const SizedBox(width: 8),
                   Text(
                     'Confirm',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, fontFamily: 'Afacad').copyWith(
-                      height: 22 / 18,
-                    ),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      fontFamily: 'Afacad',
+                    ).copyWith(height: 22 / 18),
                   ),
                 ],
               ),

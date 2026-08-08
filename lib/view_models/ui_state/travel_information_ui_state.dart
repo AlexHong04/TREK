@@ -1,28 +1,27 @@
-import 'ui_status.dart';
-
 class TravelInformationUiState {
-  final UiStatus status;
+  final bool isLoading;
   final String? selectedPreference;
   final String? selectedEmergencyFund;
   final String? errorMessage;
-  
+
   const TravelInformationUiState({
-    this.status = UiStatus.initial,
+    this.isLoading = false,
     this.selectedPreference,
     this.selectedEmergencyFund,
     this.errorMessage,
   });
 
   TravelInformationUiState copyWith({
-    UiStatus? status,
+    bool? isLoading,
     String? selectedPreference,
     String? selectedEmergencyFund,
     String? errorMessage,
   }) {
     return TravelInformationUiState(
-      status: status ?? this.status,
+      isLoading: isLoading ?? this.isLoading,
       selectedPreference: selectedPreference ?? this.selectedPreference,
-      selectedEmergencyFund: selectedEmergencyFund ?? this.selectedEmergencyFund,
+      selectedEmergencyFund:
+          selectedEmergencyFund ?? this.selectedEmergencyFund,
       errorMessage: errorMessage ?? this.errorMessage,
     );
   }

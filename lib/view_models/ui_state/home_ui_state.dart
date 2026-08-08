@@ -1,26 +1,24 @@
-import 'ui_status.dart';
-
 class HomeUiState {
-  final UiStatus status;
+  final bool isLoading;
   final String userName;
   final bool hasPlan;
   final String? errorMessage;
 
   const HomeUiState({
-    this.status = UiStatus.initial,
+    this.isLoading = false,
     this.userName = 'Alex',
     this.hasPlan = false,
     this.errorMessage,
   });
 
   HomeUiState copyWith({
-    UiStatus? status,
+    bool? isLoading,
     String? userName,
     bool? hasPlan,
     String? errorMessage,
   }) {
     return HomeUiState(
-      status: status ?? this.status,
+      isLoading: isLoading ?? this.isLoading,
       userName: userName ?? this.userName,
       hasPlan: hasPlan ?? this.hasPlan,
       errorMessage: errorMessage ?? this.errorMessage,
