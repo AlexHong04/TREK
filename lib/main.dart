@@ -14,6 +14,55 @@ class AppRoutes {
   static const String initialRoute = homeScreen;
 }
 
+class NavigatorService {
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+}
+
+var globalMessengerKey = GlobalKey<ScaffoldMessengerState>();
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Supabase config
+  await SupabaseConfig.initialize();
+  
+  // Initialize Gemini config
+  GeminiApiConfig.initialize();
+
+  Future.wait([
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]),
+  ]).then((value) {
+    runApp(MyApp());
+  });
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Trek',
+      debugShowCheckedModeBanner: false,
+      theme: theme,
+      builder: (context, child) {
+        return MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(1.0)),
+          child: child!,
+        );
+      },
+      navigatorKey: NavigatorService.navigatorKey,
+      initialRoute: AppRoutes.initialRoute,
+      routes: {
+        AppRoutes.homeScreen: (context) => HomeScreen.builder(context),
+        AppRoutes.travelInformationInputScreen: (context) => TravelInformationInputScreen.builder(context),
+        AppRoutes.dayItineraryDetailScreen: (context) => DayItineraryDetailScreen.builder(context),
+      },
+    );
+  }
+}
+
 
 class AppColors {
   // Primary Colors
@@ -103,52 +152,3 @@ class AppThemeData {
 final appTheme = AppThemeData();
 
 final theme = AppTheme.lightTheme;
-
-class NavigatorService {
-  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-}
-
-var globalMessengerKey = GlobalKey<ScaffoldMessengerState>();
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  
-  // Initialize Supabase config
-  await SupabaseConfig.initialize();
-  
-  // Initialize Gemini config
-  GeminiApiConfig.initialize();
-
-  Future.wait([
-    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]),
-  ]).then((value) {
-    runApp(MyApp());
-  });
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Trek',
-      debugShowCheckedModeBanner: false,
-      theme: theme,
-      builder: (context, child) {
-        return MediaQuery(
-          data: MediaQuery.of(
-            context,
-          ).copyWith(textScaler: TextScaler.linear(1.0)),
-          child: child!,
-        );
-      },
-      navigatorKey: NavigatorService.navigatorKey,
-      initialRoute: AppRoutes.initialRoute,
-      routes: {
-        AppRoutes.homeScreen: (context) => HomeScreen.builder(context),
-        AppRoutes.travelInformationInputScreen: (context) => TravelInformationInputScreen.builder(context),
-        AppRoutes.dayItineraryDetailScreen: (context) => DayItineraryDetailScreen.builder(context),
-      },
-    );
-  }
-}
