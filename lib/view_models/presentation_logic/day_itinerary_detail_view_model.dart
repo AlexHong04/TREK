@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../models/entities/day_itinerary_detail_model.dart';
+import '../../models/entities/activity.dart';
 
 import '../ui_state/day_itinerary_ui_state.dart';
 
@@ -14,7 +14,7 @@ class DayItineraryDetailViewModel extends ChangeNotifier {
 
     // Simulate some loading or just directly load
     final newActivities = [
-      ActivityItemModel(
+      Activity(
         id: '1',
         time: '08:00 - 10:00',
         title: 'Kinkaku-ji Temple',
@@ -24,7 +24,7 @@ class DayItineraryDetailViewModel extends ChangeNotifier {
         cost: '\$15',
         imagePath: '',
       ),
-      ActivityItemModel(
+      Activity(
         id: '2',
         time: '10:30 - 12:30',
         title: 'Traditional Kaiseki Lunch',
@@ -41,7 +41,7 @@ class DayItineraryDetailViewModel extends ChangeNotifier {
   }
 
   void removeActivity(String id) {
-    final updatedActivities = List<ActivityItemModel>.from(_uiState.activities)
+    final updatedActivities = List<Activity>.from(_uiState.activities)
       ..removeWhere((activity) => activity.id == id);
 
     _uiState = _uiState.copyWith(activities: updatedActivities);

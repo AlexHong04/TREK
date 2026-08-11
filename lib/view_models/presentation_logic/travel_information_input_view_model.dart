@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../models/entities/day_itinerary_detail_model.dart';
+import '../../models/entities/activity.dart';
 import '../ui_state/travel_information_ui_state.dart';
 
 class TravelInformationInputViewModel extends ChangeNotifier {

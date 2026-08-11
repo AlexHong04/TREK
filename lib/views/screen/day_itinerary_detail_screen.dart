@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../models/entities/day_itinerary_detail_model.dart';
+import '../../models/entities/activity.dart';
 import '../../view_models/presentation_logic/day_itinerary_detail_view_model.dart';
 
 import '../theme/app_theme.dart';
@@ -139,7 +139,7 @@ class _DayItineraryDetailScreenState extends State<DayItineraryDetailScreen> {
 
   Widget _buildTimelineItem({
     required BuildContext context,
-    required ActivityItemModel activity,
+    required Activity activity,
     required bool isLast,
     required VoidCallback onRemove,
   }) {

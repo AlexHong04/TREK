@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../../models/entities/day_itinerary_detail_model.dart';
+import '../../models/entities/activity.dart';
 
 import '../theme/app_theme.dart';
 
 class ActivityCardWidget extends StatelessWidget {
-  final ActivityItemModel activity;
+  final Activity activity;
 
   const ActivityCardWidget({super.key, required this.activity});
 
