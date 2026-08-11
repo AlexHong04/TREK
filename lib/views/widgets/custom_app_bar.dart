@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../main.dart';
 
-
-import '../theme/app_theme.dart';
 // removed size_utils.dart per user request
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -40,8 +39,8 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     final double resolvedPaddingH = paddingHorizontal ?? 32.0;
     final double resolvedPaddingV = paddingVertical ?? 26.0;
-    final Color resolvedBgColor = backgroundColor ?? appTheme.transparentCustom;
-    final Color resolvedBorderColor = bottomBorderColor ?? appTheme.gray_50;
+    final Color resolvedBgColor = backgroundColor ?? AppColors.transparent;
+    final Color resolvedBorderColor = bottomBorderColor ?? AppColors.gray50;
     final double resolvedIconSize = leadingIconSize ?? 24.0;
 
     return AppBar(
@@ -80,7 +79,10 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                   ),
                   child: Text(
                     title!,
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontFamily: 'Inter').copyWith(height: 1.2),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontFamily: 'Inter',
+                    ).copyWith(height: 1.2),
                   ),
                 ),
               ),

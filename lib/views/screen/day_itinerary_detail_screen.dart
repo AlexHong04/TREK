@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 
 import '../../models/entities/activity.dart';
 import '../../view_models/presentation_logic/day_itinerary_detail_view_model.dart';
-
-import '../theme/app_theme.dart';
+import '../../main.dart';
 // image_constant and size_utils removed per user request
 import '../widgets/activity_card_widget.dart';
 import '../widgets/custom_app_bar.dart';
@@ -131,7 +131,7 @@ class _DayItineraryDetailScreenState extends State<DayItineraryDetailScreen> {
           context: context,
           activity: activity,
           isLast: isLast,
-          onRemove: () => viewModel.removeActivity(activity.id ?? ''),
+          onRemove: () => viewModel.removeActivity(activity.activitiesId),
         );
       }),
     );
@@ -156,7 +156,7 @@ class _DayItineraryDetailScreenState extends State<DayItineraryDetailScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    activity.time ?? '',
+                    DateFormat('dd MMMM yyyy').format(activity.date),
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w500,

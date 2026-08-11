@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../view_models/presentation_logic/travel_information_input_view_model.dart';
 
-import '../theme/app_theme.dart';
+import '../../main.dart';
 import '../widgets/custom_app_bar.dart';
 import '../widgets/custom_text_field.dart';
 

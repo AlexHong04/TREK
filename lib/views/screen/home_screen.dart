@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../view_models/presentation_logic/home_view_model.dart';
-import '../theme/app_theme.dart';
-
-
+import '../../main.dart';
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 

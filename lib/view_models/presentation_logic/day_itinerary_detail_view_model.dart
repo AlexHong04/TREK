@@ -1,56 +1,77 @@
 import 'package:flutter/material.dart';
 
 import '../../models/entities/activity.dart';
-
 import '../ui_state/day_itinerary_ui_state.dart';
 
 class DayItineraryDetailViewModel extends ChangeNotifier {
   DayItineraryUiState _uiState = const DayItineraryUiState();
+
   DayItineraryUiState get uiState => _uiState;
 
   void initialize() {
     _uiState = _uiState.copyWith(isLoading: true);
     notifyListeners();
 
-    // Simulate some loading or just directly load
     final newActivities = [
       Activity(
-        id: '1',
-        time: '08:00 - 10:00',
-        title: 'Kinkaku-ji Temple',
-        description:
-            'Explore the Golden Pavilion and enjoy the peaceful temple gardens.',
-        duration: '2 hrs',
-        cost: '\$15',
-        imagePath: '',
+        activitiesId: '1',
+        dayTripId: 'day-trip-1',
+        destination: 'Kinkaku-ji Temple',
+        description: '',
+        activityImgUrl: '',
+        date: DateTime(2026, 8, 12),
+        allocatedBudget: 20.0,
+        overspendAmount: 15.0,
+        status: 'planned',
+        startTime: '08:00',
+        endTime: '10:00',
+        activityCategory: 'Culture',
+        isOverspend: false,
+
       ),
       Activity(
-        id: '2',
-        time: '10:30 - 12:30',
-        title: 'Traditional Kaiseki Lunch',
-        description:
-            'Enjoy a multi-course Kyoto lunch with seasonal ingredients.',
-        duration: '2 hrs',
-        cost: '\$40',
-        imagePath: '',
+        activitiesId: '2',
+        dayTripId: 'day-trip-1',
+        destination: 'Traditional Kaiseki Lunch',
+          description: '',
+          activityImgUrl: '',
+        date: DateTime(2026, 8, 12),
+        allocatedBudget: 50.0,
+        overspendAmount: 40.0,
+        status: 'planned',
+        startTime: '10:30',
+        endTime: '12:30',
+        activityCategory: 'Food',
+        isOverspend: false
       ),
     ];
 
-    _uiState = _uiState.copyWith(isLoading: false, activities: newActivities);
+    _uiState = _uiState.copyWith(
+      isLoading: false,
+      activities: newActivities,
+    );
+
     notifyListeners();
   }
 
-  void removeActivity(String id) {
+  void removeActivity(String activitiesId) {
     final updatedActivities = List<Activity>.from(_uiState.activities)
-      ..removeWhere((activity) => activity.id == id);
+      ..removeWhere(
+            (activity) => activity.activitiesId == activitiesId,
+      );
 
-    _uiState = _uiState.copyWith(activities: updatedActivities);
+    _uiState = _uiState.copyWith(
+      activities: updatedActivities,
+    );
+
     notifyListeners();
   }
 
   Future<void> onConfirmPressed(BuildContext context) async {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Itinerary confirmed!')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Itinerary confirmed!'),
+      ),
+    );
   }
 }
