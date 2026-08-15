@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../view_models/presentation_logic/home_view_model.dart';
-import '../../main.dart';
+import '../view_models/presentation_logic/home_view_model.dart';
+import '../main.dart';
+
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -74,10 +75,11 @@ class HomeScreen extends StatelessWidget {
               const SizedBox(width: 10),
               Text(
                 'Trek',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, fontFamily: 'Afacad').copyWith(
-                  color: appTheme.teal_A700,
-                  fontSize: 16,
-                ),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'Afacad',
+                ).copyWith(color: appTheme.teal_A700, fontSize: 16),
               ),
             ],
           ),
@@ -137,18 +139,22 @@ class HomeScreen extends StatelessWidget {
       children: [
         Text(
           'Hi, ${viewModel.uiState.userName}',
-          style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, fontFamily: 'Inter', color: AppColors.gray900).copyWith(
-            fontSize: 28,
-            height: 1.2,
-          ),
+          style: const TextStyle(
+            fontSize: 30,
+            fontWeight: FontWeight.w800,
+            fontFamily: 'Inter',
+            color: AppColors.gray900,
+          ).copyWith(fontSize: 28, height: 1.2),
         ),
         const SizedBox(height: 6),
         Text(
           "Here's your plan for today",
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400, fontFamily: 'Inter', color: AppColors.gray800).copyWith(
-            color: appTheme.blue_gray_300,
-            height: 1.4,
-          ),
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w400,
+            fontFamily: 'Inter',
+            color: AppColors.gray800,
+          ).copyWith(color: appTheme.blue_gray_300, height: 1.4),
         ),
       ],
     );
@@ -173,9 +179,12 @@ class HomeScreen extends StatelessWidget {
               const SizedBox(height: 12),
               Text(
                 'No plans yet',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400, fontFamily: 'Inter', color: AppColors.gray800).copyWith(
-                  color: appTheme.blue_gray_300,
-                ),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w400,
+                  fontFamily: 'Inter',
+                  color: AppColors.gray800,
+                ).copyWith(color: appTheme.blue_gray_300),
               ),
             ],
           ),
@@ -229,12 +238,17 @@ class HomeScreen extends StatelessWidget {
                     child: Center(
                       child: Text(
                         'Start Plan',
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, fontFamily: 'Afacad').copyWith(
-                          color: viewModel.uiState.hasPlan
-                              ? appTheme.white_A700
-                              : appTheme.blue_gray_300,
-                          height: 22 / 18,
-                        ),
+                        style:
+                            const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: 'Afacad',
+                            ).copyWith(
+                              color: viewModel.uiState.hasPlan
+                                  ? appTheme.white_A700
+                                  : appTheme.blue_gray_300,
+                              height: 22 / 18,
+                            ),
                       ),
                     ),
                   ),
@@ -243,7 +257,7 @@ class HomeScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          // Plan New button 
+          // Plan New button
           SizedBox(
             width: double.infinity,
             child: Container(
@@ -269,10 +283,11 @@ class HomeScreen extends StatelessWidget {
                     child: Center(
                       child: Text(
                         'Plan New',
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, fontFamily: 'Afacad').copyWith(
-                          color: appTheme.white_A700,
-                          height: 22 / 18,
-                        ),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: 'Afacad',
+                        ).copyWith(color: appTheme.white_A700, height: 22 / 18),
                       ),
                     ),
                   ),

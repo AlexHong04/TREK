@@ -3,28 +3,30 @@ import 'package:flutter/services.dart';
 import 'models/configurations/supabase_config.dart';
 import 'models/configurations/gemini_api_config.dart';
 
-import 'views/screen/day_itinerary_detail_screen.dart';
-import 'views/screen/home_screen.dart';
-import 'views/screen/travel_information_input_screen.dart';
+import 'views/day_itinerary_detail_screen.dart';
+import 'views/home_screen.dart';
+import 'views/travel_information_input_screen.dart';
 
 class AppRoutes {
   static const String homeScreen = '/homeScreen';
-  static const String travelInformationInputScreen ='/travelInformationInputScreen';
+  static const String travelInformationInputScreen =
+      '/travelInformationInputScreen';
   static const String dayItineraryDetailScreen = '/dayItineraryDetailScreen';
   static const String initialRoute = homeScreen;
 }
 
 class NavigatorService {
-  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
 }
 
 var globalMessengerKey = GlobalKey<ScaffoldMessengerState>();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize Supabase config
   await SupabaseConfig.initialize();
-  
+
   // Initialize Gemini config
   GeminiApiConfig.initialize();
 
@@ -56,13 +58,14 @@ class MyApp extends StatelessWidget {
       initialRoute: AppRoutes.initialRoute,
       routes: {
         AppRoutes.homeScreen: (context) => HomeScreen.builder(context),
-        AppRoutes.travelInformationInputScreen: (context) => TravelInformationInputScreen.builder(context),
-        AppRoutes.dayItineraryDetailScreen: (context) => DayItineraryDetailScreen.builder(context),
+        AppRoutes.travelInformationInputScreen: (context) =>
+            TravelInformationInputScreen.builder(context),
+        AppRoutes.dayItineraryDetailScreen: (context) =>
+            DayItineraryDetailScreen.builder(context),
       },
     );
   }
 }
-
 
 class AppColors {
   // Primary Colors
@@ -149,6 +152,7 @@ class AppThemeData {
   final Color grey200 = AppColors.gray200;
   final Color grey100 = AppColors.gray100;
 }
+
 final appTheme = AppThemeData();
 
 final theme = AppTheme.lightTheme;

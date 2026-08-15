@@ -2,12 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
-import '../../models/entities/activity.dart';
-import '../../view_models/presentation_logic/day_itinerary_detail_view_model.dart';
-import '../../main.dart';
-// image_constant and size_utils removed per user request
-import '../widgets/activity_card_widget.dart';
-import '../widgets/custom_app_bar.dart';
+import '../models/entities/activity.dart';
+import '../view_models/presentation_logic/day_itinerary_detail_view_model.dart';
+import '../main.dart';
 
 class DayItineraryDetailScreen extends StatefulWidget {
   const DayItineraryDetailScreen({super.key});
@@ -30,18 +27,7 @@ class _DayItineraryDetailScreenState extends State<DayItineraryDetailScreen> {
     final viewModel = context.watch<DayItineraryDetailViewModel>();
     return Scaffold(
       backgroundColor: appTheme.gray_50_03,
-      appBar: CustomAppBar(
-        title: 'Vibrant Odyssey',
-        // leadingImagePath removed - asset doesn't exist
-        onLeadingTap: () => Navigator.of(context).pop(),
-        titleColor: appTheme.teal_A700,
-        titleFontSize: 18,
-        backgroundColor: appTheme.white_A700,
-        bottomBorderColor: appTheme.blue_gray_50,
-        paddingHorizontal: 16,
-        paddingVertical: 16,
-        leadingIconSize: 40,
-      ),
+      appBar: _buildAppBar(context),
       body: Column(
         children: [
           Expanded(
@@ -62,6 +48,39 @@ class _DayItineraryDetailScreenState extends State<DayItineraryDetailScreen> {
           ),
           _buildBottomSection(context, viewModel),
         ],
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
+    return AppBar(
+      backgroundColor: appTheme.white_A700,
+      elevation: 0,
+      automaticallyImplyLeading: false,
+      toolbarHeight: 60,
+      titleSpacing: 0,
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(1),
+        child: Container(height: 1, color: appTheme.blue_gray_50),
+      ),
+      title: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: Text(
+                'Vibrant Odyssey',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'Inter',
+                  fontSize: 18,
+                  color: appTheme.teal_A700,
+                ).copyWith(height: 1.2),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -178,7 +197,7 @@ class _DayItineraryDetailScreenState extends State<DayItineraryDetailScreen> {
                 ],
               ),
               SizedBox(height: 12.0),
-              ActivityCardWidget(activity: activity),
+              _buildActivityCard(activity),
               if (!isLast) SizedBox(height: 24.0),
             ],
           ),
@@ -263,6 +282,116 @@ class _DayItineraryDetailScreenState extends State<DayItineraryDetailScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildActivityCard(Activity activity) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        border: Border.all(color: AppColors.blueGray50, width: 1),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.black900_0c,
+            offset: Offset(0, 1),
+            blurRadius: 2,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.only(
+              topLeft: const Radius.circular(12),
+              topRight: const Radius.circular(12),
+            ),
+            child:
+                activity.activityImgUrl != null &&
+                    activity.activityImgUrl!.isNotEmpty
+                ? Image.asset(
+                    activity.activityImgUrl!,
+                    height: 192,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  )
+                : const SizedBox.shrink(),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 20, left: 20, right: 20),
+            child: Text(
+              activity.destination ?? '',
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                fontFamily: 'Inter',
+                color: AppColors.gray900,
+              ).copyWith(height: 25 / 20),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 8, left: 20, right: 20),
+            child: Text(
+              activity.description ?? '',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+                fontFamily: 'Inter',
+                color: AppColors.gray800,
+              ).copyWith(height: 22 / 14),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(
+              top: 12,
+              left: 20,
+              right: 20,
+              bottom: 20,
+            ),
+            child: Wrap(
+              spacing: 8,
+              children: [
+                if (activity.duration != null && activity.duration!.isNotEmpty)
+                  _buildChip(
+                    label: activity.duration!,
+                    backgroundColor: AppColors.tealA200,
+                    textColor: AppColors.teal700,
+                  ),
+                _buildChip(
+                  label: 'RM ${activity.allocatedBudget.toStringAsFixed(2)}',
+                  backgroundColor: AppColors.amber200,
+                  textColor: AppColors.lime900,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChip({
+    required String label,
+    required Color backgroundColor,
+    required Color textColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          fontFamily: 'Inter',
+          color: textColor,
+        ).copyWith(height: 15 / 12),
       ),
     );
   }
