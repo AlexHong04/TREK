@@ -1,0 +1,189 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import '../entities/activity.dart';
+import '../configurations/gemini_api_config.dart';
+import '../repository/trip_repository.dart';
+
+class ItineraryService {
+  final TripRepository _tripRepository = TripRepository();
+
+  Future<List<Activity>> generateItinerary({
+    required String destination,
+    required String dates,
+    required String budget,
+    String? preference,
+    String? emergencyFund,
+  }) async {
+    try {
+      final responseText = await GeminiApiConfig.askGeminiForItinerary(
+        destination: destination,
+        dates: dates,
+        budget: budget,
+        preference: preference,
+        emergencyFund: emergencyFund,
+      );
+
+      // Extract JSON array
+      final jsonMatch = RegExp(
+        r'\[.*\]',
+        dotAll: true,
+      ).firstMatch(responseText);
+      List<Activity> newActivities = [];
+      if (jsonMatch != null) {
+        final jsonString = jsonMatch.group(0)!;
+        final List<dynamic> jsonList = jsonDecode(jsonString);
+        int index = 1;
+
+        for (var item in jsonList) {
+          final allocatedBudget =
+              (item['allocatedBudget'] as num?)?.toDouble() ?? 0.0;
+
+          final destName = item['destination'] as String? ?? 'Activity';
+          final imageKeyword = item['imageKeyword'] as String? ?? destName;
+
+          String imgUrl = '';
+          final query = Uri.encodeComponent(imageKeyword);
+
+          // 1. First priority: Wikimedia Commons (Richest media library for specific restaurants, streets, food)
+          try {
+            final commonsUrl = Uri.parse(
+              'https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=$query&gsrnamespace=6&gsrlimit=1&prop=imageinfo&iiprop=url&iiurlwidth=600&format=json&origin=*',
+            );
+            final commonsRes = await http.get(commonsUrl);
+            if (commonsRes.statusCode == 200) {
+              final data = jsonDecode(commonsRes.body);
+              final pages = data['query']?['pages'] as Map<String, dynamic>?;
+              if (pages != null && pages.isNotEmpty) {
+                final page = pages.values.first;
+                if (page.containsKey('imageinfo')) {
+                  final imageInfo = page['imageinfo'] as List;
+                  if (imageInfo.isNotEmpty &&
+                      imageInfo[0]['thumburl'] != null) {
+                    imgUrl = imageInfo[0]['thumburl'] as String;
+                  }
+                }
+              }
+            }
+          } catch (_) {}
+
+          // 2. Second priority: English Wikipedia (Good for big landmarks and cities)
+          if (imgUrl.isEmpty) {
+            try {
+              final wikiUrl = Uri.parse(
+                'https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=$query&gsrlimit=1&prop=pageimages&format=json&pithumbsize=600&origin=*',
+              );
+              final wikiRes = await http.get(wikiUrl);
+              if (wikiRes.statusCode == 200) {
+                final data = jsonDecode(wikiRes.body);
+                final pages = data['query']?['pages'] as Map<String, dynamic>?;
+                if (pages != null && pages.isNotEmpty) {
+                  final page = pages.values.first;
+                  if (page.containsKey('thumbnail')) {
+                    imgUrl = page['thumbnail']['source'] as String? ?? '';
+                  }
+                }
+              }
+            } catch (_) {}
+          }
+
+          if (imgUrl.isEmpty) {
+            // Fallback: Relax Flickr tags so it doesn't give random junk if it fails to find strict match
+            final keywordQuery = Uri.encodeComponent(
+              imageKeyword.replaceAll(RegExp(r'\s+'), ','),
+            );
+            imgUrl =
+                'https://loremflickr.com/600/400/$keywordQuery?lock=$index';
+          }
+
+          String startTimeStr = item['startTime'] as String? ?? '09:00';
+          DateTime parsedDate = DateTime.now();
+          try {
+            // Try parsing "09:00" assuming it's HH:mm
+            final parts = startTimeStr.split(':');
+            final h = int.parse(parts[0]);
+            final m = int.parse(parts[1]);
+            parsedDate = DateTime(
+              parsedDate.year,
+              parsedDate.month,
+              parsedDate.day,
+              h,
+              m,
+            );
+          } catch (_) {
+            // keep now() if fail
+          }
+
+          newActivities.add(
+            Activity(
+              activitiesId: index.toString(),
+              dayTripId: '00000000-0000-0000-0000-000000000001',
+              destination: destName,
+              description: item['description'] as String? ?? '',
+              activityImgUrl: imgUrl,
+              date: parsedDate,
+              allocatedBudget: allocatedBudget,
+              overspendAmount: allocatedBudget > 0 ? 0 : null,
+              status: 'pending',
+              startTime: startTimeStr,
+              endTime: item['endTime'] as String? ?? '10:00',
+              duration: item['duration'] as String? ?? '60 min',
+              activityCategory:
+                  item['activityCategory'] as String? ?? 'General',
+              isOverspend: false,
+            ),
+          );
+          index++;
+        }
+      } else {
+        throw Exception('No JSON found in response: $responseText');
+      }
+      return newActivities;
+    } catch (e) {
+      print('Service Error generating itinerary: $e');
+      return [
+        Activity(
+          activitiesId: '999',
+          dayTripId: 'error',
+          destination: 'Error Occurred',
+          description: e.toString(),
+          activityImgUrl: 'assets/logo.png',
+          date: DateTime.now(),
+          allocatedBudget: 0,
+          overspendAmount: null,
+          status: 'error',
+          startTime: '00:00',
+          endTime: '00:00',
+          duration: '',
+          activityCategory: 'Error',
+          isOverspend: false,
+        ),
+      ];
+    }
+  }
+
+  Future<bool> saveItinerary(
+    List<Activity> activities, {
+    required String destination,
+    required String datesText,
+    required String budgetText,
+  }) async {
+    if (activities.isEmpty) return false;
+
+    double budget = 0;
+    try {
+      budget = double.parse(budgetText.replaceAll(RegExp(r'[^0-9.]'), ''));
+    } catch (_) {}
+
+    try {
+      await _tripRepository.insertFullTrip(
+        destination: destination,
+        datesText: datesText,
+        totalBudget: budget,
+        activities: activities,
+      );
+      return true;
+    } catch (e) {
+      throw e;
+    }
+  }
+}

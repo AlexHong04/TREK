@@ -64,12 +64,8 @@ class HomeScreen extends StatelessWidget {
                   shape: BoxShape.circle,
                   border: Border.all(color: appTheme.teal_A700, width: 2),
                 ),
-                child: Center(
-                  child: Icon(
-                    Icons.change_history_rounded,
-                    color: appTheme.teal_A700,
-                    size: 18,
-                  ),
+                child: ClipOval(
+                  child: Image.asset('assets/logo.png', fit: BoxFit.cover),
                 ),
               ),
               const SizedBox(width: 10),
@@ -78,7 +74,7 @@ class HomeScreen extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
-                  fontFamily: 'Afacad',
+                  fontFamily: 'Inter',
                 ).copyWith(color: appTheme.teal_A700, fontSize: 16),
               ),
             ],
@@ -138,7 +134,7 @@ class HomeScreen extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Hi, ${viewModel.uiState.userName}',
+          'Hi, ${viewModel.uiState.displayName}',
           style: const TextStyle(
             fontSize: 30,
             fontWeight: FontWeight.w800,
@@ -191,7 +187,7 @@ class HomeScreen extends StatelessWidget {
         ),
       );
     }
-    // TODO: Show existing plan card
+    // Show existing plan card
     return const SizedBox.shrink();
   }
 
@@ -230,7 +226,13 @@ class HomeScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(14),
                 child: InkWell(
                   onTap: viewModel.uiState.hasPlan
-                      ? () => viewModel.onStartPlan(context)
+                      ? () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('No plan available yet.'),
+                            ),
+                          );
+                        }
                       : null,
                   borderRadius: BorderRadius.circular(14),
                   child: Padding(
@@ -242,7 +244,7 @@ class HomeScreen extends StatelessWidget {
                             const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
-                              fontFamily: 'Afacad',
+                              fontFamily: 'Inter',
                             ).copyWith(
                               color: viewModel.uiState.hasPlan
                                   ? appTheme.white_A700
@@ -276,7 +278,12 @@ class HomeScreen extends StatelessWidget {
                 color: appTheme.transparentCustom,
                 borderRadius: BorderRadius.circular(14),
                 child: InkWell(
-                  onTap: () => viewModel.onPlanNew(context),
+                  onTap: () {
+                    viewModel.prepareNewPlan();
+                    Navigator.of(
+                      context,
+                    ).pushNamed('/travelInformationInputScreen');
+                  },
                   borderRadius: BorderRadius.circular(14),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -286,7 +293,7 @@ class HomeScreen extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
-                          fontFamily: 'Afacad',
+                          fontFamily: 'Inter',
                         ).copyWith(color: appTheme.white_A700, height: 22 / 18),
                       ),
                     ),

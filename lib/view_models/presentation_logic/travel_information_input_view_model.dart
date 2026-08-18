@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../models/entities/activity.dart';
 import '../ui_state/travel_information_ui_state.dart';
 
 class TravelInformationInputViewModel extends ChangeNotifier {
@@ -43,18 +42,10 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     return null;
   }
 
-  Future<void> selectDateRange(BuildContext context) async {
-    final picked = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-    );
-
-    if (picked != null) {
-      dateController.text =
-          '${picked.start.toLocal().toString().split(' ')[0]} - ${picked.end.toLocal().toString().split(' ')[0]}';
-      notifyListeners();
-    }
+  void updateDateRange(DateTime start, DateTime end) {
+    dateController.text =
+        '${start.toLocal().toString().split(' ')[0]} - ${end.toLocal().toString().split(' ')[0]}';
+    notifyListeners();
   }
 
   void selectPreference(String label) {
@@ -67,7 +58,26 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> generateItinerary(BuildContext context) async {
+  void addWishlistItem(String item) {
+    final trimmed = item.trim();
+    if (trimmed.isEmpty) return;
+
+    if (!_uiState.wishlistItems.contains(trimmed)) {
+      _uiState = _uiState.copyWith(
+        wishlistItems: [..._uiState.wishlistItems, trimmed],
+      );
+    }
+    wishlistController.clear();
+    notifyListeners();
+  }
+
+  void removeWishlistItem(String item) {
+    final updatedList = List<String>.from(_uiState.wishlistItems)..remove(item);
+    _uiState = _uiState.copyWith(wishlistItems: updatedList);
+    notifyListeners();
+  }
+
+  String? generateItinerary() {
     final String? destinationError = validateDestination(
       destinationController.text,
     );
@@ -75,21 +85,21 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     final String? budgetError = validateBudget(budgetController.text);
 
     if (destinationError != null || dateError != null || budgetError != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            destinationError ??
-                dateError ??
-                budgetError ??
-                'Please complete the form',
-          ),
-        ),
-      );
-      return;
+      return destinationError ??
+          dateError ??
+          budgetError ??
+          'Please complete the form';
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Itinerary generation started!')),
-    );
+    return null; // Return null if success
+  }
+
+  @override
+  void dispose() {
+    destinationController.dispose();
+    dateController.dispose();
+    budgetController.dispose();
+    wishlistController.dispose();
+    super.dispose();
   }
 }

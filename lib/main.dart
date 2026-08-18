@@ -3,15 +3,18 @@ import 'package:flutter/services.dart';
 import 'models/configurations/supabase_config.dart';
 import 'models/configurations/gemini_api_config.dart';
 
-import 'views/day_itinerary_detail_screen.dart';
+import 'views/whole_itinerary_detail_screen.dart';
 import 'views/home_screen.dart';
 import 'views/travel_information_input_screen.dart';
+import 'views/activity_screen.dart';
 
 class AppRoutes {
   static const String homeScreen = '/homeScreen';
   static const String travelInformationInputScreen =
       '/travelInformationInputScreen';
-  static const String dayItineraryDetailScreen = '/dayItineraryDetailScreen';
+  static const String wholeItineraryDetailScreen =
+      '/wholeItineraryDetailScreen';
+  static const String activityScreen = '/activityScreen';
   static const String initialRoute = homeScreen;
 }
 
@@ -60,8 +63,9 @@ class MyApp extends StatelessWidget {
         AppRoutes.homeScreen: (context) => HomeScreen.builder(context),
         AppRoutes.travelInformationInputScreen: (context) =>
             TravelInformationInputScreen.builder(context),
-        AppRoutes.dayItineraryDetailScreen: (context) =>
-            DayItineraryDetailScreen.builder(context),
+        AppRoutes.wholeItineraryDetailScreen: (context) =>
+            WholeItineraryDetailScreen.builder(context),
+        AppRoutes.activityScreen: (context) => const ActivityScreen(),
       },
     );
   }

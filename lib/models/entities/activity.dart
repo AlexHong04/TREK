@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 class Activity {
   final String activitiesId;
   final String destination;
@@ -52,11 +50,21 @@ class Activity {
       dayTripId: json['day_trip_id'],
     );
   }
-}
 
-class PreferenceItemModel {
-  PreferenceItemModel({required this.label, required this.icon});
-
-  final String label;
-  final IconData icon;
+  Map<String, dynamic> toJson() {
+    return {
+      // 'activities_id': activitiesId, // Let Supabase auto-generate if possible, or include it
+      'destination': destination,
+      'description': description,
+      'activity_img_url': activityImgUrl,
+      'date': date.toIso8601String(),
+      'allocated_budget': allocatedBudget,
+      'status': status,
+      'start_time': startTime,
+      'end_time': endTime,
+      'duration': duration,
+      'activity_category': activityCategory,
+      'day_trip_id': dayTripId,
+    };
+  }
 }

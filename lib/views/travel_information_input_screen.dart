@@ -41,34 +41,60 @@ class _TravelInformationInputScreenState
                   children: [
                     const SizedBox(height: 22.0),
                     _buildCustomTextField(
-                      sectionTitle: 'WISHLIST',
-                      hintText: 'Total Trip Budget (\$)',
-                      prefixIcon: Icons.favorite,
-                      controller: viewModel.wishlistController,
-                    ),
-                    const SizedBox(height: 22.0),
-                    _buildCustomTextField(
-                      sectionTitle: 'WHERE TO?',
-                      hintText: 'City, Country',
+                      sectionTitle: 'DESTINATION',
+                      hintText: 'City',
                       prefixIcon: Icons.location_on_outlined,
                       controller: viewModel.destinationController,
                       validator: viewModel.validateDestination,
                     ),
                     const SizedBox(height: 22.0),
                     _buildCustomTextField(
-                      sectionTitle: 'Dates',
+                      sectionTitle: 'WISHLIST',
+                      hintText: 'Search wishlist...',
+                      prefixIcon: Icons.favorite,
+                      controller: viewModel.wishlistController,
+                      onFieldSubmitted: viewModel.addWishlistItem,
+                      bottomWidget: viewModel.uiState.wishlistItems.isEmpty
+                          ? null
+                          : Wrap(
+                              spacing: 8.0,
+                              runSpacing: 8.0,
+                              children: viewModel.uiState.wishlistItems
+                                  .map(
+                                    (item) => _buildWishlistChip(
+                                      item,
+                                      () => viewModel.removeWishlistItem(item),
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                    ),
+                    const SizedBox(height: 22.0),
+                    _buildCustomTextField(
+                      sectionTitle: 'WHEN?',
                       hintText: 'Select dates',
                       prefixIcon: Icons.calendar_today_outlined,
                       controller: viewModel.dateController,
                       readOnly: true,
-                      onTap: () => viewModel.selectDateRange(context),
+                      onTap: () async {
+                        final picked = await showDateRangePicker(
+                          context: context,
+                          firstDate: DateTime.now(),
+                          lastDate: DateTime.now().add(
+                            const Duration(days: 365),
+                          ),
+                        );
+                        if (picked != null) {
+                          viewModel.updateDateRange(picked.start, picked.end);
+                        }
+                      },
                       validator: viewModel.validateDate,
                     ),
                     const SizedBox(height: 22.0),
                     _buildCustomTextField(
                       sectionTitle: 'TRIP BUDGET',
                       hintText: 'Total Trip Budget (\$)',
-                      prefixIcon: Icons.payments_outlined,
+                      prefixIcon: Icons.account_balance_wallet_outlined,
                       controller: viewModel.budgetController,
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
@@ -98,8 +124,10 @@ class _TravelInformationInputScreenState
     TextEditingController? controller,
     String? Function(String?)? validator,
     VoidCallback? onTap,
+    Function(String)? onFieldSubmitted,
     bool readOnly = false,
     TextInputType? keyboardType,
+    Widget? bottomWidget,
   }) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -133,6 +161,7 @@ class _TravelInformationInputScreenState
             autovalidateMode: AutovalidateMode.onUserInteraction,
             readOnly: readOnly,
             onTap: onTap,
+            onFieldSubmitted: onFieldSubmitted,
             keyboardType: keyboardType,
             style: const TextStyle(
               fontSize: 16,
@@ -182,6 +211,10 @@ class _TravelInformationInputScreenState
             ),
             validator: validator,
           ),
+          if (bottomWidget != null) ...[
+            const SizedBox(height: 12.0),
+            bottomWidget,
+          ],
         ],
       ),
     );
@@ -243,7 +276,7 @@ class _TravelInformationInputScreenState
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
-                  fontFamily: 'Afacad',
+                  fontFamily: 'Inter',
                 ).copyWith(height: 1.22),
               ),
             ],
@@ -340,6 +373,8 @@ class _TravelInformationInputScreenState
           const SizedBox(height: 12.0),
           Row(
             children: [
+              Expanded(child: _buildEmergencyFundButton(viewModel, '0 %')),
+              const SizedBox(width: 12.0),
               Expanded(child: _buildEmergencyFundButton(viewModel, '5 %')),
               const SizedBox(width: 12.0),
               Expanded(child: _buildEmergencyFundButton(viewModel, '10 %')),
@@ -412,7 +447,24 @@ class _TravelInformationInputScreenState
           child: InkWell(
             onTap: () {
               if (_formKey.currentState?.validate() ?? false) {
-                viewModel.generateItinerary(context);
+                final error = viewModel.generateItinerary();
+                if (error != null) {
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(error)));
+                } else {
+                  Navigator.pushNamed(
+                    context,
+                    AppRoutes.wholeItineraryDetailScreen,
+                    arguments: {
+                      'destination': viewModel.destinationController.text,
+                      'dates': viewModel.dateController.text,
+                      'budget': viewModel.budgetController.text,
+                      'preference': viewModel.uiState.selectedPreference,
+                      'emergencyFund': viewModel.uiState.selectedEmergencyFund,
+                    },
+                  );
+                }
               }
             },
             borderRadius: BorderRadius.circular(14),
@@ -428,11 +480,11 @@ class _TravelInformationInputScreenState
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'Generate Itinerary',
+                    'Generate trip',
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
-                      fontFamily: 'Afacad',
+                      fontFamily: 'Inter',
                     ).copyWith(color: appTheme.white_A700, height: 22 / 18),
                   ),
                 ],
@@ -440,6 +492,39 @@ class _TravelInformationInputScreenState
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildWishlistChip(String item, VoidCallback onRemove) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0FDFA), // Light teal background
+        borderRadius: BorderRadius.circular(20.0),
+        border: Border.all(
+          color: const Color(0xFF14BBA6), // Teal border
+          width: 1.5,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            item,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              fontFamily: 'Inter',
+              color: Color(0xFF14BBA6),
+            ),
+          ),
+          const SizedBox(width: 6.0),
+          GestureDetector(
+            onTap: onRemove,
+            child: Icon(Icons.close, size: 16.0, color: appTheme.blue_gray_300),
+          ),
+        ],
       ),
     );
   }

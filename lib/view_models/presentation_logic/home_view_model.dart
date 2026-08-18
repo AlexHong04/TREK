@@ -1,19 +1,13 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
 import '../ui_state/home_ui_state.dart';
 
 class HomeViewModel extends ChangeNotifier {
-  HomeUiState _uiState = const HomeUiState();
+  final HomeUiState _uiState = const HomeUiState(email: '');
   HomeUiState get uiState => _uiState;
 
-  void onStartPlan(BuildContext context) {
-    // Navigate to existing plan details
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('No plan available yet.')));
-  }
-
-  void onPlanNew(BuildContext context) {
-    Navigator.of(context).pushNamed('/travelInformationInputScreen');
+  // Placeholder for future logic before navigating
+  void prepareNewPlan() {
+    // Initialize or reset states if needed
   }
 }
