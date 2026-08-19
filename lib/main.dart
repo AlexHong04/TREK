@@ -99,9 +99,40 @@ class AppColors {
   static const Color blueGray50 = Color(0xFFECEEF0);
 
   // Accent Colors
-  static const Color amber200 = Color(0xFFFDE68A);
-  static const Color lime900 = Color(0xFF937600);
-  static const Color errorRed = Color(0xFFEF4444);
+  // Activity Budget Usage
+  static const Color amber200 = Color(0xFFFFF0BE); // Budget Tag Background in Activity
+  static const Color lime900 = Color(0xFFD58000); // Budget Tag Text in Activity
+
+  // Itinerary Day Header Budget Tag - Alert
+  static const Color budgetAlertBg = Color(0xFFFEE2E2);
+  static const Color budgetAlertStroke = Color(0xFFFECACA);
+  static const Color budgetAlertText = Color(0xFF991B1B);
+  static const Color errorRed = Color(0xFFEF4444); // Usage Progress Bar Alert
+
+  // Itinerary Day Header Budget Tag - Good
+  static const Color greenProgress = Color(0xFF35C460); // Usage Progress Bar Good
+  static const Color goodPercentageBg = Color(0xFFECFDF5);
+  static const Color goodPercentageStroke = Color(0xFFA7F3D0);
+  static const Color goodPercentageText = Color(0xFF047857);
+
+  // Itinerary Day Header Budget Tag - Medium
+  static const Color orangeProgress = Color(0xFFFDE68A); // Usage Progress Bar Normal
+  static const Color normalPercentageBg = Color(0xFFFFEFD4);
+  static const Color normalPercentageStroke = Color(0xFFFFE0AB);
+  static const Color normalPercentageText = Color(0xFFDC8C03);
+
+  // Activity Expense Usage
+  static const Color expenseOverspendBg = Color(0xFFFFC6BD);
+  static const Color expenseOverspendText = Color(0xFFD50000);
+  static const Color expenseBg = Color(0xFFBEE2FF);
+  static const Color expenseText = Color(0xFF0074D3);
+
+  // Budget Popup Usage
+  static const Color redButton = Color(0xFFE23C3C);
+  static const Color warningPopupHeader = Color(0xFFF59E0B);
+  static const Color popupCreamStroke = Color(0xFFFED7AA);
+  static const Color popupCreamBg = Color(0xFFFFF7ED);
+  static const Color popupWarningMsg = Color(0xFFFF645C);
 
   // Neutrals
   static const Color white = Color(0xFFFFFFFF);
@@ -150,11 +181,43 @@ class AppThemeData {
 
   final Color black_900_0c = AppColors.black900_0c;
 
+  final Color grey200 = AppColors.gray200;
+  final Color grey100 = AppColors.gray100;
+
+  // Activity Budget Usage
   final Color amber_200 = AppColors.amber200;
   final Color lime_900 = AppColors.lime900;
 
-  final Color grey200 = AppColors.gray200;
-  final Color grey100 = AppColors.gray100;
+  // Itinerary Day Header Budget Tag - Alert
+  final Color wholeAlertBudgetBg = AppColors.budgetAlertBg;
+  final Color wholeAlertBudgetStroke = AppColors.budgetAlertStroke;
+  final Color wholeAlertBudgetText = AppColors.budgetAlertText;
+  final Color wholeRedBudgetProgress = AppColors.errorRed;
+
+  // Itinerary Day Header Budget Tag - Good
+  final Color wholeGoodBudgetProgress = AppColors.greenProgress;
+  final Color wholeGoodBudgetStroke = AppColors.goodPercentageStroke;
+  final Color wholeGoodBudgetText = AppColors.goodPercentageText;
+  final Color wholeGoodBudgetBg = AppColors.goodPercentageBg;
+
+  // Itinerary Day Header Budget Tag - Medium
+  final Color wholeBudgetProgress = AppColors.orangeProgress;
+  final Color wholeBudgetStroke = AppColors.normalPercentageStroke;
+  final Color wholeBudgetText = AppColors.normalPercentageText;
+  final Color wholeBudgetBg = AppColors.normalPercentageBg;
+
+  // Activity Expense Usage
+  final Color expenseOverspendBg = AppColors.expenseOverspendBg;
+  final Color expenseOverspendText = AppColors.expenseOverspendText;
+  static Color expenseBg = AppColors.expenseBg;
+  static Color expenseText = AppColors.expenseText;
+
+  // Budget Popup Usage
+  final Color redButton = AppColors.redButton;
+  final Color warningPopupHeader = AppColors.warningPopupHeader;
+  final Color popupCreamStroke = AppColors.popupCreamStroke;
+  final Color popupCreamBg = AppColors.popupCreamBg;
+  final Color popupWarningMsg = AppColors.popupWarningMsg;
 }
 
 final appTheme = AppThemeData();
