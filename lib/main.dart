@@ -99,6 +99,9 @@ class AppColors {
   static const Color blueGray50 = Color(0xFFECEEF0);
 
   // Accent Colors
+  // Overspend Tag
+  static const Color overspendTag = Color(0xFFFF0000);
+
   // Activity Budget Usage
   static const Color amber200 = Color(0xFFFFF0BE); // Budget Tag Background in Activity
   static const Color lime900 = Color(0xFFD58000); // Budget Tag Text in Activity
@@ -205,6 +208,9 @@ class AppThemeData {
   final Color wholeBudgetStroke = AppColors.normalPercentageStroke;
   final Color wholeBudgetText = AppColors.normalPercentageText;
   final Color wholeBudgetBg = AppColors.normalPercentageBg;
+
+  // Overspend Tag
+  final Color overspendTag = AppColors.overspendTag;
 
   // Activity Expense Usage
   final Color expenseOverspendBg = AppColors.expenseOverspendBg;
