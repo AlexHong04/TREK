@@ -41,7 +41,7 @@ class GeminiApiConfig {
     - Consecutive activities MUST be close to each other in real life to minimize travel time and make routing practical.
     
     Format your response as a valid JSON array of activities, where each activity has the following fields:
-    - "destination": (String) Name of the place/activity
+    - "destination": (String) Specify the exact name of the place or activity. Be specific rather than using a general category. For example, instead of "nasi lemak," provide the specific restaurant name where the user should eat nasi lemak, such as "Nasi Lemak Wanjo."
     - "imageKeyword": (String) IF it's a famous landmark, use its exact name (e.g. "Petronas Towers"). IF it's a specific restaurant/cafe, DO NOT use its name; instead, use the generic famous food/drink type (e.g. "Nasi Lemak", "Latte Art", "Seafood") so the generated image matches the activity context perfectly.
     - "description": (String) Short description
     - "allocatedBudget": (double) Estimated cost
