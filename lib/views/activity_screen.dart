@@ -1,3 +1,5 @@
+import '../theme/app_theme.dart';
+import '../theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -5,7 +7,6 @@ import 'package:provider/provider.dart';
 import '../models/entities/activity.dart';
 import '../view_models/presentation_logic/activity_view_model.dart';
 import '../view_models/ui_state/activity_ui_state.dart';
-import '../main.dart';
 
 class ActivityScreen extends StatefulWidget {
   const ActivityScreen({super.key});
