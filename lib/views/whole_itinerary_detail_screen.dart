@@ -1,3 +1,5 @@
+import '../theme/app_theme.dart';
+import '../theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -184,26 +186,26 @@ class _WholeItineraryDetailScreenState
                   vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFCCFBF1), // Teal 50
+                  color: appTheme.teal_50, // Teal 50
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   '${viewModel.uiState.activities.length} Stops Planned',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
                     fontFamily: 'Inter',
-                    color: Color(0xFF0F766E), // Teal 700
+                    color: appTheme.teal_700, // Teal 700
                   ),
                 ),
               ),
               Text(
                 'RM${viewModel.budgetText}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w800,
                   fontFamily: 'Inter',
-                  color: Color(0xFF14BBA6), // Teal A700
+                  color: appTheme.teal_A700, // Teal A700
                 ),
               ),
             ],
@@ -341,7 +343,7 @@ class _WholeItineraryDetailScreenState
           ),
         ),
         if (!isLast)
-          Container(width: 2.0, height: 380.0, color: const Color(0xFFCBD5E1)),
+          Container(width: 2.0, height: 380.0, color: appTheme.blue_gray_300),
       ],
     );
   }
@@ -522,7 +524,7 @@ class _WholeItineraryDetailScreenState
                 if (activity.duration != null && activity.duration!.isNotEmpty)
                   _buildChip(
                     label: activity.duration!,
-                    backgroundColor: const Color(0xFF64FFDA), // Neon cyan/green
+                    backgroundColor: appTheme.teal_A200, // Neon cyan/green
                     textColor: AppColors.teal700,
                   ),
                 _buildChip(
@@ -534,8 +536,8 @@ class _WholeItineraryDetailScreenState
                     activity.overspendAmount != null)
                   _buildChip(
                     label: 'RM${activity.overspendAmount!.toStringAsFixed(0)}',
-                    backgroundColor: const Color(0xFFFFCDD2), // Light Red
-                    textColor: const Color(0xFFD32F2F), // Dark Red
+                    backgroundColor: appTheme.wholeAlertBudgetBg, // Light Red
+                    textColor: appTheme.wholeAlertBudgetText, // Dark Red
                   ),
               ],
             ),
