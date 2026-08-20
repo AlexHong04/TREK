@@ -22,7 +22,7 @@ class GeminiApiConfig {
   }) async {
     final prompt =
         '''
-    You are an expert travel planner. Please help me generate a travel itinerary.
+    You are an expert travel planner. Please help me generate a travel itinerary in Malaysia.
     Details:
     - Destination: $destination
     - Dates: $dates
