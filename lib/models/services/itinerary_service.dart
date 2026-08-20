@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+
 import '../entities/activity.dart';
 import '../configurations/gemini_api_config.dart';
 import '../repository/trip_repository.dart';
@@ -42,32 +43,11 @@ class ItineraryService {
           final imageKeyword = item['imageKeyword'] as String? ?? destName;
 
           String imgUrl = '';
+          String finalDestinationTitle = destName;
           final query = Uri.encodeComponent(imageKeyword);
 
-          // 1. First priority: Wikimedia Commons (Richest media library for specific restaurants, streets, food)
-          try {
-            final commonsUrl = Uri.parse(
-              'https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=$query&gsrnamespace=6&gsrlimit=1&prop=imageinfo&iiprop=url&iiurlwidth=600&format=json&origin=*',
-            );
-            final commonsRes = await http.get(commonsUrl);
-            if (commonsRes.statusCode == 200) {
-              final data = jsonDecode(commonsRes.body);
-              final pages = data['query']?['pages'] as Map<String, dynamic>?;
-              if (pages != null && pages.isNotEmpty) {
-                final page = pages.values.first;
-                if (page.containsKey('imageinfo')) {
-                  final imageInfo = page['imageinfo'] as List;
-                  if (imageInfo.isNotEmpty &&
-                      imageInfo[0]['thumburl'] != null) {
-                    imgUrl = imageInfo[0]['thumburl'] as String;
-                  }
-                }
-              }
-            }
-          } catch (_) {}
-
-          // 2. Second priority: English Wikipedia (Good for big landmarks and cities)
-          if (imgUrl.isEmpty) {
+          // 1. FREE TIER PRIORITY: English Wikipedia (Good for Title Accuracy and Landmarks)
+          if (finalDestinationTitle == destName) {
             try {
               final wikiUrl = Uri.parse(
                 'https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=$query&gsrlimit=1&prop=pageimages&format=json&pithumbsize=600&origin=*',
@@ -78,8 +58,39 @@ class ItineraryService {
                 final pages = data['query']?['pages'] as Map<String, dynamic>?;
                 if (pages != null && pages.isNotEmpty) {
                   final page = pages.values.first;
-                  if (page.containsKey('thumbnail')) {
+                  // UPDATE Title Accuracy: Swap with Wikipedia's official article name!
+                  if (page['title'] != null &&
+                      !page['title'].toString().startsWith('File:')) {
+                    finalDestinationTitle = page['title'];
+                  }
+                  if (page.containsKey('thumbnail') && imgUrl.isEmpty) {
                     imgUrl = page['thumbnail']['source'] as String? ?? '';
+                  }
+                }
+              }
+            } catch (_) {}
+          }
+
+          // 2. FREE TIER PRIORITY: Wikimedia Commons (Richest media library for specific restaurants, streets, food)
+          if (imgUrl.isEmpty) {
+            try {
+              // Use the corrected title for better media search
+              final commonsQuery = Uri.encodeComponent(finalDestinationTitle);
+              final commonsUrl = Uri.parse(
+                'https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=$commonsQuery&gsrnamespace=6&gsrlimit=1&prop=imageinfo&iiprop=url&iiurlwidth=600&format=json&origin=*',
+              );
+              final commonsRes = await http.get(commonsUrl);
+              if (commonsRes.statusCode == 200) {
+                final data = jsonDecode(commonsRes.body);
+                final pages = data['query']?['pages'] as Map<String, dynamic>?;
+                if (pages != null && pages.isNotEmpty) {
+                  final page = pages.values.first;
+                  if (page.containsKey('imageinfo')) {
+                    final imageInfo = page['imageinfo'] as List;
+                    if (imageInfo.isNotEmpty &&
+                        imageInfo[0]['thumburl'] != null) {
+                      imgUrl = imageInfo[0]['thumburl'] as String;
+                    }
                   }
                 }
               }
@@ -117,7 +128,7 @@ class ItineraryService {
             Activity(
               activitiesId: index.toString(),
               dayTripId: '00000000-0000-0000-0000-000000000001',
-              destination: destName,
+              destination: finalDestinationTitle,
               description: item['description'] as String? ?? '',
               activityImgUrl: imgUrl,
               date: parsedDate,
@@ -183,7 +194,7 @@ class ItineraryService {
       );
       return true;
     } catch (e) {
-      throw e;
+      rethrow;
     }
   }
 }
