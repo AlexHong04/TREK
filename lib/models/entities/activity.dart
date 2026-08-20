@@ -53,7 +53,7 @@ class Activity {
 
   Map<String, dynamic> toJson() {
     return {
-      // 'activities_id': activitiesId, // Let Supabase auto-generate if possible, or include it
+      'activities_id': activitiesId,
       'destination': destination,
       'description': description,
       'activity_img_url': activityImgUrl,
