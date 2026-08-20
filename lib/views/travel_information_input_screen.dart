@@ -1,9 +1,13 @@
+import '../theme/app_theme.dart';
+import '../theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../view_models/presentation_logic/travel_information_input_view_model.dart';
 
 import '../main.dart';
+import '../widgets/custom_app_bar.dart';
+import '../widgets/custom_text_field.dart';
 
 class TravelInformationInputScreen extends StatefulWidget {
   const TravelInformationInputScreen({super.key});
@@ -30,7 +34,7 @@ class _TravelInformationInputScreenState
 
     return Scaffold(
       backgroundColor: appTheme.gray_50_02,
-      appBar: _buildAppBar(context),
+      appBar: const CustomAppBar(title: 'Travel Information'),
       body: Form(
         key: _formKey,
         child: Column(
@@ -40,7 +44,7 @@ class _TravelInformationInputScreenState
                 child: Column(
                   children: [
                     const SizedBox(height: 22.0),
-                    _buildCustomTextField(
+                    CustomTextField(
                       sectionTitle: 'DESTINATION',
                       hintText: 'City',
                       prefixIcon: Icons.location_on_outlined,
@@ -48,7 +52,7 @@ class _TravelInformationInputScreenState
                       validator: viewModel.validateDestination,
                     ),
                     const SizedBox(height: 22.0),
-                    _buildCustomTextField(
+                    CustomTextField(
                       sectionTitle: 'WISHLIST',
                       hintText: 'Search wishlist...',
                       prefixIcon: Icons.favorite,
@@ -70,7 +74,7 @@ class _TravelInformationInputScreenState
                             ),
                     ),
                     const SizedBox(height: 22.0),
-                    _buildCustomTextField(
+                    CustomTextField(
                       sectionTitle: 'WHEN?',
                       hintText: 'Select dates',
                       prefixIcon: Icons.calendar_today_outlined,
@@ -91,7 +95,7 @@ class _TravelInformationInputScreenState
                       validator: viewModel.validateDate,
                     ),
                     const SizedBox(height: 22.0),
-                    _buildCustomTextField(
+                    CustomTextField(
                       sectionTitle: 'TRIP BUDGET',
                       hintText: 'Total Trip Budget (\$)',
                       prefixIcon: Icons.account_balance_wallet_outlined,
@@ -111,142 +115,6 @@ class _TravelInformationInputScreenState
               ),
             ),
             _buildBottomSection(viewModel),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCustomTextField({
-    required String sectionTitle,
-    required String hintText,
-    required IconData prefixIcon,
-    TextEditingController? controller,
-    String? Function(String?)? validator,
-    VoidCallback? onTap,
-    Function(String)? onFieldSubmitted,
-    bool readOnly = false,
-    TextInputType? keyboardType,
-    Widget? bottomWidget,
-  }) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24.0),
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
-      decoration: BoxDecoration(
-        color: appTheme.white_A700,
-        borderRadius: BorderRadius.circular(16.0),
-        border: Border.all(color: appTheme.gray_100, width: 1.0),
-        boxShadow: [
-          BoxShadow(
-            color: appTheme.black_900_0c,
-            offset: const Offset(0, 1),
-            blurRadius: 8,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            sectionTitle,
-            style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              fontFamily: 'Inter',
-              color: AppColors.blueGray300,
-            ).copyWith(letterSpacing: 1, height: 1.2),
-          ),
-          TextFormField(
-            controller: controller,
-            autovalidateMode: AutovalidateMode.onUserInteraction,
-            readOnly: readOnly,
-            onTap: onTap,
-            onFieldSubmitted: onFieldSubmitted,
-            keyboardType: keyboardType,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w400,
-              fontFamily: 'Inter',
-              color: AppColors.gray800,
-            ),
-            decoration: InputDecoration(
-              hintText: hintText,
-              hintStyle: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w400,
-                fontFamily: 'Inter',
-                color: AppColors.gray800,
-              ).copyWith(color: appTheme.blue_gray_300),
-              prefixIcon: Icon(prefixIcon),
-              prefixIconConstraints: const BoxConstraints(
-                minWidth: 44.0,
-                minHeight: 34.0,
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                vertical: 6.0,
-                horizontal: 12.0,
-              ),
-              filled: true,
-              fillColor: appTheme.white_A700,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12.0),
-                borderSide: BorderSide(color: appTheme.gray_200, width: 1.0),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12.0),
-                borderSide: BorderSide(color: appTheme.gray_200, width: 1.0),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12.0),
-                borderSide: BorderSide(color: appTheme.teal_A700, width: 1.0),
-              ),
-              errorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12.0),
-                borderSide: BorderSide(color: appTheme.colorFFEF44, width: 1.0),
-              ),
-              focusedErrorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12.0),
-                borderSide: BorderSide(color: appTheme.colorFFEF44, width: 1.0),
-              ),
-            ),
-            validator: validator,
-          ),
-          if (bottomWidget != null) ...[
-            const SizedBox(height: 12.0),
-            bottomWidget,
-          ],
-        ],
-      ),
-    );
-  }
-
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
-    return AppBar(
-      backgroundColor: appTheme.gray_50_02,
-      elevation: 0,
-      automaticallyImplyLeading: false,
-      toolbarHeight: 68,
-      titleSpacing: 0,
-      bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(1),
-        child: Container(height: 1, color: appTheme.gray_50),
-      ),
-      title: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 20.0),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-              child: Text(
-                'Travel Information',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontFamily: 'Inter',
-                  fontSize: 20,
-                  color: appTheme.teal_A700,
-                ).copyWith(height: 1.2),
-              ),
-            ),
           ],
         ),
       ),
@@ -297,12 +165,12 @@ class _TravelInformationInputScreenState
                   ),
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? const Color(0xFFF0FDFA)
+                        ? appTheme.gray_50_01
                         : appTheme.transparentCustom,
                     borderRadius: BorderRadius.circular(20.0),
                     border: Border.all(
                       color: isSelected
-                          ? const Color(0xFF14BBA6)
+                          ? appTheme.teal_A700
                           : appTheme.gray_200,
                       width: isSelected ? 2.0 : 1.0,
                     ),
@@ -326,7 +194,7 @@ class _TravelInformationInputScreenState
                               fontFamily: 'Inter',
                             ).copyWith(
                               color: isSelected
-                                  ? const Color(0xFF14BBA6)
+                                  ? appTheme.teal_A700
                                   : appTheme.blue_gray_700,
                               height: 1.21,
                             ),
@@ -395,10 +263,10 @@ class _TravelInformationInputScreenState
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12.0),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFF0FDFA) : appTheme.white_A700,
+          color: isSelected ? appTheme.gray_50_01 : appTheme.white_A700,
           borderRadius: BorderRadius.circular(20.0),
           border: Border.all(
-            color: isSelected ? const Color(0xFF14BBA6) : appTheme.gray_200,
+            color: isSelected ? appTheme.teal_A700 : appTheme.gray_200,
             width: isSelected ? 2.0 : 1.0,
           ),
         ),
@@ -406,9 +274,7 @@ class _TravelInformationInputScreenState
         child: Text(
           label,
           style: const TextStyle(fontSize: 14, fontFamily: 'Inter').copyWith(
-            color: isSelected
-                ? const Color(0xFF14BBA6)
-                : appTheme.blue_gray_700,
+            color: isSelected ? appTheme.teal_A700 : appTheme.blue_gray_700,
             height: 1.21,
           ),
         ),
@@ -500,10 +366,10 @@ class _TravelInformationInputScreenState
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
       decoration: BoxDecoration(
-        color: const Color(0xFFF0FDFA), // Light teal background
+        color: appTheme.gray_50_01, // Light teal background
         borderRadius: BorderRadius.circular(20.0),
         border: Border.all(
-          color: const Color(0xFF14BBA6), // Teal border
+          color: appTheme.teal_A700, // Teal border
           width: 1.5,
         ),
       ),
@@ -512,11 +378,11 @@ class _TravelInformationInputScreenState
         children: [
           Text(
             item,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w700,
               fontFamily: 'Inter',
-              color: Color(0xFF14BBA6),
+              color: appTheme.teal_A700,
             ),
           ),
           const SizedBox(width: 6.0),
