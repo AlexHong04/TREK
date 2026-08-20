@@ -80,6 +80,7 @@ class AppThemeData {
   // Budget Popup Usage
   final Color redButton = AppColors.redButton;
   final Color warningPopupHeader = AppColors.warningPopupHeader;
+  final Color popupBrownBudget = AppColors.popupBrownBudget;
   final Color popupCreamStroke = AppColors.popupCreamStroke;
   final Color popupCreamBg = AppColors.popupCreamBg;
   final Color popupWarningMsg = AppColors.popupWarningMsg;

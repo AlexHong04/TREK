@@ -68,6 +68,7 @@ class AppColors {
   // Budget Popup Usage
   static const Color redButton = Color(0xFFE23C3C);
   static const Color warningPopupHeader = Color(0xFFF59E0B);
+  static const Color popupBrownBudget = Color(0xFF92400E);
   static const Color popupCreamStroke = Color(0xFFFED7AA);
   static const Color popupCreamBg = Color(0xFFFFF7ED);
   static const Color popupWarningMsg = Color(0xFFFF645C);
