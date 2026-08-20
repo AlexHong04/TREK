@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import '../entities/activity.dart';
 import '../configurations/gemini_api_config.dart';
 import '../repository/trip_repository.dart';
+import '../../utils/id_generator.dart';
 
 class ItineraryService {
   final TripRepository _tripRepository = TripRepository();
@@ -34,8 +35,17 @@ class ItineraryService {
         final jsonString = jsonMatch.group(0)!;
         final List<dynamic> jsonList = jsonDecode(jsonString);
         int index = 1;
+        String currentActId = 'AC0000';
+        String currentDayTripId = IdGenerator.generateNextFormattedId(
+          'DT',
+          null,
+        );
 
         for (var item in jsonList) {
+          currentActId = IdGenerator.generateNextFormattedId(
+            'AC',
+            currentActId,
+          );
           final allocatedBudget =
               (item['allocatedBudget'] as num?)?.toDouble() ?? 0.0;
 
@@ -126,8 +136,8 @@ class ItineraryService {
 
           newActivities.add(
             Activity(
-              activitiesId: index.toString(),
-              dayTripId: '00000000-0000-0000-0000-000000000001',
+              activitiesId: currentActId,
+              dayTripId: currentDayTripId,
               destination: finalDestinationTitle,
               description: item['description'] as String? ?? '',
               activityImgUrl: imgUrl,
@@ -153,8 +163,8 @@ class ItineraryService {
       print('Service Error generating itinerary: $e');
       return [
         Activity(
-          activitiesId: '999',
-          dayTripId: 'error',
+          activitiesId: 'AC9999',
+          dayTripId: 'DT9999',
           destination: 'Error Occurred',
           description: e.toString(),
           activityImgUrl: 'assets/logo.png',
