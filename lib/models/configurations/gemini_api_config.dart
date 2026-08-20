@@ -10,7 +10,7 @@ class GeminiApiConfig {
   static late final GenerativeModel _model;
 
   static void initialize() {
-    _model = GenerativeModel(model: 'gemini-pro', apiKey: _apiKey);
+    _model = GenerativeModel(model: 'gemini-3.6-flash', apiKey: _apiKey);
   }
 
   /// Ask Gemini for itinerary
@@ -58,7 +58,7 @@ class GeminiApiConfig {
     while (retries > 0) {
       try {
         final url = Uri.parse(
-          'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$_apiKey',
+          'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=$_apiKey',
         );
 
         final response = await http.post(
