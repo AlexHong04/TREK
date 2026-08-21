@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../models/entities/activity.dart';
 import '../view_models/presentation_logic/whole_itinerary_detail_view_model.dart';
 import '../main.dart';
+import '../widgets/custom_app_bar.dart';
 
 class WholeItineraryDetailScreen extends StatefulWidget {
   const WholeItineraryDetailScreen({super.key});
@@ -41,7 +42,7 @@ class _WholeItineraryDetailScreenState
     final viewModel = context.watch<WholeItineraryDetailViewModel>();
     return Scaffold(
       backgroundColor: appTheme.gray_50_03,
-      appBar: _buildAppBar(context),
+      appBar: const CustomAppBar(title: 'Itinerary Plan'),
       body: Column(
         children: [
           Expanded(
@@ -64,43 +65,6 @@ class _WholeItineraryDetailScreenState
           ),
           _buildBottomSection(context, viewModel),
         ],
-      ),
-    );
-  }
-
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
-    return AppBar(
-      backgroundColor: appTheme.white_A700,
-      elevation: 0,
-      automaticallyImplyLeading: false,
-      leading: IconButton(
-        icon: Icon(Icons.arrow_back, color: appTheme.teal_A700),
-        onPressed: () => Navigator.maybePop(context),
-      ),
-      toolbarHeight: 60,
-      titleSpacing: 0,
-      bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(1),
-        child: Container(height: 1, color: appTheme.blue_gray_50),
-      ),
-      title: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-              child: Text(
-                'Vibrant Odyssey',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontFamily: 'Inter',
-                  fontSize: 18,
-                  color: appTheme.teal_A700,
-                ).copyWith(height: 1.2),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -223,7 +187,7 @@ class _WholeItineraryDetailScreenState
           child: Text(
             viewModel.destinationTitle.toUpperCase(),
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 16,
               fontWeight: FontWeight.w800,
               fontFamily: 'Inter',
               color: appTheme.teal_800,
@@ -326,11 +290,12 @@ class _WholeItineraryDetailScreenState
                     ).copyWith(height: 1.2),
                   ),
                   GestureDetector(
+                    behavior: HitTestBehavior.opaque,
                     onTap: onRemove,
                     child: Icon(
-                      Icons.cancel_outlined,
+                      Icons.delete_outline,
                       color: appTheme.errorRed,
-                      size: 20,
+                      size: 24,
                     ),
                   ),
                 ],
@@ -470,6 +435,48 @@ class _WholeItineraryDetailScreenState
   }
 
   Widget _buildActivityCard(Activity activity) {
+    // Check if the activity has been cleared (empty slot state)
+    if (activity.status == 'empty' || (activity.destination.isEmpty && activity.description.isEmpty)) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(24.0),
+        height: 330,
+        decoration: BoxDecoration(
+          color: appTheme.gray_100,
+          border: Border.all(color: appTheme.blue_gray_50, width: 1),
+          borderRadius: BorderRadius.circular(12),
+          // Optional dashed border effect simulation via background or style
+        ),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: Icon(
+                  Icons.add_circle_outline,
+                  size: 32,
+                  color: appTheme.blue_gray_300,
+                ),
+                onPressed: () {
+                  // Handle tap on empty activity slot
+                },
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Empty Activity Slot',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Inter',
+                  color: appTheme.blue_gray_300,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(

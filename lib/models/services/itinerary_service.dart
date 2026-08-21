@@ -186,6 +186,38 @@ class ItineraryService {
     }
   }
 
+  Future<Activity> generateAlternativeItinerary({
+    required String destination,
+    required DateTime slotDate,
+    required String startTime,
+    required String endTime,
+    required String category,
+    required List<String> excludedActivity,
+    required String existingActivityId,
+    required String dayTripId,
+  }) async {
+
+    // TODO: get the alternative activity from gemini.
+
+
+    return Activity(
+      activitiesId: '',
+      dayTripId: '',
+      destination: '',
+      description: '',
+      activityImgUrl: '',
+      date: slotDate,
+      allocatedBudget: 0.0,
+      overspendAmount: null,
+      status: 'empty',
+      startTime: startTime,
+      endTime: endTime,
+      duration: '',
+      activityCategory: '',
+      isOverspend: false,
+    );
+  }
+
   Future<bool> saveItinerary(
     List<Activity> activities, {
     required String destination,
