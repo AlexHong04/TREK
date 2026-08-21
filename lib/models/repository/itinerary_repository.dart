@@ -4,7 +4,7 @@ import '../entities/whole_trip.dart';
 import '../entities/day_trip.dart';
 import '../../utils/id_generator.dart';
 
-class TripRepository {
+class ItineraryRepository {
   Future<void> insertFullTrip({
     required String destination,
     required String datesText,
@@ -22,16 +22,18 @@ class TripRepository {
       String? lastTripId = lastTripRes?['trip_id'] as String?;
       String newTripId = IdGenerator.generateNextFormattedId('WI', lastTripId);
 
+      final String? currentUserId = SupabaseConfig.client.auth.currentUser?.id;
+
       // Create WholeTrip Entity and Insert
       final wholeTrip = WholeTrip(
         tripId: newTripId,
-        userId: 'US0001',
+        userId: currentUserId ?? 'US0001',
         destination: destination,
         startDate: DateTime.now(), // Normally you would parse datesText here
         endDate: DateTime.now().add(const Duration(days: 3)),
         totalBudget: totalBudget,
-        status: 'Planned',
-        travelPreference: 'General',
+        status: 'pending',
+        travelPreference: 'Nature',
       );
 
       final wholeTripResponse = await SupabaseConfig.client
@@ -42,35 +44,24 @@ class TripRepository {
 
       final String tripId = wholeTripResponse['trip_id'];
 
+      // 1. Group activities by unique date
+      Map<DateTime, List<Activity>> groupedActivities = {};
+      for (var activity in activities) {
+        final d = activity.date;
+        final dateKey = DateTime(d.year, d.month, d.day);
+        if (!groupedActivities.containsKey(dateKey)) {
+          groupedActivities[dateKey] = [];
+        }
+        groupedActivities[dateKey]!.add(activity);
+      }
+
       final lastDayTripRes = await SupabaseConfig.client
           .from('day_trips')
           .select('day_trip_id')
           .order('day_trip_id', ascending: false)
           .limit(1)
           .maybeSingle();
-      String? lastDayTripId = lastDayTripRes?['day_trip_id'] as String?;
-      String newDayTripId = IdGenerator.generateNextFormattedId(
-        'DT',
-        lastDayTripId,
-      );
-
-      // Create DayTrip Entity and Insert
-      final dayTrip = DayTrip(
-        dayTripId: newDayTripId,
-        tripId: tripId,
-        destination: destination,
-        date: DateTime.now(),
-        isOverspend: false,
-        overspendAmount: 0,
-      );
-
-      final dayTripResponse = await SupabaseConfig.client
-          .from('day_trips')
-          .insert(dayTrip.toJson())
-          .select('day_trip_id')
-          .single();
-
-      final String dayTripId = dayTripResponse['day_trip_id'];
+      String? currentDayTripId = lastDayTripRes?['day_trip_id'] as String?;
 
       final lastActRes = await SupabaseConfig.client
           .from('activities')
@@ -80,21 +71,47 @@ class TripRepository {
           .maybeSingle();
       String? currentActId = lastActRes?['activities_id'] as String?;
 
-      // Update Activity Entities and Insert
-      final insertActivitiesData = activities.map((a) {
-        final json = a.toJson();
+      List<Map<String, dynamic>> allUpdatedActivities = [];
 
-        currentActId = IdGenerator.generateNextFormattedId('AC', currentActId);
-        json['activities_id'] = currentActId;
+      // 2. Insert DayTrip for each date group and link its activities
+      for (var entry in groupedActivities.entries) {
+        final dateKey = entry.key;
+        final actsInDay = entry.value;
 
-        // Point the child to its real generated parent dayTripId
-        json['day_trip_id'] = dayTripId;
-        return json;
-      }).toList();
+        currentDayTripId = IdGenerator.generateNextFormattedId(
+          'DT',
+          currentDayTripId,
+        );
 
-      await SupabaseConfig.client
-          .from('activities')
-          .insert(insertActivitiesData);
+        final dayTrip = DayTrip(
+          dayTripId: currentDayTripId,
+          tripId: tripId,
+          destination: destination,
+          date: dateKey,
+          isOverspend: false,
+          overspendAmount: 0,
+        );
+
+        await SupabaseConfig.client.from('day_trips').insert(dayTrip.toJson());
+
+        for (var act in actsInDay) {
+          final json = act.toJson();
+          currentActId = IdGenerator.generateNextFormattedId(
+            'AC',
+            currentActId,
+          );
+          json['activities_id'] = currentActId;
+          json['day_trip_id'] = currentDayTripId;
+          allUpdatedActivities.add(json);
+        }
+      }
+
+      // 3. Insert all activities
+      if (allUpdatedActivities.isNotEmpty) {
+        await SupabaseConfig.client
+            .from('activities')
+            .insert(allUpdatedActivities);
+      }
     } on Exception catch (e) {
       print('TripRepository Insert Error: $e');
       throw Exception('DB Error: $e');
