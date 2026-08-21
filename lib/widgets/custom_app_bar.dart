@@ -18,6 +18,10 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
         preferredSize: const Size.fromHeight(1),
         child: Container(height: 1, color: appTheme.gray_50),
       ),
+      leading: IconButton(
+        icon: Icon(Icons.arrow_back, color: appTheme.teal_A700),
+        onPressed: () => Navigator.maybePop(context),
+      ),
       title: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 20.0),
         child: Row(

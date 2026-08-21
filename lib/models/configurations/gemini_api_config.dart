@@ -135,4 +135,6 @@ class GeminiApiConfig {
     }
     return null;
   }
+
+  // TODO: another function to generate alternative for removed activity
 }
