@@ -38,6 +38,12 @@ class AppThemeData {
   final Color gray_50 = AppColors.gray50;
   final Color gray_100 = AppColors.gray100;
   final Color gray_200 = AppColors.gray200;
+  final Color gray_400 = AppColors.gray400;
+  final Color gray_800 = AppColors.gray800;
+  final Color gray_900 = AppColors.gray900;
+
+  final Color blueGray900 = AppColors.blueGray900;
+  final Color errorRed = AppColors.errorRed;
 
   final Color colorFFEF44 = AppColors.errorRed;
 
