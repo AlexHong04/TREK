@@ -2,6 +2,7 @@ import 'personal_constraint.dart';
 
 class User {
   final String userId;
+  final String authId;
   final String fullName;
   final String email;
   final String currency;
@@ -15,6 +16,7 @@ class User {
 
   const User({
     required this.userId,
+    required this.authId,
     required this.fullName,
     required this.email,
     required this.currency,
@@ -37,6 +39,7 @@ class User {
       }) {
     return User(
       userId: map['user_id'] as String,
+      authId: map['auth_id'] as String,
       fullName: map['full_name'] as String? ?? '',
       email: map['email'] as String,
       currency: map['currency'] as String? ?? 'MYR',
@@ -56,6 +59,7 @@ class User {
   Map<String, dynamic> toInsertMap() {
     return {
       'user_id': userId,
+      'auth_id': authId,
       'full_name': fullName,
       'email': email,
       'currency': currency,
@@ -75,6 +79,7 @@ class User {
   }) {
     return User(
       userId: userId,
+      authId: authId,
       fullName: fullName ?? this.fullName,
       email: email,
       currency: currency ?? this.currency,
