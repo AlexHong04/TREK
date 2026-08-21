@@ -10,4 +10,7 @@ class HomeViewModel extends ChangeNotifier {
   void prepareNewPlan() {
     // Initialize or reset states if needed
   }
+
+  //TODO: Update the home page available trip
+  void fetchLatestTrip() {}
 }
