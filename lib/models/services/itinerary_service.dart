@@ -3,11 +3,11 @@ import 'package:http/http.dart' as http;
 
 import '../entities/activity.dart';
 import '../configurations/gemini_api_config.dart';
-import '../repository/trip_repository.dart';
+import '../repository/itinerary_repository.dart';
 import '../../utils/id_generator.dart';
 
 class ItineraryService {
-  final TripRepository _tripRepository = TripRepository();
+  final ItineraryRepository _itineraryRepository = ItineraryRepository();
 
   Future<List<Activity>> generateItinerary({
     required String destination,
@@ -56,7 +56,7 @@ class ItineraryService {
           String finalDestinationTitle = destName;
           final query = Uri.encodeComponent(imageKeyword);
 
-          // 1. FREE TIER PRIORITY: English Wikipedia (Good for Title Accuracy and Landmarks)
+          // FREE TIER PRIORITY: English Wikipedia (Good for Title Accuracy and Landmarks)
           if (finalDestinationTitle == destName) {
             try {
               final wikiUrl = Uri.parse(
@@ -81,7 +81,7 @@ class ItineraryService {
             } catch (_) {}
           }
 
-          // 2. FREE TIER PRIORITY: Wikimedia Commons (Richest media library for specific restaurants, streets, food)
+          // FREE TIER PRIORITY: Wikimedia Commons (Richest media library for specific restaurants, streets, food)
           if (imgUrl.isEmpty) {
             try {
               // Use the corrected title for better media search
@@ -116,22 +116,26 @@ class ItineraryService {
                 'https://loremflickr.com/600/400/$keywordQuery?lock=$index';
           }
 
+          int dayNumber = item['dayNumber'] as int? ?? 1;
           String startTimeStr = item['startTime'] as String? ?? '09:00';
-          DateTime parsedDate = DateTime.now();
+
+          DateTime baseDate = DateTime.now().add(Duration(days: dayNumber - 1));
+          DateTime parsedDate = baseDate;
+
           try {
             // Try parsing "09:00" assuming it's HH:mm
             final parts = startTimeStr.split(':');
             final h = int.parse(parts[0]);
             final m = int.parse(parts[1]);
             parsedDate = DateTime(
-              parsedDate.year,
-              parsedDate.month,
-              parsedDate.day,
+              baseDate.year,
+              baseDate.month,
+              baseDate.day,
               h,
               m,
             );
           } catch (_) {
-            // keep now() if fail
+            // keep baseDate if fail
           }
 
           newActivities.add(
@@ -196,7 +200,7 @@ class ItineraryService {
     } catch (_) {}
 
     try {
-      await _tripRepository.insertFullTrip(
+      await _itineraryRepository.insertFullTrip(
         destination: destination,
         datesText: datesText,
         totalBudget: budget,
