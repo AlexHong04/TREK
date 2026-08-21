@@ -1,5 +1,4 @@
-import '../theme/app_theme.dart';
-import '../theme/app_colors.dart';
+﻿import '../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -91,24 +90,24 @@ class _ActivityScreenState extends State<ActivityScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'KYOTO, JAPAN',
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w800,
             fontFamily: 'Inter',
-            color: AppColors.teal800,
+            color: appTheme.teal_800,
             letterSpacing: 1.0,
           ),
         ),
         const SizedBox(height: 8.0),
-        const Text(
+        Text(
           'Day 1: Cultural\nImmersion',
           style: TextStyle(
             fontSize: 30,
             fontWeight: FontWeight.w800,
             fontFamily: 'Inter',
-            color: AppColors.gray900,
+            color: appTheme.gray_900,
             height: 1.1,
           ),
         ),
@@ -137,13 +136,13 @@ class _ActivityScreenState extends State<ActivityScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'Total Budget',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
                   fontFamily: 'Inter',
-                  color: AppColors.gray900,
+                  color: appTheme.gray_900,
                 ),
               ),
               Container(
@@ -171,23 +170,23 @@ class _ActivityScreenState extends State<ActivityScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'USAGE',
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w800,
                   fontFamily: 'Inter',
-                  color: AppColors.gray800,
+                  color: appTheme.gray_800,
                   letterSpacing: 0.5,
                 ),
               ),
               Text(
                 'RM ${uiState.spentBudget.toStringAsFixed(2)} / RM ${uiState.totalBudget.toStringAsFixed(2)}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w800,
                   fontFamily: 'Inter',
-                  color: AppColors.gray900,
+                  color: appTheme.gray_900,
                 ),
               ),
             ],
@@ -230,7 +229,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                 child: _buildSubBudgetCard(
                   title: 'SPENT',
                   amount: 'RM ${uiState.spentBudget.toStringAsFixed(2)}',
-                  amountColor: AppColors.gray900,
+                  amountColor: appTheme.gray_900,
                 ),
               ),
               const SizedBox(width: 12.0),
@@ -250,7 +249,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                 child: _buildSubBudgetCard(
                   title: 'OVERSPENT',
                   amount: 'RM ${uiState.overspentBudget.toStringAsFixed(2)}',
-                  amountColor: AppColors.gray900,
+                  amountColor: appTheme.gray_900,
                 ),
               ),
               const SizedBox(width: 12.0),
@@ -285,11 +284,11 @@ class _ActivityScreenState extends State<ActivityScreen> {
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w800,
               fontFamily: 'Inter',
-              color: AppColors.gray800,
+              color: appTheme.gray_800,
               letterSpacing: 0.5,
             ),
           ),
@@ -338,11 +337,11 @@ class _ActivityScreenState extends State<ActivityScreen> {
             children: [
               Text(
                 DateFormat('hh:mm a').format(activity.date),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   fontFamily: 'Inter',
-                  color: AppColors.gray800,
+                  color: appTheme.gray_800,
                 ).copyWith(height: 1.2),
               ),
               const SizedBox(height: 12.0),
@@ -389,12 +388,12 @@ class _ActivityScreenState extends State<ActivityScreen> {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: AppColors.white,
-        border: Border.all(color: AppColors.blueGray50, width: 1),
+        color: appTheme.white_A700,
+        border: Border.all(color: appTheme.blue_gray_50, width: 1),
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: AppColors.black900_0c,
+            color: appTheme.black_900_0c,
             offset: const Offset(0, 4),
             blurRadius: 10,
           ),
@@ -421,11 +420,11 @@ class _ActivityScreenState extends State<ActivityScreen> {
             padding: const EdgeInsets.only(top: 20, left: 20, right: 20),
             child: Text(
               activity.destination,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
                 fontFamily: 'Inter',
-                color: AppColors.gray900,
+                color: appTheme.gray_900,
               ).copyWith(height: 1.2),
             ),
           ),
@@ -433,11 +432,11 @@ class _ActivityScreenState extends State<ActivityScreen> {
             padding: const EdgeInsets.only(top: 12, left: 20, right: 20),
             child: Text(
               activity.description,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w400,
                 fontFamily: 'Inter',
-                color: AppColors.gray800,
+                color: appTheme.gray_800,
               ).copyWith(height: 1.5),
             ),
           ),
@@ -460,15 +459,15 @@ class _ActivityScreenState extends State<ActivityScreen> {
                   ),
                 _buildChip(
                   label: 'RM${activity.allocatedBudget.toStringAsFixed(0)}',
-                  backgroundColor: AppColors.amber200,
-                  textColor: AppColors.lime900,
+                  backgroundColor: appTheme.amber_200,
+                  textColor: appTheme.lime_900,
                 ),
                 if (activity.isOverspend == true &&
                     activity.overspendAmount != null)
                   _buildChip(
                     label: 'RM${activity.overspendAmount!.toStringAsFixed(0)}',
                     backgroundColor: appTheme.blue_gray_50,
-                    textColor: AppColors.blueGray900,
+                    textColor: appTheme.blueGray900,
                   ),
               ],
             ),

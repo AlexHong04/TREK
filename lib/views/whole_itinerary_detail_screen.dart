@@ -1,5 +1,4 @@
-import '../theme/app_theme.dart';
-import '../theme/app_colors.dart';
+﻿import '../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -139,11 +138,11 @@ class _WholeItineraryDetailScreenState
               ),
               Text(
                 viewModel.datesText.isNotEmpty ? viewModel.datesText : 'Dates',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                   fontFamily: 'Inter',
-                  color: AppColors.gray800,
+                  color: appTheme.gray_800,
                 ),
               ),
             ],
@@ -153,13 +152,13 @@ class _WholeItineraryDetailScreenState
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              const Text(
+              Text(
                 'Overview',
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w800,
                   fontFamily: 'Inter',
-                  color: AppColors.gray900,
+                  color: appTheme.gray_900,
                   height: 1.1,
                 ),
               ),
@@ -223,25 +222,11 @@ class _WholeItineraryDetailScreenState
           padding: const EdgeInsets.only(left: 8.0),
           child: Text(
             viewModel.destinationTitle.toUpperCase(),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w800,
               fontFamily: 'Inter',
-              color: AppColors.teal800,
-            ),
-          ),
-        ),
-        const SizedBox(height: 6.0),
-        const Padding(
-          padding: EdgeInsets.only(left: 8.0),
-          child: Text(
-            'Whole Itinerary',
-            style: TextStyle(
-              fontSize: 30,
-              fontWeight: FontWeight.w800,
-              fontFamily: 'Inter',
-              color: AppColors.gray900,
-              height: 1.1,
+              color: appTheme.teal_800,
             ),
           ),
         ),
@@ -260,17 +245,56 @@ class _WholeItineraryDetailScreenState
     }
 
     final activities = viewModel.uiState.activities;
-    return Column(
-      children: List.generate(activities.length, (index) {
-        final activity = activities[index];
-        final isLast = index == activities.length - 1;
-        return _buildTimelineItem(
+    List<Widget> children = [];
+    int currentDayCount = 1;
+    DateTime? lastDate;
+
+    for (int i = 0; i < activities.length; i++) {
+      final activity = activities[i];
+
+      // Detect day change
+      if (lastDate == null ||
+          lastDate.year != activity.date.year ||
+          lastDate.month != activity.date.month ||
+          lastDate.day != activity.date.day) {
+        if (lastDate != null) currentDayCount++;
+
+        children.add(
+          Padding(
+            padding: const EdgeInsets.only(left: 8.0, top: 24.0, bottom: 16.0),
+            child: Text(
+              'Day $currentDayCount',
+              style: TextStyle(
+                fontSize: 30,
+                fontWeight: FontWeight.w800,
+                fontFamily: 'Inter',
+                color: appTheme.gray_900,
+                height: 1.1,
+              ),
+            ),
+          ),
+        );
+        lastDate = activity.date;
+      }
+
+      final bool isLast =
+          i == activities.length - 1 ||
+          (i + 1 < activities.length &&
+              (activities[i + 1].date.day != activity.date.day));
+
+      children.add(
+        _buildTimelineItem(
           context: context,
           activity: activity,
           isLast: isLast,
           onRemove: () => viewModel.removeActivity(activity.activitiesId),
-        );
-      }),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: children,
     );
   }
 
@@ -294,19 +318,18 @@ class _WholeItineraryDetailScreenState
                 children: [
                   Text(
                     DateFormat('hh:mm a').format(activity.date),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                       fontFamily: 'Inter',
-                      color: AppColors.gray800,
+                      color: appTheme.gray_800,
                     ).copyWith(height: 1.2),
                   ),
                   GestureDetector(
                     onTap: onRemove,
                     child: Icon(
-                      Icons
-                          .cancel_outlined, // or close/cancel depending on the look, but cancel is similar to a red 'x' pill or bordered x
-                      color: AppColors.errorRed,
+                      Icons.cancel_outlined,
+                      color: appTheme.errorRed,
                       size: 20,
                     ),
                   ),
@@ -391,9 +414,7 @@ class _WholeItineraryDetailScreenState
               if (errorMsg == null && context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text(
-                      'Itinerary saved to database successfully! ✨',
-                    ),
+                    content: Text('Itinerary saved to database successfully!'),
                   ),
                 );
                 // Return to home page, clearing all previous routes
@@ -433,7 +454,7 @@ class _WholeItineraryDetailScreenState
                   const SizedBox(width: 8),
                   Text(
                     'Confirm',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
                       fontFamily: 'Inter',
@@ -452,12 +473,12 @@ class _WholeItineraryDetailScreenState
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: AppColors.white,
-        border: Border.all(color: AppColors.blueGray50, width: 1),
+        color: appTheme.white_A700,
+        border: Border.all(color: appTheme.blue_gray_50, width: 1),
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: AppColors.black900_0c,
+            color: appTheme.black_900_0c,
             offset: Offset(0, 1),
             blurRadius: 2,
           ),
@@ -491,11 +512,11 @@ class _WholeItineraryDetailScreenState
             padding: const EdgeInsets.only(top: 20, left: 20, right: 20),
             child: Text(
               activity.destination ?? '',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
                 fontFamily: 'Inter',
-                color: AppColors.gray900,
+                color: appTheme.gray_900,
               ).copyWith(height: 25 / 20),
             ),
           ),
@@ -503,11 +524,11 @@ class _WholeItineraryDetailScreenState
             padding: const EdgeInsets.only(top: 8, left: 20, right: 20),
             child: Text(
               activity.description ?? '',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w400,
                 fontFamily: 'Inter',
-                color: AppColors.gray800,
+                color: appTheme.gray_800,
               ).copyWith(height: 22 / 14),
             ),
           ),
@@ -520,24 +541,31 @@ class _WholeItineraryDetailScreenState
             ),
             child: Wrap(
               spacing: 8,
+              runSpacing: 8,
               children: [
+                if (activity.activityCategory.isNotEmpty)
+                  _buildChip(
+                    label: activity.activityCategory,
+                    backgroundColor: appTheme.blue_gray_50,
+                    textColor: appTheme.blue_gray_700,
+                  ),
                 if (activity.duration != null && activity.duration!.isNotEmpty)
                   _buildChip(
                     label: activity.duration!,
                     backgroundColor: appTheme.teal_A200, // Neon cyan/green
-                    textColor: AppColors.teal700,
+                    textColor: appTheme.teal_700,
                   ),
                 _buildChip(
                   label: 'RM${activity.allocatedBudget.toStringAsFixed(0)}',
-                  backgroundColor: AppColors.amber200,
-                  textColor: AppColors.lime900,
+                  backgroundColor: appTheme.amber_200,
+                  textColor: appTheme.lime_900,
                 ),
                 if (activity.isOverspend == true &&
                     activity.overspendAmount != null)
                   _buildChip(
                     label: 'RM${activity.overspendAmount!.toStringAsFixed(0)}',
-                    backgroundColor: appTheme.wholeAlertBudgetBg, // Light Red
-                    textColor: appTheme.wholeAlertBudgetText, // Dark Red
+                    backgroundColor: appTheme.wholeAlertBudgetBg,
+                    textColor: appTheme.wholeAlertBudgetText,
                   ),
               ],
             ),
