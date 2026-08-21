@@ -38,16 +38,18 @@ class GeminiApiConfig {
     - Only assign costs to food/dining, transportation, and places that explicitly require entrance tickets.
     
     CRITICAL RULE FOR ROUTING:
-    - Order the activities logically by geographical proximity! 
-    - Consecutive activities MUST be close to each other in real life to minimize travel time and make routing practical.
+    - Group activities geographically! Each day of the itinerary MUST focus on ONE specific area or neighborhood (e.g., Day 1 is dedicated entirely to "KLCC", Day 2 entirely to "Bukit Bintang").
+    - Do NOT jump across the city on the same day. Every single activity on a given "dayNumber" MUST be found within that day's designated area to minimize travel time.
+    - Consecutive activities MUST be close to each other in real life to make routing practical.
     
     Format your response as a valid JSON array of activities, where each activity has the following fields:
-    - "destination": (String) Specify the exact name of the place or activity. Be specific rather than using a general category. For example, instead of "nasi lemak," provide the specific restaurant name where the user should eat nasi lemak, such as "Nasi Lemak Wanjo."
+    - "dayNumber": (int) Based on the requested dates ("$dates"), distribute the itinerary across multiple days. Return 1 for Day 1, 2 for Day 2, etc. (e.g., if it's a 3-day trip, activities should have dayNumber 1, 2, or 3). The exact geographical neighborhood or area name for this day (e.g., "KLCC", "Bukit Bintang", "Batu Caves"). Do NOT invent catchy titles or add extra words.
+    - "destination": (String) Specify the EXACT full name of the place, restaurant, or landmark. Do NOT use generic terms like "Lunch".
     - "imageKeyword": (String) IF it's a famous landmark, use its exact name (e.g. "Petronas Towers"). IF it's a specific restaurant/cafe, DO NOT use its name; instead, use the generic famous food/drink type (e.g. "Nasi Lemak", "Latte Art", "Seafood") so the generated image matches the activity context perfectly.
     - "description": (String) Short description
     - "allocatedBudget": (double) Estimated cost
     - "duration": (String) e.g., "60-90 min"
-    - "activityCategory": (String) e.g., "Culture", "Food"
+    - "activityCategory": (String) You MUST classify the activity into exactly one of these THREE categories ONLY: "Transportation", "Attraction", or "Restaurant". Do NOT use any other categories (e.g., NO "Food", NO "Culture").
     - "startTime": (String) e.g., "09:00"
     - "endTime": (String) e.g., "11:00"
 
