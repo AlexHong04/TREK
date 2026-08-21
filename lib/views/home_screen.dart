@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../view_models/presentation_logic/home_view_model.dart';
+import '../models/local_data_source/location_source.dart';
+import 'package:geolocator/geolocator.dart';
 import '../main.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -304,6 +306,119 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
           ),
+          // const SizedBox(height: 16),
+          // // Get Current Location button
+          // SizedBox(
+          //   width: double.infinity,
+          //   child: Container(
+          //     decoration: BoxDecoration(
+          //       color: appTheme.teal_A700,
+          //       borderRadius: BorderRadius.circular(14),
+          //       boxShadow: [
+          //         BoxShadow(
+          //           color: appTheme.teal_50,
+          //           offset: const Offset(0, 4),
+          //           blurRadius: 8,
+          //         ),
+          //       ],
+          //     ),
+          //     child: Material(
+          //       color: appTheme.transparentCustom,
+          //       borderRadius: BorderRadius.circular(14),
+          //       child: InkWell(
+          //         onTap: () async {
+          //           final locationSource = LocationSource();
+          //
+          //           // Check permissions first and show a dialog if denied
+          //           LocationPermission permission = await Geolocator.checkPermission();
+          //           if (permission == LocationPermission.denied) {
+          //             permission = await Geolocator.requestPermission();
+          //             if (permission == LocationPermission.denied && context.mounted) {
+          //               showDialog(
+          //                 context: context,
+          //                 builder: (ctx) => AlertDialog(
+          //                   title: const Text('Permission Required'),
+          //                   content: const Text('Location permission is required to fetch your current location. Please allow it.'),
+          //                   actions: [
+          //                     TextButton(
+          //                       onPressed: () => Navigator.of(ctx).pop(),
+          //                       child: const Text('Cancel'),
+          //                     ),
+          //                     TextButton(
+          //                       onPressed: () async {
+          //                         Navigator.of(ctx).pop();
+          //                         await Geolocator.requestPermission();
+          //                       },
+          //                       child: const Text('Grant'),
+          //                     ),
+          //                   ],
+          //                 ),
+          //               );
+          //               return;
+          //             }
+          //           }
+          //
+          //           if (permission == LocationPermission.deniedForever && context.mounted) {
+          //             showDialog(
+          //               context: context,
+          //               builder: (ctx) => AlertDialog(
+          //                 title: const Text('Permission Denied'),
+          //                 content: const Text('Location permission is permanently denied. Please enable it from app settings.'),
+          //                 actions: [
+          //                   TextButton(
+          //                     onPressed: () => Navigator.of(ctx).pop(),
+          //                     child: const Text('Cancel'),
+          //                   ),
+          //                   TextButton(
+          //                     onPressed: () async {
+          //                       Navigator.of(ctx).pop();
+          //                       await Geolocator.openAppSettings();
+          //                     },
+          //                     child: const Text('Open Settings'),
+          //                   ),
+          //                 ],
+          //               ),
+          //             );
+          //             return;
+          //           }
+          //
+          //           final position = await locationSource.getCurrentLocation();
+          //           if (context.mounted) {
+          //             if (position != null) {
+          //               ScaffoldMessenger.of(context).showSnackBar(
+          //                 SnackBar(
+          //                   content: Text(
+          //                     'Location: ${position.latitude}, ${position.longitude}',
+          //                   ),
+          //                 ),
+          //               );
+          //             } else {
+          //               ScaffoldMessenger.of(context).showSnackBar(
+          //                 const SnackBar(
+          //                   content: Text('Could not fetch location. Ensure GPS is enabled.'),
+          //                 ),
+          //               );
+          //             }
+          //           }
+          //         },
+          //         borderRadius: BorderRadius.circular(14),
+          //         child: Padding(
+          //           padding: const EdgeInsets.symmetric(vertical: 16),
+          //           child: Center(
+          //             child: Text(
+          //               'Get Current Location',
+          //               style: const TextStyle(
+          //                 fontSize: 18,
+          //                 fontWeight: FontWeight.w700,
+          //                 fontFamily: 'Inter',
+          //               ).copyWith(color: appTheme.white_A700, height: 22 / 18),
+          //             ),
+          //           ),
+          //         ),
+          //       ),
+          //     ),
+          //   ),
+          // ),
         ],
       ),
     );
