@@ -1,6 +1,5 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
-import '../theme/app_colors.dart';
 
 class CustomTextField extends StatelessWidget {
   final String sectionTitle;
@@ -50,11 +49,11 @@ class CustomTextField extends StatelessWidget {
         children: [
           Text(
             sectionTitle,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w800,
               fontFamily: 'Inter',
-              color: AppColors.blueGray300,
+              color: appTheme.blue_gray_300,
             ).copyWith(letterSpacing: 1, height: 1.2),
           ),
           TextFormField(
@@ -64,19 +63,19 @@ class CustomTextField extends StatelessWidget {
             onTap: onTap,
             onFieldSubmitted: onFieldSubmitted,
             keyboardType: keyboardType,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w400,
               fontFamily: 'Inter',
-              color: AppColors.gray800,
+              color: appTheme.gray_800,
             ),
             decoration: InputDecoration(
               hintText: hintText,
-              hintStyle: const TextStyle(
+              hintStyle: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w400,
                 fontFamily: 'Inter',
-                color: AppColors.gray800,
+                color: appTheme.gray_800,
               ).copyWith(color: appTheme.blue_gray_300),
               prefixIcon: Icon(prefixIcon),
               prefixIconConstraints: const BoxConstraints(
@@ -121,3 +120,4 @@ class CustomTextField extends StatelessWidget {
     );
   }
 }
+
