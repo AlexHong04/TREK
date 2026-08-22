@@ -29,7 +29,8 @@ class ItineraryRepository {
         tripId: newTripId,
         userId: currentUserId ?? 'US0001',
         destination: destination,
-        startDate: DateTime.now(), // Normally you would parse datesText here
+        startDate: DateTime.now(),
+        // Normally you would parse datesText here
         endDate: DateTime.now().add(const Duration(days: 3)),
         totalBudget: totalBudget,
         status: 'pending',
@@ -115,6 +116,101 @@ class ItineraryRepository {
     } on Exception catch (e) {
       print('TripRepository Insert Error: $e');
       throw Exception('DB Error: $e');
+    }
+  }
+
+  Future<void> updateTripBudget(WholeTrip trip) async {
+    if (trip.tripId == null) {
+      throw Exception('Cannot update budget: tripId is null.');
+    }
+
+    try {
+      await SupabaseConfig.client
+          .from('whole_trips')
+          .update({
+            'remaining_balance': trip.remainingBalance,
+            'total_budget': trip.totalBudget,
+          })
+          .eq('trip_id', trip.tripId!);
+    } on Exception catch (e) {
+      print('Budget Recovery Update Balance Error: $e');
+      throw Exception('DB Error: $e');
+    }
+  }
+
+  Future<void> terminateTrip(WholeTrip trip) async {
+    if (trip.tripId == null) {
+      throw Exception('Cannot update status: tripId is null.');
+    }
+
+    try {
+      await SupabaseConfig.client
+          .from('whole_trips')
+          .update({'status': trip.status})
+          .eq('trip_id', trip.tripId!);
+    } on Exception catch (e) {
+      print('Budget Recovery End Trip Error: $e');
+      throw Exception('DB Error: $e');
+    }
+  }
+
+  Future<List<Activity>> fetchRemainingActivity(
+      String tripId,
+      String currentActivityId,
+      ) async {
+    try {
+      // 1. Fetch all activities linked to the trip via day_trips
+      final response = await SupabaseConfig.client
+          .from('day_trips')
+          .select('day_trip_id, activities(*)')
+          .eq('trip_id', tripId);
+
+      final List<Activity> allActivities = [];
+
+      for (final dayTrip in response as List<dynamic>) {
+        final activitiesList = dayTrip['activities'] as List<dynamic>? ?? [];
+        for (final json in activitiesList) {
+          allActivities.add(Activity.fromJson(json));
+        }
+      }
+
+      // 2. Sort activities chronologically by date
+      allActivities.sort((a, b) => a.date.compareTo(b.date));
+
+      // 3. Find the index of the current activity
+      final currentIndex = allActivities.indexWhere(
+            (activity) => activity.activitiesId == currentActivityId,
+      );
+
+      // If current activity is not found, return all activities or handle gracefully
+      if (currentIndex == -1) {
+        return allActivities;
+      }
+
+      // 4. Return sublist starting AFTER the current activity
+      return allActivities.sublist(currentIndex + 1);
+    } on Exception catch (e) {
+      print('Calculating Remaining Trip Cost Error: $e');
+      throw Exception('DB Error: $e');
+    }
+  }
+
+  Future<void> updateActivities(List<Activity> activities) async {
+    if (activities.isEmpty) return;
+
+    try {
+      // 1. Map the list of Activity models using your existing toJson() method
+      final List<Map<String, dynamic>> activitiesJson =
+      activities.map((activity) => activity.toJson()).toList();
+
+      // 2. Execute batch update in Supabase targeted by primary key
+      await SupabaseConfig.client
+          .from('activities')
+          .upsert(activitiesJson, onConflict: 'activities_id');
+
+    } on Exception catch (e) {
+      print('Error batch updating activities: $e');
+      throw Exception('DB Error during activities update: $e');
     }
   }
 }
