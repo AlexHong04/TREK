@@ -5,7 +5,6 @@ import '../repository/itinerary_repository.dart';
 
 class BudgetService {
   final ItineraryRepository _itineraryRepository = ItineraryRepository();
-  final ActivityRepository _activityRepository = ActivityRepository();
 
   Future<WholeTrip> topUpBudget({
     required WholeTrip trip,
@@ -36,7 +35,7 @@ class BudgetService {
     required String currentActivityId,
     required double topupAmount,
   }) async {
-    List<Activity> remainingActivities = await _activityRepository.fetchRemainingActivity(trip.tripId!, currentActivityId);
+    List<Activity> remainingActivities = await _itineraryRepository.fetchRemainingActivity(trip.tripId!, currentActivityId);
     double totalRequired = 0.00;
     for (var activity in remainingActivities) {
       totalRequired += activity.allocatedBudget;
@@ -55,7 +54,7 @@ class BudgetService {
       ) async {
     // Fetch remaining activities occurring after currentActivity
     List<Activity> remainingActivities =
-    await _activityRepository.fetchRemainingActivity(
+    await _itineraryRepository.fetchRemainingActivity(
       tripId,
       currentActivity.activitiesId,
     );
