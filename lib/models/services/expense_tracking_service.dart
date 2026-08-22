@@ -13,7 +13,6 @@ enum ExpenseProcessingResult {
 
 class ExpenseTrackingService {
   final ItineraryRepository _itineraryRepository = ItineraryRepository();
-  final ActivityRepository _activityRepository = ActivityRepository();
   final BudgetService _budgetService = BudgetService();
 
   Future<ExpenseProcessingResult> processExpense({
@@ -49,7 +48,7 @@ class ExpenseTrackingService {
       );
 
       // Update database
-      await _activityRepository.updateActivities(updatedActivities);
+      await _itineraryRepository.updateActivities(updatedActivities);
 
       return ExpenseProcessingResult.reallocatedSuccessfully;
     }
@@ -74,7 +73,7 @@ class ExpenseTrackingService {
       double overspentAmount,
       ) async {
     List<Activity> remainingActivities =
-    await _activityRepository.fetchRemainingActivity(tripId, currentActivity.activitiesId);
+    await _itineraryRepository.fetchRemainingActivity(tripId, currentActivity.activitiesId);
 
     // Find index of currentActivity inside remainingActivities list
     final int currentIndex = remainingActivities.indexWhere(
