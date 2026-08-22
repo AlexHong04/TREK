@@ -1,5 +1,0 @@
-- [x] Update dependencies in `pubspec.yaml` to fix build errors
-- [x] Configure Android permissions in `AndroidManifest.xml`
-- [x] Fix `compileSdk` value in `build.gradle.kts`
-- [x] Add "Open Camera" button to `HomeScreen`
-- [x] Integrate `CameraService` with the new button
