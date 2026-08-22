@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+import 'package:http/http.dart' as http;
 import '../configurations/supabase_config.dart';
 import '../entities/activity.dart';
 import '../entities/whole_trip.dart';
@@ -5,6 +7,34 @@ import '../entities/day_trip.dart';
 import '../../utils/id_generator.dart';
 
 class ItineraryRepository {
+  Future<String> _uploadImageToStorage(
+    String externalUrl,
+    String fileName,
+  ) async {
+    try {
+      if (externalUrl.isEmpty || externalUrl.startsWith('assets/'))
+        return externalUrl;
+
+      final response = await http.get(Uri.parse(externalUrl));
+      if (response.statusCode == 200) {
+        final Uint8List imageBytes = response.bodyBytes;
+        final String path =
+            'images/$fileName-${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+        await SupabaseConfig.client.storage
+            .from('itinerary_images')
+            .uploadBinary(path, imageBytes);
+
+        return SupabaseConfig.client.storage
+            .from('itinerary_images')
+            .getPublicUrl(path);
+      }
+    } catch (e) {
+      print('Failed to upload image $externalUrl: $e');
+    }
+    return externalUrl; // Fallback to original if failed
+  }
+
   Future<void> insertFullTrip({
     required String destination,
     required String datesText,
@@ -24,17 +54,26 @@ class ItineraryRepository {
 
       final String? currentUserId = SupabaseConfig.client.auth.currentUser?.id;
 
+      // Extract an image from the first activity to represent the whole trip
+      String? tripImageUrl;
+      if (activities.isNotEmpty) {
+        tripImageUrl = await _uploadImageToStorage(
+          activities.first.activityImgUrl,
+          'trip_${newTripId}',
+        );
+      }
+
       // Create WholeTrip Entity and Insert
       final wholeTrip = WholeTrip(
         tripId: newTripId,
         userId: currentUserId ?? 'US0001',
         destination: destination,
         startDate: DateTime.now(),
-        // Normally you would parse datesText here
         endDate: DateTime.now().add(const Duration(days: 3)),
         totalBudget: totalBudget,
         status: 'pending',
         travelPreference: 'Nature',
+        imgUrl: tripImageUrl,
       );
 
       final wholeTripResponse = await SupabaseConfig.client
@@ -45,7 +84,7 @@ class ItineraryRepository {
 
       final String tripId = wholeTripResponse['trip_id'];
 
-      // 1. Group activities by unique date
+      // Group activities by unique date
       Map<DateTime, List<Activity>> groupedActivities = {};
       for (var activity in activities) {
         final d = activity.date;
@@ -74,7 +113,7 @@ class ItineraryRepository {
 
       List<Map<String, dynamic>> allUpdatedActivities = [];
 
-      // 2. Insert DayTrip for each date group and link its activities
+      // Insert DayTrip for each date group and link its activities
       for (var entry in groupedActivities.entries) {
         final dateKey = entry.key;
         final actsInDay = entry.value;
@@ -101,8 +140,17 @@ class ItineraryRepository {
             'AC',
             currentActId,
           );
+
+          // Upload activity image to Supabase Bucket
+          String uploadedUrl = await _uploadImageToStorage(
+            act.activityImgUrl,
+            'act_${currentActId}',
+          );
+
           json['activities_id'] = currentActId;
           json['day_trip_id'] = currentDayTripId;
+          json['activity_img_url'] = uploadedUrl; // Replace with bucket URL!
+
           allUpdatedActivities.add(json);
         }
       }
@@ -155,9 +203,9 @@ class ItineraryRepository {
   }
 
   Future<List<Activity>> fetchRemainingActivity(
-      String tripId,
-      String currentActivityId,
-      ) async {
+    String tripId,
+    String currentActivityId,
+  ) async {
     try {
       // 1. Fetch all activities linked to the trip via day_trips
       final response = await SupabaseConfig.client
@@ -179,7 +227,7 @@ class ItineraryRepository {
 
       // 3. Find the index of the current activity
       final currentIndex = allActivities.indexWhere(
-            (activity) => activity.activitiesId == currentActivityId,
+        (activity) => activity.activitiesId == currentActivityId,
       );
 
       // If current activity is not found, return all activities or handle gracefully
@@ -200,17 +248,37 @@ class ItineraryRepository {
 
     try {
       // 1. Map the list of Activity models using your existing toJson() method
-      final List<Map<String, dynamic>> activitiesJson =
-      activities.map((activity) => activity.toJson()).toList();
+      final List<Map<String, dynamic>> activitiesJson = activities
+          .map((activity) => activity.toJson())
+          .toList();
 
       // 2. Execute batch update in Supabase targeted by primary key
       await SupabaseConfig.client
           .from('activities')
           .upsert(activitiesJson, onConflict: 'activities_id');
-
     } on Exception catch (e) {
       print('Error batch updating activities: $e');
       throw Exception('DB Error during activities update: $e');
     }
+  }
+
+  Future<WholeTrip?> getLatestTrip() async {
+    try {
+      final res = await SupabaseConfig.client
+          .from('whole_trips')
+          .select()
+          .order('created_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      if (res != null) {
+        return WholeTrip.fromJson(res);
+      }
+    } catch (e) {
+      print('Error fetching latest trip: $e');
+      // Rethrow to let ViewModel handle the error state
+      rethrow;
+    }
+    return null;
   }
 }
