@@ -1,4 +1,4 @@
-import 'package:trek/models/entities/whole_trip.dart';
+import '../../models/entities/whole_trip.dart';
 
 class HomeUiState {
   final bool isLoading;
