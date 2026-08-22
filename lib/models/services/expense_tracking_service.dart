@@ -2,7 +2,6 @@ import 'package:trek/models/services/budget_service.dart';
 
 import '../entities/activity.dart';
 import '../entities/whole_trip.dart';
-import '../repository/activity_repository.dart';
 import '../repository/itinerary_repository.dart';
 
 enum ExpenseProcessingResult {
