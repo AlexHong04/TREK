@@ -31,6 +31,40 @@ class Activity {
     required this.dayTripId,
   });
 
+  Activity copyWith({
+    String? activitiesId,
+    String? destination,
+    String? description,
+    String? activityImgUrl,
+    DateTime? date,
+    double? allocatedBudget,
+    String? status,
+    String? startTime,
+    String? endTime,
+    String? duration,
+    String? activityCategory,
+    bool? isOverspend,
+    double? overspendAmount,
+    String? dayTripId,
+  }) {
+    return Activity(
+      activitiesId: activitiesId ?? this.activitiesId,
+      destination: destination ?? this.destination,
+      description: description ?? this.description,
+      activityImgUrl: activityImgUrl ?? this.activityImgUrl,
+      date: date ?? this.date,
+      allocatedBudget: allocatedBudget ?? this.allocatedBudget,
+      status: status ?? this.status,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+      duration: duration ?? this.duration,
+      activityCategory: activityCategory ?? this.activityCategory,
+      isOverspend: isOverspend ?? this.isOverspend,
+      overspendAmount: overspendAmount ?? this.overspendAmount,
+      dayTripId: dayTripId ?? this.dayTripId,
+    );
+  }
+
   // directly retrieve data from Supabase
   factory Activity.fromJson(Map<String, dynamic> json) {
     return Activity(
