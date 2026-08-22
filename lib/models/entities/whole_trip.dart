@@ -29,6 +29,38 @@ class WholeTrip {
     this.imgUrl,
   });
 
+  WholeTrip copyWith({
+    String? tripId,
+    String? userId,
+    String? destination,
+    DateTime? startDate,
+    DateTime? endDate,
+    double? totalBudget,
+    double? emergencyFund,
+    double? remainingBalance,
+    bool? isCriticalBudget,
+    String? status,
+    String? travelPreference,
+    DateTime? createdAt,
+    String? imgUrl,
+  }) {
+    return WholeTrip(
+      tripId: tripId ?? this.tripId,
+      userId: userId ?? this.userId,
+      destination: destination ?? this.destination,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
+      totalBudget: totalBudget ?? this.totalBudget,
+      emergencyFund: emergencyFund ?? this.emergencyFund,
+      remainingBalance: remainingBalance ?? this.remainingBalance,
+      isCriticalBudget: isCriticalBudget ?? this.isCriticalBudget,
+      status: status ?? this.status,
+      travelPreference: travelPreference ?? this.travelPreference,
+      createdAt: createdAt ?? this.createdAt,
+      imgUrl: imgUrl ?? this.imgUrl,
+    );
+  }
+
   factory WholeTrip.fromJson(Map<String, dynamic> json) {
     return WholeTrip(
       tripId: json['trip_id'],
