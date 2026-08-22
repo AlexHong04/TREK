@@ -1,5 +1,4 @@
-import '../theme/app_theme.dart';
-import '../theme/app_colors.dart';
+﻿import '../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -141,7 +140,7 @@ class _TravelInformationInputScreenState
               const SizedBox(width: 8.0),
               Text(
                 'Travel Preferences',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
                   fontFamily: 'Inter',
@@ -189,7 +188,7 @@ class _TravelInformationInputScreenState
                       Text(
                         pref.label,
                         style:
-                            const TextStyle(
+                            TextStyle(
                               fontSize: 14,
                               fontFamily: 'Inter',
                             ).copyWith(
@@ -231,11 +230,11 @@ class _TravelInformationInputScreenState
         children: [
           Text(
             'EMERGENCY FUND',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w800,
               fontFamily: 'Inter',
-              color: AppColors.blueGray300,
+              color: appTheme.blue_gray_300,
             ).copyWith(letterSpacing: 1, height: 1.2),
           ),
           const SizedBox(height: 12.0),
@@ -273,7 +272,7 @@ class _TravelInformationInputScreenState
         alignment: Alignment.center,
         child: Text(
           label,
-          style: const TextStyle(fontSize: 14, fontFamily: 'Inter').copyWith(
+          style: TextStyle(fontSize: 14, fontFamily: 'Inter').copyWith(
             color: isSelected ? appTheme.teal_A700 : appTheme.blue_gray_700,
             height: 1.21,
           ),
@@ -347,7 +346,7 @@ class _TravelInformationInputScreenState
                   const SizedBox(width: 8),
                   Text(
                     'Generate trip',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
                       fontFamily: 'Inter',
@@ -395,3 +394,4 @@ class _TravelInformationInputScreenState
     );
   }
 }
+
