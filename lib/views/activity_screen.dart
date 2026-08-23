@@ -7,6 +7,7 @@ import '../models/entities/activity.dart';
 import '../view_models/presentation_logic/activity_view_model.dart';
 import '../view_models/ui_state/activity_ui_state.dart';
 import '../widgets/custom_app_bar.dart';
+import '../utils/date_time_formatter.dart';
 
 class ActivityScreen extends StatefulWidget {
   const ActivityScreen({super.key});
@@ -321,75 +322,139 @@ class _ActivityScreenState extends State<ActivityScreen> {
       return const Center(child: CircularProgressIndicator());
     }
 
+    if(uiState.activities.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 32.0),
+          child: Text(
+            'No activities scheduled for this trip',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              fontFamily: 'Inter',
+              color: appTheme.blue_gray_300,
+            ),
+          ),
+        ),
+      );
+    }
+
     final activities = uiState.activities;
-    return Column(
-      children: List.generate(activities.length, (index) {
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: activities.length,
+      itemBuilder: (context, index) {
         final activity = activities[index];
         final isLast = index == activities.length - 1;
         return _buildTimelineItem(activity: activity, isLast: isLast);
-      }),
+      },
     );
+    // return Column(
+      //   children: List.generate(activities.length, (index) {
+      //     final activity = activities[index];
+      //     final isLast = index == activities.length - 1;
+      //     return _buildTimelineItem(activity: activity, isLast: isLast);
+      //   }),
+      // );
+    //
   }
 
   Widget _buildTimelineItem({
     required Activity activity,
     required bool isLast,
   }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildTimelineIndicatorColumn(isLast: isLast),
-        const SizedBox(width: 20.0),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                DateFormat('hh:mm a').format(activity.date),
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'Inter',
-                  color: appTheme.gray_800,
-                ).copyWith(height: 1.2),
-              ),
-              const SizedBox(height: 12.0),
-              _buildActivityCard(activity),
-              if (!isLast) const SizedBox(height: 32.0),
-            ],
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildTimelineIndicatorColumn(isLast: isLast),
+          const SizedBox(width: 16.0),
+          Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(bottom: isLast ? 0 : 32.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      DateTimeFormatter.formatDisplayTime(activity),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Inter',
+                        color: appTheme.gray_800,
+                      ).copyWith(height: 1.2),
+                    ),
+                    const SizedBox(height: 12.0),
+                    _buildActivityCard(activity,)
+                  ],
+                ),
+              )
           ),
-        ),
-      ],
+        ],
+      ),
     );
+
+    // return Row(
+    //   crossAxisAlignment: CrossAxisAlignment.start,
+    //   children: [
+    //     _buildTimelineIndicatorColumn(isLast: isLast),
+    //     const SizedBox(width: 20.0),
+    //     Expanded(
+    //       child: Column(
+    //         crossAxisAlignment: CrossAxisAlignment.start,
+    //         children: [
+    //           Text(
+    //             DateFormat('hh:mm a').format(activity.date),
+    //             style: TextStyle(
+    //               fontSize: 14,
+    //               fontWeight: FontWeight.w600,
+    //               fontFamily: 'Inter',
+    //               color: appTheme.gray_800,
+    //             ).copyWith(height: 1.2),
+    //           ),
+    //           const SizedBox(height: 12.0),
+    //           _buildActivityCard(activity),
+    //           if (!isLast) const SizedBox(height: 32.0),
+    //         ],
+    //       ),
+    //     ),
+    //   ],
+    // );
   }
 
   Widget _buildTimelineIndicatorColumn({required bool isLast}) {
-    return Column(
-      children: [
-        Container(
-          margin: const EdgeInsets.only(top: 2.0),
-          padding: const EdgeInsets.all(4.0),
-          decoration: BoxDecoration(
-            color: appTheme.white_A700,
-            border: Border.all(color: appTheme.teal_800, width: 3),
-            shape: BoxShape.circle,
-          ),
-          child: Container(
-            width: 8.0,
-            height: 8.0,
+    return SizedBox(
+      width: 24.0,
+      child: Column(
+        children: [
+          Container(
+            margin: const EdgeInsets.only(top: 2.0),
+            padding: const EdgeInsets.all(4.0),
             decoration: BoxDecoration(
-              color: appTheme.teal_800,
+              color: appTheme.white_A700,
+              border: Border.all(color: appTheme.teal_800, width: 3),
               shape: BoxShape.circle,
             ),
+            child: Container(
+              width: 8.0,
+              height: 8.0,
+              decoration: BoxDecoration(
+                color: appTheme.teal_800,
+                shape: BoxShape.circle,
+              ),
+            ),
           ),
-        ),
-        if (!isLast)
-          Container(
-            width: 2.0,
-            height: 420.0, // adjusted height based on content
-            color: appTheme.gray_200, // Slate 300 equivalent
-          ),
-      ],
+          if (!isLast)
+            Container(
+              width: 2.0,
+              height: 420.0, // adjusted height based on content
+              color: appTheme.gray_200, // Slate 300 equivalent
+            ),
+        ],
+      )
+
     );
   }
 
