@@ -5,8 +5,8 @@ import '../repository/itinerary_repository.dart';
 class BudgetService {
   final ItineraryRepository _itineraryRepository = ItineraryRepository();
 
-  Future<WholeTrip> topUpBudget({
-    required WholeTrip trip,
+  Future<WholeTrip?> topUpBudget({
+    required String tripId,
     required String currentActivityId,
     required double topupAmount,
   }) async {
@@ -14,19 +14,28 @@ class BudgetService {
       throw ArgumentError('Top-up amount must be greater than zero.');
     }
 
-    final updatedTrip = trip.copyWith(
-      remainingBalance: (trip.remainingBalance ?? 0.0) + topupAmount,
-      totalBudget: trip.totalBudget + topupAmount,
-    );
+    final currentTrip = await _itineraryRepository.getTrip(tripId);
 
-    await _itineraryRepository.updateTripBudget(updatedTrip);
+    if (currentTrip != null) {
+      final updatedTrip = currentTrip.copyWith(
+        remainingBalance: (currentTrip.remainingBalance ?? 0.0) + topupAmount,
+        totalBudget: currentTrip.totalBudget + topupAmount,
+      );
 
-    bool sufficient = await checkBudgetSufficiency(trip: trip, currentActivityId: currentActivityId, topupAmount: topupAmount);
+      await _itineraryRepository.updateTripBudget(updatedTrip);
 
-    if (sufficient == false) {
-      throw Exception('Trigger Recommendation'); // trigger recommendation
+      bool sufficient = await checkBudgetSufficiency(
+        trip: updatedTrip,
+        currentActivityId: currentActivityId,
+        topupAmount: topupAmount,
+      );
+
+      if (sufficient == false) {
+        throw Exception('Trigger Recommendation'); // trigger recommendation
+      }
+      return updatedTrip;
     }
-    return updatedTrip;
+    return null;
   }
 
   Future<bool> checkBudgetSufficiency({
@@ -34,29 +43,28 @@ class BudgetService {
     required String currentActivityId,
     required double topupAmount,
   }) async {
-    List<Activity> remainingActivities = await _itineraryRepository.fetchRemainingActivity(trip.tripId!, currentActivityId);
+    List<Activity> remainingActivities = await _itineraryRepository
+        .fetchRemainingActivity(trip.tripId!, currentActivityId);
     double totalRequired = 0.00;
     for (var activity in remainingActivities) {
       totalRequired += activity.allocatedBudget;
     }
     if (topupAmount < totalRequired) {
       return false;
-    };
+    }
+    ;
 
     return true;
   }
 
   Future<List<Activity>> reallocateBudget(
-      String tripId,
-      Activity currentActivity,
-      double overspendAmount,
-      ) async {
+    String tripId,
+    Activity currentActivity,
+    double overspendAmount,
+  ) async {
     // Fetch remaining activities occurring after currentActivity
-    List<Activity> remainingActivities =
-    await _itineraryRepository.fetchRemainingActivity(
-      tripId,
-      currentActivity.activitiesId,
-    );
+    List<Activity> remainingActivities = await _itineraryRepository
+        .fetchRemainingActivity(tripId, currentActivity.activitiesId);
 
     // Filter remaining activities that belong to the 'restaurant' category
     final restaurantActivities = remainingActivities
@@ -65,28 +73,44 @@ class BudgetService {
 
     // If no restaurants are remaining to absorb the overspend, trigger recommendation
     if (restaurantActivities.isEmpty) {
+      return [];
       throw Exception('Trigger Recommendation'); // trigger recommendation
     }
 
     // Divide overspend amount equally among remaining restaurants
-    final double deductionPerRestaurant = overspendAmount / restaurantActivities.length;
+    final double deductionPerRestaurant =
+        overspendAmount / restaurantActivities.length;
 
     // Deduct divided amount
-    final List<Activity> updatedRemainingActivities = remainingActivities.map((activity) {
+    final List<Activity> updatedRemainingActivities = remainingActivities.map((
+      activity,
+    ) {
       if (activity.activityCategory == 'restaurant') {
-        final double newBudget = activity.allocatedBudget - deductionPerRestaurant;
+        final double newBudget =
+            activity.allocatedBudget - deductionPerRestaurant;
 
-        if (newBudget <= 0.00) {
+        if (newBudget <= 0.00) { // min price range
           throw Exception('Trigger Recommendation'); // trigger recommendation
         }
 
-        return activity.copyWith(
-          allocatedBudget: newBudget,
-        );
+        return activity.copyWith(allocatedBudget: newBudget);
       }
       return activity;
     }).toList();
 
     return updatedRemainingActivities;
+  }
+
+  Future<double> calculateSufficientDays(
+    WholeTrip trip,
+    String currentActivityId,
+  ) async {
+    List<Activity> remainingActivities = await _itineraryRepository
+        .fetchRemainingActivity(trip.tripId!, currentActivityId);
+    double remainingCost = 0.00;
+    for (var activity in remainingActivities) {
+      remainingCost += activity.allocatedBudget;
+    }
+    return remainingCost / trip.remainingBalance!;
   }
 }
