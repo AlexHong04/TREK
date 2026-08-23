@@ -10,6 +10,7 @@ import '../../utils/id_generator.dart';
 class ItineraryService {
   final ItineraryRepository _itineraryRepository = ItineraryRepository();
 
+  // kokhong
   Future<List<Activity>> generateItinerary({
     required String destination,
     required String dates,
@@ -187,6 +188,7 @@ class ItineraryService {
     }
   }
 
+  // weisong
   Future<Activity> generateAlternativeItinerary({
     required String destination,
     required DateTime slotDate,
@@ -197,21 +199,23 @@ class ItineraryService {
     required String existingActivityId,
     required String dayTripId,
   }) async {
-
     final rawJson = await GeminiApiConfig.askGeminiForAlternative(
-        destinationCity: destination,
-        category: category,
-        startTime: startTime,
-        endTime: endTime,
-        excludedActivities: excludedActivity,
+      destinationCity: destination,
+      category: category,
+      startTime: startTime,
+      endTime: endTime,
+      excludedActivities: excludedActivity,
     );
 
     final Map<String, dynamic> item = jsonDecode(rawJson);
     final destTitle = item['destination'] as String? ?? 'Alternative Place';
-    String imgUrl = (item['imageUrl'] ?? item['activityImgUrl'] ?? '') as String;
+    String imgUrl =
+        (item['imageUrl'] ?? item['activityImgUrl'] ?? '') as String;
 
     if (!imgUrl.startsWith('https://') && !imgUrl.startsWith('http://')) {
-      final cleanSeed = Uri.encodeComponent(destTitle.replaceAll(RegExp(r'\s+'), '_'));
+      final cleanSeed = Uri.encodeComponent(
+        destTitle.replaceAll(RegExp(r'\s+'), '_'),
+      );
       imgUrl = 'https://picsum.photos/seed/$cleanSeed/600/400';
     }
 
@@ -233,6 +237,7 @@ class ItineraryService {
     );
   }
 
+  // kokhong
   Future<bool> saveItinerary(
     List<Activity> activities, {
     required String destination,
@@ -259,17 +264,20 @@ class ItineraryService {
     }
   }
 
-  Future<({WholeTrip trip, List<Activity> activities})?> fetchLatestTrip() async {
+  // weisong
+  Future<({WholeTrip trip, List<Activity> activities})?>
+  fetchLatestTrip() async {
     final latestTrip = await _itineraryRepository.getLatestTrip();
-    if(latestTrip == null || latestTrip.tripId == null) {
+    if (latestTrip == null || latestTrip.tripId == null) {
       return null;
     }
-    final activities = await _itineraryRepository.fetchAllActivitiesByTrip(latestTrip.tripId!);
+    final activities = await _itineraryRepository.fetchAllActivitiesByTrip(
+      latestTrip.tripId!,
+    );
     return (trip: latestTrip, activities: activities);
   }
 
   Future<List<Activity>> fetchAllActivitiesByTrip(String tripId) async {
     return await _itineraryRepository.fetchAllActivitiesByTrip(tripId);
   }
-
 }

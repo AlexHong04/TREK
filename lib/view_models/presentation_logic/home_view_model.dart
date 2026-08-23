@@ -13,6 +13,7 @@ class HomeViewModel extends ChangeNotifier {
     fetchLatestTrip();
   }
 
+  // kokhong
   Future<void> fetchLatestTrip() async {
     _uiState = _uiState.copyWith(isLoading: true);
     notifyListeners();

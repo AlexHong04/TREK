@@ -7,6 +7,7 @@ import '../entities/day_trip.dart';
 import '../../utils/id_generator.dart';
 
 class ItineraryRepository {
+  // kokhong
   Future<String> _uploadImageToStorage(
     String externalUrl,
     String fileName,
@@ -35,6 +36,7 @@ class ItineraryRepository {
     return externalUrl; // Fallback to original if failed
   }
 
+  // kokhong
   Future<void> insertFullTrip({
     required String destination,
     required String datesText,
@@ -42,7 +44,7 @@ class ItineraryRepository {
     required List<Activity> activities,
   }) async {
     try {
-      // 0. Auto-generate Sequential Formatted IDs
+      // Auto-generate Sequential Formatted IDs
       final lastTripRes = await SupabaseConfig.client
           .from('whole_trips')
           .select('trip_id')
@@ -155,7 +157,7 @@ class ItineraryRepository {
         }
       }
 
-      // 3. Insert all activities
+      // Insert all activities
       if (allUpdatedActivities.isNotEmpty) {
         await SupabaseConfig.client
             .from('activities')
@@ -167,6 +169,7 @@ class ItineraryRepository {
     }
   }
 
+  // zhiqin
   Future<void> updateTripBudget(WholeTrip trip) async {
     if (trip.tripId == null) {
       throw Exception('Cannot update budget: tripId is null.');
@@ -186,6 +189,7 @@ class ItineraryRepository {
     }
   }
 
+  // zhiqin
   Future<void> terminateTrip(WholeTrip trip) async {
     if (trip.tripId == null) {
       throw Exception('Cannot update status: tripId is null.');
@@ -202,6 +206,7 @@ class ItineraryRepository {
     }
   }
 
+  // zhiqin
   Future<List<Activity>> fetchRemainingActivity(
     String tripId,
     String currentActivityId,
@@ -243,6 +248,7 @@ class ItineraryRepository {
     }
   }
 
+  // zhiqin
   Future<void> updateActivities(List<Activity> activities) async {
     if (activities.isEmpty) return;
 
@@ -262,6 +268,7 @@ class ItineraryRepository {
     }
   }
 
+  // kokhong
   Future<WholeTrip?> getLatestTrip() async {
     try {
       final res = await SupabaseConfig.client
@@ -282,6 +289,7 @@ class ItineraryRepository {
     return null;
   }
 
+  // weisong
   Future<List<Activity>> fetchAllActivitiesByTrip(String tripId) async {
     try {
       final response = await SupabaseConfig.client
@@ -294,7 +302,9 @@ class ItineraryRepository {
       for (final dayTrip in response as List<dynamic>) {
         final activitiesList = dayTrip['activities'] as List<dynamic>? ?? [];
         for (final json in activitiesList) {
-          allActivities.add(Activity.fromJson(Map<String, dynamic>.from(json as Map)));
+          allActivities.add(
+            Activity.fromJson(Map<String, dynamic>.from(json as Map)),
+          );
         }
       }
 
