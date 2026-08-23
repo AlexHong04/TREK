@@ -13,6 +13,7 @@ class GeminiApiConfig {
     _model = GenerativeModel(model: 'gemini-3.6-flash', apiKey: _apiKey);
   }
 
+  // kokhong
   /// Ask Gemini for itinerary
   static Future<String> askGeminiForItinerary({
     required String destination,
@@ -115,6 +116,7 @@ class GeminiApiConfig {
     throw Exception('Failed to generate itinerary after retries.');
   }
 
+  // kokhong
   /// Returns a Base64 encoded image string (Bypassing Imagen with LoremFlickr)
   static Future<String?> generateLocationImage(String promptText) async {
     final keyword = Uri.encodeComponent(
@@ -136,6 +138,7 @@ class GeminiApiConfig {
     return null;
   }
 
+  // weisong
   // TODO: another function to generate alternative for removed activity
   static Future<String> askGeminiForAlternative({
     required String destinationCity,
@@ -143,9 +146,12 @@ class GeminiApiConfig {
     required String startTime,
     required String endTime,
     required List<String> excludedActivities,
-  }) async{
-    final excludedListText = excludedActivities.isNotEmpty ? excludedActivities.map((e) => '-$e').join('\n') : 'None';
-    final prompt = '''
+  }) async {
+    final excludedListText = excludedActivities.isNotEmpty
+        ? excludedActivities.map((e) => '-$e').join('\n')
+        : 'None';
+    final prompt =
+        '''
     You are a travel assistant in Malaysia. Suggest ONE replacement activity for a trip in $destinationCity.
 
     Parameters:
@@ -171,9 +177,7 @@ class GeminiApiConfig {
     Return ONLY the raw JSON object with no markdown formatting.
     ''';
 
-    final url = Uri.parse(
-      ''
-    );
+    final url = Uri.parse('');
 
     final response = await http.post(
       url,
@@ -181,17 +185,19 @@ class GeminiApiConfig {
       body: jsonEncode({
         "contents": [
           {
-            "parts": [{"text": prompt}]
-          }
+            "parts": [
+              {"text": prompt},
+            ],
+          },
         ],
-        "generatingConfig": {"responseMimeType": "application/json"}
-      })
+        "generatingConfig": {"responseMimeType": "application/json"},
+      }),
     );
 
-    if(response.statusCode == 200) {
+    if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       return data['candidates']?[0]?['content']?['parts']?[0]?['text'] ?? '{}';
-    } else{
+    } else {
       throw Exception('Gemini Error: ${response.statusCode}');
     }
   }
