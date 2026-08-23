@@ -280,4 +280,14 @@ class ItineraryService {
   Future<List<Activity>> fetchAllActivitiesByTrip(String tripId) async {
     return await _itineraryRepository.fetchAllActivitiesByTrip(tripId);
   }
+
+  Future<bool> endTrip(String id) async {
+    try {
+      await _itineraryRepository.terminateTrip(id, 'terminated');
+      return true;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
 }
