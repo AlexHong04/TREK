@@ -190,16 +190,12 @@ class ItineraryRepository {
   }
 
   // zhiqin
-  Future<void> terminateTrip(WholeTrip trip) async {
-    if (trip.tripId == null) {
-      throw Exception('Cannot update status: tripId is null.');
-    }
-
+  Future<void> terminateTrip(String id, String status) async {
     try {
       await SupabaseConfig.client
           .from('whole_trips')
-          .update({'status': trip.status})
-          .eq('trip_id', trip.tripId!);
+          .update({'status': status})
+          .eq('trip_id', id);
     } on Exception catch (e) {
       print('Budget Recovery End Trip Error: $e');
       throw Exception('DB Error: $e');
@@ -248,23 +244,106 @@ class ItineraryRepository {
     }
   }
 
+  //zhiqin
+  Future<Activity> getCurrentActivity(String id) async {
+    try {
+      final response = await SupabaseConfig.client
+          .from('activities')
+          .select()
+          .eq('activities_id', id)
+          .single();
+
+      return Activity.fromJson(response);
+    } on Exception catch (e) {
+      print('Error getting current activity: $e');
+      throw Exception('DB Error during fetching current activity: $e');
+    }
+  }
+
+  //zhiqin
+  Future<DayTrip> getCurrentDay(String id) async {
+    try {
+      final response = await SupabaseConfig.client
+          .from('day_trips')
+          .select()
+          .eq('activities_id', id)
+          .single();
+
+      return DayTrip.fromJson(response);
+    } on Exception catch (e) {
+      print('Error getting current activity: $e');
+      throw Exception('DB Error during fetching current activity: $e');
+    }
+  }
+
+  //zhiqin
+  Future<DayTrip> updateDayOverspendDetails(DayTrip current) async {
+    try {
+      final response = await SupabaseConfig.client
+          .from('day_trips')
+          .update({
+            'overspend_amount': current.overspendAmount,
+            'overspend_category': current.overspendCategory,
+            'is_overspend': current.isOverspend,
+          })
+          .eq('day_trip_id', current.dayTripId as Object);
+
+      return DayTrip.fromJson(response as Map<String, dynamic>);
+    } on Exception catch (e) {
+      print('Error getting current activity: $e');
+      throw Exception('DB Error during fetching current activity: $e');
+    }
+  }
+
+  //zhiqin
+  Future<Activity> updateOverspendDetails(Activity current) async {
+    try {
+      final response = await SupabaseConfig.client
+          .from('activities')
+          .update({
+            'overspend_amount': current.overspendAmount,
+            'is_overspend': current.isOverspend,
+          })
+          .eq('activities_id', current.activitiesId);
+
+      return Activity.fromJson(response as Map<String, dynamic>);
+    } on Exception catch (e) {
+      print('Error getting current activity: $e');
+      throw Exception('DB Error during fetching current activity: $e');
+    }
+  }
+
   // zhiqin
-  Future<void> updateActivities(List<Activity> activities) async {
-    if (activities.isEmpty) return;
+  Future<bool> updateActivities(List<Activity> activities) async {
+    if (activities.isEmpty) return false;
 
     try {
-      // 1. Map the list of Activity models using your existing toJson() method
       final List<Map<String, dynamic>> activitiesJson = activities
           .map((activity) => activity.toJson())
           .toList();
 
-      // 2. Execute batch update in Supabase targeted by primary key
       await SupabaseConfig.client
           .from('activities')
           .upsert(activitiesJson, onConflict: 'activities_id');
+
+      return true;
     } on Exception catch (e) {
       print('Error batch updating activities: $e');
       throw Exception('DB Error during activities update: $e');
+    }
+  }
+
+  Future<WholeTrip?> getTrip(String tripId) async {
+    try {
+      final res = await SupabaseConfig.client
+          .from('whole_trips')
+          .select()
+          .eq('trip_id', tripId);
+
+      return WholeTrip.fromJson(res as Map<String, dynamic>);
+    } catch (e) {
+      print('Error fetching latest trip: $e');
+      rethrow;
     }
   }
 
