@@ -1,14 +1,63 @@
 import 'package:flutter/material.dart';
+import 'package:trek/models/repository/itinerary_repository.dart';
+import 'package:trek/models/services/itinerary_service.dart';
 
 import '../../models/entities/activity.dart';
 import '../ui_state/activity_ui_state.dart';
 
 class ActivityViewModel extends ChangeNotifier {
-  ActivityUiState _uiState = const ActivityUiState();
 
+  final ItineraryService _itineraryService = ItineraryService();
+
+  ActivityUiState _uiState = const ActivityUiState();
   ActivityUiState get uiState => _uiState;
 
-  void initialize() {
+  ActivityViewModel() {
+    initialize();
+  }
+
+  Future<void> initialize() async {
+    _uiState = _uiState.copyWith(isLoading: true);
+    notifyListeners();
+
+    try {
+      final result = await _itineraryService.fetchLatestTrip();
+
+      if(result != null) {
+        _uiState = _uiState.copyWith(
+          isLoading: false,
+          activities: result.activities,
+          totalBudget: result.trip.totalBudget,
+        );
+      } else {
+        _uiState = _uiState.copyWith(isLoading: false);
+      }
+    } catch (e) {
+      _uiState = _uiState.copyWith(isLoading: false);
+      debugPrint('Error in ActivityViewModel.initialize: $e');
+    }
+    notifyListeners();
+  }
+
+  Future<void> loadTripItinerary(String tripId) async {
+    _uiState = _uiState.copyWith(isLoading: true);
+    notifyListeners();
+
+    try {
+      final activities = await _itineraryService.fetchAllActivitiesByTrip(tripId);
+
+      _uiState = _uiState.copyWith(
+        isLoading: false,
+        activities: activities,
+      );
+    } catch (e) {
+      _uiState = _uiState.copyWith(isLoading: false);
+      debugPrint('DEBUG: Error in loadTripItinerary: $e');
+    }
+    notifyListeners();
+  }
+
+  void initializeHardcoded() {
     _uiState = _uiState.copyWith(isLoading: true);
     notifyListeners();
 

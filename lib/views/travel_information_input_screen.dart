@@ -105,8 +105,6 @@ class _TravelInformationInputScreenState
                       validator: viewModel.validateBudget,
                     ),
                     const SizedBox(height: 22.0),
-                    _buildEmergencyFundSection(viewModel),
-                    const SizedBox(height: 22.0),
                     _buildTravelPreferencesSection(viewModel),
                     const SizedBox(height: 16.0),
                   ],
@@ -209,78 +207,6 @@ class _TravelInformationInputScreenState
     );
   }
 
-  Widget _buildEmergencyFundSection(TravelInformationInputViewModel viewModel) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24.0),
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
-      decoration: BoxDecoration(
-        color: appTheme.white_A700,
-        borderRadius: BorderRadius.circular(16.0),
-        border: Border.all(color: appTheme.gray_100, width: 1.0),
-        boxShadow: [
-          BoxShadow(
-            color: appTheme.black_900_0c,
-            offset: const Offset(0, 1),
-            blurRadius: 8,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'EMERGENCY FUND',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              fontFamily: 'Inter',
-              color: appTheme.blue_gray_300,
-            ).copyWith(letterSpacing: 1, height: 1.2),
-          ),
-          const SizedBox(height: 12.0),
-          Row(
-            children: [
-              Expanded(child: _buildEmergencyFundButton(viewModel, '0 %')),
-              const SizedBox(width: 12.0),
-              Expanded(child: _buildEmergencyFundButton(viewModel, '5 %')),
-              const SizedBox(width: 12.0),
-              Expanded(child: _buildEmergencyFundButton(viewModel, '10 %')),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmergencyFundButton(
-    TravelInformationInputViewModel viewModel,
-    String label,
-  ) {
-    bool isSelected = viewModel.uiState.selectedEmergencyFund == label;
-    return GestureDetector(
-      onTap: () => viewModel.selectEmergencyFund(label),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12.0),
-        decoration: BoxDecoration(
-          color: isSelected ? appTheme.gray_50_01 : appTheme.white_A700,
-          borderRadius: BorderRadius.circular(20.0),
-          border: Border.all(
-            color: isSelected ? appTheme.teal_A700 : appTheme.gray_200,
-            width: isSelected ? 2.0 : 1.0,
-          ),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: TextStyle(fontSize: 14, fontFamily: 'Inter').copyWith(
-            color: isSelected ? appTheme.teal_A700 : appTheme.blue_gray_700,
-            height: 1.21,
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildBottomSection(TravelInformationInputViewModel viewModel) {
     return Container(
       decoration: BoxDecoration(
@@ -326,7 +252,6 @@ class _TravelInformationInputScreenState
                       'dates': viewModel.dateController.text,
                       'budget': viewModel.budgetController.text,
                       'preference': viewModel.uiState.selectedPreference,
-                      'emergencyFund': viewModel.uiState.selectedEmergencyFund,
                     },
                   );
                 }

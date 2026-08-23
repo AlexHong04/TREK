@@ -281,4 +281,28 @@ class ItineraryRepository {
     }
     return null;
   }
+
+  Future<List<Activity>> fetchAllActivitiesByTrip(String tripId) async {
+    try {
+      final response = await SupabaseConfig.client
+          .from('day_trips')
+          .select('day_trip_id, activities(*)')
+          .eq('trip_id', tripId);
+
+      final List<Activity> allActivities = [];
+
+      for (final dayTrip in response as List<dynamic>) {
+        final activitiesList = dayTrip['activities'] as List<dynamic>? ?? [];
+        for (final json in activitiesList) {
+          allActivities.add(Activity.fromJson(Map<String, dynamic>.from(json as Map)));
+        }
+      }
+
+      allActivities.sort((a, b) => a.date.compareTo(b.date));
+      return allActivities;
+    } catch (e) {
+      print('Error fetching activities: $e');
+      throw Exception('DB Error: $e');
+    }
+  }
 }

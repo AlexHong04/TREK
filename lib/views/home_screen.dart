@@ -1,9 +1,10 @@
-import '../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
 import 'package:intl/intl.dart';
+
+import '../theme/app_theme.dart';
 import '../view_models/presentation_logic/home_view_model.dart';
+import 'activity_screen.dart';
 import '../models/local_data_source/location_source.dart';
 import 'package:geolocator/geolocator.dart';
 import '../main.dart';
@@ -205,6 +206,7 @@ class HomeScreen extends StatelessWidget {
     }
 
     // Show existing plan card with dynamic data
+    // Show the latest trip plan to able user to view what will be carry on
     final trip = viewModel.uiState.latestTrip!;
     final startDateStr = DateFormat('MMM dd').format(trip.startDate);
     final endDateStr = DateFormat('MMM dd, yyyy').format(trip.endDate);
@@ -222,137 +224,155 @@ class HomeScreen extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Banner Image
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            child: Stack(
-              children: [
-                if (trip.imgUrl != null && trip.imgUrl!.isNotEmpty)
-                  Image.network(
-                    trip.imgUrl!,
-                    height: 140,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                  )
-                else
-                  Container(
-                    height: 140,
-                    width: double.infinity,
-                    color: appTheme.gray_200,
-                    child: Icon(
-                      Icons.terrain,
-                      size: 48,
-                      color: appTheme.blue_gray_300,
-                    ),
-                  ),
-                Positioned(
-                  top: 16,
-                  left: 16,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: appTheme.amber_200,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.check_circle_outline,
-                          size: 14,
-                          color: appTheme.lime_900,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          trip.status.substring(0, 1).toUpperCase() +
-                              trip.status.substring(1), // e.g. "Pending"
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            fontFamily: 'Inter',
-                            color: appTheme.lime_900,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  trip.destination,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    fontFamily: 'Inter',
-                    color: appTheme.gray_900,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(24),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: () {
+            Navigator.of(context).pushNamed(
+              '/activityScreen',
+              arguments: {
+                'trip': trip,
+                'isReadOnly': true,
+              }
+            );
+          },
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Banner Image
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                child: Stack(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
+                    if (trip.imgUrl != null && trip.imgUrl!.isNotEmpty)
+                      Image.network(
+                        trip.imgUrl!,
+                        height: 140,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      )
+                    else
+                      Container(
+                        height: 140,
+                        width: double.infinity,
+                        color: appTheme.gray_200,
+                        child: Icon(
+                          Icons.terrain,
+                          size: 48,
+                          color: appTheme.blue_gray_300,
+                        ),
                       ),
-                      decoration: BoxDecoration(
-                        color: appTheme.gray_100,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.calendar_today_outlined,
-                            size: 14,
-                            color: appTheme.teal_A700,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '$startDateStr - $endDateStr',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              fontFamily: 'Inter',
-                            ).copyWith(color: appTheme.gray_800),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Text(
-                      'RM${trip.totalBudget.toStringAsFixed(0)}',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Inter',
-                        color: appTheme.gray_900,
+                    Positioned(
+                      top: 16,
+                      left: 16,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: appTheme.amber_200,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.check_circle_outline,
+                              size: 14,
+                              color: appTheme.lime_900,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              trip.status.substring(0, 1).toUpperCase() +
+                                  trip.status.substring(1), // e.g. "Pending"
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                fontFamily: 'Inter',
+                                color: appTheme.lime_900,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      trip.destination,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        fontFamily: 'Inter',
+                        color: appTheme.gray_900,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: appTheme.gray_100,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.calendar_today_outlined,
+                                size: 14,
+                                color: appTheme.teal_A700,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                '$startDateStr - $endDateStr',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  fontFamily: 'Inter',
+                                ).copyWith(color: appTheme.gray_800),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          'RM${trip.totalBudget.toStringAsFixed(0)}',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Inter',
+                            color: appTheme.gray_900,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
+
   }
 
+  // Start Plan button and Plan New button
   Widget _buildBottomButtons(BuildContext context) {
     final viewModel = context.watch<HomeViewModel>();
 
