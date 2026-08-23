@@ -5,7 +5,6 @@ class WholeTrip {
   final DateTime startDate;
   final DateTime endDate;
   final double totalBudget;
-  final double? emergencyFund;
   final double? remainingBalance;
   final bool? isCriticalBudget;
   final String status;
@@ -20,7 +19,6 @@ class WholeTrip {
     required this.startDate,
     required this.endDate,
     required this.totalBudget,
-    this.emergencyFund,
     this.remainingBalance,
     this.isCriticalBudget,
     required this.status,
@@ -36,7 +34,6 @@ class WholeTrip {
     DateTime? startDate,
     DateTime? endDate,
     double? totalBudget,
-    double? emergencyFund,
     double? remainingBalance,
     bool? isCriticalBudget,
     String? status,
@@ -51,7 +48,6 @@ class WholeTrip {
       startDate: startDate ?? this.startDate,
       endDate: endDate ?? this.endDate,
       totalBudget: totalBudget ?? this.totalBudget,
-      emergencyFund: emergencyFund ?? this.emergencyFund,
       remainingBalance: remainingBalance ?? this.remainingBalance,
       isCriticalBudget: isCriticalBudget ?? this.isCriticalBudget,
       status: status ?? this.status,
@@ -69,7 +65,6 @@ class WholeTrip {
       startDate: DateTime.parse(json['start_date']),
       endDate: DateTime.parse(json['end_date']),
       totalBudget: (json['total_budget'] as num).toDouble(),
-      emergencyFund: (json['emergency_fund'] as num?)?.toDouble(),
       remainingBalance: (json['remaining_balance'] as num?)?.toDouble(),
       isCriticalBudget: json['is_critical_budget'],
       status: json['status'],
@@ -89,7 +84,6 @@ class WholeTrip {
       'start_date': startDate.toIso8601String(),
       'end_date': endDate.toIso8601String(),
       'total_budget': totalBudget,
-      if (emergencyFund != null) 'emergency_fund': emergencyFund,
       if (remainingBalance != null) 'remaining_balance': remainingBalance,
       if (isCriticalBudget != null) 'is_critical_budget': isCriticalBudget,
       'status': status,

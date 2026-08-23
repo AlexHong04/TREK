@@ -4,15 +4,17 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../models/entities/activity.dart';
+import '../models/entities/whole_trip.dart';
 import '../view_models/presentation_logic/activity_view_model.dart';
 import '../view_models/ui_state/activity_ui_state.dart';
+import '../widgets/custom_app_bar.dart';
 
 class ActivityScreen extends StatefulWidget {
   const ActivityScreen({super.key});
 
   static Widget builder(BuildContext context) {
     return ChangeNotifierProvider<ActivityViewModel>(
-      create: (context) => ActivityViewModel()..initialize(),
+      create: (context) => ActivityViewModel(),
       child: const ActivityScreen(),
     );
   }
@@ -22,6 +24,51 @@ class ActivityScreen extends StatefulWidget {
 }
 
 class _ActivityScreenState extends State<ActivityScreen> {
+
+  bool _isInit = false;
+  String _destination = 'Trip Itinerary';
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_isInit) {
+      final args = ModalRoute.of(context)?.settings.arguments;
+      String? extractedTripId;
+
+      if (args is Map<String, dynamic>) {
+        if (args['trip'] != null) {
+          final innerTrip = args['trip'];
+          if (innerTrip is Map) {
+            extractedTripId = (innerTrip['tripId'] ?? innerTrip['trip_id'] ?? innerTrip['dayTripId'])?.toString();
+          } else {
+            extractedTripId = (innerTrip as dynamic).tripId ?? (innerTrip as dynamic).dayTripId;
+          }
+        } else {
+          extractedTripId = (args['tripId'] ?? args['trip_id'] ?? args['dayTripId'])?.toString();
+        }
+      } else if (args != null) {
+        try {
+          extractedTripId = (args as dynamic).tripId ?? (args as dynamic).dayTripId;
+        } catch (_) {
+          extractedTripId = null;
+        }
+      }
+
+      // Schedule after the current build frame completes to prevent the '!_dirty' assertion error
+      if (extractedTripId != null && extractedTripId.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            context.read<ActivityViewModel>().loadTripItinerary(extractedTripId!);
+          }
+        });
+      } else {
+        debugPrint('Warning: Could not resolve tripId from navigation arguments.');
+      }
+
+      _isInit = true;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final viewModel = context.watch<ActivityViewModel>();
@@ -29,14 +76,14 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
     return Scaffold(
       backgroundColor: appTheme.gray_50_03,
-      appBar: _buildAppBar(context),
+      appBar: const CustomAppBar(title: 'Activities'),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.only(top: 24.0, left: 24.0, right: 24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildLocationHeader(),
+              _buildLocationHeader(_destination),
               const SizedBox(height: 24.0),
               _buildBudgetCard(uiState),
               const SizedBox(height: 32.0),
@@ -49,49 +96,12 @@ class _ActivityScreenState extends State<ActivityScreen> {
     );
   }
 
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
-    return AppBar(
-      backgroundColor: appTheme.white_A700,
-      elevation: 0,
-      automaticallyImplyLeading: false,
-      leading: IconButton(
-        icon: Icon(Icons.arrow_back, color: appTheme.teal_A700),
-        onPressed: () => Navigator.maybePop(context),
-      ),
-      toolbarHeight: 60,
-      titleSpacing: 0,
-      bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(1),
-        child: Container(height: 1, color: appTheme.blue_gray_50),
-      ),
-      title: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-              child: Text(
-                'Vibrant Odyssey',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontFamily: 'Inter',
-                  fontSize: 18,
-                  color: appTheme.teal_A700,
-                ).copyWith(height: 1.2),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLocationHeader() {
+  Widget _buildLocationHeader(String destination) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'KYOTO, JAPAN',
+          destination.toUpperCase(),
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w800,

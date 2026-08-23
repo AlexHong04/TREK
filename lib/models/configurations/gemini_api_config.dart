@@ -137,4 +137,62 @@ class GeminiApiConfig {
   }
 
   // TODO: another function to generate alternative for removed activity
+  static Future<String> askGeminiForAlternative({
+    required String destinationCity,
+    required String category,
+    required String startTime,
+    required String endTime,
+    required List<String> excludedActivities,
+  }) async{
+    final excludedListText = excludedActivities.isNotEmpty ? excludedActivities.map((e) => '-$e').join('\n') : 'None';
+    final prompt = '''
+    You are a travel assistant in Malaysia. Suggest ONE replacement activity for a trip in $destinationCity.
+
+    Parameters:
+    - Category: ${category.isNotEmpty ? category : "Attraction or Restaurant"}
+    - Time Window: $startTime to $endTime
+    
+    CRITICAL EXCLUSIONS:
+    The user explicitly removed/visited these places. You MUST NOT suggest any of these places or direct variations of them:
+    $excludedListText
+    
+    Format your response as a valid single JSON object:
+    {
+      "destination": "Name of Landmark or Venue",
+      "description": "Short 1-2 sentence description",
+      "imageUrl": "https://picsum.photos/600/400",
+      "allocatedBudget": 0.0,
+      "duration": "60 min",
+      "activityCategory": "Attraction",
+      "startTime": "$startTime",
+      "endTime": "$endTime"
+    }
+    
+    Return ONLY the raw JSON object with no markdown formatting.
+    ''';
+
+    final url = Uri.parse(
+      ''
+    );
+
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        "contents": [
+          {
+            "parts": [{"text": prompt}]
+          }
+        ],
+        "generatingConfig": {"responseMimeType": "application/json"}
+      })
+    );
+
+    if(response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['candidates']?[0]?['content']?['parts']?[0]?['text'] ?? '{}';
+    } else{
+      throw Exception('Gemini Error: ${response.statusCode}');
+    }
+  }
 }

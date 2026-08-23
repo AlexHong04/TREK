@@ -53,11 +53,6 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void selectEmergencyFund(String percentage) {
-    _uiState = _uiState.copyWith(selectedEmergencyFund: percentage);
-    notifyListeners();
-  }
-
   void addWishlistItem(String item) {
     final trimmed = item.trim();
     if (trimmed.isEmpty) return;

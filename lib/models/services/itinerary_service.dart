@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../entities/activity.dart';
+import '../entities/whole_trip.dart';
 import '../configurations/gemini_api_config.dart';
 import '../repository/itinerary_repository.dart';
 import '../../utils/id_generator.dart';
@@ -197,8 +198,22 @@ class ItineraryService {
     required String dayTripId,
   }) async {
 
-    // TODO: get the alternative activity from gemini.
+    final rawJson = await GeminiApiConfig.askGeminiForAlternative(
+        destinationCity: destination,
+        category: category,
+        startTime: startTime,
+        endTime: endTime,
+        excludedActivities: excludedActivity,
+    );
 
+    final Map<String, dynamic> item = jsonDecode(rawJson);
+    final destTitle = item['destination'] as String? ?? 'Alternative Place';
+    String imgUrl = (item['imageUrl'] ?? item['activityImgUrl'] ?? '') as String;
+
+    if (!imgUrl.startsWith('https://') && !imgUrl.startsWith('http://')) {
+      final cleanSeed = Uri.encodeComponent(destTitle.replaceAll(RegExp(r'\s+'), '_'));
+      imgUrl = 'https://picsum.photos/seed/$cleanSeed/600/400';
+    }
 
     return Activity(
       activitiesId: '',
@@ -243,4 +258,18 @@ class ItineraryService {
       rethrow;
     }
   }
+
+  Future<({WholeTrip trip, List<Activity> activities})?> fetchLatestTrip() async {
+    final latestTrip = await _itineraryRepository.getLatestTrip();
+    if(latestTrip == null || latestTrip.tripId == null) {
+      return null;
+    }
+    final activities = await _itineraryRepository.fetchAllActivitiesByTrip(latestTrip.tripId!);
+    return (trip: latestTrip, activities: activities);
+  }
+
+  Future<List<Activity>> fetchAllActivitiesByTrip(String tripId) async {
+    return await _itineraryRepository.fetchAllActivitiesByTrip(tripId);
+  }
+
 }

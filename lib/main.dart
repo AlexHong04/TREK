@@ -61,13 +61,14 @@ class MyApp extends StatelessWidget {
       },
       navigatorKey: NavigatorService.navigatorKey,
       initialRoute: AppRoutes.initialRoute,
+
       routes: {
         AppRoutes.homeScreen: (context) => HomeScreen.builder(context),
         AppRoutes.travelInformationInputScreen: (context) =>
             TravelInformationInputScreen.builder(context),
         AppRoutes.wholeItineraryDetailScreen: (context) =>
             WholeItineraryDetailScreen.builder(context),
-        AppRoutes.activityScreen: (context) => const ActivityScreen(),
+        AppRoutes.activityScreen: (context) => ActivityScreen.builder(context),
       },
     );
   }
