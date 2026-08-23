@@ -1,13 +1,14 @@
-import 'package:trek/models/services/budget_service.dart';
-
 import '../entities/activity.dart';
 import '../entities/whole_trip.dart';
 import '../repository/itinerary_repository.dart';
+import 'budget_service.dart';
 
 enum ExpenseProcessingResult {
   withinBudget,
   reallocatedSuccessfully,
+  reallocatedFailed,
   exceedsThresholdTriggerRecommendation,
+  noAvailableRestaurantsToReallocateBudgetTriggerRecommendation,
 }
 
 class ExpenseTrackingService {
@@ -16,9 +17,12 @@ class ExpenseTrackingService {
 
   Future<ExpenseProcessingResult> processExpense({
     required String tripId,
-    required Activity currentActivity,
+    required String currentActivityId,
     required double expense,
   }) async {
+    final currentActivity = await _itineraryRepository.getCurrentActivity(currentActivityId);
+    final currentDay = await _itineraryRepository.getCurrentDay(currentActivityId);
+
     // Detect overspend
     final bool isOverspend = await detectOverspend(tripId, currentActivity, expense);
 
@@ -27,6 +31,34 @@ class ExpenseTrackingService {
     }
 
     final double overspentAmount = expense - currentActivity.allocatedBudget;
+
+    final updatedActivity = currentActivity.copyWith(
+      overspendAmount: overspentAmount,
+      isOverspend: true,
+    );
+
+    final existingCategories = currentDay.overspendCategory
+        ?.split(',')
+        .map((category) => category.trim())
+        .where((category) => category.isNotEmpty)
+        .toList() ??
+        [];
+
+    final newCategory = currentActivity.activityCategory.trim();
+
+    if (!existingCategories.contains(newCategory)) {
+      existingCategories.add(newCategory);
+    }
+
+    final updatedDay = currentDay.copyWith(
+      overspendAmount:
+      (currentDay.overspendAmount ?? 0.00) + overspentAmount,
+      overspendCategory: existingCategories.join(', '),
+      isOverspend: true,
+    );
+
+    await _itineraryRepository.updateDayOverspendDetails(updatedDay);
+    await _itineraryRepository.updateOverspendDetails(updatedActivity);
 
     // Check if overspend exceeds defined threshold
     final bool isAboveThreshold = await calculateOverspendPercentage(
@@ -46,10 +78,18 @@ class ExpenseTrackingService {
         overspentAmount,
       );
 
-      // Update database
-      await _itineraryRepository.updateActivities(updatedActivities);
+      if (updatedActivities == []) {
+        return ExpenseProcessingResult.noAvailableRestaurantsToReallocateBudgetTriggerRecommendation;
+      }
 
-      return ExpenseProcessingResult.reallocatedSuccessfully;
+      // Update database
+      final updateSuccessful = await _itineraryRepository.updateActivities(updatedActivities);
+
+      if (updateSuccessful) {
+        return ExpenseProcessingResult.reallocatedSuccessfully;
+      } else {
+        return ExpenseProcessingResult.reallocatedFailed;
+      }
     }
   }
 
