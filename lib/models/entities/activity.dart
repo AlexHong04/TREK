@@ -71,7 +71,7 @@ class Activity {
       activitiesId: json['activities_id'],
       destination: json['destination'],
       description: json['description'],
-      activityImgUrl: json['activity_img_url'],
+      activityImgUrl: (json['activity_img_url'] ?? '').toString(),
       date: DateTime.parse(json['date']),
       allocatedBudget: (json['allocated_budget'] as num).toDouble(),
       status: json['status'],

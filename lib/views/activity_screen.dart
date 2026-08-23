@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../models/entities/activity.dart';
-import '../models/entities/whole_trip.dart';
 import '../view_models/presentation_logic/activity_view_model.dart';
 import '../view_models/ui_state/activity_ui_state.dart';
 import '../widgets/custom_app_bar.dart';
@@ -26,7 +25,7 @@ class ActivityScreen extends StatefulWidget {
 class _ActivityScreenState extends State<ActivityScreen> {
 
   bool _isInit = false;
-  String _destination = 'Trip Itinerary';
+  final String _destination = 'Trip Itinerary';
 
   @override
   void didChangeDependencies() {
@@ -417,14 +416,15 @@ class _ActivityScreenState extends State<ActivityScreen> {
               topLeft: Radius.circular(12),
               topRight: Radius.circular(12),
             ),
-            child: activity.activityImgUrl.isNotEmpty
-                ? Image.asset(
-                    activity.activityImgUrl,
-                    height: 180,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                  )
-                : Container(height: 180, color: appTheme.gray_200),
+            // child: activity.activityImgUrl.isNotEmpty
+            //     ? Image.asset(
+            //         activity.activityImgUrl,
+            //         height: 180,
+            //         width: double.infinity,
+            //         fit: BoxFit.cover,
+            //       )
+            //     : Container(height: 180, color: appTheme.gray_200),
+            child: _buildAdaptiveImage(activity.activityImgUrl),
           ),
           Padding(
             padding: const EdgeInsets.only(top: 20, left: 20, right: 20),
@@ -506,6 +506,62 @@ class _ActivityScreenState extends State<ActivityScreen> {
           fontFamily: 'Inter',
           color: textColor,
         ).copyWith(height: 1.2),
+      ),
+    );
+  }
+
+  Widget _buildAdaptiveImage(String url) {
+    const double height = 180.0;
+
+    if (url.isEmpty) {
+      return _buildImagePlaceholder(height);
+    }
+
+    // 1. Check if it's a web/Supabase URL
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return Image.network(
+        url,
+        height: height,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Container(
+            height: height,
+            color: appTheme.gray_100,
+            child: const Center(
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          debugPrint('Image load error for URL $url: $error');
+          return _buildImagePlaceholder(height);
+        },
+      );
+    }
+
+    // 2. Fallback to local asset
+    return Image.asset(
+      url,
+      height: height,
+      width: double.infinity,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        return _buildImagePlaceholder(height);
+      },
+    );
+  }
+
+  Widget _buildImagePlaceholder(double height) {
+    return Container(
+      height: height,
+      width: double.infinity,
+      color: appTheme.gray_200,
+      child: Icon(
+        Icons.terrain,
+        size: 40,
+        color: appTheme.blue_gray_300,
       ),
     );
   }
