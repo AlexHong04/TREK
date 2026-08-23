@@ -1,6 +1,6 @@
 class WholeTrip {
   final String? tripId;
-  final String? userId; // Nullable for demo if no auth
+  final String? userId;
   final String destination;
   final DateTime startDate;
   final DateTime endDate;
