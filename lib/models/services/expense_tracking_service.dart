@@ -1,5 +1,8 @@
 import '../entities/activity.dart';
+import '../entities/expense.dart';
+import '../entities/expense_item.dart';
 import '../entities/whole_trip.dart';
+import '../repository/expense_repository.dart';
 import '../repository/itinerary_repository.dart';
 import 'budget_service.dart';
 
@@ -14,6 +17,103 @@ enum ExpenseProcessingResult {
 class ExpenseTrackingService {
   final ItineraryRepository _itineraryRepository = ItineraryRepository();
   final BudgetService _budgetService = BudgetService();
+  final ExpenseRepository _expenseRepository = ExpenseRepository();
+
+  /// Validates, calculates, and records one parent expense with its child items.
+  Future<Expense> recordExpense({
+    required String activitiesId,
+    required List<ExpenseItem> expenseItems,
+    String? paymentMethod,
+    String? receiptLocalPath,
+  }) async {
+    if (activitiesId.trim().isEmpty) {
+      throw ArgumentError('An expense must be linked to a selected activity.');
+    }
+
+    validateExpenseItems(expenseItems);
+
+    final itemsWithCalculatedSubtotals = expenseItems
+        .map(
+          (item) => item.copyWith(
+            subtotal: calculateItemSubtotal(item.quantity, item.unitPrice),
+          ),
+        )
+        .toList();
+
+    final totalAmount = calculateTotalExpense(itemsWithCalculatedSubtotals);
+    validateTotalAmount(totalAmount);
+
+    final savedExpense = await _expenseRepository.insertExpense(
+      Expense(
+        activitiesId: activitiesId,
+        totalAmount: totalAmount,
+        paymentMethod: paymentMethod,
+      ),
+    );
+
+    final expenseId = savedExpense.expenseId;
+    if (expenseId == null || expenseId.isEmpty) {
+      throw Exception('Supabase did not return an expense ID.');
+    }
+
+    final itemsWithExpenseId = itemsWithCalculatedSubtotals
+        .map((item) => item.copyWith(expenseId: expenseId))
+        .toList();
+
+    await _expenseRepository.insertExpenseItems(itemsWithExpenseId);
+
+    if (receiptLocalPath == null || receiptLocalPath.trim().isEmpty) {
+      return savedExpense;
+    }
+
+    final receiptImageUrl = await _expenseRepository.uploadReceiptImage(
+      localImagePath: receiptLocalPath,
+      expenseId: expenseId,
+    );
+
+    await _expenseRepository.updateReceiptImageUrl(
+      expenseId: expenseId,
+      receiptImageUrl: receiptImageUrl,
+    );
+
+    return savedExpense.copyWith(receiptImageUrl: receiptImageUrl);
+  }
+
+  double calculateItemSubtotal(int quantity, double unitPrice) {
+    return quantity * unitPrice;
+  }
+
+  double calculateTotalExpense(List<ExpenseItem> expenseItems) {
+    return expenseItems.fold(0.0, (total, item) => total + item.subtotal);
+  }
+
+  void validateExpenseItems(List<ExpenseItem> expenseItems) {
+    if (expenseItems.isEmpty) {
+      throw ArgumentError('Add at least one expense item.');
+    }
+
+    for (final item in expenseItems) {
+      if (item.itemName.trim().isEmpty) {
+        throw ArgumentError('Item name cannot be empty.');
+      }
+
+      if (item.quantity <= 0) {
+        throw ArgumentError('Item quantity must be greater than zero.');
+      }
+
+      if (item.unitPrice < 0) {
+        throw ArgumentError('Item unit price cannot be negative.');
+      }
+    }
+  }
+
+  void validateTotalAmount(double totalAmount) {
+    if (totalAmount <= 0 || totalAmount > 999999) {
+      throw ArgumentError(
+        'Amount must be a positive number within the allowed transaction limit.',
+      );
+    }
+  }
 
   Future<ExpenseProcessingResult> processExpense({
     required String tripId,
