@@ -25,8 +25,7 @@ class TravelInformationUiState {
     return TravelInformationUiState(
       isLoading: isLoading ?? this.isLoading,
       selectedPreference: selectedPreference ?? this.selectedPreference,
-      selectedEmergencyFund:
-          selectedEmergencyFund ?? this.selectedEmergencyFund,
+      selectedEmergencyFund: selectedEmergencyFund ?? this.selectedEmergencyFund,
       errorMessage: errorMessage ?? this.errorMessage,
       wishlistItems: wishlistItems ?? this.wishlistItems,
     );

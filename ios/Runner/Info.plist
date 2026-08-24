@@ -42,6 +42,12 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<key>NSCameraUsageDescription</key>
+    <string>This app needs access to the camera to capture expense receipts and activity photos.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>This app needs access to the photo library to pick activity photos.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>This app requires location access to track real-time itinerary proximity.</string>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>

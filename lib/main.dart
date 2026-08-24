@@ -3,6 +3,7 @@ import 'theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'models/configurations/supabase_config.dart';
 import 'models/configurations/gemini_api_config.dart';
+import 'models/local_data_source/location_source.dart';
 
 import 'views/whole_itinerary_detail_screen.dart';
 import 'views/home_screen.dart';
@@ -60,13 +61,14 @@ class MyApp extends StatelessWidget {
       },
       navigatorKey: NavigatorService.navigatorKey,
       initialRoute: AppRoutes.initialRoute,
+
       routes: {
         AppRoutes.homeScreen: (context) => HomeScreen.builder(context),
         AppRoutes.travelInformationInputScreen: (context) =>
             TravelInformationInputScreen.builder(context),
         AppRoutes.wholeItineraryDetailScreen: (context) =>
             WholeItineraryDetailScreen.builder(context),
-        AppRoutes.activityScreen: (context) => const ActivityScreen(),
+        AppRoutes.activityScreen: (context) => ActivityScreen.builder(context),
       },
     );
   }

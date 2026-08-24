@@ -2,13 +2,15 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../entities/activity.dart';
+import '../entities/whole_trip.dart';
 import '../configurations/gemini_api_config.dart';
-import '../repository/trip_repository.dart';
+import '../repository/itinerary_repository.dart';
 import '../../utils/id_generator.dart';
 
 class ItineraryService {
-  final TripRepository _tripRepository = TripRepository();
+  final ItineraryRepository _itineraryRepository = ItineraryRepository();
 
+  // kokhong
   Future<List<Activity>> generateItinerary({
     required String destination,
     required String dates,
@@ -56,7 +58,7 @@ class ItineraryService {
           String finalDestinationTitle = destName;
           final query = Uri.encodeComponent(imageKeyword);
 
-          // 1. FREE TIER PRIORITY: English Wikipedia (Good for Title Accuracy and Landmarks)
+          // FREE TIER PRIORITY: English Wikipedia (Good for Title Accuracy and Landmarks)
           if (finalDestinationTitle == destName) {
             try {
               final wikiUrl = Uri.parse(
@@ -81,7 +83,7 @@ class ItineraryService {
             } catch (_) {}
           }
 
-          // 2. FREE TIER PRIORITY: Wikimedia Commons (Richest media library for specific restaurants, streets, food)
+          // FREE TIER PRIORITY: Wikimedia Commons (Richest media library for specific restaurants, streets, food)
           if (imgUrl.isEmpty) {
             try {
               // Use the corrected title for better media search
@@ -116,22 +118,26 @@ class ItineraryService {
                 'https://loremflickr.com/600/400/$keywordQuery?lock=$index';
           }
 
+          int dayNumber = item['dayNumber'] as int? ?? 1;
           String startTimeStr = item['startTime'] as String? ?? '09:00';
-          DateTime parsedDate = DateTime.now();
+
+          DateTime baseDate = DateTime.now().add(Duration(days: dayNumber - 1));
+          DateTime parsedDate = baseDate;
+
           try {
             // Try parsing "09:00" assuming it's HH:mm
             final parts = startTimeStr.split(':');
             final h = int.parse(parts[0]);
             final m = int.parse(parts[1]);
             parsedDate = DateTime(
-              parsedDate.year,
-              parsedDate.month,
-              parsedDate.day,
+              baseDate.year,
+              baseDate.month,
+              baseDate.day,
               h,
               m,
             );
           } catch (_) {
-            // keep now() if fail
+            // keep baseDate if fail
           }
 
           newActivities.add(
@@ -182,6 +188,56 @@ class ItineraryService {
     }
   }
 
+  // weisong
+  Future<Activity> generateAlternativeItinerary({
+    required String destination,
+    required DateTime slotDate,
+    required String startTime,
+    required String endTime,
+    required String category,
+    required List<String> excludedActivity,
+    required String existingActivityId,
+    required String dayTripId,
+  }) async {
+    final rawJson = await GeminiApiConfig.askGeminiForAlternative(
+      destinationCity: destination,
+      category: category,
+      startTime: startTime,
+      endTime: endTime,
+      excludedActivities: excludedActivity,
+    );
+
+    final Map<String, dynamic> item = jsonDecode(rawJson);
+    final destTitle = item['destination'] as String? ?? 'Alternative Place';
+    String imgUrl =
+        (item['imageUrl'] ?? item['activityImgUrl'] ?? '') as String;
+
+    if (!imgUrl.startsWith('https://') && !imgUrl.startsWith('http://')) {
+      final cleanSeed = Uri.encodeComponent(
+        destTitle.replaceAll(RegExp(r'\s+'), '_'),
+      );
+      imgUrl = 'https://picsum.photos/seed/$cleanSeed/600/400';
+    }
+
+    return Activity(
+      activitiesId: '',
+      dayTripId: '',
+      destination: '',
+      description: '',
+      activityImgUrl: '',
+      date: slotDate,
+      allocatedBudget: 0.0,
+      overspendAmount: null,
+      status: 'empty',
+      startTime: startTime,
+      endTime: endTime,
+      duration: '',
+      activityCategory: '',
+      isOverspend: false,
+    );
+  }
+
+  // kokhong
   Future<bool> saveItinerary(
     List<Activity> activities, {
     required String destination,
@@ -196,7 +252,7 @@ class ItineraryService {
     } catch (_) {}
 
     try {
-      await _tripRepository.insertFullTrip(
+      await _itineraryRepository.insertFullTrip(
         destination: destination,
         datesText: datesText,
         totalBudget: budget,
@@ -207,4 +263,31 @@ class ItineraryService {
       rethrow;
     }
   }
+
+  // weisong
+  Future<({WholeTrip trip, List<Activity> activities})?>
+  fetchLatestTrip() async {
+    final latestTrip = await _itineraryRepository.getLatestTrip();
+    if (latestTrip == null || latestTrip.tripId == null) {
+      return null;
+    }
+    final activities = await _itineraryRepository.fetchAllActivitiesByTrip(
+      latestTrip.tripId!,
+    );
+    return (trip: latestTrip, activities: activities);
+  }
+
+  Future<List<Activity>> fetchAllActivitiesByTrip(String tripId) async {
+    return await _itineraryRepository.fetchAllActivitiesByTrip(tripId);
+  }
+
+  Future<bool> endTrip(String id) async {
+    try {
+      await _itineraryRepository.terminateTrip(id, 'terminated');
+      return true;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
 }

@@ -19,6 +19,28 @@ class DayTrip {
     this.createdAt,
   });
 
+  DayTrip copyWith({
+    String? dayTripId,
+    String? tripId,
+    String? destination,
+    DateTime? date,
+    bool? isOverspend,
+    double? overspendAmount,
+    String? overspendCategory,
+    DateTime? createdAt
+}) {
+    return DayTrip(
+      dayTripId: dayTripId ?? this.dayTripId,
+      tripId: tripId ?? this.tripId,
+      destination: destination ?? this.destination,
+      date: date ?? this.date,
+      isOverspend: isOverspend ?? this.isOverspend,
+      overspendAmount: overspendAmount ?? this.overspendAmount,
+      overspendCategory: overspendCategory ?? this.overspendCategory,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
   factory DayTrip.fromJson(Map<String, dynamic> json) {
     return DayTrip(
       dayTripId: json['day_trip_id'],

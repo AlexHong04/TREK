@@ -8,7 +8,10 @@ class SupabaseConfig {
     const supabaseAnonKey =
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpd29yaGlpZWpwdHZzamFqZ2l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMTQ2NTksImV4cCI6MjEwMTU5MDY1OX0.pKPZa9Ihu4YbpXvl8sBiXcD_fZ7KviDvx8oFUox5_rc';
 
-    await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
+    await Supabase.initialize(
+      url: supabaseUrl,
+      publishableKey: supabaseAnonKey,
+    );
 
     client = Supabase.instance.client;
   }

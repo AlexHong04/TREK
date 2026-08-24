@@ -1,11 +1,10 @@
 class WholeTrip {
   final String? tripId;
-  final String? userId; // Nullable for demo if no auth
+  final String? userId;
   final String destination;
   final DateTime startDate;
   final DateTime endDate;
   final double totalBudget;
-  final double? emergencyFund;
   final double? remainingBalance;
   final bool? isCriticalBudget;
   final String status;
@@ -20,7 +19,6 @@ class WholeTrip {
     required this.startDate,
     required this.endDate,
     required this.totalBudget,
-    this.emergencyFund,
     this.remainingBalance,
     this.isCriticalBudget,
     required this.status,
@@ -28,6 +26,36 @@ class WholeTrip {
     this.createdAt,
     this.imgUrl,
   });
+
+  WholeTrip copyWith({
+    String? tripId,
+    String? userId,
+    String? destination,
+    DateTime? startDate,
+    DateTime? endDate,
+    double? totalBudget,
+    double? remainingBalance,
+    bool? isCriticalBudget,
+    String? status,
+    String? travelPreference,
+    DateTime? createdAt,
+    String? imgUrl,
+  }) {
+    return WholeTrip(
+      tripId: tripId ?? this.tripId,
+      userId: userId ?? this.userId,
+      destination: destination ?? this.destination,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
+      totalBudget: totalBudget ?? this.totalBudget,
+      remainingBalance: remainingBalance ?? this.remainingBalance,
+      isCriticalBudget: isCriticalBudget ?? this.isCriticalBudget,
+      status: status ?? this.status,
+      travelPreference: travelPreference ?? this.travelPreference,
+      createdAt: createdAt ?? this.createdAt,
+      imgUrl: imgUrl ?? this.imgUrl,
+    );
+  }
 
   factory WholeTrip.fromJson(Map<String, dynamic> json) {
     return WholeTrip(
@@ -37,7 +65,6 @@ class WholeTrip {
       startDate: DateTime.parse(json['start_date']),
       endDate: DateTime.parse(json['end_date']),
       totalBudget: (json['total_budget'] as num).toDouble(),
-      emergencyFund: (json['emergency_fund'] as num?)?.toDouble(),
       remainingBalance: (json['remaining_balance'] as num?)?.toDouble(),
       isCriticalBudget: json['is_critical_budget'],
       status: json['status'],
@@ -57,7 +84,6 @@ class WholeTrip {
       'start_date': startDate.toIso8601String(),
       'end_date': endDate.toIso8601String(),
       'total_budget': totalBudget,
-      if (emergencyFund != null) 'emergency_fund': emergencyFund,
       if (remainingBalance != null) 'remaining_balance': remainingBalance,
       if (isCriticalBudget != null) 'is_critical_budget': isCriticalBudget,
       'status': status,
