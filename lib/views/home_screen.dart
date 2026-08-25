@@ -276,10 +276,7 @@ class _HomeScreenState extends State<HomeScreen> {
           onTap: () {
             Navigator.of(context).pushNamed(
               '/activityScreen',
-              arguments: {
-                'trip': trip,
-                'isReadOnly': true,
-              }
+              arguments: {'trip': trip, 'isReadOnly': true},
             );
           },
           child: Column(
@@ -287,7 +284,9 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               // Banner Image
               ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
                 child: Stack(
                   children: [
                     if (trip.imgUrl != null && trip.imgUrl!.isNotEmpty)
@@ -413,7 +412,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
-
   }
 
   // Start Plan button and Plan New button
