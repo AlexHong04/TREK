@@ -321,10 +321,25 @@ class ActivityViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> topUpBudget(double additionalAmount) async {
+  void setCurrentActivityId(String activityId) {
+    _uiState = _uiState.copyWith(currentActivityId: activityId);
+    notifyListeners();
+  }
+
+  Future<bool> topUpBudget(double additionalAmount) async {
+    if (additionalAmount <= 0) {
+      _uiState = _uiState.copyWith(
+        isLoading: false,
+        errorMessage: 'Please enter a top-up amount greater than RM0.00.',
+      );
+      notifyListeners();
+      return false;
+    }
+
     final id = _uiState.tripId;
     final activityId = _uiState.currentActivityId;
-    _uiState = _uiState.copyWith(isLoading: true);
+
+    _uiState = _uiState.copyWith(isLoading: true, errorMessage: '');
     notifyListeners();
 
     try {
@@ -347,19 +362,36 @@ class ActivityViewModel extends ChangeNotifier {
           isLoading: false,
           totalBudget: updatedTrip.totalBudget,
           remainingBudget: updatedTrip.remainingBalance,
+          overspentBudget: _uiState.overspentBudget - additionalAmount,
           sufficientDays: days.toInt(),
           usedPercentageValue: percentage,
           usedPercentageString:
               '${(percentage * 100).toStringAsFixed(0)}% Used',
+          errorMessage: '',
         );
-      } else {
-        _uiState = _uiState.copyWith(isLoading: false);
-      }
-    } catch (e) {
-      _uiState = _uiState.copyWith(isLoading: false);
-    }
 
-    notifyListeners();
+        notifyListeners();
+        return true;
+      }
+
+      _uiState = _uiState.copyWith(
+        isLoading: false,
+        errorMessage: 'Unable to top up budget. Please try again.',
+      );
+
+      notifyListeners();
+      return false;
+    } catch (e) {
+      debugPrint('Top-up error: $e');
+
+      _uiState = _uiState.copyWith(
+        isLoading: false,
+        errorMessage: 'Unable to top up budget. Please try again.',
+      );
+
+      notifyListeners();
+      return false;
+    }
   }
 
   Future<void> handleExpenseSubmission(
@@ -377,30 +409,30 @@ class ActivityViewModel extends ChangeNotifier {
 
     switch (result) {
       case ExpenseProcessingResult.withinBudget:
-        // Update UI state normally
+        _uiState.copyWith(popupAction: '');
         break;
 
       case ExpenseProcessingResult.reallocatedSuccessfully:
-        // Show snackbar notifying user that restaurant budgets were reallocated
-        // update ui State
+        _uiState = _uiState.copyWith(popupAction: 'successful');
         break;
 
       case ExpenseProcessingResult.reallocatedFailed:
-        // Show snackbar notifying user that restaurant budgets were reallocated, but not fully covered the overspend amount
-        // update ui State
+        _uiState = _uiState.copyWith(popupAction: 'fail');
         break;
 
       case ExpenseProcessingResult.exceedsThresholdTriggerRecommendation:
-        // Open dialog/screen showing top-up or recovery recommendations
-        break;
-
-      case ExpenseProcessingResult
-          .noAvailableRestaurantsToReallocateBudgetTriggerRecommendation:
-        // Open dialog/screen showing top-up or recovery recommendations
+        _uiState = _uiState.copyWith(popupAction: 'recommendation');
         break;
     }
 
     _uiState = _uiState.copyWith(isLoading: false);
+    notifyListeners();
+  }
+
+  void clearPopupAction() {
+    _uiState = _uiState.copyWith(
+      popupAction: '',
+    );
     notifyListeners();
   }
 }
