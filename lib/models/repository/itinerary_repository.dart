@@ -352,7 +352,7 @@ class ItineraryRepository {
     try {
       final res = await SupabaseConfig.client
           .from('whole_trips')
-          .select()
+          .select('*')
           .order('created_at', ascending: false)
           .limit(1)
           .maybeSingle();
@@ -391,6 +391,19 @@ class ItineraryRepository {
       return allActivities;
     } catch (e) {
       print('Error fetching activities: $e');
+      throw Exception('DB Error: $e');
+    }
+  }
+
+  // weisong
+  Future<void> updateTripStatus(String tripId, String newStatus) async {
+    try {
+      await SupabaseConfig.client
+          .from('whole_trips')
+          .update({'status': newStatus})
+          .eq('trip_id', tripId);
+    } catch (e) {
+      print('Error updating trip status: $e');
       throw Exception('DB Error: $e');
     }
   }

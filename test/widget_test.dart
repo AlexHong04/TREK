@@ -8,7 +8,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:trek/main.dart';
+import 'package:Trek/main.dart';
 
 void main() {
   testWidgets('app builds without crashing', (WidgetTester tester) async {

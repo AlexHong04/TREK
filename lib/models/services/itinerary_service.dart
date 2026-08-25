@@ -289,5 +289,11 @@ class ItineraryService {
       rethrow;
     }
   }
-
+  Future<void> updateTripStatus(String tripId, String newStatus) async {
+    final allowedStatus = ['Pending', 'Ongoing', 'Completed'];
+    if (!allowedStatus.contains(newStatus)) {
+      throw ArgumentError('Invalid trip status. Allowed values are: $allowedStatus');
+    }
+    await _itineraryRepository.updateTripStatus(tripId, newStatus);
+  }
 }
