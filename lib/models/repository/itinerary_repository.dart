@@ -333,12 +333,14 @@ class ItineraryRepository {
     }
   }
 
+  //zhiqin
   Future<WholeTrip?> getTrip(String tripId) async {
     try {
       final res = await SupabaseConfig.client
           .from('whole_trips')
           .select()
-          .eq('trip_id', tripId);
+          .eq('trip_id', tripId)
+          .maybeSingle();
 
       return WholeTrip.fromJson(res as Map<String, dynamic>);
     } catch (e) {
