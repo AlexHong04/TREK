@@ -8,8 +8,9 @@ import 'activity_screen.dart';
 import '../models/local_data_source/location_source.dart';
 import 'package:geolocator/geolocator.dart';
 import '../main.dart';
+import 'financial_dashboard_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   static Widget builder(BuildContext context) {
@@ -20,7 +21,32 @@ class HomeScreen extends StatelessWidget {
   }
 
   @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final PageController _pageController = PageController();
+  int _currentPage = 0;
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    return PageView(
+      controller: _pageController,
+      onPageChanged: (page) => setState(() => _currentPage = page),
+      children: [
+        _buildHomePage(context),
+        FinancialDashboardScreen(onHomeSelected: () => _goToPage(0)),
+      ],
+    );
+  }
+
+  Widget _buildHomePage(BuildContext context) {
     return Scaffold(
       backgroundColor: appTheme.gray_50_02,
       body: SafeArea(
@@ -111,25 +137,43 @@ class HomeScreen extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: appTheme.teal_A700,
+          GestureDetector(
+            onTap: () => _goToPage(0),
+            child: Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _currentPage == 0
+                    ? appTheme.teal_A700
+                    : appTheme.gray_200,
+              ),
             ),
           ),
           const SizedBox(width: 6),
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: appTheme.gray_200,
+          GestureDetector(
+            onTap: () => _goToPage(1),
+            child: Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _currentPage == 1
+                    ? appTheme.teal_A700
+                    : appTheme.gray_200,
+              ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  void _goToPage(int page) {
+    _pageController.animateToPage(
+      page,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
     );
   }
 
