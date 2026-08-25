@@ -11,7 +11,6 @@ enum ExpenseProcessingResult {
   reallocatedSuccessfully,
   reallocatedFailed,
   exceedsThresholdTriggerRecommendation,
-  noAvailableRestaurantsToReallocateBudgetTriggerRecommendation,
 }
 
 class ExpenseTrackingService {
@@ -115,6 +114,7 @@ class ExpenseTrackingService {
     }
   }
 
+  // zhiqin
   Future<ExpenseProcessingResult> processExpense({
     required String tripId,
     required String currentActivityId,
@@ -179,7 +179,7 @@ class ExpenseTrackingService {
       );
 
       if (updatedActivities == []) {
-        return ExpenseProcessingResult.noAvailableRestaurantsToReallocateBudgetTriggerRecommendation;
+        return ExpenseProcessingResult.reallocatedFailed;
       }
 
       // Update database
@@ -193,6 +193,7 @@ class ExpenseTrackingService {
     }
   }
 
+  // zhiqin
   Future<bool> detectOverspend(String tripId, Activity currentActivity, double expense) async {
     if (currentActivity.allocatedBudget < expense) {
       return true;
@@ -200,6 +201,7 @@ class ExpenseTrackingService {
     return false;
   }
 
+  // zhiqin
   Future<List<Activity>> reallocateBudget(String tripId, Activity currentActivity, double overspendAmount) async {
     List<Activity> modifiedActivities =
     await _budgetService.reallocateBudget(tripId, currentActivity, overspendAmount);
