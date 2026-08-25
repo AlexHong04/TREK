@@ -3,6 +3,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class SupabaseConfig {
   static late final SupabaseClient client;
 
+  // deep linking
+  static const String authCallbackUrl = 'io.supabase.trek://login-callback/';
+  static const String passwordResetCallbackUrl = 'io.supabase.trek://reset-password-callback/';
+
   static Future<void> initialize() async {
     const supabaseUrl = 'https://viworhiiejptvsjajgit.supabase.co';
     const supabaseAnonKey =
