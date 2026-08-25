@@ -27,6 +27,8 @@ class ActivityUiState {
   final double usedPercentageValue;
   final double shortageAmount;
 
+  final String popupAction;
+
   const ActivityUiState({
     this.isLoading = false,
     this.tripId = '',
@@ -49,6 +51,7 @@ class ActivityUiState {
     this.usedPercentageString = '0% Used',
     this.usedPercentageValue = 0.0,
     this.shortageAmount = 0.0,
+    this.popupAction = '',
   });
 
   ActivityUiState copyWith({
@@ -72,7 +75,8 @@ class ActivityUiState {
     int? sufficientDays,
     String? usedPercentageString,
     double? usedPercentageValue,
-    double? shortageAmount
+    double? shortageAmount,
+    String? popupAction,
   }) {
     return ActivityUiState(
       isLoading: isLoading ?? this.isLoading,
@@ -96,6 +100,7 @@ class ActivityUiState {
       usedPercentageString: usedPercentageString ?? this.usedPercentageString,
       usedPercentageValue: usedPercentageValue ?? this.usedPercentageValue,
       shortageAmount: shortageAmount ?? this.shortageAmount,
+      popupAction: popupAction ?? this.popupAction,
     );
   }
 }
