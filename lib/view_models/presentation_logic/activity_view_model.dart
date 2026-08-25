@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../models/entities/activity.dart';
+import '../../models/entities/expense_item.dart';
+import '../../models/local_data_source/camera_source.dart';
 import '../../models/services/budget_service.dart';
 import '../../models/services/expense_tracking_service.dart';
 import '../../models/services/itinerary_service.dart';
@@ -11,6 +13,7 @@ class ActivityViewModel extends ChangeNotifier {
   final BudgetService _budgetService = BudgetService();
   final ExpenseTrackingService _expenseTrackingService =
       ExpenseTrackingService();
+  final CameraSource _cameraSource = CameraSource();
 
   ActivityUiState _uiState = const ActivityUiState();
 
@@ -18,6 +21,188 @@ class ActivityViewModel extends ChangeNotifier {
 
   ActivityViewModel() {
     initialize();
+  }
+
+  void selectActivityForExpense(Activity activity) {
+    _uiState = _uiState.copyWith(
+      selectedActivity: activity,
+      currentActivityId: activity.activitiesId,
+      draftExpenseItems: const [],
+      draftTotalAmount: 0.0,
+      paymentMethod: '',
+      receiptLocalPath: '',
+      errorMessage: '',
+      successMessage: '',
+    );
+    notifyListeners();
+  }
+
+  void addExpenseItem(ExpenseItem item) {
+    _updateDraftExpenseItems([..._uiState.draftExpenseItems, item]);
+  }
+
+  void updateExpenseItem(int index, ExpenseItem item) {
+    if (index < 0 || index >= _uiState.draftExpenseItems.length) {
+      _setExpenseError('The expense item could not be found.');
+      return;
+    }
+
+    final updatedItems = [..._uiState.draftExpenseItems];
+    updatedItems[index] = item;
+    _updateDraftExpenseItems(updatedItems);
+  }
+
+  void removeExpenseItem(int index) {
+    if (index < 0 || index >= _uiState.draftExpenseItems.length) {
+      _setExpenseError('The expense item could not be found.');
+      return;
+    }
+
+    final updatedItems = [..._uiState.draftExpenseItems]..removeAt(index);
+    _updateDraftExpenseItems(updatedItems);
+  }
+
+  void setPaymentMethod(String paymentMethod) {
+    _uiState = _uiState.copyWith(
+      paymentMethod: paymentMethod,
+      errorMessage: '',
+      successMessage: '',
+    );
+    notifyListeners();
+  }
+
+  Future<void> takeReceiptPhoto() async {
+    _uiState = _uiState.copyWith(
+      isPickingReceipt: true,
+      errorMessage: '',
+      successMessage: '',
+    );
+    notifyListeners();
+
+    try {
+      final localPath = await _cameraSource.takePhoto();
+      _uiState = _uiState.copyWith(
+        isPickingReceipt: false,
+        receiptLocalPath: localPath ?? _uiState.receiptLocalPath,
+      );
+    } catch (error) {
+      _uiState = _uiState.copyWith(
+        isPickingReceipt: false,
+        errorMessage: _readableError(error),
+      );
+    }
+    notifyListeners();
+  }
+
+  Future<void> chooseReceiptFromGallery() async {
+    _uiState = _uiState.copyWith(
+      isPickingReceipt: true,
+      errorMessage: '',
+      successMessage: '',
+    );
+    notifyListeners();
+
+    try {
+      final localPath = await _cameraSource.pickPhotoFromGallery();
+      _uiState = _uiState.copyWith(
+        isPickingReceipt: false,
+        receiptLocalPath: localPath ?? _uiState.receiptLocalPath,
+      );
+    } catch (error) {
+      _uiState = _uiState.copyWith(
+        isPickingReceipt: false,
+        errorMessage: _readableError(error),
+      );
+    }
+    notifyListeners();
+  }
+
+  void removeReceipt() {
+    _uiState = _uiState.copyWith(receiptLocalPath: '');
+    notifyListeners();
+  }
+
+  void clearExpenseMessage() {
+    _uiState = _uiState.copyWith(errorMessage: '', successMessage: '');
+    notifyListeners();
+  }
+
+  Future<void> confirmExpense() async {
+    final selectedActivity = _uiState.selectedActivity;
+    if (selectedActivity == null) {
+      _setExpenseError('Select an activity before recording an expense.');
+      return;
+    }
+
+    _uiState = _uiState.copyWith(
+      isSavingExpense: true,
+      errorMessage: '',
+      successMessage: '',
+    );
+    notifyListeners();
+
+    try {
+      await _expenseTrackingService.recordExpense(
+        activitiesId: selectedActivity.activitiesId,
+        expenseItems: _uiState.draftExpenseItems,
+        paymentMethod: _uiState.paymentMethod.isEmpty
+            ? null
+            : _uiState.paymentMethod,
+        receiptLocalPath: _uiState.receiptLocalPath.isEmpty
+            ? null
+            : _uiState.receiptLocalPath,
+      );
+
+      _uiState = _uiState.copyWith(
+        isSavingExpense: false,
+        draftExpenseItems: const [],
+        draftTotalAmount: 0.0,
+        paymentMethod: '',
+        receiptLocalPath: '',
+        successMessage: 'The expense record has been successfully saved.',
+      );
+    } catch (error) {
+      _uiState = _uiState.copyWith(
+        isSavingExpense: false,
+        errorMessage: _readableError(error),
+      );
+    }
+    notifyListeners();
+  }
+
+  void _updateDraftExpenseItems(List<ExpenseItem> items) {
+    final itemsWithCalculatedSubtotals = items
+        .map(
+          (item) => item.copyWith(
+            subtotal: _expenseTrackingService.calculateItemSubtotal(
+              item.quantity,
+              item.unitPrice,
+            ),
+          ),
+        )
+        .toList();
+
+    _uiState = _uiState.copyWith(
+      draftExpenseItems: itemsWithCalculatedSubtotals,
+      draftTotalAmount: _expenseTrackingService.calculateTotalExpense(
+        itemsWithCalculatedSubtotals,
+      ),
+      errorMessage: '',
+      successMessage: '',
+    );
+    notifyListeners();
+  }
+
+  void _setExpenseError(String message) {
+    _uiState = _uiState.copyWith(errorMessage: message, successMessage: '');
+    notifyListeners();
+  }
+
+  String _readableError(Object error) {
+    return error
+        .toString()
+        .replaceFirst('Exception: ', '')
+        .replaceFirst('Invalid argument(s): ', '');
   }
 
   Future<void> initialize() async {

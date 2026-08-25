@@ -8,7 +8,7 @@ import '../entities/expense_item.dart';
 
 class ExpenseRepository {
   static const String _expensesTable = 'expenses';
-  static const String _expenseItemsTable = 'expense_items';
+  static const String _expenseItemsTable = 'expense_item';
   static const String _receiptImagesBucket = 'receipt_images';
   static const int _maximumReceiptSizeInBytes = 15 * 1024 * 1024;
 
