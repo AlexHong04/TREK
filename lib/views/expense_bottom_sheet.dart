@@ -12,18 +12,6 @@ import '../models/entities/expense_item.dart';
 import '../view_models/presentation_logic/activity_view_model.dart';
 import '../view_models/ui_state/activity_ui_state.dart';
 
-/// Expense-specific shades that are not part of the shared team palette.
-class _ExpenseColors {
-  static const Color fieldOverlay = Color(0x08F9FAFB);
-  static const Color disabledIcon = Color(0xFFB3B3B3);
-  static const Color hintText = Color(0xFFBFC4CC);
-  static const Color errorBackground = Color(0xFFFFE4E6);
-  static const Color errorText = Color(0xFF7F1D1D);
-  static const Color cardShadow = Color(0x14000000);
-  static const Color subtleShadow = Color(0x0D000000);
-  static const Color alertShadow = Color(0x24000000);
-}
-
 /// Opens the Expense form for the Activity selected from the itinerary.
 Future<void> showExpenseBottomSheet({
   required BuildContext context,
@@ -217,7 +205,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: const [
           BoxShadow(
-            color: _ExpenseColors.cardShadow,
+            color: const Color(0x14000000),
             blurRadius: 16,
             offset: Offset(0, 6),
           ),
@@ -327,7 +315,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: const BoxDecoration(
-              color: _ExpenseColors.fieldOverlay,
+              color: const Color(0x08F9FAFB),
               border: Border(bottom: BorderSide(color: AppColors.gray100)),
             ),
             child: Row(
@@ -382,7 +370,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                   onPressed: () => setState(() => _isEditingItem = true),
                   icon: const Icon(
                     Icons.edit_outlined,
-                    color: _ExpenseColors.disabledIcon,
+                    color: const Color(0xFFB3B3B3),
                   ),
                 ),
                 IconButton(
@@ -392,7 +380,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                           _editingItemIndex!,
                           clearEditor: true,
                         ),
-                  icon: const Icon(Icons.close, color: _ExpenseColors.disabledIcon),
+                  icon: const Icon(Icons.close, color: const Color(0xFFB3B3B3)),
                 ),
               ],
             ),
@@ -692,7 +680,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isError ? _ExpenseColors.errorBackground : AppColors.teal50,
+        color: isError ? const Color(0xFFFFE4E6) : AppColors.teal50,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(message),
@@ -981,7 +969,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   InputDecoration _fieldDecoration(String? hint) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: const TextStyle(color: _ExpenseColors.hintText),
+      hintStyle: const TextStyle(color: const Color(0xFFBFC4CC)),
       filled: true,
       fillColor: AppColors.gray50,
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -1017,12 +1005,12 @@ class _TopMessageAlert extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
           decoration: BoxDecoration(
-            color: _ExpenseColors.errorBackground,
+            color: const Color(0xFFFFE4E6),
             border: Border.all(color: AppColors.errorRed),
             borderRadius: BorderRadius.circular(12),
             boxShadow: const [
               BoxShadow(
-                color: _ExpenseColors.alertShadow,
+                color: const Color(0x24000000),
                 blurRadius: 12,
                 offset: Offset(0, 4),
               ),
@@ -1036,7 +1024,7 @@ class _TopMessageAlert extends StatelessWidget {
                 child: Text(
                   message,
                   style: const TextStyle(
-                    color: _ExpenseColors.errorText,
+                    color: const Color(0xFF7F1D1D),
                     fontFamily: 'Inter',
                     fontWeight: FontWeight.w600,
                   ),
@@ -1044,7 +1032,7 @@ class _TopMessageAlert extends StatelessWidget {
               ),
               IconButton(
                 onPressed: onClose,
-                icon: const Icon(Icons.close, color: _ExpenseColors.errorText),
+                icon: const Icon(Icons.close, color: const Color(0xFF7F1D1D)),
                 tooltip: 'Close message',
               ),
             ],
@@ -1072,7 +1060,7 @@ class _ExpenseSectionCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: const [
           BoxShadow(
-            color: _ExpenseColors.subtleShadow,
+            color: const Color(0x0D000000),
             blurRadius: 15,
             offset: Offset(0, 4),
           ),
@@ -1221,7 +1209,7 @@ class _ExpenseCategoryCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: const [
           BoxShadow(
-            color: _ExpenseColors.cardShadow,
+            color: const Color(0x14000000),
             blurRadius: 16,
             offset: Offset(0, 6),
           ),

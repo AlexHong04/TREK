@@ -1,4 +1,5 @@
 import '../../models/entities/activity.dart';
+import '../../models/entities/expense.dart';
 import '../../models/entities/expense_item.dart';
 
 class ActivityUiState {
@@ -17,6 +18,10 @@ class ActivityUiState {
   final bool isPickingReceipt;
   final String errorMessage;
   final String successMessage;
+
+  // Confirmed expenses already saved for the selected Activity.
+  final List<Expense> recordedExpenses;
+  final bool isLoadingRecordedExpenses;
 
   final double totalBudget;
   final double spentBudget;
@@ -43,6 +48,8 @@ class ActivityUiState {
     this.isPickingReceipt = false,
     this.errorMessage = '',
     this.successMessage = '',
+    this.recordedExpenses = const [],
+    this.isLoadingRecordedExpenses = false,
     this.totalBudget = 0.0,
     this.spentBudget = 0.0,
     this.remainingBudget = 0.0,
@@ -68,6 +75,8 @@ class ActivityUiState {
     bool? isPickingReceipt,
     String? errorMessage,
     String? successMessage,
+    List<Expense>? recordedExpenses,
+    bool? isLoadingRecordedExpenses,
     double? totalBudget,
     double? spentBudget,
     double? remainingBudget,
@@ -92,6 +101,9 @@ class ActivityUiState {
       isPickingReceipt: isPickingReceipt ?? this.isPickingReceipt,
       errorMessage: errorMessage ?? this.errorMessage,
       successMessage: successMessage ?? this.successMessage,
+      recordedExpenses: recordedExpenses ?? this.recordedExpenses,
+      isLoadingRecordedExpenses:
+          isLoadingRecordedExpenses ?? this.isLoadingRecordedExpenses,
       totalBudget: totalBudget ?? this.totalBudget,
       spentBudget: spentBudget ?? this.spentBudget,
       remainingBudget: remainingBudget ?? this.remainingBudget,
