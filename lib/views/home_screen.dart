@@ -4,10 +4,6 @@ import 'package:intl/intl.dart';
 
 import '../theme/app_theme.dart';
 import '../view_models/presentation_logic/home_view_model.dart';
-import 'activity_screen.dart';
-import '../models/local_data_source/location_source.dart';
-import 'package:geolocator/geolocator.dart';
-import '../main.dart';
 import 'financial_dashboard_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -88,7 +84,6 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Logo + Explorer
           Row(
             children: [
               Container(
@@ -113,7 +108,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          // Profile avatar
           Container(
             width: 40,
             height: 40,
@@ -223,7 +217,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (!viewModel.uiState.hasPlan || viewModel.uiState.latestTrip == null) {
-      // Empty state placeholder
       return Container(
         width: double.infinity,
         height: 260,
@@ -252,11 +245,17 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    // Show existing plan card with dynamic data
-    // Show the latest trip plan to able user to view what will be carry on
     final trip = viewModel.uiState.latestTrip!;
     final startDateStr = DateFormat('MMM dd').format(trip.startDate);
     final endDateStr = DateFormat('MMM dd, yyyy').format(trip.endDate);
+
+    final status = trip.computedStatus.toLowerCase();
+    final bool isOngoing = status == 'ongoing';
+    final bool isCompleted = status == 'completed';
+
+    final String? activeImageUrl = (trip.imgUrl != null && trip.imgUrl!.trim().isNotEmpty)
+        ? trip.imgUrl!.trim()
+        : null;
 
     return Container(
       width: double.infinity,
@@ -279,37 +278,20 @@ class _HomeScreenState extends State<HomeScreen> {
           onTap: () {
             Navigator.of(context).pushNamed(
               '/activityScreen',
-              arguments: {'trip': trip, 'isReadOnly': true},
+              arguments: {
+                'trip': trip,
+                'isReadOnly': false,
+              },
             );
           },
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Banner Image
               ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(24),
-                ),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
                 child: Stack(
                   children: [
-                    if (trip.imgUrl != null && trip.imgUrl!.isNotEmpty)
-                      Image.network(
-                        trip.imgUrl!,
-                        height: 140,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      )
-                    else
-                      Container(
-                        height: 140,
-                        width: double.infinity,
-                        color: appTheme.gray_200,
-                        child: Icon(
-                          Icons.terrain,
-                          size: 48,
-                          color: appTheme.blue_gray_300,
-                        ),
-                      ),
+                    _buildTripBanner(activeImageUrl, destination: trip.destination),
                     Positioned(
                       top: 16,
                       left: 16,
@@ -319,26 +301,41 @@ class _HomeScreenState extends State<HomeScreen> {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: appTheme.amber_200,
+                          color: isOngoing
+                              ? appTheme.amber_200
+                              : isCompleted
+                              ? appTheme.gray_200
+                              : appTheme.amber_200,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              Icons.check_circle_outline,
+                              isOngoing
+                                  ? Icons.play_circle_outline
+                                  : Icons.check_circle_outline,
                               size: 14,
-                              color: appTheme.lime_900,
+                              color: isOngoing
+                                  ? appTheme.lime_900
+                                  : isCompleted
+                                  ? appTheme.gray_800
+                                  : appTheme.lime_900,
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              trip.status.substring(0, 1).toUpperCase() +
-                                  trip.status.substring(1), // e.g. "Pending"
+                              status.isNotEmpty
+                                  ? status[0].toUpperCase() + status.substring(1)
+                                  : 'Pending',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
                                 fontFamily: 'Inter',
-                                color: appTheme.lime_900,
+                                color: isOngoing
+                                    ? appTheme.lime_900
+                                    : isCompleted
+                                    ? appTheme.gray_800
+                                    : appTheme.lime_900,
                               ),
                             ),
                           ],
@@ -417,14 +414,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Start Plan button and Plan New button
   Widget _buildBottomButtons(BuildContext context) {
     final viewModel = context.watch<HomeViewModel>();
+    final trip = viewModel.uiState.latestTrip;
 
-    // Determine if the start button is enabled based on user request:
-    // "when pending disable when ongoing enable"
-    final bool hasPlan = viewModel.uiState.hasPlan;
-    final String? status = viewModel.uiState.latestTrip?.status;
+    final bool hasPlan = viewModel.uiState.hasPlan && trip != null;
+    final String status = trip?.computedStatus.toLowerCase() ?? 'pending';
     final bool isStartEnabled = hasPlan && status == 'ongoing';
 
     return Padding(
@@ -445,12 +440,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 borderRadius: BorderRadius.circular(14),
                 boxShadow: isStartEnabled
                     ? [
-                        BoxShadow(
-                          color: appTheme.teal_50,
-                          offset: const Offset(0, 4),
-                          blurRadius: 8,
-                        ),
-                      ]
+                  BoxShadow(
+                    color: appTheme.teal_50,
+                    offset: const Offset(0, 4),
+                    blurRadius: 8,
+                  ),
+                ]
                     : [],
               ),
               child: Material(
@@ -458,13 +453,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 borderRadius: BorderRadius.circular(14),
                 child: InkWell(
                   onTap: isStartEnabled
-                      ? () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Starting ongoing plan...'),
-                            ),
-                          );
-                        }
+                      ? () async {
+                    await Navigator.of(context).pushNamed(
+                      '/activityScreen',
+                      arguments: {
+                        'trip': trip,
+                        'isReadOnly': false,
+                      },
+                    );
+                    viewModel.fetchLatestTrip();
+                  }
                       : null,
                   borderRadius: BorderRadius.circular(14),
                   child: Padding(
@@ -472,17 +470,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Center(
                       child: Text(
                         'Start Plan',
-                        style:
-                            const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              fontFamily: 'Inter',
-                            ).copyWith(
-                              color: isStartEnabled
-                                  ? appTheme.white_A700
-                                  : appTheme.blue_gray_300,
-                              height: 22 / 18,
-                            ),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: 'Inter',
+                        ).copyWith(
+                          color: isStartEnabled
+                              ? appTheme.white_A700
+                              : appTheme.blue_gray_300,
+                          height: 22 / 18,
+                        ),
                       ),
                     ),
                   ),
@@ -515,8 +512,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     await Navigator.of(
                       context,
                     ).pushNamed('/travelInformationInputScreen');
-
-                    // Refresh the data when returning to home!
                     viewModel.fetchLatestTrip();
                   },
                   borderRadius: BorderRadius.circular(14),
@@ -537,120 +532,67 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
-          // const SizedBox(height: 16),
-          // // Get Current Location button
-          // SizedBox(
-          //   width: double.infinity,
-          //   child: Container(
-          //     decoration: BoxDecoration(
-          //       color: appTheme.teal_A700,
-          //       borderRadius: BorderRadius.circular(14),
-          //       boxShadow: [
-          //         BoxShadow(
-          //           color: appTheme.teal_50,
-          //           offset: const Offset(0, 4),
-          //           blurRadius: 8,
-          //         ),
-          //       ],
-          //     ),
-          //     child: Material(
-          //       color: appTheme.transparentCustom,
-          //       borderRadius: BorderRadius.circular(14),
-          //       child: InkWell(
-          //         onTap: () async {
-          //           final locationSource = LocationSource();
-          //
-          //           // Check permissions first and show a dialog if denied
-          //           LocationPermission permission = await Geolocator.checkPermission();
-          //           if (permission == LocationPermission.denied) {
-          //             permission = await Geolocator.requestPermission();
-          //             if (permission == LocationPermission.denied && context.mounted) {
-          //               showDialog(
-          //                 context: context,
-          //                 builder: (ctx) => AlertDialog(
-          //                   title: const Text('Permission Required'),
-          //                   content: const Text('Location permission is required to fetch your current location. Please allow it.'),
-          //                   actions: [
-          //                     TextButton(
-          //                       onPressed: () => Navigator.of(ctx).pop(),
-          //                       child: const Text('Cancel'),
-          //                     ),
-          //                     TextButton(
-          //                       onPressed: () async {
-          //                         Navigator.of(ctx).pop();
-          //                         await Geolocator.requestPermission();
-          //                       },
-          //                       child: const Text('Grant'),
-          //                     ),
-          //                   ],
-          //                 ),
-          //               );
-          //               return;
-          //             }
-          //           }
-          //
-          //           if (permission == LocationPermission.deniedForever && context.mounted) {
-          //             showDialog(
-          //               context: context,
-          //               builder: (ctx) => AlertDialog(
-          //                 title: const Text('Permission Denied'),
-          //                 content: const Text('Location permission is permanently denied. Please enable it from app settings.'),
-          //                 actions: [
-          //                   TextButton(
-          //                     onPressed: () => Navigator.of(ctx).pop(),
-          //                     child: const Text('Cancel'),
-          //                   ),
-          //                   TextButton(
-          //                     onPressed: () async {
-          //                       Navigator.of(ctx).pop();
-          //                       await Geolocator.openAppSettings();
-          //                     },
-          //                     child: const Text('Open Settings'),
-          //                   ),
-          //                 ],
-          //               ),
-          //             );
-          //             return;
-          //           }
-          //
-          //           final position = await locationSource.getCurrentLocation();
-          //           if (context.mounted) {
-          //             if (position != null) {
-          //               ScaffoldMessenger.of(context).showSnackBar(
-          //                 SnackBar(
-          //                   content: Text(
-          //                     'Location: ${position.latitude}, ${position.longitude}',
-          //                   ),
-          //                 ),
-          //               );
-          //             } else {
-          //               ScaffoldMessenger.of(context).showSnackBar(
-          //                 const SnackBar(
-          //                   content: Text('Could not fetch location. Ensure GPS is enabled.'),
-          //                 ),
-          //               );
-          //             }
-          //           }
-          //         },
-          //         borderRadius: BorderRadius.circular(14),
-          //         child: Padding(
-          //           padding: const EdgeInsets.symmetric(vertical: 16),
-          //           child: Center(
-          //             child: Text(
-          //               'Get Current Location',
-          //               style: const TextStyle(
-          //                 fontSize: 18,
-          //                 fontWeight: FontWeight.w700,
-          //                 fontFamily: 'Inter',
-          //               ).copyWith(color: appTheme.white_A700, height: 22 / 18),
-          //             ),
-          //           ),
-          //         ),
-          //       ),
-          //     ),
-          //   ),
-          // ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTripBanner(String? imgUrl, {String destination = ''}) {
+    const double height = 140.0;
+
+    if (imgUrl == null || imgUrl.trim().isEmpty) {
+      return _buildFallBackImagePlaceholder(height);
+    }
+
+    final cleanUrl = imgUrl.trim();
+
+    if (cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://')) {
+      return Image.network(
+        cleanUrl,
+        height: height,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Container(
+            height: height,
+            width: double.infinity,
+            color: appTheme.gray_200,
+            child: const Center(
+              child: CircularProgressIndicator(strokeWidth: 2.0),
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          return _buildFallBackImagePlaceholder(height);
+        },
+      );
+    }
+
+    if (cleanUrl.startsWith('assets/')) {
+      return Image.asset(
+        cleanUrl,
+        height: height,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return _buildFallBackImagePlaceholder(height);
+        },
+      );
+    }
+
+    return _buildFallBackImagePlaceholder(height);
+  }
+
+  Widget _buildFallBackImagePlaceholder(double height) {
+    return Container(
+      height: height,
+      width: double.infinity,
+      color: appTheme.gray_200,
+      child: Icon(
+        Icons.terrain,
+        size: 48,
+        color: appTheme.blue_gray_300,
       ),
     );
   }
