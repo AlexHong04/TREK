@@ -8,6 +8,7 @@ import '../utils/date_time_formatter.dart';
 import '../view_models/presentation_logic/activity_view_model.dart';
 import '../view_models/ui_state/activity_ui_state.dart';
 import '../widgets/custom_app_bar.dart';
+import 'budget_popup.dart';
 import 'expense_bottom_sheet.dart';
 
 class ActivityScreen extends StatefulWidget {
@@ -46,8 +47,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
           if (innerTrip is Map) {
             extractedTripId =
                 (innerTrip['tripId'] ??
-                    innerTrip['trip_id'] ??
-                    innerTrip['dayTripId'])
+                        innerTrip['trip_id'] ??
+                        innerTrip['dayTripId'])
                     ?.toString();
             if (innerTrip['destination'] != null) {
               _destination = innerTrip['destination'].toString();
@@ -55,7 +56,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
           } else {
             extractedTripId =
                 (innerTrip as dynamic).tripId ??
-                    (innerTrip as dynamic).dayTripId;
+                (innerTrip as dynamic).dayTripId;
             try {
               if ((innerTrip as dynamic).destination != null) {
                 _destination = (innerTrip as dynamic).destination.toString();
@@ -96,6 +97,106 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
       _isInit = true;
     }
+  }
+
+  void _handleUiStateChange() {
+    if (!mounted) return;
+
+    final viewModel = context.read<ActivityViewModel>();
+    final state = viewModel.uiState;
+
+    if (state.popupAction.isEmpty) {
+      return;
+    }
+
+    switch (state.popupAction) {
+      case 'successful':
+        _showUnderThresholdDialog(state);
+        break;
+
+      case 'fail':
+        _showFailedDialog(state);
+        break;
+
+      case 'recommendation':
+        _showExceedsThresholdDialog(state);
+        break;
+
+      case 'critical':
+        _showBudgetRecoveryDialog(
+          state,
+          onEndTrip: viewModel.endTrip,
+          onTopUpBudget: (amount) => viewModel.topUpBudget(amount),
+        );
+        break;
+    }
+  }
+
+  void _showUnderThresholdDialog(ActivityUiState state) {
+    showBudgetExceededDialog(
+      context: context,
+      allocatedBudget:
+          'RM ${state.selectedActivity?.allocatedBudget.toStringAsFixed(2)}',
+      remainingBudget: state.remainingBudget.toString(),
+      exceededAmount: state.overspentBudget.toString(),
+      warningText1:
+          'You have overspent ${state.overspentBudget} so far on this trip.',
+      warningText2:
+          'The budget allocated for remaining restaurants have been modified.',
+      onContinue: () {
+        Navigator.pop(context);
+      },
+    );
+  }
+
+  void _showFailedDialog(ActivityUiState state) {
+    // show your failed dialog
+  }
+
+  void _showExceedsThresholdDialog(ActivityUiState state) {
+    // show your Budget Recovery dialog
+    showBudgetExceeded20Dialog(
+      context: context,
+      allocatedBudget:
+          'RM ${state.selectedActivity?.allocatedBudget.toStringAsFixed(2)}',
+      remainingBudget: state.remainingBudget.toStringAsFixed(2),
+      exceededAmount: state.shortageAmount.toStringAsFixed(2),
+      warningText1:
+          'You have overspent ${state.overspentBudget} so far on this trip.',
+      estimatedDays: state.sufficientDays.toString(),
+      warningText3: 'Plan will be modified automatically.',
+      onContinue: () {
+        // Handle action
+      },
+    );
+  }
+
+  void _showBudgetRecoveryDialog(
+    ActivityUiState uiState, {
+    required VoidCallback onEndTrip,
+    required Future<bool> Function(double amount) onTopUpBudget,
+  }) {
+    showBudgetRecoveryDialog(
+      context: context,
+      shortageAmount: uiState.shortageAmount.toString(),
+      remainingBudget: uiState.remainingBudget.toString(),
+      warningText:
+          'Insufficient top-up amount will trigger alternative recommendation directly.',
+      onEndTrip: onEndTrip,
+      onTopUpBudget: (amount) async {
+        final success = await onTopUpBudget(amount);
+
+        if (!context.mounted) return false;
+
+        if (!success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to top up budget.')),
+          );
+        }
+
+        return success;
+      },
+    );
   }
 
   @override
@@ -260,7 +361,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                 ),
                 Expanded(
                   flex:
-                  100 -
+                      100 -
                       (uiState.usedPercentageValue * 100).toInt().clamp(0, 100),
                   child: const SizedBox(),
                 ),
@@ -426,15 +527,17 @@ class _ActivityScreenState extends State<ActivityScreen> {
                   _buildActivityCard(
                     activity,
                     uiState,
-                    onTap: () {
+                    onTap: () async {
                       viewModel.selectActivityForExpense(activity);
 
-                      showExpenseBottomSheet(
+                      await showExpenseBottomSheet(
                         context: context,
                         activity: activity,
                         viewModel: viewModel,
                       );
-                    },
+
+                      _handleUiStateChange();
+                      },
                   ),
                 ],
               ),
@@ -468,22 +571,17 @@ class _ActivityScreenState extends State<ActivityScreen> {
             ),
           ),
           if (!isLast)
-            Expanded(
-              child: Container(
-                width: 2.0,
-                color: appTheme.gray_200,
-              ),
-            ),
+            Expanded(child: Container(width: 2.0, color: appTheme.gray_200)),
         ],
       ),
     );
   }
 
   Widget _buildActivityCard(
-      Activity activity,
-      ActivityUiState uiState, {
-        VoidCallback? onTap,
-      }) {
+    Activity activity,
+    ActivityUiState uiState, {
+    VoidCallback? onTap,
+  }) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -564,7 +662,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                         activity.overspendAmount != null)
                       _buildChip(
                         label:
-                        'RM${activity.overspendAmount!.toStringAsFixed(0)}',
+                            'RM${activity.overspendAmount!.toStringAsFixed(0)}',
                         backgroundColor: appTheme.blue_gray_50,
                         textColor: appTheme.blueGray900,
                       ),
@@ -650,523 +748,4 @@ class _ActivityScreenState extends State<ActivityScreen> {
       child: Icon(Icons.terrain, size: 40, color: appTheme.blue_gray_300),
     );
   }
-}
-
-class BaseBudgetDialog extends StatelessWidget {
-  final String title;
-  final Widget summaryCard;
-  final String warningText;
-  final Widget? contentCard;
-  final Widget actions;
-
-  const BaseBudgetDialog({
-    super.key,
-    required this.title,
-    required this.summaryCard,
-    required this.warningText,
-    this.contentCard,
-    required this.actions,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: appTheme.warningPopupHeader,
-                ),
-              ),
-              const SizedBox(height: 16),
-              summaryCard,
-              const SizedBox(height: 16),
-              _buildWarningRow(warningText),
-              const SizedBox(height: 16),
-              if (contentCard != null) ...[
-                contentCard!,
-                const SizedBox(height: 16),
-              ],
-              const SizedBox(height: 8),
-              actions,
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  static Widget _buildWarningRow(String text) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(
-          Icons.warning_amber_rounded,
-          color: appTheme.popupWarningMsg,
-          size: 22,
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            text,
-            style: TextStyle(
-              fontSize: 14,
-              color: appTheme.popupWarningMsg,
-              height: 1.4,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  static Widget buildTagChip({
-    required String label,
-    required Color bgColor,
-    required Color textColor,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: textColor,
-        ),
-      ),
-    );
-  }
-}
-
-Future<void> showBudgetExceededDialog({
-  required BuildContext context,
-  required String allocatedBudget,
-  required String remainingBudget,
-  required String exceededAmount,
-  required String warningText1,
-  required String warningText2,
-  VoidCallback? onContinue,
-}) {
-  return showDialog(
-    context: context,
-    builder: (context) {
-      return BaseBudgetDialog(
-        title: 'Budget Exceeded',
-        summaryCard: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: appTheme.popupCreamBg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: appTheme.popupCreamStroke),
-          ),
-          child: Column(
-            children: [
-              _buildSummaryRow('Allocated Budget:', allocatedBudget),
-              const SizedBox(height: 12),
-              _buildSummaryRow('Remaining Budget:', remainingBudget),
-              const SizedBox(height: 12),
-              _buildSummaryRow(
-                'Exceeded Amount',
-                exceededAmount,
-                valueColor: appTheme.warningPopupHeader,
-              ),
-            ],
-          ),
-        ),
-        warningText: warningText1,
-        contentCard: Column(
-          children: [
-            BaseBudgetDialog._buildWarningRow(warningText2),
-          ],
-        ),
-        actions: SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: appTheme.teal_A700,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
-              elevation: 0,
-            ),
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            child: Text(
-              'Continue',
-              style: TextStyle(
-                fontSize: 16,
-                fontFamily: 'Inter',
-                fontWeight: FontWeight.bold,
-                color: appTheme.white_A700,
-              ),
-            ),
-          ),
-        ),
-      );
-    },
-  );
-}
-
-Future<void> showBudgetExceeded20Dialog({
-  required BuildContext context,
-  required String allocatedBudget,
-  required String remainingBudget,
-  required String exceededAmount,
-  required String warningText1,
-  required String estimatedDays,
-  required String warningText3,
-  VoidCallback? onContinue,
-}) {
-  return showDialog(
-    context: context,
-    builder: (context) {
-      return BaseBudgetDialog(
-        title: 'Budget Exceeded',
-        summaryCard: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: appTheme.popupCreamBg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: appTheme.popupCreamStroke),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Allocated Budget:',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: appTheme.warningPopupHeader,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                allocatedBudget,
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: appTheme.black,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Divider(color: appTheme.popupCreamStroke, height: 1),
-              const SizedBox(height: 12),
-              _buildSummaryRow('Remaining Budget:', remainingBudget),
-              const SizedBox(height: 12),
-              _buildSummaryRow(
-                'Exceeded Amount',
-                exceededAmount,
-                valueColor: appTheme.warningPopupHeader,
-              ),
-            ],
-          ),
-        ),
-        warningText: warningText1,
-        contentCard: Column(
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.warning_amber_rounded,
-                  color: appTheme.popupWarningMsg,
-                  size: 22,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: RichText(
-                    text: TextSpan(
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: appTheme.popupWarningMsg,
-                        height: 1.4,
-                      ),
-                      children: [
-                        const TextSpan(
-                          text:
-                          'Based on your current spending rate, your remaining budget is estimated to last ',
-                        ),
-                        TextSpan(
-                          text: '$estimatedDays more day(s)',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        const TextSpan(
-                          text:
-                          '. Please review your spending to avoid running out of budget.',
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            BaseBudgetDialog._buildWarningRow(warningText3),
-          ],
-        ),
-        actions: SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: appTheme.teal_700,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
-              elevation: 0,
-            ),
-            onPressed: () {
-              Navigator.of(context).pop();
-              if (onContinue != null) {
-                onContinue();
-              }
-            },
-            child: Text(
-              'Continue',
-              style: TextStyle(
-                fontSize: 16,
-                fontFamily: 'Inter',
-                fontWeight: FontWeight.bold,
-                color: appTheme.white_A700,
-              ),
-            ),
-          ),
-        ),
-      );
-    },
-  );
-}
-
-Future<void> showBudgetRecoveryDialog({
-  required BuildContext context,
-  required String shortageAmount,
-  required String remainingBudget,
-  required String warningText,
-  VoidCallback? onEndTrip,
-  required Future<bool> Function(double amount) onTopUpBudget,
-}) {
-  final TextEditingController topUpController = TextEditingController();
-
-  return showDialog(
-    context: context,
-    builder: (context) {
-      return BaseBudgetDialog(
-        title: 'Budget Recovery',
-        summaryCard: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: appTheme.popupCreamBg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: appTheme.popupCreamStroke),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Budget Shortage Amount:',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: appTheme.popupBrownBudget,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                shortageAmount,
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: appTheme.black,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Divider(color: appTheme.popupCreamStroke, height: 1),
-              const SizedBox(height: 12),
-              _buildSummaryRow('Remaining Budget:', remainingBudget),
-            ],
-          ),
-        ),
-        warningText: warningText,
-        contentCard: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey.shade200),
-            boxShadow: [
-              BoxShadow(
-                color: appTheme.black.withAlpha(8),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'TOP-UP AMOUNT',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: appTheme.blue_gray_300,
-                  letterSpacing: 0.8,
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: topUpController,
-                keyboardType: TextInputType.number,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: appTheme.black,
-                ),
-                decoration: InputDecoration(
-                  prefixIcon: const Icon(
-                    Icons.account_balance_wallet_outlined,
-                    color: Colors.grey,
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  filled: true,
-                  fillColor: appTheme.white_A700,
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: appTheme.blue_gray_300),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: appTheme.teal_A700,
-                      width: 1.5,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: Row(
-          children: [
-            Expanded(
-              child: SizedBox(
-                height: 48,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: appTheme.redButton,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    elevation: 0,
-                  ),
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    if (onEndTrip != null) {
-                      onEndTrip();
-                    }
-                  },
-                  child: Text(
-                    'End Trip',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: appTheme.white_A700,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: SizedBox(
-                height: 48,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: appTheme.teal_A700,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    elevation: 0,
-                  ),
-                  onPressed: () async {
-                    final amountText = topUpController.text.trim();
-                    final amount = double.tryParse(amountText);
-
-                    if (amount == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Please enter a valid top-up amount.'),
-                        ),
-                      );
-                      return;
-                    }
-
-                    final success = await onTopUpBudget(amount);
-
-                    if (success && context.mounted) {
-                      Navigator.of(context).pop();
-                    }
-                  },
-                  child: Text(
-                    'Top-up Budget',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: appTheme.white_A700,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    },
-  );
-}
-
-Widget _buildSummaryRow(String label, String value, {Color? valueColor}) {
-  return Row(
-    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-    children: [
-      Text(
-        label,
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: appTheme.popupBrownBudget,
-        ),
-      ),
-      Text(
-        value,
-        style: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-          color: valueColor ?? appTheme.black,
-        ),
-      ),
-    ],
-  );
 }
