@@ -13,7 +13,7 @@ class ActivityViewModel extends ChangeNotifier {
   final ItineraryService _itineraryService = ItineraryService();
   final BudgetService _budgetService = BudgetService();
   final ExpenseTrackingService _expenseTrackingService =
-      ExpenseTrackingService();
+  ExpenseTrackingService();
   final ExpenseRepository _expenseRepository = ExpenseRepository();
   final CameraSource _cameraSource = CameraSource();
 
@@ -321,12 +321,12 @@ class ActivityViewModel extends ChangeNotifier {
     final itemsWithCalculatedSubtotals = items
         .map(
           (item) => item.copyWith(
-            subtotal: _expenseTrackingService.calculateItemSubtotal(
-              item.quantity,
-              item.unitPrice,
-            ),
-          ),
-        )
+        subtotal: _expenseTrackingService.calculateItemSubtotal(
+          item.quantity,
+          item.unitPrice,
+        ),
+      ),
+    )
         .toList();
 
     _uiState = _uiState.copyWith(
@@ -352,8 +352,12 @@ class ActivityViewModel extends ChangeNotifier {
         .replaceFirst('Invalid argument(s): ', '');
   }
 
-  Future<void> initialize() async {
-    _uiState = _uiState.copyWith(isLoading: true);
+  Future<void> initialize({DateTime? filterDate}) async {
+    _uiState = _uiState.copyWith(
+      isLoading: true,
+      filterDate: filterDate,
+      clearFilterDate: filterDate == null,
+    );
     notifyListeners();
 
     try {
@@ -376,8 +380,13 @@ class ActivityViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> loadTripItinerary(String tripId) async {
-    _uiState = _uiState.copyWith(isLoading: true);
+  Future<void> loadTripItinerary(String tripId, {DateTime? filterDate}) async {
+    _uiState = _uiState.copyWith(
+      isLoading: true,
+      tripId: tripId,
+      filterDate: filterDate,
+      clearFilterDate: filterDate == null,
+    );
     notifyListeners();
 
     try {
@@ -393,36 +402,46 @@ class ActivityViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setDateFilter(DateTime? filterDate) {
+    _uiState = _uiState.copyWith(
+      filterDate: filterDate,
+      clearFilterDate: filterDate == null,
+    );
+    notifyListeners();
+  }
+
+  void clearDateFilter() {
+    _uiState = _uiState.copyWith(clearFilterDate: true);
+    notifyListeners();
+  }
+
   void initializeHardcoded() {
     _uiState = _uiState.copyWith(isLoading: true);
     notifyListeners();
 
-    // Mock data matching the UI
     final List<Activity> newActivities = [
       Activity(
         activitiesId: '1',
         dayTripId: 'day1',
         destination: 'Kinkaku-ji Temple',
         description:
-            'Marvel at the Zen Buddhist temple whose top two floors are completely covered in gold leaf.',
+        'Marvel at the Zen Buddhist temple whose top two floors are completely covered in gold leaf.',
         activityImgUrl: 'assets/images/placeholder.png',
-        // dummy
         date: DateTime(2026, 8, 12, 9, 0),
         allocatedBudget: 25.0,
         overspendAmount: 25.0,
         status: 'planned',
         duration: '60-90 min',
         activityCategory: 'Culture',
-        isOverspend: true, // triggers the blue badge in UI
+        isOverspend: true,
       ),
       Activity(
         activitiesId: '2',
         dayTripId: 'day1',
         destination: 'Traditional Kaiseki Lunch',
         description:
-            'Experience a multi-course dinner that balances taste, texture, and appearance in the historic Gion district.',
+        'Experience a multi-course dinner that balances taste, texture, and appearance in the historic Gion district.',
         activityImgUrl: 'assets/images/placeholder.png',
-        // dummy
         date: DateTime(2026, 8, 12, 12, 0),
         allocatedBudget: 25.0,
         overspendAmount: 0.0,
@@ -442,7 +461,6 @@ class ActivityViewModel extends ChangeNotifier {
       overspentBudget: 0.00,
       sufficientDays: 7,
       usedPercentageString: '1% Used',
-      // Matching the design text
       usedPercentageValue: 0.01,
     );
 
@@ -513,7 +531,7 @@ class ActivityViewModel extends ChangeNotifier {
           sufficientDays: days.toInt(),
           usedPercentageValue: percentage,
           usedPercentageString:
-              '${(percentage * 100).toStringAsFixed(0)}% Used',
+          '${(percentage * 100).toStringAsFixed(0)}% Used',
           errorMessage: '',
         );
 
@@ -542,9 +560,9 @@ class ActivityViewModel extends ChangeNotifier {
   }
 
   Future<void> handleExpenseSubmission(
-    Activity activity,
-    double expense,
-  ) async {
+      Activity activity,
+      double expense,
+      ) async {
     _uiState = _uiState.copyWith(isLoading: true);
     notifyListeners();
 
@@ -556,7 +574,7 @@ class ActivityViewModel extends ChangeNotifier {
 
     switch (result) {
       case ExpenseProcessingResult.withinBudget:
-        _uiState.copyWith(popupAction: '');
+        _uiState = _uiState.copyWith(popupAction: '');
         break;
 
       case ExpenseProcessingResult.reallocatedSuccessfully:

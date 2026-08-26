@@ -1,12 +1,13 @@
-import '../theme/app_theme.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../models/entities/activity.dart';
+import '../theme/app_theme.dart';
+import '../utils/date_time_formatter.dart';
 import '../view_models/presentation_logic/activity_view_model.dart';
 import '../view_models/ui_state/activity_ui_state.dart';
 import '../widgets/custom_app_bar.dart';
-import '../utils/date_time_formatter.dart';
 import 'expense_bottom_sheet.dart';
 
 class ActivityScreen extends StatefulWidget {
@@ -25,7 +26,8 @@ class ActivityScreen extends StatefulWidget {
 
 class _ActivityScreenState extends State<ActivityScreen> {
   bool _isInit = false;
-  final String _destination = 'Trip Itinerary';
+  String _destination = 'Trip Itinerary';
+  DateTime? _filterDate;
 
   @override
   void didChangeDependencies() {
@@ -35,18 +37,30 @@ class _ActivityScreenState extends State<ActivityScreen> {
       String? extractedTripId;
 
       if (args is Map<String, dynamic>) {
+        if (args['filterDate'] is DateTime) {
+          _filterDate = args['filterDate'] as DateTime;
+        }
+
         if (args['trip'] != null) {
           final innerTrip = args['trip'];
           if (innerTrip is Map) {
             extractedTripId =
                 (innerTrip['tripId'] ??
-                        innerTrip['trip_id'] ??
-                        innerTrip['dayTripId'])
+                    innerTrip['trip_id'] ??
+                    innerTrip['dayTripId'])
                     ?.toString();
+            if (innerTrip['destination'] != null) {
+              _destination = innerTrip['destination'].toString();
+            }
           } else {
             extractedTripId =
                 (innerTrip as dynamic).tripId ??
-                (innerTrip as dynamic).dayTripId;
+                    (innerTrip as dynamic).dayTripId;
+            try {
+              if ((innerTrip as dynamic).destination != null) {
+                _destination = (innerTrip as dynamic).destination.toString();
+              }
+            } catch (_) {}
           }
         } else {
           extractedTripId =
@@ -57,17 +71,20 @@ class _ActivityScreenState extends State<ActivityScreen> {
         try {
           extractedTripId =
               (args as dynamic).tripId ?? (args as dynamic).dayTripId;
+          if ((args as dynamic).destination != null) {
+            _destination = (args as dynamic).destination.toString();
+          }
         } catch (_) {
           extractedTripId = null;
         }
       }
 
-      // Schedule after the current build frame completes to prevent the '!_dirty' assertion error
       if (extractedTripId != null && extractedTripId.isNotEmpty) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
             context.read<ActivityViewModel>().loadTripItinerary(
               extractedTripId!,
+              filterDate: _filterDate,
             );
           }
         });
@@ -88,14 +105,16 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
     return Scaffold(
       backgroundColor: appTheme.gray_50_03,
-      appBar: const CustomAppBar(title: 'Activities'),
+      appBar: CustomAppBar(
+        title: uiState.filterDate != null ? "Today's Schedule" : 'Activities',
+      ),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.only(top: 24.0, left: 24.0, right: 24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildLocationHeader(_destination),
+              _buildLocationHeader(_destination, uiState.filterDate),
               const SizedBox(height: 24.0),
               _buildBudgetCard(uiState),
               const SizedBox(height: 32.0),
@@ -108,7 +127,11 @@ class _ActivityScreenState extends State<ActivityScreen> {
     );
   }
 
-  Widget _buildLocationHeader(String destination) {
+  Widget _buildLocationHeader(String destination, DateTime? filterDate) {
+    final String subTitle = filterDate != null
+        ? DateFormat('EEEE, MMM dd').format(filterDate)
+        : 'Full Itinerary';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -124,7 +147,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
         ),
         const SizedBox(height: 8.0),
         Text(
-          'Day 1: Cultural\nImmersion',
+          subTitle,
           style: TextStyle(
             fontSize: 30,
             fontWeight: FontWeight.w800,
@@ -173,7 +196,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                   vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color: appTheme.teal_50, // replaced emerald-100
+                  color: appTheme.teal_50,
                   borderRadius: BorderRadius.circular(16.0),
                 ),
                 child: Text(
@@ -182,7 +205,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
                     fontFamily: 'Inter',
-                    color: appTheme.teal_700, // replaced emerald-600
+                    color: appTheme.teal_700,
                   ),
                 ),
               ),
@@ -218,7 +241,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
             height: 8.0,
             width: double.infinity,
             decoration: BoxDecoration(
-              color: appTheme.gray_200, // gray-200
+              color: appTheme.gray_200,
               borderRadius: BorderRadius.circular(4.0),
             ),
             child: Row(
@@ -230,14 +253,14 @@ class _ActivityScreenState extends State<ActivityScreen> {
                   ),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: appTheme.teal_A700, // replaced emerald-500
+                      color: appTheme.teal_A700,
                       borderRadius: BorderRadius.circular(4.0),
                     ),
                   ),
                 ),
                 Expanded(
                   flex:
-                      100 -
+                  100 -
                       (uiState.usedPercentageValue * 100).toInt().clamp(0, 100),
                   child: const SizedBox(),
                 ),
@@ -334,12 +357,16 @@ class _ActivityScreenState extends State<ActivityScreen> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (uiState.activities.isEmpty) {
+    final activities = uiState.displayActivities;
+
+    if (activities.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 32.0),
           child: Text(
-            'No activities scheduled for this trip',
+            uiState.filterDate != null
+                ? 'No activities scheduled for today'
+                : 'No activities scheduled for this trip',
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
@@ -351,7 +378,6 @@ class _ActivityScreenState extends State<ActivityScreen> {
       );
     }
 
-    final activities = uiState.activities;
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -367,14 +393,6 @@ class _ActivityScreenState extends State<ActivityScreen> {
         );
       },
     );
-    // return Column(
-    //   children: List.generate(activities.length, (index) {
-    //     final activity = activities[index];
-    //     final isLast = index == activities.length - 1;
-    //     return _buildTimelineItem(activity: activity, isLast: isLast);
-    //   }),
-    // );
-    //
   }
 
   Widget _buildTimelineItem({
@@ -416,68 +434,6 @@ class _ActivityScreenState extends State<ActivityScreen> {
                         activity: activity,
                         viewModel: viewModel,
                       );
-
-                      // viewModel.setCurrentActivityId(activity.activitiesId);
-                      // showBudgetRecoveryDialog(
-                      //   context: context,
-                      //   shortageAmount: uiState.overspentBudget.toString(),
-                      //   remainingBudget: uiState.remainingBudget.toString(),
-                      //   warningText:
-                      //       'Insufficient top-up amount will trigger alternative recommendation directly.',
-                      //   onEndTrip: () {
-                      //     viewModel.endTrip();
-                      //   },
-                      //   onTopUpBudget: (amount) async {
-                      //     final success = await viewModel.topUpBudget(amount);
-                      //
-                      //     if (!context.mounted) return false;
-                      //
-                      //     if (!success) {
-                      //       ScaffoldMessenger.of(context).showSnackBar(
-                      //         SnackBar(
-                      //           content: Text(viewModel.uiState.errorMessage),
-                      //         ),
-                      //       );
-                      //       return false;
-                      //     }
-                      //
-                      //     ScaffoldMessenger.of(context).showSnackBar(
-                      //       const SnackBar(
-                      //         content: Text('Top-up successful!'),
-                      //       ),
-                      //     );
-                      //
-                      //     return true;
-                      //   },
-                      // );
-                      // showBudgetExceededDialog(
-                      //   context: context,
-                      //   allocatedBudget:
-                      //       'RM ${activity.allocatedBudget.toStringAsFixed(2)}',
-                      //   remainingBudget: uiState.remainingBudget.toString(),
-                      //   exceededAmount: uiState.overspentBudget.toString(),
-                      //   warningText1:
-                      //       'You have overspent ${uiState.overspentBudget.toString()} so far on this trip.',
-                      //   warningText2:
-                      //       'The budget allocated for remaining restaurants have been modified.',
-                      //   onContinue: () {
-                      //     // Handle continue action here
-                      //     Navigator.pop(context);
-                      //   },
-                      // );
-                      // showBudgetExceeded20Dialog(
-                      //   context: context,
-                      //   allocatedBudget: 'RM25.00',
-                      //   remainingBudget: 'RM2325.00',
-                      //   exceededAmount: 'RM100.00',
-                      //   warningText1:
-                      //       'You have overspent RM 100.00 so far on this trip.',
-                      //   estimatedDays: '3',
-                      //   warningText3: 'Plan will be modified automatically.',
-                      //   onContinue: () {
-                      //     // Handle action
-                      //   },
-                      // );
                     },
                   ),
                 ],
@@ -487,33 +443,6 @@ class _ActivityScreenState extends State<ActivityScreen> {
         ],
       ),
     );
-
-    // return Row(
-    //   crossAxisAlignment: CrossAxisAlignment.start,
-    //   children: [
-    //     _buildTimelineIndicatorColumn(isLast: isLast),
-    //     const SizedBox(width: 20.0),
-    //     Expanded(
-    //       child: Column(
-    //         crossAxisAlignment: CrossAxisAlignment.start,
-    //         children: [
-    //           Text(
-    //             DateFormat('hh:mm a').format(activity.date),
-    //             style: TextStyle(
-    //               fontSize: 14,
-    //               fontWeight: FontWeight.w600,
-    //               fontFamily: 'Inter',
-    //               color: appTheme.gray_800,
-    //             ).copyWith(height: 1.2),
-    //           ),
-    //           const SizedBox(height: 12.0),
-    //           _buildActivityCard(activity),
-    //           if (!isLast) const SizedBox(height: 32.0),
-    //         ],
-    //       ),
-    //     ),
-    //   ],
-    // );
   }
 
   Widget _buildTimelineIndicatorColumn({required bool isLast}) {
@@ -539,10 +468,11 @@ class _ActivityScreenState extends State<ActivityScreen> {
             ),
           ),
           if (!isLast)
-            Container(
-              width: 2.0,
-              height: 420.0, // adjusted height based on content
-              color: appTheme.gray_200, // Slate 300 equivalent
+            Expanded(
+              child: Container(
+                width: 2.0,
+                color: appTheme.gray_200,
+              ),
             ),
         ],
       ),
@@ -550,10 +480,10 @@ class _ActivityScreenState extends State<ActivityScreen> {
   }
 
   Widget _buildActivityCard(
-    Activity activity,
-    ActivityUiState uiState, {
-    VoidCallback? onTap,
-  }) {
+      Activity activity,
+      ActivityUiState uiState, {
+        VoidCallback? onTap,
+      }) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -581,14 +511,6 @@ class _ActivityScreenState extends State<ActivityScreen> {
                   topLeft: Radius.circular(12),
                   topRight: Radius.circular(12),
                 ),
-                // child: activity.activityImgUrl.isNotEmpty
-                //     ? Image.asset(
-                //         activity.activityImgUrl,
-                //         height: 180,
-                //         width: double.infinity,
-                //         fit: BoxFit.cover,
-                //       )
-                //     : Container(height: 180, color: appTheme.gray_200),
                 child: _buildAdaptiveImage(activity.activityImgUrl),
               ),
               Padding(
@@ -642,41 +564,13 @@ class _ActivityScreenState extends State<ActivityScreen> {
                         activity.overspendAmount != null)
                       _buildChip(
                         label:
-                            'RM${activity.overspendAmount!.toStringAsFixed(0)}',
+                        'RM${activity.overspendAmount!.toStringAsFixed(0)}',
                         backgroundColor: appTheme.blue_gray_50,
                         textColor: appTheme.blueGray900,
                       ),
                   ],
                 ),
               ),
-              // Padding(
-              //   padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-              //   child: SizedBox(
-              //     width: double.infinity,
-              //     child: OutlinedButton.icon(
-              //       onPressed: () {
-              //         context
-              //             .read<ActivityViewModel>()
-              //             .selectActivityForExpense(activity);
-              //
-              //         showModalBottomSheet<void>(
-              //           context: context,
-              //           isScrollControlled: true,
-              //           isDismissible: true,
-              //           enableDrag: true,
-              //           barrierColor: Colors.black.withOpacity(0.20),
-              //           backgroundColor: Colors.transparent,
-              //           builder: (_) => ChangeNotifierProvider.value(
-              //             value: context.read<ActivityViewModel>(),
-              //             child: _ExpenseBottomSheet(activity: activity),
-              //           ),
-              //         );
-              //       },
-              //       icon: const Icon(Icons.add_card_outlined),
-              //       label: const Text('Record Expense'),
-              //     ),
-              //   ),
-              // ),
             ],
           ),
         ),
@@ -714,7 +608,6 @@ class _ActivityScreenState extends State<ActivityScreen> {
       return _buildImagePlaceholder(height);
     }
 
-    // 1. Check if it's a web/Supabase URL
     if (url.startsWith('http://') || url.startsWith('https://')) {
       return Image.network(
         url,
@@ -738,7 +631,6 @@ class _ActivityScreenState extends State<ActivityScreen> {
       );
     }
 
-    // 2. Fallback to local asset
     return Image.asset(
       url,
       height: height,
@@ -788,7 +680,6 @@ class BaseBudgetDialog extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header Title
               Text(
                 title,
                 style: TextStyle(
@@ -798,24 +689,15 @@ class BaseBudgetDialog extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-
-              // Summary Section
               summaryCard,
               const SizedBox(height: 16),
-
-              // Warning Message
               _buildWarningRow(warningText),
               const SizedBox(height: 16),
-
-              // Optional Content Widget (Item details card or Top-Up input)
               if (contentCard != null) ...[
                 contentCard!,
                 const SizedBox(height: 16),
               ],
-
               const SizedBox(height: 8),
-
-              // Action Buttons
               actions,
             ],
           ),
@@ -824,7 +706,6 @@ class BaseBudgetDialog extends StatelessWidget {
     );
   }
 
-  // Shared Warning Row Builder
   static Widget _buildWarningRow(String text) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -849,7 +730,6 @@ class BaseBudgetDialog extends StatelessWidget {
     );
   }
 
-  // Shared Tag Chip Builder
   static Widget buildTagChip({
     required String label,
     required Color bgColor,
@@ -873,7 +753,6 @@ class BaseBudgetDialog extends StatelessWidget {
   }
 }
 
-// Budget Exceeded Within 20% Popup
 Future<void> showBudgetExceededDialog({
   required BuildContext context,
   required String allocatedBudget,
@@ -912,72 +791,6 @@ Future<void> showBudgetExceededDialog({
         warningText: warningText1,
         contentCard: Column(
           children: [
-            // Center(
-            //   child: Container(
-            //     decoration: BoxDecoration(
-            //       color: appTheme.white_A700,
-            //       borderRadius: BorderRadius.circular(12),
-            //       border: Border.all(color: appTheme.blue_gray_50),
-            //       boxShadow: [
-            //         BoxShadow(
-            //           color: appTheme.black.withAlpha(10),
-            //           offset: const Offset(0, 2),
-            //           blurRadius: 10,
-            //         ),
-            //       ],
-            //     ),
-            //     child: Column(
-            //       crossAxisAlignment: CrossAxisAlignment.start,
-            //       children: [
-            //         ClipRRect(
-            //           borderRadius: const BorderRadius.vertical(
-            //             top: Radius.circular(12),
-            //           ),
-            //           child: Image.network(
-            //             imageUrl,
-            //             height: 160,
-            //             width: double.infinity,
-            //             fit: BoxFit.cover,
-            //             errorBuilder: (_, __, ___) => Container(
-            //               height: 160,
-            //               color: Colors.grey.shade300,
-            //               child: const Icon(Icons.restaurant, size: 48),
-            //             ),
-            //           ),
-            //         ),
-            //         Padding(
-            //           padding: const EdgeInsets.all(12.0),
-            //           child: Column(
-            //             crossAxisAlignment: CrossAxisAlignment.start,
-            //             children: [
-            //               Text(
-            //                 itemTitle,
-            //                 style: TextStyle(
-            //                   fontSize: 18,
-            //                   fontWeight: FontWeight.bold,
-            //                   color: appTheme.black,
-            //                 ),
-            //               ),
-            //               const SizedBox(height: 10),
-            //               BaseBudgetDialog.buildTagChip(
-            //                 label: originalBudgetChipText,
-            //                 bgColor: appTheme.lime_900,
-            //                 textColor: appTheme.amber_200,
-            //               ),
-            //               const SizedBox(height: 6),
-            //               BaseBudgetDialog.buildTagChip(
-            //                 label: modifiedBudgetChipText,
-            //                 bgColor: appTheme.expenseOverspendBg,
-            //                 textColor: appTheme.expenseOverspendText,
-            //               ),
-            //             ],
-            //           ),
-            //         ),
-            //       ],
-            //     ),
-            //   ),
-            // ),
-            // const SizedBox(height: 16),
             BaseBudgetDialog._buildWarningRow(warningText2),
           ],
         ),
@@ -1011,7 +824,6 @@ Future<void> showBudgetExceededDialog({
   );
 }
 
-// Budget Exceeded Above 20% Popup
 Future<void> showBudgetExceeded20Dialog({
   required BuildContext context,
   required String allocatedBudget,
@@ -1070,7 +882,6 @@ Future<void> showBudgetExceeded20Dialog({
         warningText: warningText1,
         contentCard: Column(
           children: [
-            // Second Warning Message with bold days text
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1091,7 +902,7 @@ Future<void> showBudgetExceeded20Dialog({
                       children: [
                         const TextSpan(
                           text:
-                              'Based on your current spending rate, your remaining budget is estimated to last ',
+                          'Based on your current spending rate, your remaining budget is estimated to last ',
                         ),
                         TextSpan(
                           text: '$estimatedDays more day(s)',
@@ -1099,7 +910,7 @@ Future<void> showBudgetExceeded20Dialog({
                         ),
                         const TextSpan(
                           text:
-                              '. Please review your spending to avoid running out of budget.',
+                          '. Please review your spending to avoid running out of budget.',
                         ),
                       ],
                     ),
@@ -1108,7 +919,6 @@ Future<void> showBudgetExceeded20Dialog({
               ],
             ),
             const SizedBox(height: 16),
-            // Third Warning Message
             BaseBudgetDialog._buildWarningRow(warningText3),
           ],
         ),
@@ -1145,7 +955,6 @@ Future<void> showBudgetExceeded20Dialog({
   );
 }
 
-// Budget Recovery Popup
 Future<void> showBudgetRecoveryDialog({
   required BuildContext context,
   required String shortageAmount,
@@ -1361,43 +1170,3 @@ Widget _buildSummaryRow(String label, String value, {Color? valueColor}) {
     ],
   );
 }
-
-// showBudgetRecoveryDialog(
-//   context: context,
-//   shortageAmount: 'RM30.00',
-//   remainingBudget: 'RM20.00',
-//   warningText:
-//   'Insufficient top-up amount will trigger alternative recommendation directly.',
-// onEndTrip: () {
-// viewModel.endTrip();
-// },
-// onTopUpBudget: (amount) {
-// viewModel.topUpBudget(double.tryParse(amount) ?? 0.0);
-// },
-// );
-// showBudgetExceededDialog(
-//   context: context,
-//   allocatedBudget: 'RM ${activity.allocatedBudget.toStringAsFixed(2)}',
-//   remainingBudget: 'RM2405.00',
-//   exceededAmount: 'RM20.00',
-//   warningText1: 'You have overspent RM 20.00 so far on this trip.',
-//   imageUrl: activity.activityImgUrl ?? '',
-//   itemTitle: activity.destination ?? 'Activity Details',
-//   originalBudgetChipText: 'Original allocated budget: RM ${activity.allocatedBudget.toStringAsFixed(2)}',
-//   modifiedBudgetChipText: 'Modified allocated budget: RM15.00',
-//   warningText2: 'The budget allocated for remaining restaurants have been modified.',
-//   onContinue: () {
-//     // Handle continue action here
-//   },
-// );
-// showBudgetExceeded20Dialog(
-// context: context,
-// allocatedBudget: 'RM25.00',
-// remainingBudget: 'RM2325.00',
-// exceededAmount: 'RM100.00',
-// warningText1: 'You have overspent RM 100.00 so far on this trip.',
-// estimatedDays: '3',
-// warningText3: 'Plan will be modified automatically.',
-// onContinue: () {
-// // Handle action
-// },

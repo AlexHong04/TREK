@@ -7,6 +7,7 @@ class ActivityUiState {
   final String tripId;
   final String currentActivityId;
   final List<Activity> activities;
+  final DateTime? filterDate;
 
   // Temporary Add Expense form data.
   final Activity? selectedActivity;
@@ -47,6 +48,7 @@ class ActivityUiState {
     this.tripId = '',
     this.currentActivityId = '',
     this.activities = const [],
+    this.filterDate,
     this.selectedActivity,
     this.draftExpenseItems = const [],
     this.draftTotalAmount = 0.0,
@@ -77,11 +79,26 @@ class ActivityUiState {
     this.popupAction = '',
   });
 
+  List<Activity> get displayActivities {
+    if(filterDate == null) {
+      return activities;
+    }
+
+    return activities.where((activity) {
+      final actDate = activity.date;
+      return actDate.year == filterDate!.year &&
+          actDate.month == filterDate!.month &&
+          actDate.day == filterDate!.day;
+    }).toList();
+  }
+
   ActivityUiState copyWith({
     bool? isLoading,
     String? tripId,
     String? currentActivityId,
     List<Activity>? activities,
+    DateTime? filterDate,
+    bool clearFilterDate = false,
     Activity? selectedActivity,
     List<ExpenseItem>? draftExpenseItems,
     double? draftTotalAmount,
@@ -119,6 +136,7 @@ class ActivityUiState {
       tripId: tripId ?? this.tripId,
       currentActivityId: currentActivityId ?? this.currentActivityId,
       activities: activities ?? this.activities,
+      filterDate: clearFilterDate ? null: (filterDate ?? this.filterDate),
       selectedActivity: selectedActivity ?? this.selectedActivity,
       draftExpenseItems: draftExpenseItems ?? this.draftExpenseItems,
       draftTotalAmount: draftTotalAmount ?? this.draftTotalAmount,
