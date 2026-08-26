@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../models/entities/activity.dart';
 import '../../models/services/itinerary_service.dart';
 import '../ui_state/whole_itinerary_ui_state.dart';
+export '../ui_state/whole_itinerary_ui_state.dart';
 
 class WholeItineraryDetailViewModel extends ChangeNotifier {
   WholeItineraryUiState _uiState = const WholeItineraryUiState();
@@ -11,10 +11,6 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
 
   final ItineraryService _itineraryService = ItineraryService();
 
-  String destinationTitle = '';
-  String datesText = '';
-  String budgetText = '';
-
   Future<void> initialize({
     required String destination,
     required String dates,
@@ -22,11 +18,12 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     String? preference,
     String? emergencyFund,
   }) async {
-    destinationTitle = destination;
-    datesText = dates;
-    budgetText = budget;
-
-    _uiState = _uiState.copyWith(isLoading: true);
+    _uiState = _uiState.copyWith(
+      isLoading: true,
+      destinationTitle: destination,
+      datesText: dates,
+      budgetText: budget,
+    );
     notifyListeners();
 
     final fetchedActivities = await _itineraryService.generateItinerary(
@@ -46,11 +43,10 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
 
   // remove the activity from the trip but remain the card with empty slot
   void removeActivity(String activitiesId) {
-
     Activity? targetActivity;
 
     final updatedActivities = _uiState.activities.map((activity) {
-      if(activity.activitiesId == activitiesId) {
+      if (activity.activitiesId == activitiesId) {
         // get the stash activity
         targetActivity = activity;
         return Activity(
@@ -74,11 +70,14 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     }).toList();
 
     List<Activity> updatedStash = List.from(_uiState.stashedActivities);
-    if(targetActivity != null && targetActivity!.destination.isNotEmpty) {
+    if (targetActivity != null && targetActivity!.destination.isNotEmpty) {
       updatedStash.add(targetActivity!);
     }
 
-    _uiState = _uiState.copyWith(activities: updatedActivities, stashedActivities: updatedStash);
+    _uiState = _uiState.copyWith(
+      activities: updatedActivities,
+      stashedActivities: updatedStash,
+    );
 
     notifyListeners();
   }
@@ -88,18 +87,21 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     required String slotActivityId,
     required String destination,
   }) async {
-
-    final slotIndex = _uiState.activities.indexWhere((a) => a.activitiesId == slotActivityId);
-    if(slotIndex == -1) return;
+    final slotIndex = _uiState.activities.indexWhere(
+      (a) => a.activitiesId == slotActivityId,
+    );
+    if (slotIndex == -1) return;
 
     final targetSlot = _uiState.activities[slotIndex];
     _uiState = _uiState.copyWith(isLoading: true);
     notifyListeners();
 
-    try{
+    try {
       final excludedActivity = [
         ..._uiState.stashedActivities.map((a) => a.destination),
-        ..._uiState.activities.where((a) => a.destination.isNotEmpty).map((a) => a.destination)
+        ..._uiState.activities
+            .where((a) => a.destination.isNotEmpty)
+            .map((a) => a.destination),
       ];
 
       final newActivity = await _itineraryService.generateAlternativeItinerary(
@@ -116,11 +118,8 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
       final updatedList = List<Activity>.from(_uiState.activities);
       updatedList[slotIndex] = newActivity;
 
-      _uiState = _uiState.copyWith(
-        activities: updatedList,
-        isLoading: false,
-      );
-    } catch(e) {
+      _uiState = _uiState.copyWith(activities: updatedList, isLoading: false);
+    } catch (e) {
       _uiState = _uiState.copyWith(
         isLoading: false,
         errorMessage: e.toString(),
@@ -129,14 +128,13 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-
   Future<String?> confirmItinerary() async {
     try {
       final success = await _itineraryService.saveItinerary(
         _uiState.activities,
-        destination: destinationTitle,
-        datesText: datesText,
-        budgetText: budgetText,
+        destination: _uiState.destinationTitle,
+        datesText: _uiState.datesText,
+        budgetText: _uiState.budgetText,
       );
       if (success) return null; // no error
       return 'Failed to save itinerary to database (Unknown error).';
