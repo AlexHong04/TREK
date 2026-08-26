@@ -14,10 +14,6 @@ class BudgetService {
   }) async {
     final currentTrip = await _itineraryRepository.getTrip(tripId);
 
-    if (currentTrip == null) {
-      return null;
-    }
-
     final oldRemaining = currentTrip.remainingBalance ?? 0.0;
     final oldTotal = currentTrip.totalBudget;
 
@@ -68,11 +64,17 @@ class BudgetService {
     // Fetch remaining activities occurring after currentActivity
     List<Activity> remainingActivities = await _itineraryRepository
         .fetchRemainingActivity(tripId, currentActivity.activitiesId);
+    debugPrint("current activity $currentActivity");
+    debugPrint("trip id $tripId");
+    debugPrint("remaining activities $remainingActivities");
+    debugPrint("remaining overspend $overspendAmount");
 
     // Filter remaining activities that belong to the 'restaurant' category
     final restaurantActivities = remainingActivities
-        .where((activity) => activity.activityCategory == 'restaurant')
+        .where((activity) => activity.activityCategory == 'Restaurant')
         .toList();
+
+    debugPrint("restaurant activities $restaurantActivities");
 
     // If no restaurants are remaining to absorb the overspend, trigger recommendation
     if (restaurantActivities.isEmpty) {
@@ -83,6 +85,8 @@ class BudgetService {
     // Divide overspend amount equally among remaining restaurants
     final double deductionPerRestaurant =
         overspendAmount / restaurantActivities.length;
+
+    debugPrint("deduction $deductionPerRestaurant");
 
     // Deduct divided amount
     final List<Activity> updatedRemainingActivities = remainingActivities.map((
