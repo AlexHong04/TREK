@@ -1,9 +1,11 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'package:http/http.dart' as http;
 
 import '../entities/activity.dart';
 import '../entities/whole_trip.dart';
 import '../configurations/gemini_api_config.dart';
+import '../configurations/google_places_api_config.dart';
 import '../repository/itinerary_repository.dart';
 import '../../utils/id_generator.dart';
 
@@ -56,61 +58,108 @@ class ItineraryService {
 
           String imgUrl = '';
           String finalDestinationTitle = destName;
-          final query = Uri.encodeComponent(imageKeyword);
+          bool resolvedByGooglePlaces = false;
 
-          // FREE TIER PRIORITY: English Wikipedia (Good for Title Accuracy and Landmarks)
-          if (finalDestinationTitle == destName) {
+          // ──────────────────────────────────────────────────
+          // Google Places API
+          // Provides official name correction + high-quality photos
+          // ──────────────────────────────────────────────────
+          if (GooglePlacesApiConfig.isConfigured) {
+            try {
+              final place = await GooglePlacesApiConfig.searchPlace(destName);
+              if (place != null) {
+                resolvedByGooglePlaces = true;
+                // Correct name to official Google Places name
+                if (place['name'] != null &&
+                    place['name'].toString().isNotEmpty) {
+                  finalDestinationTitle = place['name'];
+                }
+                // Fetch official high-resolution photo
+                final photos = place['photos'] as List?;
+                if (photos != null && photos.isNotEmpty) {
+                  final firstPhoto = photos.first as Map<String, dynamic>;
+                  final photoReference =
+                      firstPhoto['photo_reference'] as String?;
+                  if (photoReference != null && photoReference.isNotEmpty) {
+                    imgUrl = GooglePlacesApiConfig.getPhotoUrl(photoReference);
+                  }
+                }
+              }
+            } catch (e) {
+              developer.log('Google Places resolution error for $destName: $e');
+            }
+          }
+
+          // ──────────────────────────────────────────────────
+          // Wikipedia + Wikimedia Commons
+          // Only used when Google Places is NOT configured or
+          // did NOT find the place at all. Skipped if Google
+          // Places found the place (even without a photo),
+          // because Wikipedia returns irrelevant results for
+          // specific Malaysian restaurants/cafes.
+          // ──────────────────────────────────────────────────
+          if (imgUrl.isEmpty && !resolvedByGooglePlaces) {
+            final query = Uri.encodeComponent(imageKeyword);
+            const wikiHeaders = {
+              'User-Agent': 'TrekApp/1.0 (Flutter; travel itinerary generator)',
+            };
+
+            // English Wikipedia
             try {
               final wikiUrl = Uri.parse(
                 'https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=$query&gsrlimit=1&prop=pageimages&format=json&pithumbsize=600&origin=*',
               );
-              final wikiRes = await http.get(wikiUrl);
+              final wikiRes = await http.get(wikiUrl, headers: wikiHeaders);
               if (wikiRes.statusCode == 200) {
                 final data = jsonDecode(wikiRes.body);
                 final pages = data['query']?['pages'] as Map<String, dynamic>?;
                 if (pages != null && pages.isNotEmpty) {
                   final page = pages.values.first;
-                  // UPDATE Title Accuracy: Swap with Wikipedia's official article name!
                   if (page['title'] != null &&
                       !page['title'].toString().startsWith('File:')) {
                     finalDestinationTitle = page['title'];
                   }
-                  if (page.containsKey('thumbnail') && imgUrl.isEmpty) {
+                  if (page.containsKey('thumbnail')) {
                     imgUrl = page['thumbnail']['source'] as String? ?? '';
                   }
                 }
               }
             } catch (_) {}
-          }
 
-          // FREE TIER PRIORITY: Wikimedia Commons (Richest media library for specific restaurants, streets, food)
-          if (imgUrl.isEmpty) {
-            try {
-              // Use the corrected title for better media search
-              final commonsQuery = Uri.encodeComponent(finalDestinationTitle);
-              final commonsUrl = Uri.parse(
-                'https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=$commonsQuery&gsrnamespace=6&gsrlimit=1&prop=imageinfo&iiprop=url&iiurlwidth=600&format=json&origin=*',
-              );
-              final commonsRes = await http.get(commonsUrl);
-              if (commonsRes.statusCode == 200) {
-                final data = jsonDecode(commonsRes.body);
-                final pages = data['query']?['pages'] as Map<String, dynamic>?;
-                if (pages != null && pages.isNotEmpty) {
-                  final page = pages.values.first;
-                  if (page.containsKey('imageinfo')) {
-                    final imageInfo = page['imageinfo'] as List;
-                    if (imageInfo.isNotEmpty &&
-                        imageInfo[0]['thumburl'] != null) {
-                      imgUrl = imageInfo[0]['thumburl'] as String;
+            // Wikimedia Commons (if Wikipedia had no image)
+            if (imgUrl.isEmpty) {
+              try {
+                final commonsQuery = Uri.encodeComponent(finalDestinationTitle);
+                final commonsUrl = Uri.parse(
+                  'https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=$commonsQuery&gsrnamespace=6&gsrlimit=1&prop=imageinfo&iiprop=url&iiurlwidth=600&format=json&origin=*',
+                );
+                final commonsRes = await http.get(
+                  commonsUrl,
+                  headers: wikiHeaders,
+                );
+                if (commonsRes.statusCode == 200) {
+                  final data = jsonDecode(commonsRes.body);
+                  final pages =
+                      data['query']?['pages'] as Map<String, dynamic>?;
+                  if (pages != null && pages.isNotEmpty) {
+                    final page = pages.values.first;
+                    if (page.containsKey('imageinfo')) {
+                      final imageInfo = page['imageinfo'] as List;
+                      if (imageInfo.isNotEmpty &&
+                          imageInfo[0]['thumburl'] != null) {
+                        imgUrl = imageInfo[0]['thumburl'] as String;
+                      }
                     }
                   }
                 }
-              }
-            } catch (_) {}
+              } catch (_) {}
+            }
           }
 
+          // ──────────────────────────────────────────────────
+          // LoremFlickr placeholder
+          // ──────────────────────────────────────────────────
           if (imgUrl.isEmpty) {
-            // Fallback: Relax Flickr tags so it doesn't give random junk if it fails to find strict match
             final keywordQuery = Uri.encodeComponent(
               imageKeyword.replaceAll(RegExp(r'\s+'), ','),
             );
@@ -160,13 +209,16 @@ class ItineraryService {
             ),
           );
           index++;
+
+          // Throttle requests to avoid Wikipedia/Wikimedia 429 rate limiting
+          await Future.delayed(const Duration(milliseconds: 300));
         }
       } else {
         throw Exception('No JSON found in response: $responseText');
       }
       return newActivities;
     } catch (e) {
-      print('Service Error generating itinerary: $e');
+      developer.log('Service Error generating itinerary: $e');
       return [
         Activity(
           activitiesId: 'AC9999',
