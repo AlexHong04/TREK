@@ -1,4 +1,6 @@
+import 'dart:math';
 import 'dart:typed_data';
+import 'package:flutter/cupertino.dart';
 import 'package:http/http.dart' as http;
 import '../configurations/supabase_config.dart';
 import '../entities/activity.dart';
@@ -261,25 +263,26 @@ class ItineraryRepository {
   }
 
   //zhiqin
-  Future<DayTrip> getCurrentDay(String id) async {
+  Future<DayTrip> getCurrentDay(String dayId) async {
+    debugPrint("get current day $dayId");
     try {
       final response = await SupabaseConfig.client
           .from('day_trips')
           .select()
-          .eq('activities_id', id)
+          .eq('day_trip_id', dayId)
           .single();
 
       return DayTrip.fromJson(response);
     } on Exception catch (e) {
-      print('Error getting current activity: $e');
-      throw Exception('DB Error during fetching current activity: $e');
+      print('Error getting current day: $e');
+      throw Exception('DB Error during fetching current day: $e');
     }
   }
 
   //zhiqin
-  Future<DayTrip> updateDayOverspendDetails(DayTrip current) async {
+  Future<bool> updateDayOverspendDetails(DayTrip current) async {
     try {
-      final response = await SupabaseConfig.client
+      await SupabaseConfig.client
           .from('day_trips')
           .update({
             'overspend_amount': current.overspendAmount,
@@ -288,17 +291,17 @@ class ItineraryRepository {
           })
           .eq('day_trip_id', current.dayTripId as Object);
 
-      return DayTrip.fromJson(response as Map<String, dynamic>);
+      return true;
     } on Exception catch (e) {
-      print('Error getting current activity: $e');
-      throw Exception('DB Error during fetching current activity: $e');
+      print('Error updating current day overspend: $e');
+      throw Exception('DB Error during updating current day overspend: $e');
     }
   }
 
   //zhiqin
-  Future<Activity> updateOverspendDetails(Activity current) async {
+  Future<bool> updateOverspendDetails(Activity current) async {
     try {
-      final response = await SupabaseConfig.client
+      await SupabaseConfig.client
           .from('activities')
           .update({
             'overspend_amount': current.overspendAmount,
@@ -306,10 +309,10 @@ class ItineraryRepository {
           })
           .eq('activities_id', current.activitiesId);
 
-      return Activity.fromJson(response as Map<String, dynamic>);
+      return true;
     } on Exception catch (e) {
-      print('Error getting current activity: $e');
-      throw Exception('DB Error during fetching current activity: $e');
+      print('Error updating current activity overspend: $e');
+      throw Exception('DB Error during updating current activity overspend: $e');
     }
   }
 
@@ -334,17 +337,34 @@ class ItineraryRepository {
   }
 
   //zhiqin
-  Future<WholeTrip?> getTrip(String tripId) async {
+  Future<WholeTrip> getTrip(String tripId) async {
     try {
       final res = await SupabaseConfig.client
           .from('whole_trips')
           .select()
           .eq('trip_id', tripId)
-          .maybeSingle();
+          .single();
 
-      return WholeTrip.fromJson(res as Map<String, dynamic>);
+      return WholeTrip.fromJson(res);
     } catch (e) {
       print('Error fetching latest trip: $e');
+      rethrow;
+    }
+  }
+
+  // zhiqin
+  Future<WholeTrip> getTripByActivityId(String activityId) async {
+    try {
+      final activity = await getCurrentActivity(activityId);
+      final dayTrip = await getCurrentDay(activity.dayTripId);
+
+      final tripId = dayTrip.tripId;
+
+      final trip = await getTrip(tripId);
+
+      return trip;
+    } catch (e) {
+      print('Error fetching trip by activity ID: $e');
       rethrow;
     }
   }
