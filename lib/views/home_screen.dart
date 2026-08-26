@@ -454,11 +454,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: InkWell(
                   onTap: isStartEnabled
                       ? () async {
+                    final now = DateTime.now();
+                    final deviceDate = DateTime(now.year, now.month, now.day);
                     await Navigator.of(context).pushNamed(
                       '/activityScreen',
                       arguments: {
                         'trip': trip,
                         'isReadOnly': false,
+                        'filterDate' : deviceDate,
                       },
                     );
                     viewModel.fetchLatestTrip();
