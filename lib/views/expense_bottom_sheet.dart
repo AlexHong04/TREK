@@ -53,6 +53,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   bool _isEditingItem = false;
   bool _showItemForm = true;
   bool _isRecordingNewExpense = false;
+  bool _hasAppliedOcrValues = false;
   String? _topMessage;
   Timer? _topMessageTimer;
 
@@ -180,6 +181,12 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         _buildPaymentMethodSection(uiState),
         const SizedBox(height: 10),
         _buildReceiptSection(uiState),
+        if (uiState.isScanningReceipt ||
+            uiState.ocrRawText.isNotEmpty ||
+            uiState.errorMessage.startsWith('Unable to read the receipt.')) ...[
+          const SizedBox(height: 10),
+          _buildOcrReviewSection(uiState),
+        ],
         if (uiState.errorMessage.isNotEmpty) ...[
           const SizedBox(height: 12),
           _buildMessage(uiState.errorMessage, true),
@@ -857,27 +864,52 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     return _ExpenseSectionCard(
       title: 'UPLOAD RECEIPT',
       child: hasReceipt
-          ? Row(
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.file(
-                    File(uiState.receiptLocalPath),
-                    width: 56,
-                    height: 56,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => const SizedBox(
-                      width: 56,
-                      height: 56,
-                      child: Icon(Icons.broken_image_outlined),
+                Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.file(
+                        File(uiState.receiptLocalPath),
+                        width: 56,
+                        height: 56,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => const SizedBox(
+                          width: 56,
+                          height: 56,
+                          child: Icon(Icons.broken_image_outlined),
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 12),
+                    const Expanded(child: Text('Receipt selected')),
+                    IconButton(
+                      onPressed:
+                          uiState.isScanningReceipt
+                              ? null
+                              : context.read<ActivityViewModel>().removeReceipt,
+                      icon: const Icon(Icons.close, color: AppColors.errorRed),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                const Expanded(child: Text('Receipt selected')),
-                IconButton(
-                  onPressed: context.read<ActivityViewModel>().removeReceipt,
-                  icon: const Icon(Icons.close, color: AppColors.errorRed),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: uiState.isScanningReceipt ? null : _scanReceipt,
+                  icon:
+                      uiState.isScanningReceipt
+                          ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                          : const Icon(Icons.document_scanner_outlined),
+                  label: Text(
+                    uiState.isScanningReceipt
+                        ? 'Scanning receipt...'
+                        : 'Scan Receipt',
+                  ),
                 ),
               ],
             )
@@ -896,6 +928,137 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                     : 'Scan or upload receipt',
               ),
             ),
+    );
+  }
+
+  Widget _buildOcrReviewSection(ActivityUiState uiState) {
+    if (uiState.isScanningReceipt) {
+      return const _ExpenseSectionCard(
+        title: 'RECEIPT OCR',
+        child: Row(
+          children: [
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 12),
+            Text('Reading receipt text...'),
+          ],
+        ),
+      );
+    }
+
+    final hasOcrDateTime = uiState.ocrTransactionDateTime != null;
+    final hasOcrTotal = uiState.ocrExtractedTotal != null;
+    final ocrFailed =
+        uiState.ocrRawText.isEmpty &&
+        uiState.errorMessage.startsWith('Unable to read the receipt.');
+
+    if (ocrFailed) {
+      return _ExpenseSectionCard(
+        title: 'RECEIPT OCR',
+        child: Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: _scanReceipt,
+                child: const Text('Retry OCR'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: context.read<ActivityViewModel>().clearExpenseMessage,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.tealA700,
+                  foregroundColor: AppColors.white,
+                ),
+                child: const Text('Manual Entry'),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return _ExpenseSectionCard(
+      title: 'RECEIPT OCR REVIEW',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildOcrValue(
+            'Merchant',
+            uiState.ocrMerchantName.isEmpty
+                ? 'Not detected'
+                : uiState.ocrMerchantName,
+          ),
+          _buildOcrValue(
+            'Date and time',
+            hasOcrDateTime
+                ? DateFormat('dd MMM yyyy, hh:mm a').format(
+                  uiState.ocrTransactionDateTime!,
+                )
+                : 'Not detected',
+          ),
+          _buildOcrValue(
+            'Extracted total',
+            hasOcrTotal
+                ? 'RM${uiState.ocrExtractedTotal!.toStringAsFixed(2)}'
+                : 'Not detected',
+          ),
+          if (uiState.ocrItemLines.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            const Text('Possible receipt items', style: _fieldLabelStyle),
+            const SizedBox(height: 4),
+            ...uiState.ocrItemLines.map(
+              (line) => Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: Text('- $line'),
+              ),
+            ),
+          ],
+          const SizedBox(height: 8),
+          const Text(
+            'Review and edit these values in the item form before saving.',
+            style: TextStyle(color: AppColors.blueGray300, fontSize: 12),
+          ),
+          const SizedBox(height: 10),
+          if (_hasAppliedOcrValues)
+            const Text(
+              'OCR values were copied to the editable item form below.',
+              style: TextStyle(color: AppColors.tealA700, fontSize: 12),
+            )
+          else
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _applyOcrValuesToItemForm,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.tealA700,
+                  foregroundColor: AppColors.white,
+                ),
+                icon: const Icon(Icons.edit_note_outlined),
+                label: const Text('Use OCR Values in Item Form'),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOcrValue(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: RichText(
+        text: TextSpan(
+          style: const TextStyle(color: AppColors.gray900, fontSize: 14),
+          children: [
+            TextSpan(text: '$label: ', style: _fieldLabelStyle),
+            TextSpan(text: value),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1060,6 +1223,87 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         _merchantController.text.trim().isNotEmpty ||
         _quantityController.text.trim().isNotEmpty ||
         _unitPriceController.text.trim().isNotEmpty;
+  }
+
+  void _applyOcrValuesToItemForm() {
+    final uiState = context.read<ActivityViewModel>().uiState;
+    if (uiState.ocrRawText.isEmpty) {
+      return;
+    }
+
+    final extractedItemLine =
+        uiState.ocrItemLines.isEmpty ? '' : uiState.ocrItemLines.first;
+    final extractedTotal = uiState.ocrExtractedTotal;
+    final isValidExtractedTotal =
+        extractedTotal != null && extractedTotal > 0 && extractedTotal <= 999999;
+    final canUseTotalAsUnitPrice =
+        isValidExtractedTotal && uiState.ocrItemLines.length <= 1;
+
+    setState(() {
+      _editingItemIndex = null;
+      _isEditingItem = true;
+      _showItemForm = true;
+      _hasAppliedOcrValues = true;
+      _itemNameController.text = _itemNameFromOcrLine(extractedItemLine);
+      _descriptionController.clear();
+      _merchantController.text = uiState.ocrMerchantName;
+      _quantityController.text = '1';
+
+      if (canUseTotalAsUnitPrice) {
+        _unitPriceController.text = extractedTotal.toStringAsFixed(2);
+      } else {
+        _unitPriceController.clear();
+      }
+
+      final extractedDateTime = uiState.ocrTransactionDateTime;
+      if (extractedDateTime != null) {
+        _selectedDate = extractedDateTime;
+        _selectedTime = TimeOfDay.fromDateTime(extractedDateTime);
+      }
+    });
+
+  }
+
+  String _itemNameFromOcrLine(String line) {
+    final nameWithoutAmount = line
+        .replaceFirst(
+          RegExp(r'(?:RM\s*)?\d{1,3}(?:,\d{3})*(?:\.\d{2})?\s*$', caseSensitive: false),
+          '',
+        )
+        .trim();
+
+    return nameWithoutAmount.isEmpty ? 'Receipt item' : nameWithoutAmount;
+  }
+
+  Future<void> _scanReceipt() async {
+    final viewModel = context.read<ActivityViewModel>();
+    final hasUnsavedManualItems =
+        viewModel.uiState.draftExpenseItems.isNotEmpty || _hasUnfinishedItem();
+
+    if (hasUnsavedManualItems) {
+      final replaceManualItems = await _showConfirmationDialog(
+        title: 'Replace Unsaved Expense Items?',
+        message:
+            'Scanning this receipt will remove the current unsaved manual expense items. Do you want to continue?',
+        confirmLabel: 'Replace and Scan',
+      );
+
+      if (!replaceManualItems || !mounted) {
+        return;
+      }
+
+      viewModel.clearDraftExpenseItemsForOcr();
+      _discardItem();
+    }
+
+    await viewModel.scanReceipt();
+    if (!mounted) return;
+
+    setState(() => _hasAppliedOcrValues = false);
+
+    if (viewModel.uiState.errorMessage.isNotEmpty) {
+      _showValidationMessage(viewModel.uiState.errorMessage);
+    }
   }
 
   Future<void> _chooseReceipt() async {

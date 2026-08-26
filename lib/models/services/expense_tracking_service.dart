@@ -1,3 +1,5 @@
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+
 import '../entities/activity.dart';
 import '../entities/expense.dart';
 import '../entities/expense_item.dart';
@@ -17,6 +19,169 @@ class ExpenseTrackingService {
   final ItineraryRepository _itineraryRepository = ItineraryRepository();
   final BudgetService _budgetService = BudgetService();
   final ExpenseRepository _expenseRepository = ExpenseRepository();
+
+  /// Reads the visible Latin text from a receipt image stored on the device.
+  /// The caller decides how to display or use the extracted text.
+  Future<String> readReceiptText(String receiptLocalPath) async {
+    if (receiptLocalPath.trim().isEmpty) {
+      throw ArgumentError('Choose a receipt image before scanning it.');
+    }
+
+    final inputImage = InputImage.fromFilePath(receiptLocalPath);
+    final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
+
+    try {
+      final recognizedText = await textRecognizer.processImage(inputImage);
+      final receiptText = recognizedText.text.trim();
+
+      if (receiptText.isEmpty) {
+        throw Exception(
+          'Unable to read the receipt. Please try another image or continue with the manual entry.',
+        );
+      }
+
+      return receiptText;
+    } finally {
+      await textRecognizer.close();
+    }
+  }
+
+  /// Uses common receipt wording to find a merchant name. The first useful
+  /// text line is the best available guess and must still be reviewed by the
+  /// tourist before the expense is saved.
+  String? extractMerchantName(String receiptText) {
+    final lines = _receiptLines(receiptText);
+
+    for (final line in lines) {
+      final normalizedLine = line.toLowerCase();
+      final isSummaryLine = normalizedLine.contains('total') ||
+          normalizedLine.contains('subtotal') ||
+          normalizedLine.contains('tax') ||
+          normalizedLine.contains('change') ||
+          normalizedLine.contains('cash') ||
+          normalizedLine.contains('receipt');
+
+      if (!isSummaryLine && RegExp(r'[a-zA-Z]').hasMatch(line)) {
+        return line;
+      }
+    }
+
+    return null;
+  }
+
+  /// Finds a date and time when the receipt contains both in familiar numeric
+  /// formats such as 26/08/2026 and 01:45 PM. Returns null if either is absent
+  /// or invalid, so the existing date/time picker remains the fallback.
+  DateTime? extractReceiptDateTime(String receiptText) {
+    final dateMatch = RegExp(
+      r'\b(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})\b',
+    ).firstMatch(receiptText);
+    final timeMatch = RegExp(
+      r'\b(\d{1,2})[:.](\d{2})\s*(AM|PM)?\b',
+      caseSensitive: false,
+    ).firstMatch(receiptText);
+
+    if (dateMatch == null || timeMatch == null) {
+      return null;
+    }
+
+    final day = int.tryParse(dateMatch.group(1)!);
+    final month = int.tryParse(dateMatch.group(2)!);
+    var year = int.tryParse(dateMatch.group(3)!);
+    var hour = int.tryParse(timeMatch.group(1)!);
+    final minute = int.tryParse(timeMatch.group(2)!);
+    final period = timeMatch.group(3)?.toUpperCase();
+
+    if (day == null || month == null || year == null || hour == null || minute == null) {
+      return null;
+    }
+
+    if (year < 100) {
+      year += 2000;
+    }
+
+    if (period == 'PM' && hour < 12) {
+      hour += 12;
+    } else if (period == 'AM' && hour == 12) {
+      hour = 0;
+    }
+
+    final dateTime = DateTime(year, month, day, hour, minute);
+    final isInvalidDate = dateTime.year != year ||
+        dateTime.month != month ||
+        dateTime.day != day ||
+        dateTime.hour != hour ||
+        dateTime.minute != minute;
+
+    return isInvalidDate ? null : dateTime;
+  }
+
+  /// Finds the amount on a labelled total line, for example "TOTAL RM 12.50".
+  /// It never uses an unlabelled price as the total because that could be an
+  /// individual item price.
+  double? extractReceiptTotal(String receiptText) {
+    const totalLabels = [
+      'grand total',
+      'net total',
+      'total amount',
+      'amount due',
+      'total due',
+      'total',
+    ];
+
+    for (final line in _receiptLines(receiptText).reversed) {
+      final normalizedLine = line.toLowerCase();
+      if (!totalLabels.any(normalizedLine.contains)) {
+        continue;
+      }
+
+      final amounts = _amountPattern
+          .allMatches(line)
+          .map((match) => match.group(1)!.replaceAll(',', ''))
+          .map(double.tryParse)
+          .whereType<double>()
+          .toList();
+
+      if (amounts.isNotEmpty) {
+        return amounts.last;
+      }
+    }
+
+    return null;
+  }
+
+  /// Returns likely purchase lines for review. They are deliberately returned
+  /// as text because receipt layouts do not reliably expose quantity and price
+  /// in one universal format.
+  List<String> extractReceiptItemLines(String receiptText) {
+    return _receiptLines(receiptText).where((line) {
+      final normalizedLine = line.toLowerCase();
+      final isSummaryLine = normalizedLine.contains('total') ||
+          normalizedLine.contains('subtotal') ||
+          normalizedLine.contains('tax') ||
+          normalizedLine.contains('change') ||
+          normalizedLine.contains('cash') ||
+          normalizedLine.contains('visa') ||
+          normalizedLine.contains('mastercard');
+
+      return !isSummaryLine &&
+          RegExp(r'[a-zA-Z]').hasMatch(line) &&
+          _amountPattern.hasMatch(line);
+    }).toList();
+  }
+
+  static final RegExp _amountPattern = RegExp(
+    r'(?<!\d)(?:RM\s*)?(\d{1,3}(?:,\d{3})*(?:\.\d{2})|\d+(?:\.\d{2}))(?!\d)',
+    caseSensitive: false,
+  );
+
+  List<String> _receiptLines(String receiptText) {
+    return receiptText
+        .split(RegExp(r'\r?\n'))
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty)
+        .toList();
+  }
 
   /// Validates, calculates, and records one parent expense with its child items.
   Future<Expense> recordExpense({

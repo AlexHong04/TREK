@@ -33,6 +33,7 @@ class ActivityViewModel extends ChangeNotifier {
       draftTotalAmount: 0.0,
       paymentMethod: '',
       receiptLocalPath: '',
+      clearOcrData: true,
       errorMessage: '',
       successMessage: '',
       recordedExpenses: const [],
@@ -133,6 +134,18 @@ class ActivityViewModel extends ChangeNotifier {
     _updateDraftExpenseItems(updatedItems);
   }
 
+  /// Removes only unsaved draft items after the tourist agrees to replace them
+  /// with OCR results. Confirmed Expense records are never changed here.
+  void clearDraftExpenseItemsForOcr() {
+    _uiState = _uiState.copyWith(
+      draftExpenseItems: const [],
+      draftTotalAmount: 0.0,
+      errorMessage: '',
+      successMessage: '',
+    );
+    notifyListeners();
+  }
+
   void setPaymentMethod(String paymentMethod) {
     _uiState = _uiState.copyWith(
       paymentMethod: paymentMethod,
@@ -155,6 +168,7 @@ class ActivityViewModel extends ChangeNotifier {
       _uiState = _uiState.copyWith(
         isPickingReceipt: false,
         receiptLocalPath: localPath ?? _uiState.receiptLocalPath,
+        clearOcrData: localPath != null,
       );
     } catch (error) {
       _uiState = _uiState.copyWith(
@@ -178,6 +192,7 @@ class ActivityViewModel extends ChangeNotifier {
       _uiState = _uiState.copyWith(
         isPickingReceipt: false,
         receiptLocalPath: localPath ?? _uiState.receiptLocalPath,
+        clearOcrData: localPath != null,
       );
     } catch (error) {
       _uiState = _uiState.copyWith(
@@ -189,7 +204,66 @@ class ActivityViewModel extends ChangeNotifier {
   }
 
   void removeReceipt() {
-    _uiState = _uiState.copyWith(receiptLocalPath: '');
+    _uiState = _uiState.copyWith(receiptLocalPath: '', clearOcrData: true);
+    notifyListeners();
+  }
+
+  /// Scans the selected receipt and keeps the extracted values temporary until
+  /// the tourist has reviewed and confirmed the whole expense.
+  Future<void> scanReceipt() async {
+    final receiptLocalPath = _uiState.receiptLocalPath;
+    if (receiptLocalPath.isEmpty) {
+      _setExpenseError('Choose a receipt image before scanning it.');
+      return;
+    }
+
+    _uiState = _uiState.copyWith(
+      isScanningReceipt: true,
+      errorMessage: '',
+      successMessage: '',
+    );
+    notifyListeners();
+
+    try {
+      final receiptText = await _expenseTrackingService.readReceiptText(
+        receiptLocalPath,
+      );
+      final extractedTotal = _expenseTrackingService.extractReceiptTotal(
+        receiptText,
+      );
+      final extractedDateTime = _expenseTrackingService
+          .extractReceiptDateTime(receiptText);
+      String extractedTotalError = '';
+
+      if (extractedTotal != null) {
+        try {
+          _expenseTrackingService.validateTotalAmount(extractedTotal);
+        } on ArgumentError {
+          extractedTotalError = 'The extracted amount is invalid. Please correct it.';
+        }
+      }
+
+      _uiState = _uiState.copyWith(
+        isScanningReceipt: false,
+        ocrRawText: receiptText,
+        ocrMerchantName: _expenseTrackingService.extractMerchantName(
+          receiptText,
+        ) ?? '',
+        ocrTransactionDateTime: extractedDateTime,
+        clearOcrTransactionDateTime: extractedDateTime == null,
+        ocrExtractedTotal: extractedTotal,
+        clearOcrExtractedTotal: extractedTotal == null,
+        ocrItemLines: _expenseTrackingService.extractReceiptItemLines(
+          receiptText,
+        ),
+        errorMessage: extractedTotalError,
+      );
+    } catch (error) {
+      _uiState = _uiState.copyWith(
+        isScanningReceipt: false,
+        errorMessage: _readableError(error),
+      );
+    }
     notifyListeners();
   }
 
@@ -230,6 +304,7 @@ class ActivityViewModel extends ChangeNotifier {
         draftTotalAmount: 0.0,
         paymentMethod: '',
         receiptLocalPath: '',
+        clearOcrData: true,
         successMessage: 'The expense record has been successfully saved.',
       );
       await loadRecordedExpensesForSelectedActivity();

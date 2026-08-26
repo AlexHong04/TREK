@@ -16,6 +16,12 @@ class ActivityUiState {
   final String receiptLocalPath;
   final bool isSavingExpense;
   final bool isPickingReceipt;
+  final bool isScanningReceipt;
+  final String ocrRawText;
+  final String ocrMerchantName;
+  final DateTime? ocrTransactionDateTime;
+  final double? ocrExtractedTotal;
+  final List<String> ocrItemLines;
   final String errorMessage;
   final String successMessage;
 
@@ -48,6 +54,12 @@ class ActivityUiState {
     this.receiptLocalPath = '',
     this.isSavingExpense = false,
     this.isPickingReceipt = false,
+    this.isScanningReceipt = false,
+    this.ocrRawText = '',
+    this.ocrMerchantName = '',
+    this.ocrTransactionDateTime,
+    this.ocrExtractedTotal,
+    this.ocrItemLines = const [],
     this.errorMessage = '',
     this.successMessage = '',
     this.recordedExpenses = const [],
@@ -77,6 +89,15 @@ class ActivityUiState {
     String? receiptLocalPath,
     bool? isSavingExpense,
     bool? isPickingReceipt,
+    bool? isScanningReceipt,
+    String? ocrRawText,
+    String? ocrMerchantName,
+    DateTime? ocrTransactionDateTime,
+    double? ocrExtractedTotal,
+    List<String>? ocrItemLines,
+    bool clearOcrData = false,
+    bool clearOcrTransactionDateTime = false,
+    bool clearOcrExtractedTotal = false,
     String? errorMessage,
     String? successMessage,
     List<Expense>? recordedExpenses,
@@ -105,6 +126,19 @@ class ActivityUiState {
       receiptLocalPath: receiptLocalPath ?? this.receiptLocalPath,
       isSavingExpense: isSavingExpense ?? this.isSavingExpense,
       isPickingReceipt: isPickingReceipt ?? this.isPickingReceipt,
+      isScanningReceipt: isScanningReceipt ?? this.isScanningReceipt,
+      ocrRawText: clearOcrData ? '' : ocrRawText ?? this.ocrRawText,
+      ocrMerchantName:
+          clearOcrData ? '' : ocrMerchantName ?? this.ocrMerchantName,
+      ocrTransactionDateTime:
+          clearOcrData || clearOcrTransactionDateTime
+              ? null
+              : ocrTransactionDateTime ?? this.ocrTransactionDateTime,
+      ocrExtractedTotal:
+          clearOcrData || clearOcrExtractedTotal
+              ? null
+              : ocrExtractedTotal ?? this.ocrExtractedTotal,
+      ocrItemLines: clearOcrData ? const [] : ocrItemLines ?? this.ocrItemLines,
       errorMessage: errorMessage ?? this.errorMessage,
       successMessage: successMessage ?? this.successMessage,
       recordedExpenses: recordedExpenses ?? this.recordedExpenses,
