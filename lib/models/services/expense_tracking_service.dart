@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
 import '../entities/activity.dart';
@@ -13,6 +14,8 @@ enum ExpenseProcessingResult {
   reallocatedSuccessfully,
   reallocatedFailed,
   exceedsThresholdTriggerRecommendation,
+  critical,
+  updateFailed
 }
 
 class ExpenseTrackingService {
@@ -54,7 +57,8 @@ class ExpenseTrackingService {
 
     for (final line in lines) {
       final normalizedLine = line.toLowerCase();
-      final isSummaryLine = normalizedLine.contains('total') ||
+      final isSummaryLine =
+          normalizedLine.contains('total') ||
           normalizedLine.contains('subtotal') ||
           normalizedLine.contains('tax') ||
           normalizedLine.contains('change') ||
@@ -92,7 +96,11 @@ class ExpenseTrackingService {
     final minute = int.tryParse(timeMatch.group(2)!);
     final period = timeMatch.group(3)?.toUpperCase();
 
-    if (day == null || month == null || year == null || hour == null || minute == null) {
+    if (day == null ||
+        month == null ||
+        year == null ||
+        hour == null ||
+        minute == null) {
       return null;
     }
 
@@ -107,7 +115,8 @@ class ExpenseTrackingService {
     }
 
     final dateTime = DateTime(year, month, day, hour, minute);
-    final isInvalidDate = dateTime.year != year ||
+    final isInvalidDate =
+        dateTime.year != year ||
         dateTime.month != month ||
         dateTime.day != day ||
         dateTime.hour != hour ||
@@ -156,7 +165,8 @@ class ExpenseTrackingService {
   List<String> extractReceiptItemLines(String receiptText) {
     return _receiptLines(receiptText).where((line) {
       final normalizedLine = line.toLowerCase();
-      final isSummaryLine = normalizedLine.contains('total') ||
+      final isSummaryLine =
+          normalizedLine.contains('total') ||
           normalizedLine.contains('subtotal') ||
           normalizedLine.contains('tax') ||
           normalizedLine.contains('change') ||
@@ -285,11 +295,50 @@ class ExpenseTrackingService {
     required String currentActivityId,
     required double expense,
   }) async {
-    final currentActivity = await _itineraryRepository.getCurrentActivity(currentActivityId);
-    final currentDay = await _itineraryRepository.getCurrentDay(currentActivityId);
+    debugPrint("process expense");
+
+    final currentTrip = await _itineraryRepository.getTrip(tripId);
+    final activities = await _itineraryRepository.fetchAllActivitiesByTrip(
+      tripId,
+    );
+
+    double totalAllocatedBudget = 0.00;
+
+    for (var activity in activities) {
+      totalAllocatedBudget += activity.allocatedBudget;
+    }
+    final remainingBudget = currentTrip.remainingBalance;
+
+    final bool isCritical = await detectCriticalOverspend(totalAllocatedBudget, remainingBudget!);
+
+    if (isCritical) {
+      return ExpenseProcessingResult.critical;
+    }
+    debugPrint("Expense: $expense");
+    debugPrint("trip Id: $tripId");
+    debugPrint("current activity id: $currentActivityId");
+    debugPrint("total allocated budget: $totalAllocatedBudget");
+    debugPrint("remaining budget: $remainingBudget");
+    debugPrint("is critical: $isCritical");
+
+    final currentActivity = await _itineraryRepository.getCurrentActivity(
+      currentActivityId,
+    );
+
+    debugPrint("current activity: $currentActivity");
+
+    final currentDay = await _itineraryRepository.getCurrentDay(
+      currentActivity.dayTripId,
+    );
 
     // Detect overspend
-    final bool isOverspend = await detectOverspend(tripId, currentActivity, expense);
+    final bool isOverspend = await detectOverspend(
+      tripId,
+      currentActivity,
+      expense,
+    );
+    debugPrint("is overspend: $isOverspend");
+
 
     if (!isOverspend) {
       return ExpenseProcessingResult.withinBudget;
@@ -297,16 +346,21 @@ class ExpenseTrackingService {
 
     final double overspentAmount = expense - currentActivity.allocatedBudget;
 
+    debugPrint("overspend amount $overspentAmount");
+
     final updatedActivity = currentActivity.copyWith(
       overspendAmount: overspentAmount,
       isOverspend: true,
     );
 
-    final existingCategories = currentDay.overspendCategory
-        ?.split(',')
-        .map((category) => category.trim())
-        .where((category) => category.isNotEmpty)
-        .toList() ??
+    debugPrint("updated activity $updatedActivity");
+
+    final existingCategories =
+        currentDay.overspendCategory
+            ?.split(',')
+            .map((category) => category.trim())
+            .where((category) => category.isNotEmpty)
+            .toList() ??
         [];
 
     final newCategory = currentActivity.activityCategory.trim();
@@ -315,22 +369,34 @@ class ExpenseTrackingService {
       existingCategories.add(newCategory);
     }
 
+    debugPrint("existing categories $existingCategories");
+
+
     final updatedDay = currentDay.copyWith(
-      overspendAmount:
-      (currentDay.overspendAmount ?? 0.00) + overspentAmount,
+      overspendAmount: (currentDay.overspendAmount ?? 0.00) + overspentAmount,
       overspendCategory: existingCategories.join(', '),
       isOverspend: true,
     );
+    debugPrint("updated day $updatedDay");
 
-    await _itineraryRepository.updateDayOverspendDetails(updatedDay);
-    await _itineraryRepository.updateOverspendDetails(updatedActivity);
+    final success = await _itineraryRepository.updateDayOverspendDetails(updatedDay);
+    final success2 = await _itineraryRepository.updateOverspendDetails(updatedActivity);
 
+    debugPrint("update day success: $success");
+    debugPrint("update activity success: $success2");
+
+    if (!success || !success2) {
+      debugPrint("Failed to update overspend details");
+      return ExpenseProcessingResult.updateFailed;
+    }
     // Check if overspend exceeds defined threshold
     final bool isAboveThreshold = await calculateOverspendPercentage(
       tripId,
       currentActivity,
       overspentAmount,
     );
+
+    debugPrint("is above threshold $isAboveThreshold");
 
     if (isAboveThreshold) {
       // Above threshold -> Trigger recommendation flow
@@ -348,7 +414,9 @@ class ExpenseTrackingService {
       }
 
       // Update database
-      final updateSuccessful = await _itineraryRepository.updateActivities(updatedActivities);
+      final updateSuccessful = await _itineraryRepository.updateActivities(
+        updatedActivities,
+      );
 
       if (updateSuccessful) {
         return ExpenseProcessingResult.reallocatedSuccessfully;
@@ -359,59 +427,94 @@ class ExpenseTrackingService {
   }
 
   // zhiqin
-  Future<bool> detectOverspend(String tripId, Activity currentActivity, double expense) async {
+  Future<bool> detectOverspend(
+    String tripId,
+    Activity currentActivity,
+    double expense,
+  ) async {
     if (currentActivity.allocatedBudget < expense) {
       return true;
     }
     return false;
   }
 
+  Future<bool> detectCriticalOverspend(
+    double totalAllocatedBudget,
+      double remainingBudget
+  ) async {
+    if (remainingBudget <= totalAllocatedBudget * 0.2) {
+      return true;
+    }
+    return false;
+  }
+
   // zhiqin
-  Future<List<Activity>> reallocateBudget(String tripId, Activity currentActivity, double overspendAmount) async {
-    List<Activity> modifiedActivities =
-    await _budgetService.reallocateBudget(tripId, currentActivity, overspendAmount);
+  Future<List<Activity>> reallocateBudget(
+    String tripId,
+    Activity currentActivity,
+    double overspendAmount,
+  ) async {
+    debugPrint("reallocate budget");
+    List<Activity> modifiedActivities = await _budgetService.reallocateBudget(
+      tripId,
+      currentActivity,
+      overspendAmount,
+    );
     return modifiedActivities;
   }
 
   Future<bool> calculateOverspendPercentage(
-      String tripId,
-      Activity currentActivity,
-      double overspentAmount,
-      ) async {
-    List<Activity> remainingActivities =
-    await _itineraryRepository.fetchRemainingActivity(tripId, currentActivity.activitiesId);
+    String tripId,
+    Activity currentActivity,
+    double overspentAmount,
+  ) async {
+    final allRemainingActivities = await _itineraryRepository
+        .fetchRemainingActivity(tripId, currentActivity.activitiesId);
 
-    // Find index of currentActivity inside remainingActivities list
+    // Only keep activities from the same date as the current activity
+    final remainingActivities = allRemainingActivities.where((activity) {
+      return activity.date.year == currentActivity.date.year &&
+          activity.date.month == currentActivity.date.month &&
+          activity.date.day == currentActivity.date.day;
+    }).toList();
+
+    // Find current activity inside today's activities
     final int currentIndex = remainingActivities.indexWhere(
-          (activity) => activity.activitiesId == currentActivity.activitiesId,
+      (activity) => activity.activitiesId == currentActivity.activitiesId,
     );
 
-    // Fallback if activity isn't found in remaining list
     if (currentIndex == -1) {
       return false;
     }
 
     double targetAllocatedBudget = 0.0;
+
     final bool isLastActivityOfDay =
         currentIndex == remainingActivities.length - 1;
 
     if (!isLastActivityOfDay) {
-      // Not the last activity: calculate remaining allocated budget for the rest of today
-      final upcomingTodayActivities = remainingActivities.sublist(currentIndex + 1);
+      // Sum the allocated budgets of activities after
+      // the current activity on the same day.
+      final upcomingTodayActivities = remainingActivities.sublist(
+        currentIndex + 1,
+      );
+
       targetAllocatedBudget = upcomingTodayActivities.fold(
         0.0,
-            (sum, item) => sum + item.allocatedBudget,
+        (sum, item) => sum + item.allocatedBudget,
       );
     } else {
-      // Last activity of the day: fetch remaining allocated budget for the next day
+      // Current activity is the last activity of the day.
+      // Fetch the next day's activities from the already-fetched list.
       final DateTime currentDate = currentActivity.date;
+
       final DateTime nextDay = DateTime(
         currentDate.year,
         currentDate.month,
         currentDate.day + 1,
       );
 
-      final nextDayActivities = remainingActivities.where((activity) {
+      final nextDayActivities = allRemainingActivities.where((activity) {
         return activity.date.year == nextDay.year &&
             activity.date.month == nextDay.month &&
             activity.date.day == nextDay.day;
@@ -419,12 +522,13 @@ class ExpenseTrackingService {
 
       targetAllocatedBudget = nextDayActivities.fold(
         0.0,
-            (sum, item) => sum + item.allocatedBudget,
+        (sum, item) => sum + item.allocatedBudget,
       );
     }
 
-    // Calculate overspend threshold percentage
+    // Determine overspend threshold
     double overspendThresholdPercentage;
+
     if (targetAllocatedBudget <= 100.0) {
       overspendThresholdPercentage = 0.15; // 15%
     } else if (targetAllocatedBudget <= 500.0) {
@@ -433,11 +537,9 @@ class ExpenseTrackingService {
       overspendThresholdPercentage = 0.05; // 5%
     }
 
-    // Check if overspend exceeds threshold limit
     final double allowedOverspendLimit =
         targetAllocatedBudget * overspendThresholdPercentage;
 
     return overspentAmount > allowedOverspendLimit;
   }
-
 }
