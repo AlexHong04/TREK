@@ -80,18 +80,22 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         !_isRecordingNewExpense;
     final isExpenseFormMode =
         !uiState.isLoadingRecordedExpenses && !showRecordedExpenses;
+    final hasOneRecordedExpense = uiState.recordedExpenses.length == 1;
     final hasMoreRecordedExpensesThanFit = uiState.recordedExpenses.length >= 3;
     final canExpandSheet = isExpenseFormMode || hasMoreRecordedExpensesThanFit;
+    final recordedExpensesHeight = hasOneRecordedExpense ? 0.65 : 0.74;
 
     return DraggableScrollableSheet(
-      initialChildSize: isExpenseFormMode ? 0.78 : 0.74,
+      initialChildSize: isExpenseFormMode ? 0.78 : recordedExpensesHeight,
       minChildSize: 0.10,
-      maxChildSize: canExpandSheet ? 0.90 : 0.74,
+      maxChildSize: canExpandSheet ? 0.90 : recordedExpensesHeight,
       snap: true,
       snapSizes: isExpenseFormMode
           ? const [0.50, 0.78, 0.90]
           : hasMoreRecordedExpensesThanFit
           ? const [0.50, 0.74, 0.90]
+          : hasOneRecordedExpense
+          ? const [0.50, 0.65]
           : const [0.50, 0.74],
       shouldCloseOnMinExtent: true,
       builder: (context, scrollController) => Stack(
@@ -367,6 +371,11 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                 Text('Total: RM${expense.totalAmount.toStringAsFixed(2)}'),
                 Text('Payment: ${expense.paymentMethod ?? 'Not specified'}'),
                 Text(
+                  expense.createdAt == null
+                      ? 'Recorded: Date and time unavailable'
+                      : 'Recorded: ${DateFormat('dd MMM yyyy, hh:mm a').format(expense.createdAt!)}',
+                ),
+                Text(
                   expense.receiptImageUrl == null
                       ? 'Receipt: Not attached'
                       : 'Receipt: Attached',
@@ -391,6 +400,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                       contentPadding: EdgeInsets.zero,
                       title: Text(item.itemName),
                       subtitle: Text(
+                        '${DateFormat('dd MMM yyyy, hh:mm a').format(item.expenseDateTime)}\n'
                         '${item.quantity} × RM${item.unitPrice.toStringAsFixed(2)}',
                       ),
                       trailing: Text('RM${item.subtotal.toStringAsFixed(2)}'),
@@ -1093,10 +1103,38 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     }
 
     if (viewModel.uiState.successMessage.isEmpty) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(viewModel.uiState.successMessage)));
-    Navigator.pop(context);
+
+    final expenseNumber = viewModel.uiState.recordedExpenses.length;
+    viewModel.clearExpenseMessage();
+    final recordAnotherExpense = await _showConfirmationDialog(
+      title: 'Expense #$expenseNumber Saved',
+      message:
+          'Expense #$expenseNumber has been successfully recorded. Would you like to record another expense for this activity?',
+      confirmLabel: 'Yes, Record Another',
+    );
+    if (!mounted) return;
+
+    if (recordAnotherExpense) {
+      _startAnotherExpenseForActivity();
+    } else {
+      Navigator.pop(context);
+    }
+  }
+
+  void _startAnotherExpenseForActivity() {
+    setState(() {
+      _isRecordingNewExpense = true;
+      _editingItemIndex = null;
+      _isEditingItem = true;
+      _showItemForm = true;
+      _itemNameController.clear();
+      _descriptionController.clear();
+      _merchantController.clear();
+      _quantityController.clear();
+      _unitPriceController.clear();
+      _selectedDate = DateTime.now();
+      _selectedTime = TimeOfDay.now();
+    });
   }
 
   Future<void> _showConfirmExpenseDialog() async {
