@@ -74,7 +74,7 @@ class MyApp extends StatelessWidget {
             WholeItineraryDetailScreen.builder(context),
         AppRoutes.activityScreen: (context) => ActivityScreen.builder(context),
         AppRoutes.financialDashboardScreen: (context) =>
-            const FinancialDashboardScreen(),
+            FinancialDashboardScreen.builder(context),
         AppRoutes.tripSummaryScreen: (context) => const TripSummaryScreen(),
       },
     );

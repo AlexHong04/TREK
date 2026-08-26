@@ -1,37 +1,31 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart' as intl;
+import 'package:provider/provider.dart';
 
+import '../main.dart';
 import '../theme/app_theme.dart';
+import '../view_models/presentation_logic/financial_dashboard_view_model.dart';
+import '../view_models/ui_state/financial_dashboard_ui_state.dart';
 
 class FinancialDashboardScreen extends StatelessWidget {
   final VoidCallback? onHomeSelected;
 
   const FinancialDashboardScreen({super.key, this.onHomeSelected});
 
-  static final _categories = [
-    _CategoryBudget(
-      name: 'Food',
-      budget: 300,
-      expense: 150,
-      color: appTheme.teal_50,
-    ),
-    _CategoryBudget(
-      name: 'Attraction',
-      budget: 500,
-      expense: 250,
-      color: appTheme.teal_A700,
-    ),
-    _CategoryBudget(
-      name: 'Transport',
-      budget: 200,
-      expense: 300,
-      color: appTheme.teal_800,
-    ),
-  ];
+  static Widget builder(BuildContext context, {VoidCallback? onHomeSelected}) {
+    return ChangeNotifierProvider<FinancialDashboardViewModel>(
+      create: (_) => FinancialDashboardViewModel()..loadCurrentDay(),
+      child: FinancialDashboardScreen(onHomeSelected: onHomeSelected),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final viewModel = context.watch<FinancialDashboardViewModel>();
+    final uiState = viewModel.uiState;
+
     return Scaffold(
       backgroundColor: appTheme.gray_50_02,
       body: SafeArea(
@@ -57,15 +51,27 @@ class FinancialDashboardScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 22),
-                    _buildSummaryCard(),
-                    const SizedBox(height: 18),
-                    _buildDateFilter(context),
-                    const SizedBox(height: 34),
-                    _buildCategoryChart(),
-                    const SizedBox(height: 26),
-                    _buildExpenseChart(),
-                    const SizedBox(height: 24),
-                    _buildBreakdownCard(),
+                    if (uiState.isLoading)
+                      const Center(child: CircularProgressIndicator())
+                    else if (uiState.errorMessage != null)
+                      _buildErrorState(
+                        context,
+                        viewModel,
+                        uiState.errorMessage!,
+                      )
+                    else if (!uiState.hasCurrentTrip)
+                      _buildEmptyState()
+                    else ...[
+                      _buildSummaryCard(uiState),
+                      const SizedBox(height: 18),
+                      _buildDateFilter(context, uiState),
+                      const SizedBox(height: 34),
+                      _buildCategoryChart(uiState),
+                      const SizedBox(height: 26),
+                      _buildExpenseChart(uiState),
+                      const SizedBox(height: 24),
+                      _buildBreakdownCard(uiState),
+                    ],
                   ],
                 ),
               ),
@@ -115,11 +121,7 @@ class FinancialDashboardScreen extends StatelessWidget {
               color: appTheme.gray_200,
               border: Border.all(color: appTheme.gray_100),
             ),
-            child: Icon(
-              Icons.person,
-              color: appTheme.blue_gray_300,
-              size: 24,
-            ),
+            child: Icon(Icons.person, color: appTheme.blue_gray_300, size: 24),
           ),
         ],
       ),
@@ -156,7 +158,7 @@ class FinancialDashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSummaryCard() {
+  Widget _buildSummaryCard(FinancialDashboardUiState uiState) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -165,40 +167,43 @@ class FinancialDashboardScreen extends StatelessWidget {
       ),
       child: Column(
         children: [
-          const _SummaryRow(
+          _SummaryRow(
             icon: Icons.account_balance_wallet_outlined,
             label: 'Total Allocated Budget',
-            amount: 'RM1000',
+            amount: uiState.totalAllocatedBudget,
           ),
           Divider(
             color: appTheme.white_A700.withValues(alpha: 0.33),
             height: 1,
           ),
-          const _SummaryRow(
+          _SummaryRow(
             icon: Icons.south_west,
             label: 'Total Expense',
-            amount: 'RM600',
+            amount: uiState.totalExpense,
           ),
           Divider(
             color: appTheme.white_A700.withValues(alpha: 0.33),
             height: 1,
           ),
-          const _SummaryRow(
+          _SummaryRow(
             icon: Icons.shield_outlined,
             label: 'Total Remain Budget',
-            amount: 'RM400',
+            amount: uiState.remainingBudget,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDateFilter(BuildContext context) {
+  Widget _buildDateFilter(
+    BuildContext context,
+    FinancialDashboardUiState uiState,
+  ) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
-          'From 14 Dec, 2026',
+          'For ${intl.DateFormat('d MMM, yyyy').format(uiState.selectedDate)}',
           style: TextStyle(color: appTheme.gray_400, fontSize: 18),
         ),
         PopupMenuButton<_DashboardFilter>(
@@ -212,9 +217,7 @@ class FinancialDashboardScreen extends StatelessWidget {
           color: appTheme.white_A700,
           elevation: 3,
           position: PopupMenuPosition.under,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(4),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
           itemBuilder: (context) => const [
             PopupMenuItem(
               value: _DashboardFilter.byDate,
@@ -241,10 +244,7 @@ class FinancialDashboardScreen extends StatelessWidget {
                   size: 21,
                 ),
                 const SizedBox(width: 7),
-                Text(
-                  'Filter',
-                  style: TextStyle(color: appTheme.teal_A700),
-                ),
+                Text('Filter', style: TextStyle(color: appTheme.teal_A700)),
               ],
             ),
           ),
@@ -269,18 +269,20 @@ class FinancialDashboardScreen extends StatelessWidget {
     );
 
     if (selectedTrip != null && context.mounted) {
-      Navigator.pushNamed(context, '/tripSummaryScreen');
+      //navigate to tripsummary
+      Navigator.pushNamed(context, AppRoutes.tripSummaryScreen);
     }
   }
 
-  Widget _buildCategoryChart() {
+  Widget _buildCategoryChart(FinancialDashboardUiState uiState) {
+    final categories = _categoryBudgets(uiState);
     return Column(
       children: [
         SizedBox(
-          height: 160,
+          height: 220,
           child: CustomPaint(
-            size: const Size(double.infinity, 160),
-            painter: _DonutChartPainter(_categories),
+            size: const Size(double.infinity, 220),
+            painter: _DonutChartPainter(categories),
           ),
         ),
         const SizedBox(height: 18),
@@ -288,32 +290,40 @@ class FinancialDashboardScreen extends StatelessWidget {
           alignment: WrapAlignment.center,
           spacing: 10,
           runSpacing: 8,
-          children: _categories
-              .map(
-                (item) => _LegendChip(
-                  label: item.name,
-                  color: item.color,
-                ),
-              )
+          children: categories
+              .map((item) => _LegendChip(label: item.name, color: item.color))
               .toList(),
         ),
       ],
     );
   }
 
-  Widget _buildExpenseChart() {
+  Widget _buildExpenseChart(FinancialDashboardUiState uiState) {
+    final categories = _categoryBudgets(uiState);
+    final maximumAmount = categories.fold<double>(
+      0,
+      (maximum, category) =>
+          math.max(maximum, math.max(category.budget, category.expense)),
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text('Expense', style: TextStyle(fontSize: 15)),
         const SizedBox(height: 16),
         SizedBox(
-          height: 120,
+          height: 155,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             crossAxisAlignment: CrossAxisAlignment.end,
-            children: _categories
-                .map((item) => _ExpenseBars(category: item))
+            children: categories
+                .map(
+                  (item) => Expanded(
+                    child: _ExpenseBars(
+                      category: item,
+                      maximumAmount: maximumAmount,
+                    ),
+                  ),
+                )
                 .toList(),
           ),
         ),
@@ -324,15 +334,18 @@ class FinancialDashboardScreen extends StatelessWidget {
           children: [
             _DotLegend(label: 'Allocated Budget', color: appTheme.teal_800),
             _DotLegend(label: 'Expenses', color: appTheme.gray_200),
-            _DotLegend(label: 'Overspending', color: appTheme.expenseOverspendBg),
+            _DotLegend(
+              label: 'Overspending',
+              color: appTheme.expenseOverspendBg,
+            ),
           ],
         ),
       ],
     );
   }
 
-  Widget _buildBreakdownCard() {
-    final orderedCategories = _categories.reversed.toList();
+  Widget _buildBreakdownCard(FinancialDashboardUiState uiState) {
+    final orderedCategories = _categoryBudgets(uiState);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -349,12 +362,25 @@ class FinancialDashboardScreen extends StatelessWidget {
       child: Column(
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _ColumnHeading(color: AppThemeData.expenseBg, label: 'Budget'),
-              _ColumnHeading(color: appTheme.warningPopupHeader, label: 'Expense'),
-              _ColumnHeading(color: appTheme.teal_A700, label: 'Remaining'),
-              _ColumnHeading(color: appTheme.errorRed, label: 'Overspend'),
+              Expanded(
+                child: _ColumnHeading(
+                  color: AppThemeData.expenseBg,
+                  label: 'Budget',
+                ),
+              ),
+              Expanded(
+                child: _ColumnHeading(
+                  color: appTheme.warningPopupHeader,
+                  label: 'Expense',
+                ),
+              ),
+              Expanded(
+                child: _ColumnHeading(
+                  color: appTheme.teal_A700,
+                  label: 'Remaining',
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -367,12 +393,51 @@ class FinancialDashboardScreen extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildErrorState(
+    BuildContext context,
+    FinancialDashboardViewModel viewModel,
+    String message,
+  ) {
+    return Center(
+      child: Column(
+        children: [
+          Text(message, textAlign: TextAlign.center),
+          const SizedBox(height: 12),
+          FilledButton(
+            onPressed: viewModel.loadCurrentDay,
+            child: const Text('Try Again'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return const Center(child: Text('No trip or expenses found for today.'));
+  }
+
+  List<_CategoryBudget> _categoryBudgets(FinancialDashboardUiState uiState) {
+    return List.generate(uiState.categories.length, (index) {
+      final category = uiState.categories[index];
+      return _CategoryBudget(
+        name: category.name,
+        budget: category.budget,
+        expense: category.expense,
+        color: switch (category.name) {
+          'Restaurant' => appTheme.teal_50,
+          'Transport' => appTheme.teal_800,
+          _ => appTheme.teal_A700,
+        },
+      );
+    });
+  }
 }
 
 class _SummaryRow extends StatelessWidget {
   final IconData icon;
   final String label;
-  final String amount;
+  final double amount;
 
   const _SummaryRow({
     required this.icon,
@@ -406,18 +471,31 @@ class _SummaryRow extends StatelessWidget {
               ),
             ),
           ),
-          Text(
-            amount,
-            style: TextStyle(
-              color: appTheme.white_A700,
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
+          SizedBox(
+            width: 112,
+            child: Row(
+              children: [
+                SizedBox(width: 28, child: Text('RM', style: _amountStyle)),
+                Expanded(
+                  child: Text(
+                    amount.toStringAsFixed(2),
+                    textAlign: TextAlign.right,
+                    style: _amountStyle,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
       ),
     );
   }
+
+  TextStyle get _amountStyle => TextStyle(
+    color: appTheme.white_A700,
+    fontSize: 14,
+    fontWeight: FontWeight.w800,
+  );
 }
 
 class _LegendChip extends StatelessWidget {
@@ -449,29 +527,36 @@ class _LegendChip extends StatelessWidget {
 
 class _ExpenseBars extends StatelessWidget {
   final _CategoryBudget category;
+  final double maximumAmount;
 
-  const _ExpenseBars({required this.category});
+  const _ExpenseBars({required this.category, required this.maximumAmount});
 
   @override
   Widget build(BuildContext context) {
     final expenseColor = category.isOverspent
         ? appTheme.expenseOverspendBg
         : appTheme.gray_200;
+    double barHeight(double amount) {
+      if (amount <= 0 || maximumAmount <= 0) return 2;
+      return math.max(8, 88 * amount / maximumAmount);
+    }
+
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
         Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Container(
-              width: 8,
-              height: 90 * category.budget / 500,
+            _AmountBar(
+              amount: category.budget,
+              height: barHeight(category.budget),
               color: appTheme.teal_800,
             ),
-            const SizedBox(width: 7),
-            Container(
-              width: 8,
-              height: 90 * category.expense / 500,
+            const SizedBox(width: 10),
+            _AmountBar(
+              amount: category.expense,
+              height: barHeight(category.expense),
               color: expenseColor,
             ),
           ],
@@ -479,7 +564,46 @@ class _ExpenseBars extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           category.name,
+          textAlign: TextAlign.center,
           style: TextStyle(color: appTheme.gray_400, fontSize: 12),
+        ),
+      ],
+    );
+  }
+}
+
+class _AmountBar extends StatelessWidget {
+  final double amount;
+  final double height;
+  final Color color;
+
+  const _AmountBar({
+    required this.amount,
+    required this.height,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'RM${amount.toStringAsFixed(0)}',
+          style: TextStyle(
+            color: amount == 0 ? appTheme.gray_400 : color,
+            fontSize: 9,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Container(
+          width: 12,
+          height: height,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+          ),
         ),
       ],
     );
@@ -497,7 +621,11 @@ class _DotLegend extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(width: 9, height: 9, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        Container(
+          width: 9,
+          height: 9,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
         const SizedBox(width: 7),
         Text(label, style: TextStyle(color: appTheme.gray_400, fontSize: 12)),
       ],
@@ -513,13 +641,22 @@ class _ColumnHeading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(width: 10, height: 10, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3))),
-        const SizedBox(width: 5),
-        Text(label, style: TextStyle(color: appTheme.gray_400, fontSize: 10)),
-      ],
+    return Center(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(3),
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text(label, style: TextStyle(color: appTheme.gray_400, fontSize: 10)),
+        ],
+      ),
     );
   }
 }
@@ -532,15 +669,29 @@ class _BreakdownRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final remaining = category.budget - category.expense;
-    final percentage = category.expense / category.budget * 100;
+    final percentage = category.budget == 0
+        ? 0.0
+        : category.expense / category.budget * 100;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Container(width: 10, height: 10, decoration: BoxDecoration(color: category.color, borderRadius: BorderRadius.circular(3))),
+            Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                color: category.isOverspent
+                    ? appTheme.errorRed
+                    : appTheme.teal_A700,
+                borderRadius: BorderRadius.circular(3),
+              ),
+            ),
             const SizedBox(width: 9),
-            Text(category.name, style: const TextStyle(fontWeight: FontWeight.w700)),
+            Text(
+              category.name,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
             if (category.isOverspent) ...[
               const SizedBox(width: 8),
               Container(
@@ -550,7 +701,14 @@ class _BreakdownRow extends StatelessWidget {
                   border: Border.all(color: appTheme.wholeAlertBudgetStroke),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Text('Overspend', style: TextStyle(color: appTheme.errorRed, fontSize: 10, fontWeight: FontWeight.w700)),
+                child: Text(
+                  'Overspend',
+                  style: TextStyle(
+                    color: appTheme.errorRed,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
             ],
           ],
@@ -558,9 +716,25 @@ class _BreakdownRow extends StatelessWidget {
         const SizedBox(height: 10),
         Row(
           children: [
-            _MoneyCell(amount: category.budget, percentage: 100, color: appTheme.gray_400),
-            _MoneyCell(amount: category.expense, percentage: percentage, color: appTheme.warningPopupHeader),
-            _MoneyCell(amount: remaining, percentage: 100 - percentage, color: remaining < 0 ? appTheme.errorRed : appTheme.teal_A700),
+            _MoneyCell(
+              amount: category.budget,
+              percentage: 100,
+              color: appTheme.gray_400,
+            ),
+            _MoneyCell(
+              amount: category.expense,
+              percentage: percentage,
+              color: appTheme.warningPopupHeader,
+            ),
+            _MoneyCell(
+              amount: remaining,
+              percentage: category.budget == 0
+                  ? 0
+                  : remaining / category.budget * 100,
+              color: category.isOverspent
+                  ? appTheme.errorRed
+                  : appTheme.teal_A700,
+            ),
           ],
         ),
       ],
@@ -573,7 +747,11 @@ class _MoneyCell extends StatelessWidget {
   final double percentage;
   final Color color;
 
-  const _MoneyCell({required this.amount, required this.percentage, required this.color});
+  const _MoneyCell({
+    required this.amount,
+    required this.percentage,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -581,9 +759,19 @@ class _MoneyCell extends StatelessWidget {
     return Expanded(
       child: Column(
         children: [
-          Text('$sign RM ${amount.abs().toStringAsFixed(0)}', style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 13)),
+          Text(
+            'RM $sign${amount.abs().toStringAsFixed(0)}',
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+            ),
+          ),
           const SizedBox(height: 2),
-          Text('${percentage.toStringAsFixed(0)}%', style: TextStyle(color: color, fontSize: 10)),
+          Text(
+            '${percentage.toStringAsFixed(0)}%',
+            style: TextStyle(color: color, fontSize: 10),
+          ),
         ],
       ),
     );
@@ -598,14 +786,16 @@ class _DonutChartPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    const radius = 62.0;
+    const radius = 58.0;
     const strokeWidth = 24.0;
     final rect = Rect.fromCircle(center: center, radius: radius);
-    final total = categories.fold<double>(0, (sum, item) => sum + item.budget);
+    final total = categories.fold<double>(0, (sum, item) => sum + item.expense);
+    if (total <= 0) return;
     var startAngle = -math.pi / 2;
 
     for (final category in categories) {
-      final sweep = math.pi * 2 * category.budget / total;
+      if (category.expense <= 0) continue;
+      final sweep = math.pi * 2 * category.expense / total;
       canvas.drawArc(
         rect,
         startAngle,
@@ -618,21 +808,35 @@ class _DonutChartPainter extends CustomPainter {
       );
 
       final middleAngle = startAngle + sweep / 2;
-      final labelPosition = center + Offset(math.cos(middleAngle), math.sin(middleAngle)) * 94;
+      final labelPosition =
+          center + Offset(math.cos(middleAngle), math.sin(middleAngle)) * 100;
       final textPainter = TextPainter(
         text: TextSpan(
-          text: 'RM${category.budget.toStringAsFixed(0)}',
+          text: 'RM ${category.expense.toStringAsFixed(0)}',
           style: TextStyle(color: appTheme.gray_900, fontSize: 14),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
-      textPainter.paint(canvas, labelPosition - Offset(textPainter.width / 2, textPainter.height / 2));
+      final desiredOffset =
+          labelPosition - Offset(textPainter.width / 2, textPainter.height / 2);
+      textPainter.paint(
+        canvas,
+        Offset(
+          desiredOffset.dx
+              .clamp(4, size.width - textPainter.width - 4)
+              .toDouble(),
+          desiredOffset.dy
+              .clamp(4, size.height - textPainter.height - 4)
+              .toDouble(),
+        ),
+      );
       startAngle += sweep;
     }
   }
 
   @override
-  bool shouldRepaint(covariant _DonutChartPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _DonutChartPainter oldDelegate) =>
+      oldDelegate.categories != categories;
 }
 
 enum _DashboardFilter { byDate, byTrip }
@@ -682,7 +886,10 @@ class _CompletedTripDialog extends StatelessWidget {
       backgroundColor: appTheme.white_A700,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: 380, maxHeight: screenHeight * 0.82),
+        constraints: BoxConstraints(
+          maxWidth: 380,
+          maxHeight: screenHeight * 0.82,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1122,7 +1329,12 @@ class _CategoryBudget {
   final double expense;
   final Color color;
 
-  const _CategoryBudget({required this.name, required this.budget, required this.expense, required this.color});
+  const _CategoryBudget({
+    required this.name,
+    required this.budget,
+    required this.expense,
+    required this.color,
+  });
 
   bool get isOverspent => expense > budget;
 }

@@ -41,7 +41,10 @@ class _HomeScreenState extends State<HomeScreen> {
       onPageChanged: (page) => setState(() => _currentPage = page),
       children: [
         _buildHomePage(context),
-        FinancialDashboardScreen(onHomeSelected: () => _goToPage(0)),
+        FinancialDashboardScreen.builder(
+          context,
+          onHomeSelected: () => _goToPage(0),
+        ),
       ],
     );
   }
