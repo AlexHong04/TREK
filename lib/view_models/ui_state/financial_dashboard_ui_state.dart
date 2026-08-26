@@ -1,12 +1,30 @@
+class DashboardExpenseDetailUiState {
+  final String activityName;
+  final String activityImageUrl;
+  final String timeText;
+  final double amount;
+  final String paymentMethod;
+
+  const DashboardExpenseDetailUiState({
+    required this.activityName,
+    required this.activityImageUrl,
+    required this.timeText,
+    required this.amount,
+    required this.paymentMethod,
+  });
+}
+
 class DashboardCategoryUiState {
   final String name;
   final double budget;
   final double expense;
+  final List<DashboardExpenseDetailUiState> expenseDetails;
 
   const DashboardCategoryUiState({
     required this.name,
     required this.budget,
     required this.expense,
+    this.expenseDetails = const [],
   });
 
   double get remaining => budget - expense;

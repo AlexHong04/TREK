@@ -7,11 +7,29 @@ class FinancialCategorySummary {
   final String category;
   final double allocatedBudget;
   final double expense;
+  final List<FinancialExpenseDetail> expenseDetails;
 
   const FinancialCategorySummary({
     required this.category,
     required this.allocatedBudget,
     required this.expense,
+    this.expenseDetails = const [],
+  });
+}
+
+class FinancialExpenseDetail {
+  final String activityName;
+  final String activityImageUrl;
+  final String? activityStartTime;
+  final double amount;
+  final String? paymentMethod;
+
+  const FinancialExpenseDetail({
+    required this.activityName,
+    required this.activityImageUrl,
+    required this.activityStartTime,
+    required this.amount,
+    required this.paymentMethod,
   });
 }
 
@@ -55,11 +73,31 @@ class FinancialDashboardService implements IFinancialDashboardService {
     );
 
     final expenseByActivity = <String, double>{};
+    final activityById = {
+      for (final activity in activities) activity.activitiesId: activity,
+    };
+    final detailsByCategory = <String, List<FinancialExpenseDetail>>{
+      for (final category in _dashboardCategories) category: [],
+    };
     for (final expense in expenses) {
       expenseByActivity.update(
         expense.activitiesId,
         (total) => total + expense.totalAmount,
         ifAbsent: () => expense.totalAmount,
+      );
+
+      final activity = activityById[expense.activitiesId];
+      if (activity == null) continue;
+      final category = _normalizedCategory(activity);
+      if (category == null) continue;
+      detailsByCategory[category]!.add(
+        FinancialExpenseDetail(
+          activityName: activity.destination,
+          activityImageUrl: activity.activityImgUrl,
+          activityStartTime: activity.startTime,
+          amount: expense.totalAmount,
+          paymentMethod: expense.paymentMethod,
+        ),
       );
     }
 
@@ -85,6 +123,7 @@ class FinancialDashboardService implements IFinancialDashboardService {
             category: entry.key,
             allocatedBudget: entry.value.budget,
             expense: entry.value.expense,
+            expenseDetails: List.unmodifiable(detailsByCategory[entry.key]!),
           ),
         )
         .toList();

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:intl/intl.dart';
 import '../../models/services/financial_dashboard_service.dart';
 import '../ui_state/financial_dashboard_ui_state.dart';
 
@@ -45,6 +46,20 @@ class FinancialDashboardViewModel extends ChangeNotifier {
                   name: category.category,
                   budget: category.allocatedBudget,
                   expense: category.expense,
+                  expenseDetails: category.expenseDetails
+                      .map(
+                        (detail) => DashboardExpenseDetailUiState(
+                          activityName: detail.activityName,
+                          activityImageUrl: detail.activityImageUrl,
+                          timeText: _formatTime(detail.activityStartTime, date),
+                          amount: detail.amount,
+                          paymentMethod:
+                              detail.paymentMethod?.trim().isNotEmpty == true
+                              ? detail.paymentMethod!.trim()
+                              : 'Payment method unavailable',
+                        ),
+                      )
+                      .toList(),
                 ),
               )
               .toList(),
@@ -62,5 +77,28 @@ class FinancialDashboardViewModel extends ChangeNotifier {
       );
     }
     notifyListeners();
+  }
+
+  String _formatTime(String? value, DateTime date) {
+    final time = value?.trim() ?? '';
+    if (time.isEmpty) return 'Scheduled';
+    if (time.toUpperCase().contains('AM') ||
+        time.toUpperCase().contains('PM')) {
+      return time;
+    }
+
+    try {
+      final parts = time.split(':');
+      final parsed = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        int.parse(parts[0]),
+        int.parse(parts[1]),
+      );
+      return DateFormat('hh:mm a').format(parsed);
+    } catch (_) {
+      return time;
+    }
   }
 }

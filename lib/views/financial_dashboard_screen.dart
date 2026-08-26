@@ -280,9 +280,24 @@ class FinancialDashboardScreen extends StatelessWidget {
       children: [
         SizedBox(
           height: 220,
-          child: CustomPaint(
-            size: const Size(double.infinity, 220),
-            painter: _DonutChartPainter(categories),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final chartSize = Size(constraints.maxWidth, 220);
+              return GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTapUp: (details) => _handleDonutTap(
+                  context,
+                  details.localPosition,
+                  chartSize,
+                  categories,
+                  uiState,
+                ),
+                child: CustomPaint(
+                  size: chartSize,
+                  painter: _DonutChartPainter(categories),
+                ),
+              );
+            },
           ),
         ),
         const SizedBox(height: 18),
@@ -431,6 +446,321 @@ class FinancialDashboardScreen extends StatelessWidget {
         },
       );
     });
+  }
+
+  void _handleDonutTap(
+    BuildContext context,
+    Offset position,
+    Size size,
+    List<_CategoryBudget> chartCategories,
+    FinancialDashboardUiState uiState,
+  ) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final distance = (position - center).distance;
+    if (distance < 42 || distance > 74) return;
+
+    final totalExpense = chartCategories.fold<double>(
+      0,
+      (sum, category) => sum + category.expense,
+    );
+    if (totalExpense <= 0) return;
+
+    var tapAngle = math.atan2(position.dy - center.dy, position.dx - center.dx);
+    tapAngle += math.pi / 2;
+    if (tapAngle < 0) tapAngle += math.pi * 2;
+
+    var accumulatedAngle = 0.0;
+    for (final chartCategory in chartCategories) {
+      if (chartCategory.expense <= 0) continue;
+      final sweep = math.pi * 2 * chartCategory.expense / totalExpense;
+      if (tapAngle >= accumulatedAngle && tapAngle < accumulatedAngle + sweep) {
+        final selectedCategory = uiState.categories.firstWhere(
+          (category) => category.name == chartCategory.name,
+        );
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => _FinancialExpenseDetailView(
+              category: selectedCategory,
+              date: uiState.selectedDate,
+            ),
+          ),
+        );
+        return;
+      }
+      accumulatedAngle += sweep;
+    }
+  }
+}
+
+class _FinancialExpenseDetailView extends StatelessWidget {
+  final DashboardCategoryUiState category;
+  final DateTime date;
+
+  const _FinancialExpenseDetailView({
+    required this.category,
+    required this.date,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: appTheme.gray_50_02,
+      appBar: AppBar(
+        backgroundColor: appTheme.white_A700,
+        elevation: 0,
+        centerTitle: true,
+        leading: IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: Icon(Icons.arrow_back, color: appTheme.teal_800),
+        ),
+        title: Text(
+          'Dashboard',
+          style: TextStyle(
+            color: appTheme.teal_A700,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+      body: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
+          child: Column(
+            children: [
+              Text(
+                category.name,
+                style: TextStyle(color: appTheme.gray_900, fontSize: 18),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'From ${intl.DateFormat('d MMM, yyyy').format(date)}',
+                style: TextStyle(color: appTheme.gray_400, fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              _DashboardDetailSummary(category: category),
+              const SizedBox(height: 24),
+              if (category.expenseDetails.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 48),
+                  child: Text(
+                    'No expense records for ${category.name}.',
+                    style: TextStyle(color: appTheme.gray_400),
+                  ),
+                )
+              else
+                ...category.expenseDetails.map(
+                  (item) => Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: _DashboardExpenseCard(item: item),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DashboardDetailSummary extends StatelessWidget {
+  final DashboardCategoryUiState category;
+
+  const _DashboardDetailSummary({required this.category});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: appTheme.teal_A700,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        children: [
+          _SummaryRow(
+            icon: Icons.account_balance_wallet_outlined,
+            label: 'Total Allocated Budget',
+            amount: category.budget,
+          ),
+          Divider(
+            color: appTheme.white_A700.withValues(alpha: 0.33),
+            height: 1,
+          ),
+          _SummaryRow(
+            icon: Icons.south_west,
+            label: 'Total Expense',
+            amount: category.expense,
+          ),
+          Divider(
+            color: appTheme.white_A700.withValues(alpha: 0.33),
+            height: 1,
+          ),
+          _SummaryRow(
+            icon: Icons.shield_outlined,
+            label: 'Total Remain Budget',
+            amount: category.remaining,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DashboardExpenseCard extends StatelessWidget {
+  final DashboardExpenseDetailUiState item;
+
+  const _DashboardExpenseCard({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: appTheme.white_A700,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: appTheme.black_900_0c,
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: _DashboardActivityImage(imageUrl: item.activityImageUrl),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.activityName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: appTheme.gray_900,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 7),
+                _DashboardDetailLine(icon: Icons.schedule, text: item.timeText),
+                const SizedBox(height: 6),
+                _DashboardDetailLine(
+                  icon: Icons.account_balance_wallet_outlined,
+                  text: 'RM ${item.amount.toStringAsFixed(2)}',
+                ),
+                const SizedBox(height: 7),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: appTheme.gray_100,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.credit_card,
+                        size: 13,
+                        color: appTheme.teal_A700,
+                      ),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(
+                          item.paymentMethod,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: appTheme.blue_gray_700,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DashboardDetailLine extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _DashboardDetailLine({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: appTheme.blue_gray_300),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: appTheme.blue_gray_300, fontSize: 14),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DashboardActivityImage extends StatelessWidget {
+  final String imageUrl;
+
+  const _DashboardActivityImage({required this.imageUrl});
+
+  @override
+  Widget build(BuildContext context) {
+    if (imageUrl.startsWith('http')) {
+      return Image.network(
+        imageUrl,
+        width: 120,
+        height: 100,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => _placeholder(),
+      );
+    }
+    if (imageUrl.isNotEmpty) {
+      return Image.asset(
+        imageUrl,
+        width: 120,
+        height: 100,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => _placeholder(),
+      );
+    }
+    return _placeholder();
+  }
+
+  Widget _placeholder() {
+    return Container(
+      width: 120,
+      height: 100,
+      color: appTheme.gray_100,
+      child: Icon(
+        Icons.image_outlined,
+        color: appTheme.blue_gray_300,
+        size: 34,
+      ),
+    );
   }
 }
 
