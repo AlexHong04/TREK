@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/entities/activity.dart';
 import '../../models/entities/expense_item.dart';
 import '../../models/local_data_source/camera_source.dart';
+import '../../models/repository/expense_repository.dart';
 import '../../models/services/budget_service.dart';
 import '../../models/services/expense_tracking_service.dart';
 import '../../models/services/itinerary_service.dart';
@@ -13,6 +14,7 @@ class ActivityViewModel extends ChangeNotifier {
   final BudgetService _budgetService = BudgetService();
   final ExpenseTrackingService _expenseTrackingService =
       ExpenseTrackingService();
+  final ExpenseRepository _expenseRepository = ExpenseRepository();
   final CameraSource _cameraSource = CameraSource();
 
   ActivityUiState _uiState = const ActivityUiState();
@@ -33,7 +35,47 @@ class ActivityViewModel extends ChangeNotifier {
       receiptLocalPath: '',
       errorMessage: '',
       successMessage: '',
+      recordedExpenses: const [],
+      isLoadingRecordedExpenses: true,
     );
+    notifyListeners();
+
+    loadRecordedExpensesForSelectedActivity();
+  }
+
+  /// Loads the confirmed Expense records for the currently selected Activity.
+  Future<void> loadRecordedExpensesForSelectedActivity() async {
+    final selectedActivity = _uiState.selectedActivity;
+    if (selectedActivity == null) {
+      _uiState = _uiState.copyWith(
+        recordedExpenses: const [],
+        isLoadingRecordedExpenses: false,
+      );
+      notifyListeners();
+      return;
+    }
+
+    _uiState = _uiState.copyWith(
+      isLoadingRecordedExpenses: true,
+      errorMessage: '',
+    );
+    notifyListeners();
+
+    try {
+      final recordedExpenses = await _expenseRepository
+          .getExpensesByActivityId(selectedActivity.activitiesId);
+
+      _uiState = _uiState.copyWith(
+        recordedExpenses: recordedExpenses,
+        isLoadingRecordedExpenses: false,
+      );
+    } catch (error) {
+      _uiState = _uiState.copyWith(
+        recordedExpenses: const [],
+        isLoadingRecordedExpenses: false,
+        errorMessage: _readableError(error),
+      );
+    }
     notifyListeners();
   }
 
@@ -161,6 +203,7 @@ class ActivityViewModel extends ChangeNotifier {
         receiptLocalPath: '',
         successMessage: 'The expense record has been successfully saved.',
       );
+      await loadRecordedExpensesForSelectedActivity();
     } catch (error) {
       _uiState = _uiState.copyWith(
         isSavingExpense: false,
