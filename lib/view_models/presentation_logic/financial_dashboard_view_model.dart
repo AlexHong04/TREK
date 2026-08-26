@@ -32,6 +32,8 @@ class FinancialDashboardViewModel extends ChangeNotifier {
         _uiState = _uiState.copyWith(
           isLoading: false,
           hasCurrentTrip: false,
+          tripId: '',
+          userId: '',
           destination: '',
           categories: const [],
         );
@@ -39,6 +41,8 @@ class FinancialDashboardViewModel extends ChangeNotifier {
         _uiState = _uiState.copyWith(
           isLoading: false,
           hasCurrentTrip: true,
+          tripId: summary.trip.tripId ?? '',
+          userId: summary.trip.userId ?? '',
           destination: summary.trip.destination,
           categories: summary.categories
               .map(
@@ -74,6 +78,42 @@ class FinancialDashboardViewModel extends ChangeNotifier {
       _uiState = _uiState.copyWith(
         isLoading: false,
         errorMessage: 'Unable to load expenses. Please try again.',
+      );
+    }
+    notifyListeners();
+  }
+
+  Future<void> loadAvailableDates() async {
+    if (_uiState.userId.isEmpty) {
+      _uiState = _uiState.copyWith(
+        availableDatesErrorMessage: 'No user trip data is available.',
+      );
+      notifyListeners();
+      return;
+    }
+
+    _uiState = _uiState.copyWith(
+      isLoadingAvailableDates: true,
+      clearAvailableDatesError: true,
+    );
+    notifyListeners();
+
+    try {
+      final dates = await _service.getAvailableDates(_uiState.userId);
+      _uiState = _uiState.copyWith(
+        isLoadingAvailableDates: false,
+        availableDates: dates,
+      );
+    } on TimeoutException {
+      _uiState = _uiState.copyWith(
+        isLoadingAvailableDates: false,
+        availableDatesErrorMessage: 'Connection timed out. Please try again.',
+      );
+    } catch (_) {
+      _uiState = _uiState.copyWith(
+        isLoadingAvailableDates: false,
+        availableDatesErrorMessage:
+            'Unable to load available dates. Please try again.',
       );
     }
     notifyListeners();

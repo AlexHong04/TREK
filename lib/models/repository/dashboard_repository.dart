@@ -14,6 +14,8 @@ abstract class IDashboardRepository {
   Future<List<Activity>> getActivities(String dayTripId);
 
   Future<List<Expense>> getExpenses(List<String> activityIds);
+
+  Future<List<DateTime>> getAvailableDates(String userId);
 }
 
 class DashboardRepository implements IDashboardRepository {
@@ -115,6 +117,43 @@ class DashboardRepository implements IDashboardRepository {
       rethrow;
     } catch (error) {
       throw Exception("Unable to retrieve today's expenses: $error");
+    }
+  }
+
+  @override
+  Future<List<DateTime>> getAvailableDates(String userId) async {
+    try {
+      final tripRows = await SupabaseConfig.client
+          .from('whole_trips')
+          .select('trip_id')
+          .eq('user_id', userId)
+          .timeout(_timeout);
+      final tripIds = tripRows
+          .map((row) => row['trip_id']?.toString() ?? '')
+          .where((tripId) => tripId.isNotEmpty)
+          .toList();
+      if (tripIds.isEmpty) return const [];
+
+      final response = await SupabaseConfig.client
+          .from('day_trips')
+          .select('date')
+          .inFilter('trip_id', tripIds)
+          .order('date')
+          .timeout(_timeout);
+
+      final uniqueDates = <String, DateTime>{};
+      for (final row in response) {
+        final value = row['date']?.toString();
+        if (value == null || value.isEmpty) continue;
+        final parsed = DateTime.parse(value);
+        final date = DateTime(parsed.year, parsed.month, parsed.day);
+        uniqueDates[_dateOnly(date)] = date;
+      }
+      return uniqueDates.values.toList();
+    } on TimeoutException {
+      rethrow;
+    } catch (error) {
+      throw Exception('Unable to retrieve available dates: $error');
     }
   }
 

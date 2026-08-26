@@ -207,11 +207,11 @@ class FinancialDashboardScreen extends StatelessWidget {
           style: TextStyle(color: appTheme.gray_400, fontSize: 18),
         ),
         PopupMenuButton<_DashboardFilter>(
-          onSelected: (filter) {
+          onSelected: (filter) async {
             if (filter == _DashboardFilter.byDate) {
-              _showAvailableDateDialog(context);
+              await _showAvailableDateDialog(context);
             } else {
-              _showCompletedTripDialog(context);
+              await _showCompletedTripDialog(context);
             }
           },
           color: appTheme.white_A700,
@@ -253,12 +253,22 @@ class FinancialDashboardScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _showAvailableDateDialog(BuildContext context) {
-    return showDialog<void>(
+  Future<void> _showAvailableDateDialog(BuildContext context) async {
+    final viewModel = context.read<FinancialDashboardViewModel>();
+    viewModel.loadAvailableDates();
+
+    final selectedDate = await showDialog<DateTime>(
       context: context,
       barrierColor: appTheme.gray_900.withValues(alpha: 0.25),
-      builder: (context) => const _AvailableDateDialog(),
+      builder: (_) => ChangeNotifierProvider.value(
+        value: viewModel,
+        child: const _AvailableDateDialog(),
+      ),
     );
+
+    if (selectedDate != null && context.mounted) {
+      await viewModel.loadDate(selectedDate);
+    }
   }
 
   Future<void> _showCompletedTripDialog(BuildContext context) async {
@@ -1464,6 +1474,9 @@ class _AvailableDateDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final viewModel = context.watch<FinancialDashboardViewModel>();
+    final uiState = viewModel.uiState;
+
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 22),
       backgroundColor: appTheme.white_A700,
@@ -1488,7 +1501,43 @@ class _AvailableDateDialog extends StatelessWidget {
             Divider(color: appTheme.gray_200, height: 1),
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 14, 24, 14),
-              child: _AvailableDateCalendar(today: DateTime.now()),
+              child: uiState.isLoadingAvailableDates
+                  ? const SizedBox(
+                      height: 220,
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  : uiState.availableDatesErrorMessage != null
+                  ? SizedBox(
+                      height: 220,
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              uiState.availableDatesErrorMessage!,
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 12),
+                            FilledButton(
+                              onPressed: viewModel.loadAvailableDates,
+                              child: const Text('Try Again'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : uiState.availableDates.isEmpty
+                  ? const SizedBox(
+                      height: 220,
+                      child: Center(
+                        child: Text('No available dates for this trip.'),
+                      ),
+                    )
+                  : _AvailableDateCalendar(
+                      availableDates: uiState.availableDates,
+                      selectedDate: uiState.selectedDate,
+                      onSelected: (date) => Navigator.pop(context, date),
+                    ),
             ),
             Container(
               width: double.infinity,
@@ -1525,10 +1574,23 @@ class _AvailableDateDialog extends StatelessWidget {
   }
 }
 
-class _AvailableDateCalendar extends StatelessWidget {
-  final DateTime today;
+class _AvailableDateCalendar extends StatefulWidget {
+  final List<DateTime> availableDates;
+  final DateTime selectedDate;
+  final ValueChanged<DateTime> onSelected;
 
-  const _AvailableDateCalendar({required this.today});
+  const _AvailableDateCalendar({
+    required this.availableDates,
+    required this.selectedDate,
+    required this.onSelected,
+  });
+
+  @override
+  State<_AvailableDateCalendar> createState() => _AvailableDateCalendarState();
+}
+
+class _AvailableDateCalendarState extends State<_AvailableDateCalendar> {
+  late DateTime _displayedMonth;
 
   static const _monthNames = [
     'January',
@@ -1548,12 +1610,38 @@ class _AvailableDateCalendar extends StatelessWidget {
   static const _weekdays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
   @override
+  void initState() {
+    super.initState();
+    _displayedMonth = DateTime(
+      widget.selectedDate.year,
+      widget.selectedDate.month,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final firstDay = DateTime(today.year, today.month);
-    final daysInMonth = DateUtils.getDaysInMonth(today.year, today.month);
+    final firstDay = _displayedMonth;
+    final daysInMonth = DateUtils.getDaysInMonth(
+      _displayedMonth.year,
+      _displayedMonth.month,
+    );
     final leadingEmptyCells = firstDay.weekday % 7;
     final totalCells = leadingEmptyCells + daysInMonth;
     final rowCount = (totalCells / 7).ceil();
+    final firstAvailable = widget.availableDates.reduce(
+      (first, date) => date.isBefore(first) ? date : first,
+    );
+    final lastAvailable = widget.availableDates.reduce(
+      (last, date) => date.isAfter(last) ? date : last,
+    );
+    final canGoPrevious = _isMonthAfter(
+      _displayedMonth,
+      DateTime(firstAvailable.year, firstAvailable.month),
+    );
+    final canGoNext = _isMonthAfter(
+      DateTime(lastAvailable.year, lastAvailable.month),
+      _displayedMonth,
+    );
 
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 14, 12, 16),
@@ -1572,13 +1660,44 @@ class _AvailableDateCalendar extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '${_monthNames[today.month - 1]} ${today.year}',
-            style: TextStyle(
-              color: appTheme.gray_900,
-              fontSize: 17,
-              fontWeight: FontWeight.w700,
-            ),
+          Row(
+            children: [
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                onPressed: canGoPrevious
+                    ? () => setState(
+                        () => _displayedMonth = DateTime(
+                          _displayedMonth.year,
+                          _displayedMonth.month - 1,
+                        ),
+                      )
+                    : null,
+                icon: const Icon(Icons.chevron_left),
+              ),
+              Expanded(
+                child: Text(
+                  '${_monthNames[_displayedMonth.month - 1]} ${_displayedMonth.year}',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: appTheme.gray_900,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                onPressed: canGoNext
+                    ? () => setState(
+                        () => _displayedMonth = DateTime(
+                          _displayedMonth.year,
+                          _displayedMonth.month + 1,
+                        ),
+                      )
+                    : null,
+                icon: const Icon(Icons.chevron_right),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           Row(
@@ -1608,7 +1727,13 @@ class _AvailableDateCalendar extends StatelessWidget {
                 return Expanded(
                   child: day < 1 || day > daysInMonth
                       ? const SizedBox(height: 40)
-                      : _buildDay(day),
+                      : _buildDay(
+                          DateTime(
+                            _displayedMonth.year,
+                            _displayedMonth.month,
+                            day,
+                          ),
+                        ),
                 );
               }),
             ),
@@ -1617,39 +1742,55 @@ class _AvailableDateCalendar extends StatelessWidget {
     );
   }
 
-  Widget _buildDay(int day) {
-    final isToday = day == today.day;
-    final hasRecord = day <= today.day && !{5, 6, 7}.contains(day);
-    final backgroundColor = isToday
+  Widget _buildDay(DateTime date) {
+    final isSelected = _isSameDate(date, widget.selectedDate);
+    final isAvailable = widget.availableDates.any(
+      (availableDate) => _isSameDate(date, availableDate),
+    );
+    final backgroundColor = isSelected
         ? appTheme.wholeGoodBudgetProgress
-        : hasRecord
-        ? appTheme.transparentCustom
+        : isAvailable
+        ? appTheme.teal_50
         : appTheme.gray_200;
-    final textColor = isToday
+    final textColor = isSelected
         ? appTheme.white_A700
-        : hasRecord
-        ? appTheme.gray_900
+        : isAvailable
+        ? appTheme.teal_800
         : appTheme.gray_400;
 
     return Center(
-      child: Container(
-        width: 36,
-        height: 36,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          shape: BoxShape.circle,
-        ),
-        child: Text(
-          '$day',
-          style: TextStyle(
-            color: textColor,
-            fontSize: 16,
-            fontWeight: isToday ? FontWeight.w700 : FontWeight.w400,
+      child: GestureDetector(
+        onTap: isAvailable ? () => widget.onSelected(date) : null,
+        child: Container(
+          width: 36,
+          height: 36,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            shape: BoxShape.circle,
+          ),
+          child: Text(
+            '${date.day}',
+            style: TextStyle(
+              color: textColor,
+              fontSize: 16,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
+            ),
           ),
         ),
       ),
     );
+  }
+
+  bool _isSameDate(DateTime first, DateTime second) {
+    return first.year == second.year &&
+        first.month == second.month &&
+        first.day == second.day;
+  }
+
+  bool _isMonthAfter(DateTime first, DateTime second) {
+    return first.year > second.year ||
+        (first.year == second.year && first.month > second.month);
   }
 }
 

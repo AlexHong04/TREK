@@ -47,6 +47,8 @@ class CurrentDayFinancialSummary {
 
 abstract class IFinancialDashboardService {
   Future<CurrentDayFinancialSummary?> getCurrentDaySummary(DateTime date);
+
+  Future<List<DateTime>> getAvailableDates(String userId);
 }
 
 class FinancialDashboardService implements IFinancialDashboardService {
@@ -134,6 +136,18 @@ class FinancialDashboardService implements IFinancialDashboardService {
       dayTrip: dayTrip,
       categories: categories,
     );
+  }
+
+  @override
+  Future<List<DateTime>> getAvailableDates(String userId) async {
+    final dates = await _repository.getAvailableDates(userId);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    return dates.where((date) {
+      final dateOnly = DateTime(date.year, date.month, date.day);
+      return !dateOnly.isAfter(today);
+    }).toList();
   }
 
   String? _normalizedCategory(Activity activity) {
