@@ -161,6 +161,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.7.15"
+  dio:
+    dependency: transitive
+    description:
+      name: dio
+      sha256: "0df44ebba85e503958eb75d07eedd3c86275a58c1d3eda2f2ce8f0a2c3abbb3c"
+      url: "https://pub.dev"
+    source: hosted
+    version: "5.11.0"
+  dio_web_adapter:
+    dependency: transitive
+    description:
+      name: dio_web_adapter
+      sha256: "0786d0b7295a373de356fc0af4f6f1d0ab2844ed31b19dfc5e7556b70e24212c"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.2.1"
   fake_async:
     dependency: transitive
     description:
@@ -254,6 +270,30 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.0.0"
+  flutter_osm_interface:
+    dependency: transitive
+    description:
+      name: flutter_osm_interface
+      sha256: "98cc8855f3d94e1c953b72c31ae594221d54a5ef1b5a6689f8c0df2f613fe356"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.5.0"
+  flutter_osm_plugin:
+    dependency: "direct main"
+    description:
+      name: flutter_osm_plugin
+      sha256: "2c2be585a23f9e213993e82765b66fe04c1bf1e7f337ee11ff4b8ee5fb5cd2dd"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.4.5"
+  flutter_osm_web:
+    dependency: transitive
+    description:
+      name: flutter_osm_web
+      sha256: "4b457aed05915a4af820b74e8bd387a8d1b562b538b4cac14f8fadee9fffa80e"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.4.4"
   flutter_plugin_android_lifecycle:
     dependency: transitive
     description:
@@ -368,6 +408,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.17.1"
+  google_polyline_algorithm:
+    dependency: transitive
+    description:
+      name: google_polyline_algorithm
+      sha256: "357874f00d3f93c3ba1bf4b4d9a154aa9ee87147c068238c1e8392012b686a03"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.1.0"
   gotrue:
     dependency: transitive
     description:
@@ -752,6 +800,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.2.2"
+  permission_manager:
+    dependency: transitive
+    description:
+      name: permission_manager
+      sha256: c3ad9951dd23fa713559a6dde3974421273b53cf62fe0088d2c860260fa03623
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.9"
   petitparser:
     dependency: transitive
     description:
@@ -832,6 +888,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.6.0"
+  routing_client_dart:
+    dependency: transitive
+    description:
+      name: routing_client_dart
+      sha256: "4e2acf1145bb8056e04fd93101a9f2bab2fd769c9d972f7f403f9733a670cb33"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.5.5"
   shared_preferences:
     dependency: transitive
     description:
@@ -925,6 +989,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.4"
+  stream_transform:
+    dependency: transitive
+    description:
+      name: stream_transform
+      sha256: ad47125e588cfd37a9a7f86c7d6356dde8dfe89d071d293f80ca9e9273a33871
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.1.1"
   string_scanner:
     dependency: transitive
     description:
