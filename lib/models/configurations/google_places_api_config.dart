@@ -2,6 +2,16 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+/// Thrown when the Google Places API returns REQUEST_DENIED or similar
+/// non-recoverable API-level errors (e.g. key not enabled).
+class PlacesApiDeniedException implements Exception {
+  final String status;
+  final String message;
+  PlacesApiDeniedException(this.status, this.message);
+  @override
+  String toString() => 'PlacesApiDeniedException: $status - $message';
+}
+
 class GooglePlacesApiConfig {
   // Google Places API Key.
   // Developers should replace this placeholder with their own valid Google Maps Platform API Key.
@@ -47,6 +57,13 @@ class GooglePlacesApiConfig {
           );
           if (response.statusCode == 200) {
             final data = jsonDecode(response.body);
+            final status = data['status'] as String? ?? '';
+            if (status == 'REQUEST_DENIED' || status == 'OVER_QUERY_LIMIT') {
+              throw PlacesApiDeniedException(
+                status,
+                data['error_message'] as String? ?? 'Unknown error',
+              );
+            }
             final results = data['results'] as List?;
             if (results != null && results.isNotEmpty) {
               return results.first as Map<String, dynamic>;
@@ -71,6 +88,13 @@ class GooglePlacesApiConfig {
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        final status = data['status'] as String? ?? '';
+        if (status == 'REQUEST_DENIED' || status == 'OVER_QUERY_LIMIT') {
+          throw PlacesApiDeniedException(
+            status,
+            data['error_message'] as String? ?? 'Unknown error',
+          );
+        }
         final results = data['results'] as List?;
         if (results != null && results.isNotEmpty) {
           return results.first as Map<String, dynamic>;
