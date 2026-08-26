@@ -12,6 +12,50 @@ class ExpenseRepository {
   static const String _receiptImagesBucket = 'receipt_images';
   static const int _maximumReceiptSizeInBytes = 15 * 1024 * 1024;
 
+  /// Retrieves every confirmed Expense recorded for one Activity.
+  Future<List<Expense>> getExpensesByActivityId(String activityId) async {
+    if (activityId.trim().isEmpty) {
+      throw ArgumentError('An activity ID is required to retrieve expenses.');
+    }
+
+    try {
+      final response = await SupabaseConfig.client
+          .from(_expensesTable)
+          .select()
+          .eq('activities_id', activityId)
+          .order('created_at', ascending: true);
+
+      return (response as List<dynamic>)
+          .map((row) => Expense.fromJson(Map<String, dynamic>.from(row)))
+          .toList();
+    } catch (error) {
+      throw Exception('Unable to retrieve recorded expenses: $error');
+    }
+  }
+
+  /// Retrieves the child ExpenseItems belonging to one confirmed Expense.
+  Future<List<ExpenseItem>> getExpenseItemsByExpenseId(String expenseId) async {
+    if (expenseId.trim().isEmpty) {
+      throw ArgumentError(
+        'An expense ID is required to retrieve expense items.',
+      );
+    }
+
+    try {
+      final response = await SupabaseConfig.client
+          .from(_expenseItemsTable)
+          .select()
+          .eq('expense_id', expenseId)
+          .order('expense_datetime', ascending: true);
+
+      return (response as List<dynamic>)
+          .map((row) => ExpenseItem.fromJson(Map<String, dynamic>.from(row)))
+          .toList();
+    } catch (error) {
+      throw Exception('Unable to retrieve recorded expense items: $error');
+    }
+  }
+
   /// Records the parent expense and returns it with the Supabase-generated ID.
   Future<Expense> insertExpense(Expense expense) async {
     try {
