@@ -7,8 +7,9 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../models/entities/activity.dart';
-import '../theme/app_colors.dart';
+import '../models/entities/expense.dart';
 import '../models/entities/expense_item.dart';
+import '../theme/app_colors.dart';
 import '../view_models/presentation_logic/activity_view_model.dart';
 import '../view_models/ui_state/activity_ui_state.dart';
 
@@ -51,6 +52,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   int? _editingItemIndex;
   bool _isEditingItem = false;
   bool _showItemForm = true;
+  bool _isRecordingNewExpense = false;
   String? _topMessage;
   Timer? _topMessageTimer;
 
@@ -72,13 +74,25 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         ? activity.startTime!
         : DateFormat.jm().format(activity.date);
     final uiState = context.watch<ActivityViewModel>().uiState;
+    final showRecordedExpenses =
+        !uiState.isLoadingRecordedExpenses &&
+        uiState.recordedExpenses.isNotEmpty &&
+        !_isRecordingNewExpense;
+    final isExpenseFormMode =
+        !uiState.isLoadingRecordedExpenses && !showRecordedExpenses;
+    final hasMoreRecordedExpensesThanFit = uiState.recordedExpenses.length >= 3;
+    final canExpandSheet = isExpenseFormMode || hasMoreRecordedExpensesThanFit;
 
     return DraggableScrollableSheet(
-      initialChildSize: 0.92,
+      initialChildSize: isExpenseFormMode ? 0.78 : 0.74,
       minChildSize: 0.10,
-      maxChildSize: 0.96,
+      maxChildSize: canExpandSheet ? 0.90 : 0.74,
       snap: true,
-      snapSizes: const [0.50, 0.92],
+      snapSizes: isExpenseFormMode
+          ? const [0.50, 0.78, 0.90]
+          : hasMoreRecordedExpensesThanFit
+          ? const [0.50, 0.74, 0.90]
+          : const [0.50, 0.74],
       shouldCloseOnMinExtent: true,
       builder: (context, scrollController) => Stack(
         children: [
@@ -105,8 +119,8 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      const Text(
-                        'Add Expense',
+                      Text(
+                        showRecordedExpenses ? 'Recorded Expenses' : 'Add Expense',
                         style: TextStyle(
                           color: AppColors.blueGray900,
                           fontFamily: 'Inter',
@@ -122,58 +136,15 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                       const SizedBox(height: 10),
                       _ExpenseCategoryCard(category: activity.activityCategory),
                       const SizedBox(height: 10),
-                      _buildExpenseItemsSection(uiState),
-                      const SizedBox(height: 10),
-                      _buildTotalAmountSection(uiState),
-                      const SizedBox(height: 10),
-                      _buildPaymentMethodSection(uiState),
-                      const SizedBox(height: 10),
-                      _buildReceiptSection(uiState),
-                      if (uiState.errorMessage.isNotEmpty) ...[
-                        const SizedBox(height: 12),
-                        _buildMessage(uiState.errorMessage, true),
-                      ],
-                      if (uiState.successMessage.isNotEmpty) ...[
-                        const SizedBox(height: 12),
-                        _buildMessage(uiState.successMessage, false),
-                      ],
-                      const SizedBox(height: 18),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 60,
-                        child: ElevatedButton.icon(
-                          onPressed: uiState.isSavingExpense
-                              ? null
-                              : _showConfirmExpenseDialog,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.tealA700,
-                            foregroundColor: AppColors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                          icon: uiState.isSavingExpense
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    color: AppColors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.save_outlined),
-                          label: Text(
-                            uiState.isSavingExpense
-                                ? 'Saving Expense...'
-                                : 'Confirm Expense',
-                            style: const TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ),
+                      if (uiState.isLoadingRecordedExpenses)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 48),
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      else if (showRecordedExpenses)
+                        _buildRecordedExpensesSection(uiState)
+                      else
+                        _buildNewExpenseForm(uiState),
                     ],
                   ),
                 ),
@@ -190,6 +161,249 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                 onClose: _dismissTopMessage,
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNewExpenseForm(ActivityUiState uiState) {
+    return Column(
+      children: [
+        _buildExpenseItemsSection(uiState),
+        const SizedBox(height: 10),
+        _buildTotalAmountSection(uiState),
+        const SizedBox(height: 10),
+        _buildPaymentMethodSection(uiState),
+        const SizedBox(height: 10),
+        _buildReceiptSection(uiState),
+        if (uiState.errorMessage.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _buildMessage(uiState.errorMessage, true),
+        ],
+        if (uiState.successMessage.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _buildMessage(uiState.successMessage, false),
+        ],
+        const SizedBox(height: 18),
+        SizedBox(
+          width: double.infinity,
+          height: 60,
+          child: ElevatedButton.icon(
+            onPressed: uiState.isSavingExpense ? null : _showConfirmExpenseDialog,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.tealA700,
+              foregroundColor: AppColors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            icon: uiState.isSavingExpense
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      color: AppColors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Icon(Icons.save_outlined),
+            label: Text(
+              uiState.isSavingExpense ? 'Saving Expense...' : 'Confirm Expense',
+              style: const TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecordedExpensesSection(ActivityUiState uiState) {
+    final expenses = uiState.recordedExpenses;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Previously Recorded',
+          style: TextStyle(
+            color: AppColors.gray400,
+            fontFamily: 'Inter',
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.2,
+          ),
+        ),
+        const SizedBox(height: 10),
+        for (var index = 0; index < expenses.length; index++) ...[
+          _buildRecordedExpenseCard(expenses[index], index + 1),
+          const SizedBox(height: 10),
+        ],
+        if (uiState.isLoadingRecordedExpenseItems)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 10),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          height: 56,
+          child: ElevatedButton.icon(
+            onPressed: () => setState(() => _isRecordingNewExpense = true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.tealA700,
+              foregroundColor: AppColors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            icon: const Icon(Icons.add),
+            label: const Text(
+              'Record New Expense',
+              style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w700),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecordedExpenseCard(Expense expense, int expenseNumber) {
+    final recordedOn = expense.createdAt == null
+        ? 'Recorded expense'
+        : DateFormat('dd MMM yyyy, hh:mm a').format(expense.createdAt!);
+
+    return Material(
+      color: AppColors.transparent,
+      child: InkWell(
+        onTap: () => _showRecordedExpenseDetails(expense, expenseNumber),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            border: Border.all(color: AppColors.gray200),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.receipt_long_outlined, color: AppColors.tealA700),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Expense #$expenseNumber',
+                      style: const TextStyle(
+                        color: AppColors.blueGray900,
+                        fontFamily: 'Inter',
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      recordedOn,
+                      style: const TextStyle(
+                        color: AppColors.gray400,
+                        fontFamily: 'Inter',
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                'RM${expense.totalAmount.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  color: AppColors.blueGray900,
+                  fontFamily: 'Inter',
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Icon(Icons.chevron_right, color: AppColors.gray400),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showRecordedExpenseDetails(
+    Expense expense,
+    int expenseNumber,
+  ) async {
+    final expenseId = expense.expenseId;
+    if (expenseId == null || expenseId.isEmpty) {
+      _showValidationMessage('The selected expense could not be found.');
+      return;
+    }
+
+    final viewModel = context.read<ActivityViewModel>();
+    await viewModel.loadRecordedExpenseItems(expenseId);
+    if (!mounted) return;
+
+    if (viewModel.uiState.errorMessage.isNotEmpty) {
+      _showValidationMessage(viewModel.uiState.errorMessage);
+      return;
+    }
+
+    final expenseItems = viewModel.uiState.selectedRecordedExpenseItems;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Expense #$expenseNumber'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Total: RM${expense.totalAmount.toStringAsFixed(2)}'),
+                Text('Payment: ${expense.paymentMethod ?? 'Not specified'}'),
+                Text(
+                  expense.receiptImageUrl == null
+                      ? 'Receipt: Not attached'
+                      : 'Receipt: Attached',
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'ITEMS',
+                  style: TextStyle(
+                    color: AppColors.gray400,
+                    fontFamily: 'Inter',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                if (expenseItems.isEmpty)
+                  const Text('No expense items were found.')
+                else
+                  for (final item in expenseItems)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(item.itemName),
+                      subtitle: Text(
+                        '${item.quantity} × RM${item.unitPrice.toStringAsFixed(2)}',
+                      ),
+                      trailing: Text('RM${item.subtotal.toStringAsFixed(2)}'),
+                    ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
         ],
       ),
     );

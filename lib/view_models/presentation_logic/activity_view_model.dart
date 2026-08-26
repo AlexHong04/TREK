@@ -37,6 +37,8 @@ class ActivityViewModel extends ChangeNotifier {
       successMessage: '',
       recordedExpenses: const [],
       isLoadingRecordedExpenses: true,
+      selectedRecordedExpenseItems: const [],
+      isLoadingRecordedExpenseItems: false,
     );
     notifyListeners();
 
@@ -73,6 +75,33 @@ class ActivityViewModel extends ChangeNotifier {
       _uiState = _uiState.copyWith(
         recordedExpenses: const [],
         isLoadingRecordedExpenses: false,
+        errorMessage: _readableError(error),
+      );
+    }
+    notifyListeners();
+  }
+
+  /// Loads the child items of one confirmed Expense for read-only display.
+  Future<void> loadRecordedExpenseItems(String expenseId) async {
+    _uiState = _uiState.copyWith(
+      selectedRecordedExpenseItems: const [],
+      isLoadingRecordedExpenseItems: true,
+      errorMessage: '',
+    );
+    notifyListeners();
+
+    try {
+      final expenseItems = await _expenseRepository
+          .getExpenseItemsByExpenseId(expenseId);
+
+      _uiState = _uiState.copyWith(
+        selectedRecordedExpenseItems: expenseItems,
+        isLoadingRecordedExpenseItems: false,
+      );
+    } catch (error) {
+      _uiState = _uiState.copyWith(
+        selectedRecordedExpenseItems: const [],
+        isLoadingRecordedExpenseItems: false,
         errorMessage: _readableError(error),
       );
     }

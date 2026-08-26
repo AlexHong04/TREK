@@ -22,6 +22,8 @@ class ActivityUiState {
   // Confirmed expenses already saved for the selected Activity.
   final List<Expense> recordedExpenses;
   final bool isLoadingRecordedExpenses;
+  final List<ExpenseItem> selectedRecordedExpenseItems;
+  final bool isLoadingRecordedExpenseItems;
 
   final double totalBudget;
   final double spentBudget;
@@ -50,6 +52,8 @@ class ActivityUiState {
     this.successMessage = '',
     this.recordedExpenses = const [],
     this.isLoadingRecordedExpenses = false,
+    this.selectedRecordedExpenseItems = const [],
+    this.isLoadingRecordedExpenseItems = false,
     this.totalBudget = 0.0,
     this.spentBudget = 0.0,
     this.remainingBudget = 0.0,
@@ -77,6 +81,8 @@ class ActivityUiState {
     String? successMessage,
     List<Expense>? recordedExpenses,
     bool? isLoadingRecordedExpenses,
+    List<ExpenseItem>? selectedRecordedExpenseItems,
+    bool? isLoadingRecordedExpenseItems,
     double? totalBudget,
     double? spentBudget,
     double? remainingBudget,
@@ -104,6 +110,10 @@ class ActivityUiState {
       recordedExpenses: recordedExpenses ?? this.recordedExpenses,
       isLoadingRecordedExpenses:
           isLoadingRecordedExpenses ?? this.isLoadingRecordedExpenses,
+      selectedRecordedExpenseItems:
+          selectedRecordedExpenseItems ?? this.selectedRecordedExpenseItems,
+      isLoadingRecordedExpenseItems:
+          isLoadingRecordedExpenseItems ?? this.isLoadingRecordedExpenseItems,
       totalBudget: totalBudget ?? this.totalBudget,
       spentBudget: spentBudget ?? this.spentBudget,
       remainingBudget: remainingBudget ?? this.remainingBudget,
