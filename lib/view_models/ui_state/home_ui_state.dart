@@ -7,6 +7,7 @@ class HomeUiState {
   final bool hasPlan;
   final String? errorMessage;
   final WholeTrip? latestTrip;
+  final String? bannerImgUrl;
 
   const HomeUiState({
     this.isLoading = false,
@@ -15,6 +16,7 @@ class HomeUiState {
     this.hasPlan = false,
     this.errorMessage,
     this.latestTrip,
+    this.bannerImgUrl,
   });
 
   String get displayName =>
@@ -27,6 +29,7 @@ class HomeUiState {
     bool? hasPlan,
     String? errorMessage,
     WholeTrip? latestTrip,
+    String? bannerImgUrl
   }) {
     return HomeUiState(
       isLoading: isLoading ?? this.isLoading,
@@ -35,6 +38,7 @@ class HomeUiState {
       hasPlan: hasPlan ?? this.hasPlan,
       errorMessage: errorMessage ?? this.errorMessage,
       latestTrip: latestTrip ?? this.latestTrip,
+      bannerImgUrl: bannerImgUrl ?? this.bannerImgUrl,
     );
   }
 }

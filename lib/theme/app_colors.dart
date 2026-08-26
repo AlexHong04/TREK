@@ -76,5 +76,6 @@ class AppColors {
   // Neutrals
   static const Color white = Color(0xFFFFFFFF);
   static const Color black900_0c = Color(0x0C000000);
+  static const Color black = Color(0xFF000000);
   static const Color transparent = Colors.transparent;
 }

@@ -27,6 +27,22 @@ class WholeTrip {
     this.imgUrl,
   });
 
+  // dynamically change the status of itinerary
+  String get computedStatus {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final tripStart = DateTime(startDate.year, startDate.month, startDate.day);
+    final tripEnd = DateTime(endDate.year, endDate.month, endDate.day);
+
+    if(status.toLowerCase() == 'completed' || today.isAfter(tripEnd)) {
+      return 'completed';
+    } else if(today.isBefore(tripStart)) {
+      return 'pending';
+    } else {
+      return 'ongoing';
+    }
+  }
+
   WholeTrip copyWith({
     String? tripId,
     String? userId,

@@ -1,3 +1,5 @@
+import 'package:flutter/cupertino.dart';
+
 import '../entities/activity.dart';
 import '../entities/whole_trip.dart';
 import '../repository/itinerary_repository.dart';
@@ -10,32 +12,33 @@ class BudgetService {
     required String currentActivityId,
     required double topupAmount,
   }) async {
-    if (topupAmount <= 0) {
-      throw ArgumentError('Top-up amount must be greater than zero.');
-    }
-
     final currentTrip = await _itineraryRepository.getTrip(tripId);
 
-    if (currentTrip != null) {
-      final updatedTrip = currentTrip.copyWith(
-        remainingBalance: (currentTrip.remainingBalance ?? 0.0) + topupAmount,
-        totalBudget: currentTrip.totalBudget + topupAmount,
-      );
-
-      await _itineraryRepository.updateTripBudget(updatedTrip);
-
-      bool sufficient = await checkBudgetSufficiency(
-        trip: updatedTrip,
-        currentActivityId: currentActivityId,
-        topupAmount: topupAmount,
-      );
-
-      if (sufficient == false) {
-        throw Exception('Trigger Recommendation'); // trigger recommendation
-      }
-      return updatedTrip;
+    if (currentTrip == null) {
+      return null;
     }
-    return null;
+
+    final oldRemaining = currentTrip.remainingBalance ?? 0.0;
+    final oldTotal = currentTrip.totalBudget;
+
+    final updatedTrip = currentTrip.copyWith(
+      remainingBalance: oldRemaining + topupAmount,
+      totalBudget: oldTotal + topupAmount,
+    );
+
+    await _itineraryRepository.updateTripBudget(updatedTrip);
+
+    final sufficient = await checkBudgetSufficiency(
+      trip: updatedTrip,
+      currentActivityId: currentActivityId,
+      topupAmount: topupAmount,
+    );
+
+    if (!sufficient) {
+      return null;
+    }
+
+    return updatedTrip;
   }
 
   Future<bool> checkBudgetSufficiency({

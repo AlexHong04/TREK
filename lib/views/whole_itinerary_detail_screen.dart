@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
-import '../models/entities/activity.dart';
 import '../view_models/presentation_logic/whole_itinerary_detail_view_model.dart';
 import '../main.dart';
 import '../widgets/custom_app_bar.dart';
@@ -101,7 +100,9 @@ class _WholeItineraryDetailScreenState
                 ),
               ),
               Text(
-                viewModel.datesText.isNotEmpty ? viewModel.datesText : 'Dates',
+                viewModel.uiState.datesText.isNotEmpty
+                    ? viewModel.uiState.datesText
+                    : 'Dates',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -163,7 +164,7 @@ class _WholeItineraryDetailScreenState
                 ),
               ),
               Text(
-                'RM${viewModel.budgetText}',
+                'RM${viewModel.uiState.budgetText}',
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w800,
@@ -185,7 +186,7 @@ class _WholeItineraryDetailScreenState
         Padding(
           padding: const EdgeInsets.only(left: 8.0),
           child: Text(
-            viewModel.destinationTitle.toUpperCase(),
+            viewModel.uiState.destinationTitle.toUpperCase(),
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w800,
@@ -436,7 +437,8 @@ class _WholeItineraryDetailScreenState
 
   Widget _buildActivityCard(Activity activity) {
     // Check if the activity has been cleared (empty slot state)
-    if (activity.status == 'empty' || (activity.destination.isEmpty && activity.description.isEmpty)) {
+    if (activity.status == 'empty' ||
+        (activity.destination.isEmpty && activity.description.isEmpty)) {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(24.0),
@@ -518,7 +520,7 @@ class _WholeItineraryDetailScreenState
           Padding(
             padding: const EdgeInsets.only(top: 20, left: 20, right: 20),
             child: Text(
-              activity.destination ?? '',
+              activity.destination,
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
@@ -530,7 +532,7 @@ class _WholeItineraryDetailScreenState
           Padding(
             padding: const EdgeInsets.only(top: 8, left: 20, right: 20),
             child: Text(
-              activity.description ?? '',
+              activity.description,
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w400,
