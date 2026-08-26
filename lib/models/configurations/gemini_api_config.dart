@@ -42,10 +42,16 @@ class GeminiApiConfig {
     - Group activities geographically! Each day of the itinerary MUST focus on ONE specific area or neighborhood (e.g., Day 1 is dedicated entirely to "KLCC", Day 2 entirely to "Bukit Bintang").
     - Do NOT jump across the city on the same day. Every single activity on a given "dayNumber" MUST be found within that day's designated area to minimize travel time.
     - Consecutive activities MUST be close to each other in real life to make routing practical.
+
+    CRITICAL RULE FOR DESTINATIONS/RESTAURANTS:
+    - Every destination, restaurant, cafe, or eatery MUST be specified using its full, real-world, specific business or place name.
+    - Do NOT generate generic dish or food names (such as "Nasi Lemak", "Teh Tarik", "Roti Canai", "Satay") as the destination. You must specify the actual restaurant name where it can be eaten (e.g., "Village Park Restaurant", "Nasi Lemak Antarabangsa").
+    - Every "destination" value MUST be an actual, currently operating business or landmark that returns results when searched on Google Places API / Google Maps. Do NOT invent fictional place names.
+    - We will programmatically verify each destination against Google Places API. If a destination is NOT found on Google Places, the itinerary is invalid.
     
     Format your response as a valid JSON array of activities, where each activity has the following fields:
     - "dayNumber": (int) Based on the requested dates ("$dates"), distribute the itinerary across multiple days. Return 1 for Day 1, 2 for Day 2, etc. (e.g., if it's a 3-day trip, activities should have dayNumber 1, 2, or 3). The exact geographical neighborhood or area name for this day (e.g., "KLCC", "Bukit Bintang", "Batu Caves"). Do NOT invent catchy titles or add extra words.
-    - "destination": (String) Specify the EXACT full name of the place, restaurant, or landmark. Do NOT use generic terms like "Lunch".
+    - "destination": (String) The EXACT, FULL official business name or landmark name as it appears on Google Maps. Examples of CORRECT values: "Village Park Restaurant", "Madam Kwan's KLCC", "Petronas Twin Towers", "Jalan Alor", "Lot 10 Hutong", "Din Tai Fung Pavilion KL". Examples of WRONG values: "Nasi Lemak Breakfast", "Local Coffee Shop", "Relaxation Spa", "Street Food Tour".
     - "imageKeyword": (String) IF it's a famous landmark, use its exact name (e.g. "Petronas Towers"). IF it's a specific restaurant/cafe, DO NOT use its name; instead, use the generic famous food/drink type (e.g. "Nasi Lemak", "Latte Art", "Seafood") so the generated image matches the activity context perfectly.
     - "description": (String) Short description
     - "allocatedBudget": (double) Estimated cost
@@ -164,7 +170,7 @@ class GeminiApiConfig {
     
     Format your response as a valid single JSON object:
     {
-      "destination": "Name of Landmark or Venue",
+      "destination": "Name of Landmark or Venue (MUST be a specific, real-world venue/attraction searchable on Google Places, e.g. 'Museum of Illusions Kuala Lumpur')",
       "description": "Short 1-2 sentence description",
       "imageUrl": "https://picsum.photos/600/400",
       "allocatedBudget": 0.0,
@@ -177,7 +183,9 @@ class GeminiApiConfig {
     Return ONLY the raw JSON object with no markdown formatting.
     ''';
 
-    final url = Uri.parse('');
+    final url = Uri.parse(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=$_apiKey',
+    );
 
     final response = await http.post(
       url,
@@ -190,15 +198,25 @@ class GeminiApiConfig {
             ],
           },
         ],
-        "generatingConfig": {"responseMimeType": "application/json"},
+        "generationConfig": {"responseMimeType": "application/json"},
       }),
     );
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      return data['candidates']?[0]?['content']?['parts']?[0]?['text'] ?? '{}';
+      final candidates = data['candidates'] as List?;
+      if (candidates != null && candidates.isNotEmpty) {
+        final content = candidates[0]['content'];
+        final parts = content['parts'] as List?;
+        if (parts != null && parts.isNotEmpty) {
+          return parts[0]['text'] ?? '{}';
+        }
+      }
+      return '{}';
     } else {
-      throw Exception('Gemini Error: ${response.statusCode}');
+      throw Exception(
+        'Gemini Error: ${response.statusCode} - ${response.body}',
+      );
     }
   }
 }
