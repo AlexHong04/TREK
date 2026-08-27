@@ -253,7 +253,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final bool isOngoing = status == 'ongoing';
     final bool isCompleted = status == 'completed';
 
-    final String? activeImageUrl = (trip.imgUrl != null && trip.imgUrl!.trim().isNotEmpty)
+    final String? activeImageUrl =
+        (trip.imgUrl != null && trip.imgUrl!.trim().isNotEmpty)
         ? trip.imgUrl!.trim()
         : null;
 
@@ -278,20 +279,22 @@ class _HomeScreenState extends State<HomeScreen> {
           onTap: () {
             Navigator.of(context).pushNamed(
               '/activityScreen',
-              arguments: {
-                'trip': trip,
-                'isReadOnly': false,
-              },
+              arguments: {'trip': trip, 'isReadOnly': false},
             );
           },
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
                 child: Stack(
                   children: [
-                    _buildTripBanner(activeImageUrl, destination: trip.destination),
+                    _buildTripBanner(
+                      activeImageUrl,
+                      destination: trip.destination,
+                    ),
                     Positioned(
                       top: 16,
                       left: 16,
@@ -325,7 +328,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             const SizedBox(width: 4),
                             Text(
                               status.isNotEmpty
-                                  ? status[0].toUpperCase() + status.substring(1)
+                                  ? status[0].toUpperCase() +
+                                        status.substring(1)
                                   : 'Pending',
                               style: TextStyle(
                                 fontSize: 12,
@@ -440,12 +444,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 borderRadius: BorderRadius.circular(14),
                 boxShadow: isStartEnabled
                     ? [
-                  BoxShadow(
-                    color: appTheme.teal_50,
-                    offset: const Offset(0, 4),
-                    blurRadius: 8,
-                  ),
-                ]
+                        BoxShadow(
+                          color: appTheme.teal_50,
+                          offset: const Offset(0, 4),
+                          blurRadius: 8,
+                        ),
+                      ]
                     : [],
               ),
               child: Material(
@@ -454,18 +458,22 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: InkWell(
                   onTap: isStartEnabled
                       ? () async {
-                    final now = DateTime.now();
-                    final deviceDate = DateTime(now.year, now.month, now.day);
-                    await Navigator.of(context).pushNamed(
-                      '/activityScreen',
-                      arguments: {
-                        'trip': trip,
-                        'isReadOnly': false,
-                        'filterDate' : deviceDate,
-                      },
-                    );
-                    viewModel.fetchLatestTrip();
-                  }
+                          final now = DateTime.now();
+                          final deviceDate = DateTime(
+                            now.year,
+                            now.month,
+                            now.day,
+                          );
+                          await Navigator.of(context).pushNamed(
+                            '/activityScreen',
+                            arguments: {
+                              'trip': trip,
+                              'isReadOnly': false,
+                              'filterDate': deviceDate,
+                            },
+                          );
+                          viewModel.fetchLatestTrip();
+                        }
                       : null,
                   borderRadius: BorderRadius.circular(14),
                   child: Padding(
@@ -473,16 +481,17 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Center(
                       child: Text(
                         'Start Plan',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          fontFamily: 'Inter',
-                        ).copyWith(
-                          color: isStartEnabled
-                              ? appTheme.white_A700
-                              : appTheme.blue_gray_300,
-                          height: 22 / 18,
-                        ),
+                        style:
+                            const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: 'Inter',
+                            ).copyWith(
+                              color: isStartEnabled
+                                  ? appTheme.white_A700
+                                  : appTheme.blue_gray_300,
+                              height: 22 / 18,
+                            ),
                       ),
                     ),
                   ),
@@ -592,11 +601,7 @@ class _HomeScreenState extends State<HomeScreen> {
       height: height,
       width: double.infinity,
       color: appTheme.gray_200,
-      child: Icon(
-        Icons.terrain,
-        size: 48,
-        color: appTheme.blue_gray_300,
-      ),
+      child: Icon(Icons.terrain, size: 48, color: appTheme.blue_gray_300),
     );
   }
 }

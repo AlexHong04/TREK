@@ -1,5 +1,3 @@
-import 'dart:math';
-
 class IdGenerator {
   static String generateNextFormattedId(
     String prefix,

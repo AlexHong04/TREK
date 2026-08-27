@@ -5,14 +5,23 @@ import 'package:provider/provider.dart';
 import 'theme/app_theme.dart';
 import 'models/configurations/supabase_config.dart';
 import 'models/configurations/gemini_api_config.dart';
-import 'models/local_data_source/location_source.dart';
 
 import 'models/repository/auth_repository.dart';
 import 'models/repository/i_user_repository.dart';
 import 'models/repository/user_repository.dart';
+import 'models/repository/i_itinerary_repository.dart';
+import 'models/repository/itinerary_repository.dart';
+import 'models/repository/i_expense_repository.dart';
+import 'models/repository/expense_repository.dart';
 
 import 'models/services/auth_service.dart';
 import 'models/services/i_auth_service.dart';
+import 'models/services/i_itinerary_service.dart';
+import 'models/services/itinerary_service.dart';
+import 'models/services/i_budget_service.dart';
+import 'models/services/budget_service.dart';
+import 'models/services/i_expense_tracking_service.dart';
+import 'models/services/expense_tracking_service.dart';
 
 import 'views/login_screen.dart';
 import 'views/registration_screen.dart';
@@ -70,10 +79,24 @@ Future<void> main() async {
   );
 
   final IAuthService authService = AuthService(authRepository, userRepository);
+  final IItineraryRepository itineraryRepository = ItineraryRepository();
+  final IExpenseRepository expenseRepository = ExpenseRepository();
+  final IItineraryService itineraryService = ItineraryService();
+  final IBudgetService budgetService = BudgetService();
+  final IExpenseTrackingService expenseTrackingService =
+      ExpenseTrackingService();
 
   runApp(
-    ChangeNotifierProvider<IAuthService>.value(
-      value: authService,
+    MultiProvider(
+      providers: [
+        Provider<IUserRepository>.value(value: userRepository),
+        Provider<IItineraryRepository>.value(value: itineraryRepository),
+        Provider<IExpenseRepository>.value(value: expenseRepository),
+        ChangeNotifierProvider<IAuthService>.value(value: authService),
+        Provider<IItineraryService>.value(value: itineraryService),
+        Provider<IBudgetService>.value(value: budgetService),
+        Provider<IExpenseTrackingService>.value(value: expenseTrackingService),
+      ],
       child: const MyApp(),
     ),
   );
@@ -110,16 +133,10 @@ class MyApp extends StatelessWidget {
             );
           },
           onRegister: () {
-            Navigator.pushNamed(
-              context,
-              AppRoutes.registrationScreen,
-            );
+            Navigator.pushNamed(context, AppRoutes.registrationScreen);
           },
           onForgotPassword: () {
-            Navigator.pushNamed(
-              context,
-              AppRoutes.forgotPasswordScreen,
-            );
+            Navigator.pushNamed(context, AppRoutes.forgotPasswordScreen);
           },
         ),
 
