@@ -328,7 +328,7 @@ class ActivityViewModel extends ChangeNotifier {
       await loadRecordedExpensesForSelectedActivity();
 
       // detect overspend
-      await handleExpenseSubmission(selectedActivity, expenseAmount);
+      await handleExpenseSubmission(expenseAmount);
     } catch (error) {
       _uiState = _uiState.copyWith(
         isSavingExpense: false,
@@ -576,7 +576,6 @@ class ActivityViewModel extends ChangeNotifier {
   }
 
   Future<void> handleExpenseSubmission(
-    Activity? activity,
     double expense,
   ) async {
     debugPrint("zq handleExpenseSubmission");
