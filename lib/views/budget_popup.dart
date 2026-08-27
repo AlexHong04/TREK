@@ -35,6 +35,7 @@ class BaseBudgetDialog extends StatelessWidget {
               Text(
                 title,
                 style: TextStyle(
+                  fontFamily: 'Inter',
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: appTheme.warningPopupHeader,
@@ -82,6 +83,7 @@ class BaseBudgetDialog extends StatelessWidget {
           child: Text(
             text,
             style: TextStyle(
+              fontFamily: 'Inter',
               fontSize: 14,
               color: appTheme.popupWarningMsg,
               height: 1.4,
@@ -107,6 +109,7 @@ class BaseBudgetDialog extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
+          fontFamily: 'Inter',
           fontSize: 12,
           fontWeight: FontWeight.w600,
           color: textColor,
@@ -283,6 +286,7 @@ Future<void> showBudgetExceeded20Dialog({
               Text(
                 'Allocated Budget:',
                 style: TextStyle(
+                  fontFamily: 'Inter',
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: appTheme.warningPopupHeader,
@@ -292,6 +296,7 @@ Future<void> showBudgetExceeded20Dialog({
               Text(
                 allocatedBudget,
                 style: TextStyle(
+                  fontFamily: 'Inter',
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                   color: appTheme.black,
@@ -327,6 +332,7 @@ Future<void> showBudgetExceeded20Dialog({
                   child: RichText(
                     text: TextSpan(
                       style: TextStyle(
+                        fontFamily: 'Inter',
                         fontSize: 14,
                         color: appTheme.popupWarningMsg,
                         height: 1.4,
@@ -334,11 +340,14 @@ Future<void> showBudgetExceeded20Dialog({
                       children: [
                         const TextSpan(
                           text:
-                          'Based on your current spending rate, your remaining budget is estimated to last ',
+                              'Based on your current spending rate, your remaining budget is estimated to last ',
                         ),
                         TextSpan(
                           text: '$estimatedDays more day(s)',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Inter',
+                          ),
                         ),
                       ],
                     ),
@@ -413,6 +422,7 @@ Future<void> showBudgetRecoveryDialog({
               Text(
                 'Budget Shortage Amount:',
                 style: TextStyle(
+                  fontFamily: 'Inter',
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: appTheme.popupBrownBudget,
@@ -422,6 +432,7 @@ Future<void> showBudgetRecoveryDialog({
               Text(
                 shortageAmount,
                 style: TextStyle(
+                  fontFamily: 'Inter',
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                   color: appTheme.black,
@@ -456,6 +467,7 @@ Future<void> showBudgetRecoveryDialog({
               Text(
                 'TOP-UP AMOUNT',
                 style: TextStyle(
+                  fontFamily: 'Inter',
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
                   color: appTheme.blue_gray_300,
@@ -467,6 +479,7 @@ Future<void> showBudgetRecoveryDialog({
                 controller: topUpController,
                 keyboardType: TextInputType.number,
                 style: TextStyle(
+                  fontFamily: 'Inter',
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                   color: appTheme.black,
@@ -520,6 +533,7 @@ Future<void> showBudgetRecoveryDialog({
                   child: Text(
                     'End Trip',
                     style: TextStyle(
+                      fontFamily: 'Inter',
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: appTheme.white_A700,
@@ -562,6 +576,7 @@ Future<void> showBudgetRecoveryDialog({
                   child: Text(
                     'Top-up Budget',
                     style: TextStyle(
+                      fontFamily: 'Inter',
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: appTheme.white_A700,
@@ -604,6 +619,7 @@ Future<void> showInitialTotalBudgetInsufficient({
               Text(
                 'Budget Shortage Amount:',
                 style: TextStyle(
+                  fontFamily: 'Inter',
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: appTheme.popupBrownBudget,
@@ -613,6 +629,7 @@ Future<void> showInitialTotalBudgetInsufficient({
               Text(
                 shortageAmount,
                 style: TextStyle(
+                  fontFamily: 'Inter',
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                   color: appTheme.black,
@@ -643,6 +660,7 @@ Future<void> showInitialTotalBudgetInsufficient({
               Text(
                 'TOP-UP AMOUNT',
                 style: TextStyle(
+                  fontFamily: 'Inter',
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
                   color: appTheme.blue_gray_300,
@@ -654,6 +672,7 @@ Future<void> showInitialTotalBudgetInsufficient({
                 controller: topUpController,
                 keyboardType: TextInputType.number,
                 style: TextStyle(
+                  fontFamily: 'Inter',
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                   color: appTheme.black,
@@ -707,6 +726,7 @@ Future<void> showInitialTotalBudgetInsufficient({
                   child: Text(
                     'Cancel',
                     style: TextStyle(
+                      fontFamily: 'Inter',
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: appTheme.white_A700,
@@ -749,6 +769,7 @@ Future<void> showInitialTotalBudgetInsufficient({
                   child: Text(
                     'Top-up Budget',
                     style: TextStyle(
+                      fontFamily: 'Inter',
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: appTheme.white_A700,
@@ -771,6 +792,7 @@ Widget _buildSummaryRow(String label, String value, {Color? valueColor}) {
       Text(
         label,
         style: TextStyle(
+          fontFamily: 'Inter',
           fontSize: 14,
           fontWeight: FontWeight.w600,
           color: appTheme.popupBrownBudget,
@@ -779,6 +801,7 @@ Widget _buildSummaryRow(String label, String value, {Color? valueColor}) {
       Text(
         value,
         style: TextStyle(
+          fontFamily: 'Inter',
           fontSize: 16,
           fontWeight: FontWeight.bold,
           color: valueColor ?? appTheme.black,
