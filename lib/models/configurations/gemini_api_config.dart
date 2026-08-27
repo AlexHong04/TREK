@@ -14,7 +14,6 @@ class GeminiApiConfig {
   }
 
   // kokhong
-  /// Ask Gemini for itinerary
   static Future<String> askGeminiForItinerary({
     required String destination,
     required String dates,
@@ -22,6 +21,7 @@ class GeminiApiConfig {
     String? preference,
     String? emergencyFund,
     List<String>? avoidPlaces,
+    List<String>? wishlist,
   }) async {
     final prompt =
         '''
@@ -32,6 +32,7 @@ class GeminiApiConfig {
     - Budget: \$$budget
     ${preference != null ? '- Preference: $preference' : ''}
     ${emergencyFund != null ? '- Emergency Fund: $emergencyFund' : ''}
+    ${(wishlist != null && wishlist.isNotEmpty) ? '- Wishlist Items to try to cover: ' + wishlist.join(', ') : ''}
 
     Please provide a structured day-by-day itinerary with estimated costs and durations for each activity.
     CRITICAL RULE FOR BUDGET: 
@@ -51,18 +52,24 @@ class GeminiApiConfig {
     - We will programmatically verify each destination against Google Places API. If a destination is NOT found on Google Places, the itinerary is invalid.
     ${(avoidPlaces != null && avoidPlaces.isNotEmpty) ? '\nCRITICAL REJECTION LIST FOR RETRY:\nThe following places were previously generated in a prior attempt but COULD NOT be found on Google Places API. You MUST NOT include any of these in your response. Instead, suggest different, verified, operating real-world venues/landmarks that are definitely searchable on Google Places:\n' + avoidPlaces.map((e) => '- "$e"').join('\n') : ''}
     
-    Format your response as a valid JSON array of activities, where each activity has the following fields:
-    - "dayNumber": (int) Based on the requested dates ("$dates"), distribute the itinerary across multiple days. Return 1 for Day 1, 2 for Day 2, etc. (e.g., if it's a 3-day trip, activities should have dayNumber 1, 2, or 3). The exact geographical neighborhood or area name for this day (e.g., "KLCC", "Bukit Bintang", "Batu Caves"). Do NOT invent catchy titles or add extra words.
-    - "destination": (String) The EXACT, FULL official business name or landmark name as it appears on Google Maps. Examples of CORRECT values: "Village Park Restaurant", "Madam Kwan's KLCC", "Petronas Twin Towers", "Jalan Alor", "Lot 10 Hutong", "Din Tai Fung Pavilion KL". Examples of WRONG values: "Nasi Lemak Breakfast", "Local Coffee Shop", "Relaxation Spa", "Street Food Tour".
-    - "imageKeyword": (String) IF it's a famous landmark, use its exact name (e.g. "Petronas Towers"). IF it's a specific restaurant/cafe, DO NOT use its name; instead, use the generic famous food/drink type (e.g. "Nasi Lemak", "Latte Art", "Seafood") so the generated image matches the activity context perfectly.
-    - "description": (String) Short description
-    - "allocatedBudget": (double) Estimated cost
-    - "duration": (String) e.g., "60-90 min"
-    - "activityCategory": (String) You MUST classify the activity into exactly one of these THREE categories ONLY: "Transportation", "Attraction", or "Restaurant". Do NOT use any other categories (e.g., NO "Food", NO "Culture").
-    - "startTime": (String) e.g., "09:00"
-    - "endTime": (String) e.g., "11:00"
+    Format your response as a valid JSON object with the following fields:
+    - "totalAllocatedBudget": (double) The sum of the allocatedBudget of all activities in the itinerary.
+    - "wishlistItemsCoveredCount": (int) The number of user-provided wishlist items that you were actually able to include/cover in this generated itinerary.
+    - "estimatedExtraBudgetNeeded": (double) If some of the user-provided wishlist items could NOT be covered due to the budget limit, estimate how much extra budget (in RM) would be needed in total to cover the remaining/uncovered wishlist items. If all wishlist items are covered, return 0.0.
+    - "activities": (Array of Objects) A day-by-day itinerary where each activity object has the following fields:
+      - "dayNumber": (int) Based on the requested dates ("$dates"), distribute the itinerary across multiple days. Return 1 for Day 1, 2 for Day 2, etc. (e.g., if it's a 3-day trip, activities should have dayNumber 1, 2, or 3). The exact geographical neighborhood or area name for this day (e.g., "KLCC", "Bukit Bintang", "Batu Caves"). Do NOT invent catchy titles or add extra words.
+      - "destination": (String) The EXACT, FULL official business name or landmark name as it appears on Google Maps. Examples of CORRECT values: "Village Park Restaurant", "Madam Kwan's KLCC", "Petronas Twin Towers", "Jalan Alor", "Lot 10 Hutong", "Din Tai Fung Pavilion KL". Examples of WRONG values: "Nasi Lemak Breakfast", "Local Coffee Shop", "Relaxation Spa", "Street Food Tour".
+      - "imageKeyword": (String) IF it's a famous landmark, use its exact name (e.g. "Petronas Towers"). IF it's a specific restaurant/cafe, DO NOT use its name; instead, use the generic famous food/drink type (e.g. "Nasi Lemak", "Latte Art", "Seafood") so the generated image matches the activity context perfectly.
+      - "description": (String) Short description
+      - "allocatedBudget": (double) Estimated cost
+      - "duration": (String) e.g., "60-90 min"
+      - "activityCategory": (String) You MUST classify the activity into exactly one of these THREE categories ONLY: "Transportation", "Attraction", or "Restaurant". Do NOT use any other categories (e.g., NO "Food", NO "Culture").
+      - "startTime": (String) e.g., "09:00"
+      - "endTime": (String) e.g., "11:00"
+      - "minPrice": (double, optional) ONLY if activityCategory is "Restaurant", the estimated minimum food price per person (in RM). Otherwise, do not include or set to null.
+      - "maxPrice": (double, optional) ONLY if activityCategory is "Restaurant", the estimated maximum food price per person (in RM). Otherwise, do not include or set to null.
 
-    Return ONLY the JSON array, with no markdown formatting and no extra text.
+    Return ONLY the JSON object, with no markdown formatting and no extra text.
     ''';
 
     int retries = 3;
