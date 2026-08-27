@@ -1,15 +1,18 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
+import '../../models/services/i_itinerary_service.dart';
 import '../../models/services/itinerary_service.dart';
 import '../ui_state/whole_itinerary_ui_state.dart';
-export '../ui_state/whole_itinerary_ui_state.dart';
 
 class WholeItineraryDetailViewModel extends ChangeNotifier {
+  final IItineraryService _itineraryService;
+
+  WholeItineraryDetailViewModel({IItineraryService? itineraryService})
+    : _itineraryService = itineraryService ?? ItineraryService();
+
   WholeItineraryUiState _uiState = const WholeItineraryUiState();
 
   WholeItineraryUiState get uiState => _uiState;
-
-  final ItineraryService _itineraryService = ItineraryService();
 
   Future<void> initialize({
     required String destination,
@@ -17,6 +20,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     required String budget,
     String? preference,
     String? emergencyFund,
+    List<String>? wishlist,
   }) async {
     _uiState = _uiState.copyWith(
       isLoading: true,
@@ -26,52 +30,56 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     );
     notifyListeners();
 
-    final fetchedActivities = await _itineraryService.generateItinerary(
-      destination: destination,
-      dates: dates,
-      budget: budget,
-      preference: preference,
-      emergencyFund: emergencyFund,
-    );
+    try {
+      final fetchedResult = await _itineraryService.generateItinerary(
+        destination: destination,
+        dates: dates,
+        budget: budget,
+        preference: preference,
+        emergencyFund: emergencyFund,
+        wishlist: wishlist,
+      );
 
-    _uiState = _uiState.copyWith(
-      isLoading: false,
-      activities: fetchedActivities,
-    );
+      _uiState = _uiState.copyWith(
+        isLoading: false,
+        activities: fetchedResult.activities,
+        totalAllocatedBudget: fetchedResult.totalAllocatedBudget,
+        wishlistItemsCoveredCount: fetchedResult.wishlistItemsCoveredCount,
+        estimatedExtraBudgetNeeded: fetchedResult.estimatedExtraBudgetNeeded,
+        errorMessage: null,
+      );
+    } catch (e) {
+      _uiState = _uiState.copyWith(
+        isLoading: false,
+        errorMessage: e.toString(),
+      );
+    }
     notifyListeners();
   }
 
   // remove the activity from the trip but remain the card with empty slot
   void removeActivity(String activitiesId) {
-    Activity? targetActivity;
+    dynamic targetActivity;
 
     final updatedActivities = _uiState.activities.map((activity) {
       if (activity.activitiesId == activitiesId) {
         // get the stash activity
         targetActivity = activity;
-        return Activity(
+        return _itineraryService.createEmptyActivity(
           activitiesId: activitiesId,
-          dayTripId: activity.dayTripId,
-          destination: '',
-          description: '',
-          activityImgUrl: '',
+          dayTripId: activity.dayTripId ?? '',
           date: activity.date,
-          allocatedBudget: 0.0,
-          overspendAmount: null,
-          status: 'empty',
           startTime: activity.startTime,
           endTime: activity.endTime,
-          duration: '',
-          activityCategory: '',
-          isOverspend: false,
         );
       }
       return activity;
     }).toList();
 
-    List<Activity> updatedStash = List.from(_uiState.stashedActivities);
-    if (targetActivity != null && targetActivity!.destination.isNotEmpty) {
-      updatedStash.add(targetActivity!);
+    List<dynamic> updatedStash = List.from(_uiState.stashedActivities);
+    if (targetActivity != null &&
+        targetActivity.destination.toString().isNotEmpty) {
+      updatedStash.add(targetActivity);
     }
 
     _uiState = _uiState.copyWith(
@@ -97,11 +105,11 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final excludedActivity = [
-        ..._uiState.stashedActivities.map((a) => a.destination),
+      final excludedActivity = <String>[
+        ..._uiState.stashedActivities.map((a) => a.destination.toString()),
         ..._uiState.activities
-            .where((a) => a.destination.isNotEmpty)
-            .map((a) => a.destination),
+            .where((a) => a.destination.toString().isNotEmpty)
+            .map((a) => a.destination.toString()),
       ];
 
       final newActivity = await _itineraryService.generateAlternativeItinerary(
@@ -115,7 +123,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         dayTripId: targetSlot.dayTripId,
       );
 
-      final updatedList = List<Activity>.from(_uiState.activities);
+      final updatedList = List<dynamic>.from(_uiState.activities);
       updatedList[slotIndex] = newActivity;
 
       _uiState = _uiState.copyWith(activities: updatedList, isLoading: false);
@@ -139,7 +147,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
       if (success) return null; // no error
       return 'Failed to save itinerary to database (Unknown error).';
     } catch (e) {
-      return e.toString(); // Return error text
+      return e.toString();
     }
   }
 }

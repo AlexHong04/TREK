@@ -6,22 +6,17 @@ import '../entities/expense.dart';
 import '../entities/expense_item.dart';
 import '../entities/whole_trip.dart';
 import '../repository/expense_repository.dart';
+import '../repository/i_expense_repository.dart';
 import '../repository/itinerary_repository.dart';
+import '../repository/i_itinerary_repository.dart';
 import 'budget_service.dart';
+import 'i_budget_service.dart';
+import 'i_expense_tracking_service.dart';
 
-enum ExpenseProcessingResult {
-  withinBudget,
-  reallocatedSuccessfully,
-  reallocatedFailed,
-  exceedsThresholdTriggerRecommendation,
-  critical,
-  updateFailed
-}
-
-class ExpenseTrackingService {
-  final ItineraryRepository _itineraryRepository = ItineraryRepository();
-  final BudgetService _budgetService = BudgetService();
-  final ExpenseRepository _expenseRepository = ExpenseRepository();
+class ExpenseTrackingService implements IExpenseTrackingService {
+  final IItineraryRepository _itineraryRepository = ItineraryRepository();
+  final IBudgetService _budgetService = BudgetService();
+  final IExpenseRepository _expenseRepository = ExpenseRepository();
 
   /// Reads the visible Latin text from a receipt image stored on the device.
   /// The caller decides how to display or use the extracted text.
@@ -309,7 +304,10 @@ class ExpenseTrackingService {
     }
     final remainingBudget = currentTrip.remainingBalance;
 
-    final bool isCritical = await detectCriticalOverspend(totalAllocatedBudget, remainingBudget!);
+    final bool isCritical = await detectCriticalOverspend(
+      totalAllocatedBudget,
+      remainingBudget!,
+    );
 
     if (isCritical) {
       return ExpenseProcessingResult.critical;
@@ -338,7 +336,6 @@ class ExpenseTrackingService {
       expense,
     );
     debugPrint("is overspend: $isOverspend");
-
 
     if (!isOverspend) {
       return ExpenseProcessingResult.withinBudget;
@@ -371,7 +368,6 @@ class ExpenseTrackingService {
 
     debugPrint("existing categories $existingCategories");
 
-
     final updatedDay = currentDay.copyWith(
       overspendAmount: (currentDay.overspendAmount ?? 0.00) + overspentAmount,
       overspendCategory: existingCategories.join(', '),
@@ -379,8 +375,12 @@ class ExpenseTrackingService {
     );
     debugPrint("updated day $updatedDay");
 
-    final success = await _itineraryRepository.updateDayOverspendDetails(updatedDay);
-    final success2 = await _itineraryRepository.updateOverspendDetails(updatedActivity);
+    final success = await _itineraryRepository.updateDayOverspendDetails(
+      updatedDay,
+    );
+    final success2 = await _itineraryRepository.updateOverspendDetails(
+      updatedActivity,
+    );
 
     debugPrint("update day success: $success");
     debugPrint("update activity success: $success2");
@@ -440,7 +440,7 @@ class ExpenseTrackingService {
 
   Future<bool> detectCriticalOverspend(
     double totalAllocatedBudget,
-      double remainingBudget
+    double remainingBudget,
   ) async {
     if (remainingBudget <= totalAllocatedBudget * 0.2) {
       return true;

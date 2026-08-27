@@ -80,7 +80,7 @@ class ActivityUiState {
   });
 
   List<Activity> get displayActivities {
-    if(filterDate == null) {
+    if (filterDate == null) {
       return activities;
     }
 
@@ -136,7 +136,7 @@ class ActivityUiState {
       tripId: tripId ?? this.tripId,
       currentActivityId: currentActivityId ?? this.currentActivityId,
       activities: activities ?? this.activities,
-      filterDate: clearFilterDate ? null: (filterDate ?? this.filterDate),
+      filterDate: clearFilterDate ? null : (filterDate ?? this.filterDate),
       selectedActivity: selectedActivity ?? this.selectedActivity,
       draftExpenseItems: draftExpenseItems ?? this.draftExpenseItems,
       draftTotalAmount: draftTotalAmount ?? this.draftTotalAmount,
@@ -146,16 +146,15 @@ class ActivityUiState {
       isPickingReceipt: isPickingReceipt ?? this.isPickingReceipt,
       isScanningReceipt: isScanningReceipt ?? this.isScanningReceipt,
       ocrRawText: clearOcrData ? '' : ocrRawText ?? this.ocrRawText,
-      ocrMerchantName:
-          clearOcrData ? '' : ocrMerchantName ?? this.ocrMerchantName,
-      ocrTransactionDateTime:
-          clearOcrData || clearOcrTransactionDateTime
-              ? null
-              : ocrTransactionDateTime ?? this.ocrTransactionDateTime,
-      ocrExtractedTotal:
-          clearOcrData || clearOcrExtractedTotal
-              ? null
-              : ocrExtractedTotal ?? this.ocrExtractedTotal,
+      ocrMerchantName: clearOcrData
+          ? ''
+          : ocrMerchantName ?? this.ocrMerchantName,
+      ocrTransactionDateTime: clearOcrData || clearOcrTransactionDateTime
+          ? null
+          : ocrTransactionDateTime ?? this.ocrTransactionDateTime,
+      ocrExtractedTotal: clearOcrData || clearOcrExtractedTotal
+          ? null
+          : ocrExtractedTotal ?? this.ocrExtractedTotal,
       ocrItemLines: clearOcrData ? const [] : ocrItemLines ?? this.ocrItemLines,
       errorMessage: errorMessage ?? this.errorMessage,
       successMessage: successMessage ?? this.successMessage,

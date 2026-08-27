@@ -2,10 +2,12 @@ import 'package:flutter/cupertino.dart';
 
 import '../entities/activity.dart';
 import '../entities/whole_trip.dart';
+import '../repository/i_itinerary_repository.dart';
 import '../repository/itinerary_repository.dart';
+import 'i_budget_service.dart';
 
-class BudgetService {
-  final ItineraryRepository _itineraryRepository = ItineraryRepository();
+class BudgetService implements IBudgetService {
+  final IItineraryRepository _itineraryRepository = ItineraryRepository();
 
   Future<WholeTrip?> topUpBudget({
     required String tripId,
@@ -96,7 +98,8 @@ class BudgetService {
         final double newBudget =
             activity.allocatedBudget - deductionPerRestaurant;
 
-        if (newBudget <= 0.00) { // min price range
+        if (newBudget <= 0.00) {
+          // min price range
           throw Exception('Trigger Recommendation'); // trigger recommendation
         }
 

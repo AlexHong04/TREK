@@ -537,7 +537,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                       );
 
                       _handleUiStateChange();
-                      },
+                    },
                   ),
                 ],
               ),

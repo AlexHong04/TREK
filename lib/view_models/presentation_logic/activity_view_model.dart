@@ -1,30 +1,41 @@
 import 'package:flutter/material.dart';
 
 import '../../models/entities/activity.dart';
-import '../../models/entities/expense.dart';
 import '../../models/entities/expense_item.dart';
 import '../../models/local_data_source/camera_source.dart';
 import '../../models/repository/expense_repository.dart';
+import '../../models/repository/i_expense_repository.dart';
 import '../../models/services/budget_service.dart';
+import '../../models/services/i_budget_service.dart';
 import '../../models/services/expense_tracking_service.dart';
+import '../../models/services/i_expense_tracking_service.dart';
 import '../../models/services/itinerary_service.dart';
+import '../../models/services/i_itinerary_service.dart';
 import '../ui_state/activity_ui_state.dart';
 
 class ActivityViewModel extends ChangeNotifier {
-  final ItineraryService _itineraryService = ItineraryService();
-  final BudgetService _budgetService = BudgetService();
-  final ExpenseTrackingService _expenseTrackingService =
-      ExpenseTrackingService();
-  final ExpenseRepository _expenseRepository = ExpenseRepository();
+  final IItineraryService _itineraryService;
+  final IBudgetService _budgetService;
+  final IExpenseTrackingService _expenseTrackingService;
+  final IExpenseRepository _expenseRepository;
   final CameraSource _cameraSource = CameraSource();
+
+  ActivityViewModel({
+    IItineraryService? itineraryService,
+    IBudgetService? budgetService,
+    IExpenseTrackingService? expenseTrackingService,
+    IExpenseRepository? expenseRepository,
+  }) : _itineraryService = itineraryService ?? ItineraryService(),
+       _budgetService = budgetService ?? BudgetService(),
+       _expenseTrackingService =
+           expenseTrackingService ?? ExpenseTrackingService(),
+       _expenseRepository = expenseRepository ?? ExpenseRepository() {
+    initialize();
+  }
 
   ActivityUiState _uiState = const ActivityUiState();
 
   ActivityUiState get uiState => _uiState;
-
-  ActivityViewModel() {
-    initialize();
-  }
 
   void selectActivityForExpense(Activity activity) {
     _uiState = _uiState.copyWith(
@@ -601,7 +612,7 @@ class ActivityViewModel extends ChangeNotifier {
       case ExpenseProcessingResult.critical:
         _uiState = _uiState.copyWith(popupAction: 'critical');
         break;
-        
+
       case ExpenseProcessingResult.updateFailed:
         _uiState = _uiState.copyWith(popupAction: 'error');
         break;

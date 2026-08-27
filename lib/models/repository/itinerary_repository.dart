@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/cupertino.dart';
 import 'package:http/http.dart' as http;
@@ -8,7 +7,9 @@ import '../entities/whole_trip.dart';
 import '../entities/day_trip.dart';
 import '../../utils/id_generator.dart';
 
-class ItineraryRepository {
+import 'i_itinerary_repository.dart';
+
+class ItineraryRepository implements IItineraryRepository {
   // kokhong
   Future<String> _uploadImageToStorage(
     String externalUrl,
@@ -312,7 +313,9 @@ class ItineraryRepository {
       return true;
     } on Exception catch (e) {
       print('Error updating current activity overspend: $e');
-      throw Exception('DB Error during updating current activity overspend: $e');
+      throw Exception(
+        'DB Error during updating current activity overspend: $e',
+      );
     }
   }
 

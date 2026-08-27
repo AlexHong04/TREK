@@ -32,6 +32,7 @@ Future<void> showExpenseBottomSheet({
     ),
   );
 }
+
 class ExpenseBottomSheet extends StatefulWidget {
   final Activity activity;
 
@@ -125,7 +126,9 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                       ),
                       const SizedBox(height: 20),
                       Text(
-                        showRecordedExpenses ? 'Recorded Expenses' : 'Add Expense',
+                        showRecordedExpenses
+                            ? 'Recorded Expenses'
+                            : 'Add Expense',
                         style: TextStyle(
                           color: AppColors.blueGray900,
                           fontFamily: 'Inter',
@@ -200,7 +203,9 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
           width: double.infinity,
           height: 60,
           child: ElevatedButton.icon(
-            onPressed: uiState.isSavingExpense ? null : _showConfirmExpenseDialog,
+            onPressed: uiState.isSavingExpense
+                ? null
+                : _showConfirmExpenseDialog,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.tealA700,
               foregroundColor: AppColors.white,
@@ -273,7 +278,10 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
             icon: const Icon(Icons.add),
             label: const Text(
               'Record New Expense',
-              style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w700),
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ),
@@ -301,7 +309,10 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
           ),
           child: Row(
             children: [
-              const Icon(Icons.receipt_long_outlined, color: AppColors.tealA700),
+              const Icon(
+                Icons.receipt_long_outlined,
+                color: AppColors.tealA700,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -886,10 +897,9 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                     const SizedBox(width: 12),
                     const Expanded(child: Text('Receipt selected')),
                     IconButton(
-                      onPressed:
-                          uiState.isScanningReceipt
-                              ? null
-                              : context.read<ActivityViewModel>().removeReceipt,
+                      onPressed: uiState.isScanningReceipt
+                          ? null
+                          : context.read<ActivityViewModel>().removeReceipt,
                       icon: const Icon(Icons.close, color: AppColors.errorRed),
                     ),
                   ],
@@ -897,14 +907,13 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                 const SizedBox(height: 10),
                 OutlinedButton.icon(
                   onPressed: uiState.isScanningReceipt ? null : _scanReceipt,
-                  icon:
-                      uiState.isScanningReceipt
-                          ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                          : const Icon(Icons.document_scanner_outlined),
+                  icon: uiState.isScanningReceipt
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.document_scanner_outlined),
                   label: Text(
                     uiState.isScanningReceipt
                         ? 'Scanning receipt...'
@@ -969,7 +978,9 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
             const SizedBox(width: 10),
             Expanded(
               child: ElevatedButton(
-                onPressed: context.read<ActivityViewModel>().clearExpenseMessage,
+                onPressed: context
+                    .read<ActivityViewModel>()
+                    .clearExpenseMessage,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.tealA700,
                   foregroundColor: AppColors.white,
@@ -996,9 +1007,9 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
           _buildOcrValue(
             'Date and time',
             hasOcrDateTime
-                ? DateFormat('dd MMM yyyy, hh:mm a').format(
-                  uiState.ocrTransactionDateTime!,
-                )
+                ? DateFormat(
+                    'dd MMM yyyy, hh:mm a',
+                  ).format(uiState.ocrTransactionDateTime!)
                 : 'Not detected',
           ),
           _buildOcrValue(
@@ -1231,11 +1242,14 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
       return;
     }
 
-    final extractedItemLine =
-        uiState.ocrItemLines.isEmpty ? '' : uiState.ocrItemLines.first;
+    final extractedItemLine = uiState.ocrItemLines.isEmpty
+        ? ''
+        : uiState.ocrItemLines.first;
     final extractedTotal = uiState.ocrExtractedTotal;
     final isValidExtractedTotal =
-        extractedTotal != null && extractedTotal > 0 && extractedTotal <= 999999;
+        extractedTotal != null &&
+        extractedTotal > 0 &&
+        extractedTotal <= 999999;
     final canUseTotalAsUnitPrice =
         isValidExtractedTotal && uiState.ocrItemLines.length <= 1;
 
@@ -1261,13 +1275,15 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         _selectedTime = TimeOfDay.fromDateTime(extractedDateTime);
       }
     });
-
   }
 
   String _itemNameFromOcrLine(String line) {
     final nameWithoutAmount = line
         .replaceFirst(
-          RegExp(r'(?:RM\s*)?\d{1,3}(?:,\d{3})*(?:\.\d{2})?\s*$', caseSensitive: false),
+          RegExp(
+            r'(?:RM\s*)?\d{1,3}(?:,\d{3})*(?:\.\d{2})?\s*$',
+            caseSensitive: false,
+          ),
           '',
         )
         .trim();
@@ -1734,7 +1750,10 @@ class _ExpenseCategoryCard extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.category_outlined, color: AppColors.blueGray900),
+                const Icon(
+                  Icons.category_outlined,
+                  color: AppColors.blueGray900,
+                ),
                 const SizedBox(width: 12),
                 Text(
                   category,
