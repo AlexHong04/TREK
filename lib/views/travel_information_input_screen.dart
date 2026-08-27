@@ -57,9 +57,69 @@ class _TravelInformationInputScreenState
                       prefixIcon: Icons.favorite,
                       controller: viewModel.wishlistController,
                       onFieldSubmitted: viewModel.addWishlistItem,
-                      bottomWidget: viewModel.uiState.wishlistItems.isEmpty
-                          ? null
-                          : Wrap(
+                      onChanged: viewModel.onWishlistChanged,
+                      bottomWidget: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (viewModel.uiState.isSearchingSuggestions) ...[
+                            const SizedBox(height: 8.0),
+                            const LinearProgressIndicator(
+                              minHeight: 2.0,
+                              backgroundColor: Colors.transparent,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.teal,
+                              ),
+                            ),
+                          ],
+                          if (viewModel.uiState.suggestions.isNotEmpty) ...[
+                            const SizedBox(height: 8.0),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: appTheme.white_A700,
+                                borderRadius: BorderRadius.circular(12.0),
+                                border: Border.all(
+                                  color: appTheme.gray_200,
+                                  width: 1.0,
+                                ),
+                              ),
+                              child: ListView.separated(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: viewModel.uiState.suggestions.length,
+                                separatorBuilder: (context, index) => Divider(
+                                  color: appTheme.gray_100,
+                                  height: 1.0,
+                                ),
+                                itemBuilder: (context, index) {
+                                  final suggestion =
+                                      viewModel.uiState.suggestions[index];
+                                  return ListTile(
+                                    title: Text(
+                                      suggestion,
+                                      style: TextStyle(
+                                        fontSize: 14.0,
+                                        fontFamily: 'Inter',
+                                        color: appTheme.gray_800,
+                                      ),
+                                    ),
+                                    trailing: Icon(
+                                      Icons.arrow_forward_ios,
+                                      size: 14.0,
+                                      color: appTheme.blue_gray_300,
+                                    ),
+                                    dense: true,
+                                    onTap: () {
+                                      viewModel.addWishlistItem(suggestion);
+                                      viewModel.clearSuggestions();
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                          if (viewModel.uiState.wishlistItems.isNotEmpty) ...[
+                            const SizedBox(height: 12.0),
+                            Wrap(
                               spacing: 8.0,
                               runSpacing: 8.0,
                               children: viewModel.uiState.wishlistItems
@@ -71,6 +131,9 @@ class _TravelInformationInputScreenState
                                   )
                                   .toList(),
                             ),
+                          ],
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 22.0),
                     CustomTextField(
@@ -185,11 +248,8 @@ class _TravelInformationInputScreenState
                       const SizedBox(width: 6.0),
                       Text(
                         pref.label,
-                        style:
-                            TextStyle(
-                              fontSize: 14,
-                              fontFamily: 'Inter',
-                            ).copyWith(
+                        style: TextStyle(fontSize: 14, fontFamily: 'Inter')
+                            .copyWith(
                               color: isSelected
                                   ? appTheme.teal_A700
                                   : appTheme.blue_gray_700,
@@ -252,6 +312,7 @@ class _TravelInformationInputScreenState
                       'dates': viewModel.dateController.text,
                       'budget': viewModel.budgetController.text,
                       'preference': viewModel.uiState.selectedPreference,
+                      'wishlist': viewModel.uiState.wishlistItems,
                     },
                   );
                 }
@@ -319,4 +380,3 @@ class _TravelInformationInputScreenState
     );
   }
 }
-

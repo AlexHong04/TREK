@@ -22,6 +22,9 @@ class WholeItineraryDetailScreen extends StatefulWidget {
           budget: args?['budget'] as String? ?? '0',
           preference: args?['preference'] as String?,
           emergencyFund: args?['emergencyFund'] as String?,
+          wishlist: (args?['wishlist'] as List?)
+              ?.map((e) => e.toString())
+              .toList(),
         );
         return vm;
       },
@@ -174,6 +177,82 @@ class _WholeItineraryDetailScreenState
               ),
             ],
           ),
+          const SizedBox(height: 12.0),
+          Divider(color: appTheme.gray_100, height: 1.0),
+          const SizedBox(height: 12.0),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'AI Allocated Budget',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Inter',
+                  color: appTheme.blue_gray_700,
+                ),
+              ),
+              Text(
+                'RM${viewModel.uiState.totalAllocatedBudget.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  fontFamily: 'Inter',
+                  color: appTheme.teal_800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6.0),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Wishlist Covered',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Inter',
+                  color: appTheme.blue_gray_700,
+                ),
+              ),
+              Text(
+                '${viewModel.uiState.wishlistItemsCoveredCount} Items',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  fontFamily: 'Inter',
+                  color: appTheme.teal_800,
+                ),
+              ),
+            ],
+          ),
+          if (viewModel.uiState.estimatedExtraBudgetNeeded > 0.0) ...[
+            const SizedBox(height: 6.0),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Extra Budget Needed',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Inter',
+                    color: appTheme.errorRed,
+                  ),
+                ),
+                Text(
+                  'RM${viewModel.uiState.estimatedExtraBudgetNeeded.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    fontFamily: 'Inter',
+                    color: appTheme.errorRed,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -265,7 +344,7 @@ class _WholeItineraryDetailScreenState
 
   Widget _buildTimelineItem({
     required BuildContext context,
-    required Activity activity,
+    required dynamic activity,
     required bool isLast,
     required VoidCallback onRemove,
   }) {
@@ -435,7 +514,7 @@ class _WholeItineraryDetailScreenState
     );
   }
 
-  Widget _buildActivityCard(Activity activity) {
+  Widget _buildActivityCard(dynamic activity) {
     // Check if the activity has been cleared (empty slot state)
     if (activity.status == 'empty' ||
         (activity.destination.isEmpty && activity.description.isEmpty)) {
@@ -557,6 +636,15 @@ class _WholeItineraryDetailScreenState
                     label: activity.activityCategory,
                     backgroundColor: appTheme.blue_gray_50,
                     textColor: appTheme.blue_gray_700,
+                  ),
+                if (activity.activityCategory.toLowerCase() == 'restaurant' &&
+                    activity.minPrice != null &&
+                    activity.maxPrice != null)
+                  _buildChip(
+                    label:
+                        'RM${activity.minPrice!.toStringAsFixed(0)} - RM${activity.maxPrice!.toStringAsFixed(0)} / pax',
+                    backgroundColor: AppThemeData.expenseBg,
+                    textColor: AppThemeData.expenseText,
                   ),
                 if (activity.duration != null && activity.duration!.isNotEmpty)
                   _buildChip(
