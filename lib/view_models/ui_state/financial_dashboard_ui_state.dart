@@ -1,3 +1,5 @@
+enum DashboardFilter { byDate, byTrip }
+
 class DashboardExpenseDetailUiState {
   final String activityName;
   final String activityImageUrl;
@@ -60,6 +62,7 @@ class FinancialDashboardUiState {
   final String? completedTripsErrorMessage;
   final bool hasCurrentTrip;
   final DateTime selectedDate;
+  final DateTime displayedCalendarMonth;
   final String tripId;
   final String userId;
   final String destination;
@@ -76,6 +79,7 @@ class FinancialDashboardUiState {
     this.completedTripsErrorMessage,
     this.hasCurrentTrip = false,
     required this.selectedDate,
+    required this.displayedCalendarMonth,
     this.tripId = '',
     this.userId = '',
     this.destination = '',
@@ -104,6 +108,7 @@ class FinancialDashboardUiState {
     bool clearCompletedTripsError = false,
     bool? hasCurrentTrip,
     DateTime? selectedDate,
+    DateTime? displayedCalendarMonth,
     String? tripId,
     String? userId,
     String? destination,
@@ -126,6 +131,8 @@ class FinancialDashboardUiState {
           : completedTripsErrorMessage ?? this.completedTripsErrorMessage,
       hasCurrentTrip: hasCurrentTrip ?? this.hasCurrentTrip,
       selectedDate: selectedDate ?? this.selectedDate,
+      displayedCalendarMonth:
+          displayedCalendarMonth ?? this.displayedCalendarMonth,
       tripId: tripId ?? this.tripId,
       userId: userId ?? this.userId,
       destination: destination ?? this.destination,

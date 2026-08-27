@@ -1,4 +1,4 @@
-﻿import '../theme/app_theme.dart';
+import '../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -643,8 +643,8 @@ class _WholeItineraryDetailScreenState
                   _buildChip(
                     label:
                         'RM${activity.minPrice!.toStringAsFixed(0)} - RM${activity.maxPrice!.toStringAsFixed(0)} / pax',
-                    backgroundColor: AppThemeData.expenseBg,
-                    textColor: AppThemeData.expenseText,
+                    backgroundColor: appTheme.expenseBg,
+                    textColor: appTheme.expenseText,
                   ),
                 if (activity.duration != null && activity.duration!.isNotEmpty)
                   _buildChip(

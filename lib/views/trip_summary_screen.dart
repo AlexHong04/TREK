@@ -1,12 +1,9 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../theme/app_theme.dart';
 import '../view_models/presentation_logic/trip_summary_view_model.dart';
-import '../view_models/ui_state/trip_summary_ui_state.dart';
 
 class TripSummaryScreen extends StatelessWidget {
   final String tripId;
@@ -118,6 +115,8 @@ class TripSummaryScreen extends StatelessWidget {
             _buildFinancialHealth(uiState),
             const SizedBox(height: 18),
             _buildSpendingBreakdown(uiState),
+            const SizedBox(height: 22),
+            _buildCostSavingTips(viewModel, uiState),
           ],
         ),
       ),
@@ -134,7 +133,7 @@ class TripSummaryScreen extends StatelessWidget {
           width: 138,
           height: 138,
           child: CustomPaint(
-            painter: _HealthDonutPainter(
+            painter: HealthDonutPainter(
               progress: progress,
               progressColor: isOverspent
                   ? appTheme.errorRed
@@ -248,12 +247,82 @@ class TripSummaryScreen extends StatelessWidget {
           Text(
             highest == null || highest.expense == 0
                 ? 'No expenses recorded for this trip'
-                : 'Highest Expenditure: ${highest.name} (${_formatMoney(highest.expense)})',
+                : 'Highest Expenditure: ${highest.name} (${highest.expenseText})',
             textAlign: TextAlign.center,
             style: TextStyle(color: appTheme.gray_900, fontSize: 14),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildCostSavingTips(
+    TripSummaryViewModel viewModel,
+    TripSummaryUiState uiState,
+  ) {
+    return _SectionCard(
+      title: 'Cost-Saving Tips',
+      centerTitle: false,
+      child: uiState.isLoadingCostSavingTips
+          ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      color: appTheme.teal_A700,
+                      strokeWidth: 2.5,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Generating tips with Gemini...',
+                    style: TextStyle(color: appTheme.gray_800, fontSize: 13),
+                  ),
+                ],
+              ),
+            )
+          : uiState.costSavingTipsErrorMessage != null
+          ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Column(
+                children: [
+                  Text(
+                    uiState.costSavingTipsErrorMessage!,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: appTheme.errorRed, fontSize: 13),
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    onPressed: viewModel.loadCostSavingTips,
+                    icon: const Icon(Icons.refresh, size: 18),
+                    label: const Text('Try Again'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: appTheme.teal_A700,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : uiState.costSavingTips.isEmpty
+          ? Text(
+              'No cost-saving tips are available.',
+              style: TextStyle(color: appTheme.gray_400, fontSize: 13),
+            )
+          : Column(
+              children: List.generate(
+                uiState.costSavingTips.length,
+                (index) => Padding(
+                  padding: EdgeInsets.only(
+                    bottom: index == uiState.costSavingTips.length - 1 ? 0 : 12,
+                  ),
+                  child: _CostSavingTipRow(tip: uiState.costSavingTips[index]),
+                ),
+              ),
+            ),
     );
   }
 
@@ -287,14 +356,14 @@ class _BudgetMetricsCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _BudgetMetric(
-                  amount: _formatMoney(uiState.allocatedBudget),
+                  amount: uiState.allocatedBudgetText,
                   label: 'Allocated Budget',
                 ),
               ),
               Container(width: 1, height: 58, color: appTheme.gray_200),
               Expanded(
                 child: _BudgetMetric(
-                  amount: _formatMoney(uiState.totalExpense),
+                  amount: uiState.totalExpenseText,
                   label: 'Expense',
                 ),
               ),
@@ -302,7 +371,7 @@ class _BudgetMetricsCard extends StatelessWidget {
           ),
           Divider(color: appTheme.gray_200, height: 1),
           _BudgetMetric(
-            amount: _formatMoney(uiState.remainingBudget),
+            amount: uiState.remainingBudgetText,
             label: 'Remain',
             amountColor: uiState.remainingBudget < 0 ? appTheme.errorRed : null,
           ),
@@ -371,7 +440,7 @@ class _SpendingBarWidget extends StatelessWidget {
         FittedBox(
           fit: BoxFit.scaleDown,
           child: Text(
-            _formatMoney(category.expense),
+            category.expenseText,
             maxLines: 1,
             style: TextStyle(
               color: appTheme.gray_800,
@@ -414,11 +483,68 @@ class _SpendingBarWidget extends StatelessWidget {
   }
 }
 
+class _CostSavingTipRow extends StatelessWidget {
+  final CostSavingTipUiState tip;
+
+  const _CostSavingTipRow({required this.tip});
+
+  @override
+  Widget build(BuildContext context) {
+    final (icon, background) = switch (tip.category) {
+      'Transport' => (Icons.directions_bus_outlined, appTheme.teal_A200),
+      'Attraction' => (Icons.confirmation_number_outlined, appTheme.amber_200),
+      'Food' => (Icons.restaurant_outlined, appTheme.expenseBg),
+      _ => (Icons.savings_outlined, appTheme.blue_gray_50),
+    };
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: background,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Icon(icon, color: appTheme.teal_800, size: 21),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                tip.title,
+                style: TextStyle(
+                  color: appTheme.gray_900,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                tip.description,
+                style: TextStyle(color: appTheme.blue_gray_700, fontSize: 10),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _SectionCard extends StatelessWidget {
   final String title;
   final Widget child;
+  final bool centerTitle;
 
-  const _SectionCard({required this.title, required this.child});
+  const _SectionCard({
+    required this.title,
+    required this.child,
+    this.centerTitle = true,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -440,10 +566,11 @@ class _SectionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Center(
+          Align(
+            alignment: centerTitle ? Alignment.center : Alignment.centerLeft,
             child: Text(
               title,
-              textAlign: TextAlign.center,
+              textAlign: centerTitle ? TextAlign.center : TextAlign.left,
               style: TextStyle(
                 color: appTheme.gray_900,
                 fontSize: 15,
@@ -457,53 +584,4 @@ class _SectionCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _HealthDonutPainter extends CustomPainter {
-  final double progress;
-  final Color progressColor;
-  final Color remainderColor;
-
-  const _HealthDonutPainter({
-    required this.progress,
-    required this.progressColor,
-    required this.remainderColor,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = math.min(size.width, size.height) / 2 - 13;
-    final rect = Rect.fromCircle(center: center, radius: radius);
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 24;
-
-    canvas.drawArc(
-      rect,
-      -math.pi / 2,
-      math.pi * 2,
-      false,
-      paint..color = remainderColor,
-    );
-    canvas.drawArc(
-      rect,
-      -math.pi / 2,
-      math.pi * 2 * progress,
-      false,
-      paint..color = progressColor,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _HealthDonutPainter oldDelegate) {
-    return oldDelegate.progress != progress ||
-        oldDelegate.progressColor != progressColor ||
-        oldDelegate.remainderColor != remainderColor;
-  }
-}
-
-String _formatMoney(double amount) {
-  final absolute = NumberFormat('#,##0.00').format(amount.abs());
-  return amount < 0 ? 'RM -$absolute' : 'RM $absolute';
 }

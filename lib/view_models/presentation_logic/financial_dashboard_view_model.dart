@@ -1,14 +1,22 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
+import 'dart:math' as math;
+import 'dart:ui' as ui;
+
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+
 import '../../models/services/financial_dashboard_service.dart';
+import '../../theme/app_theme.dart';
 import '../ui_state/financial_dashboard_ui_state.dart';
+
+export '../ui_state/financial_dashboard_ui_state.dart';
 
 class FinancialDashboardViewModel extends ChangeNotifier {
   final IFinancialDashboardService _service;
 
   FinancialDashboardUiState _uiState = FinancialDashboardUiState(
     selectedDate: DateTime.now(),
+    displayedCalendarMonth: DateTime(DateTime.now().year, DateTime.now().month),
   );
 
   FinancialDashboardViewModel({IFinancialDashboardService? service})
@@ -22,6 +30,7 @@ class FinancialDashboardViewModel extends ChangeNotifier {
     _uiState = _uiState.copyWith(
       isLoading: true,
       selectedDate: date,
+      displayedCalendarMonth: DateTime(date.year, date.month),
       clearError: true,
     );
     notifyListeners();
@@ -94,6 +103,10 @@ class FinancialDashboardViewModel extends ChangeNotifier {
 
     _uiState = _uiState.copyWith(
       isLoadingAvailableDates: true,
+      displayedCalendarMonth: DateTime(
+        _uiState.selectedDate.year,
+        _uiState.selectedDate.month,
+      ),
       clearAvailableDatesError: true,
     );
     notifyListeners();
@@ -116,6 +129,26 @@ class FinancialDashboardViewModel extends ChangeNotifier {
             'Unable to load available dates. Please try again.',
       );
     }
+    notifyListeners();
+  }
+
+  void showPreviousCalendarMonth() {
+    _uiState = _uiState.copyWith(
+      displayedCalendarMonth: DateTime(
+        _uiState.displayedCalendarMonth.year,
+        _uiState.displayedCalendarMonth.month - 1,
+      ),
+    );
+    notifyListeners();
+  }
+
+  void showNextCalendarMonth() {
+    _uiState = _uiState.copyWith(
+      displayedCalendarMonth: DateTime(
+        _uiState.displayedCalendarMonth.year,
+        _uiState.displayedCalendarMonth.month + 1,
+      ),
+    );
     notifyListeners();
   }
 
@@ -189,4 +222,74 @@ class FinancialDashboardViewModel extends ChangeNotifier {
       return time;
     }
   }
+}
+
+class DashboardDonutChartPainter extends CustomPainter {
+  final List<DashboardCategoryUiState> categories;
+
+  const DashboardDonutChartPainter(this.categories);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    const radius = 58.0;
+    const strokeWidth = 24.0;
+    final rect = Rect.fromCircle(center: center, radius: radius);
+    final total = categories.fold<double>(0, (sum, item) => sum + item.expense);
+    if (total <= 0) return;
+    var startAngle = -math.pi / 2;
+
+    for (final category in categories) {
+      if (category.expense <= 0) continue;
+      final sweep = math.pi * 2 * category.expense / total;
+      canvas.drawArc(
+        rect,
+        startAngle,
+        sweep,
+        false,
+        Paint()
+          ..color = dashboardCategoryColor(category.name)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = strokeWidth,
+      );
+
+      final middleAngle = startAngle + sweep / 2;
+      final labelPosition =
+          center + Offset(math.cos(middleAngle), math.sin(middleAngle)) * 100;
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: 'RM ${category.expense.toStringAsFixed(0)}',
+          style: TextStyle(color: appTheme.gray_900, fontSize: 14),
+        ),
+        textDirection: ui.TextDirection.ltr,
+      )..layout();
+      final desiredOffset =
+          labelPosition - Offset(textPainter.width / 2, textPainter.height / 2);
+      textPainter.paint(
+        canvas,
+        Offset(
+          desiredOffset.dx
+              .clamp(4, size.width - textPainter.width - 4)
+              .toDouble(),
+          desiredOffset.dy
+              .clamp(4, size.height - textPainter.height - 4)
+              .toDouble(),
+        ),
+      );
+      startAngle += sweep;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant DashboardDonutChartPainter oldDelegate) {
+    return oldDelegate.categories != categories;
+  }
+}
+
+Color dashboardCategoryColor(String categoryName) {
+  return switch (categoryName) {
+    'Restaurant' => appTheme.teal_50,
+    'Transport' => appTheme.teal_800,
+    _ => appTheme.teal_A700,
+  };
 }

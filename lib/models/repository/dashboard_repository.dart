@@ -1,10 +1,15 @@
 import 'dart:async';
 
+import '../configurations/gemini_api_config.dart';
 import '../configurations/supabase_config.dart';
 import '../entities/activity.dart';
 import '../entities/day_trip.dart';
 import '../entities/expense.dart';
 import '../entities/whole_trip.dart';
+
+class DashboardRecommendationRateLimitException implements Exception {
+  const DashboardRecommendationRateLimitException();
+}
 
 abstract class IDashboardRepository {
   Future<WholeTrip?> getCurrentTrip(DateTime date);
@@ -24,6 +29,8 @@ abstract class IDashboardRepository {
   Future<List<DateTime>> getAvailableDates(String userId);
 
   Future<List<WholeTrip>> getTripsForUser(String userId);
+
+  Future<String> requestGeminiRecommendation(String prompt);
 }
 
 class DashboardRepository implements IDashboardRepository {
@@ -246,6 +253,24 @@ class DashboardRepository implements IDashboardRepository {
       rethrow;
     } catch (error) {
       throw Exception('Unable to retrieve trips: $error');
+    }
+  }
+
+  @override
+  Future<String> requestGeminiRecommendation(String prompt) async {
+    try {
+      return await GeminiApiConfig.askGeminiForDashboardRecommendation(
+        prompt,
+      ).timeout(_timeout);
+    } on TimeoutException {
+      rethrow;
+    } on GeminiApiRequestException catch (error) {
+      if (error.statusCode == 429) {
+        throw const DashboardRecommendationRateLimitException();
+      }
+      throw Exception('Unable to retrieve Gemini recommendations: $error');
+    } catch (error) {
+      throw Exception('Unable to retrieve Gemini recommendations: $error');
     }
   }
 

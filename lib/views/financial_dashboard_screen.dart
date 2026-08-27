@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 
 import '../theme/app_theme.dart';
 import '../view_models/presentation_logic/financial_dashboard_view_model.dart';
-import '../view_models/ui_state/financial_dashboard_ui_state.dart';
 import 'trip_summary_screen.dart';
 
 class FinancialDashboardScreen extends StatelessWidget {
@@ -206,9 +205,9 @@ class FinancialDashboardScreen extends StatelessWidget {
           'For ${intl.DateFormat('d MMM, yyyy').format(uiState.selectedDate)}',
           style: TextStyle(color: appTheme.gray_400, fontSize: 18),
         ),
-        PopupMenuButton<_DashboardFilter>(
+        PopupMenuButton<DashboardFilter>(
           onSelected: (filter) async {
-            if (filter == _DashboardFilter.byDate) {
+            if (filter == DashboardFilter.byDate) {
               await _showAvailableDateDialog(context);
             } else {
               await _showCompletedTripDialog(context);
@@ -220,11 +219,11 @@ class FinancialDashboardScreen extends StatelessWidget {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
           itemBuilder: (context) => const [
             PopupMenuItem(
-              value: _DashboardFilter.byDate,
+              value: DashboardFilter.byDate,
               child: Text('By Date'),
             ),
             PopupMenuItem(
-              value: _DashboardFilter.byTrip,
+              value: DashboardFilter.byTrip,
               child: Text('By Trip'),
             ),
           ],
@@ -296,7 +295,7 @@ class FinancialDashboardScreen extends StatelessWidget {
   }
 
   Widget _buildCategoryChart(FinancialDashboardUiState uiState) {
-    final categories = _categoryBudgets(uiState);
+    final categories = uiState.categories;
     return Column(
       children: [
         SizedBox(
@@ -315,7 +314,7 @@ class FinancialDashboardScreen extends StatelessWidget {
                 ),
                 child: CustomPaint(
                   size: chartSize,
-                  painter: _DonutChartPainter(categories),
+                  painter: DashboardDonutChartPainter(categories),
                 ),
               );
             },
@@ -327,7 +326,12 @@ class FinancialDashboardScreen extends StatelessWidget {
           spacing: 10,
           runSpacing: 8,
           children: categories
-              .map((item) => _LegendChip(label: item.name, color: item.color))
+              .map(
+                (item) => _LegendChip(
+                  label: item.name,
+                  color: dashboardCategoryColor(item.name),
+                ),
+              )
               .toList(),
         ),
       ],
@@ -335,7 +339,7 @@ class FinancialDashboardScreen extends StatelessWidget {
   }
 
   Widget _buildExpenseChart(FinancialDashboardUiState uiState) {
-    final categories = _categoryBudgets(uiState);
+    final categories = uiState.categories;
     final maximumAmount = categories.fold<double>(
       0,
       (maximum, category) =>
@@ -381,7 +385,7 @@ class FinancialDashboardScreen extends StatelessWidget {
   }
 
   Widget _buildBreakdownCard(FinancialDashboardUiState uiState) {
-    final orderedCategories = _categoryBudgets(uiState);
+    final orderedCategories = uiState.categories;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -401,7 +405,7 @@ class FinancialDashboardScreen extends StatelessWidget {
             children: [
               Expanded(
                 child: _ColumnHeading(
-                  color: AppThemeData.expenseBg,
+                  color: appTheme.expenseBg,
                   label: 'Budget',
                 ),
               ),
@@ -453,27 +457,11 @@ class FinancialDashboardScreen extends StatelessWidget {
     return const Center(child: Text('No trip or expenses found for today.'));
   }
 
-  List<_CategoryBudget> _categoryBudgets(FinancialDashboardUiState uiState) {
-    return List.generate(uiState.categories.length, (index) {
-      final category = uiState.categories[index];
-      return _CategoryBudget(
-        name: category.name,
-        budget: category.budget,
-        expense: category.expense,
-        color: switch (category.name) {
-          'Restaurant' => appTheme.teal_50,
-          'Transport' => appTheme.teal_800,
-          _ => appTheme.teal_A700,
-        },
-      );
-    });
-  }
-
   void _handleDonutTap(
     BuildContext context,
     Offset position,
     Size size,
-    List<_CategoryBudget> chartCategories,
+    List<DashboardCategoryUiState> chartCategories,
     FinancialDashboardUiState uiState,
   ) {
     final center = Offset(size.width / 2, size.height / 2);
@@ -495,14 +483,11 @@ class FinancialDashboardScreen extends StatelessWidget {
       if (chartCategory.expense <= 0) continue;
       final sweep = math.pi * 2 * chartCategory.expense / totalExpense;
       if (tapAngle >= accumulatedAngle && tapAngle < accumulatedAngle + sweep) {
-        final selectedCategory = uiState.categories.firstWhere(
-          (category) => category.name == chartCategory.name,
-        );
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => _FinancialExpenseDetailView(
-              category: selectedCategory,
+              category: chartCategory,
               date: uiState.selectedDate,
             ),
           ),
@@ -877,7 +862,7 @@ class _LegendChip extends StatelessWidget {
 }
 
 class _ExpenseBars extends StatelessWidget {
-  final _CategoryBudget category;
+  final DashboardCategoryUiState category;
   final double maximumAmount;
 
   const _ExpenseBars({required this.category, required this.maximumAmount});
@@ -1013,7 +998,7 @@ class _ColumnHeading extends StatelessWidget {
 }
 
 class _BreakdownRow extends StatelessWidget {
-  final _CategoryBudget category;
+  final DashboardCategoryUiState category;
 
   const _BreakdownRow({required this.category});
 
@@ -1128,69 +1113,6 @@ class _MoneyCell extends StatelessWidget {
     );
   }
 }
-
-class _DonutChartPainter extends CustomPainter {
-  final List<_CategoryBudget> categories;
-
-  const _DonutChartPainter(this.categories);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    const radius = 58.0;
-    const strokeWidth = 24.0;
-    final rect = Rect.fromCircle(center: center, radius: radius);
-    final total = categories.fold<double>(0, (sum, item) => sum + item.expense);
-    if (total <= 0) return;
-    var startAngle = -math.pi / 2;
-
-    for (final category in categories) {
-      if (category.expense <= 0) continue;
-      final sweep = math.pi * 2 * category.expense / total;
-      canvas.drawArc(
-        rect,
-        startAngle,
-        sweep,
-        false,
-        Paint()
-          ..color = category.color
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = strokeWidth,
-      );
-
-      final middleAngle = startAngle + sweep / 2;
-      final labelPosition =
-          center + Offset(math.cos(middleAngle), math.sin(middleAngle)) * 100;
-      final textPainter = TextPainter(
-        text: TextSpan(
-          text: 'RM ${category.expense.toStringAsFixed(0)}',
-          style: TextStyle(color: appTheme.gray_900, fontSize: 14),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      final desiredOffset =
-          labelPosition - Offset(textPainter.width / 2, textPainter.height / 2);
-      textPainter.paint(
-        canvas,
-        Offset(
-          desiredOffset.dx
-              .clamp(4, size.width - textPainter.width - 4)
-              .toDouble(),
-          desiredOffset.dy
-              .clamp(4, size.height - textPainter.height - 4)
-              .toDouble(),
-        ),
-      );
-      startAngle += sweep;
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _DonutChartPainter oldDelegate) =>
-      oldDelegate.categories != categories;
-}
-
-enum _DashboardFilter { byDate, byTrip }
 
 class _CompletedTripDialog extends StatelessWidget {
   const _CompletedTripDialog();
@@ -1558,6 +1480,9 @@ class _AvailableDateDialog extends StatelessWidget {
                   : _AvailableDateCalendar(
                       availableDates: uiState.availableDates,
                       selectedDate: uiState.selectedDate,
+                      displayedMonth: uiState.displayedCalendarMonth,
+                      onPreviousMonth: viewModel.showPreviousCalendarMonth,
+                      onNextMonth: viewModel.showNextCalendarMonth,
                       onSelected: (date) => Navigator.pop(context, date),
                     ),
             ),
@@ -1596,60 +1521,39 @@ class _AvailableDateDialog extends StatelessWidget {
   }
 }
 
-class _AvailableDateCalendar extends StatefulWidget {
+class _AvailableDateCalendar extends StatelessWidget {
   final List<DateTime> availableDates;
   final DateTime selectedDate;
+  final DateTime displayedMonth;
+  final VoidCallback onPreviousMonth;
+  final VoidCallback onNextMonth;
   final ValueChanged<DateTime> onSelected;
 
   const _AvailableDateCalendar({
     required this.availableDates,
     required this.selectedDate,
+    required this.displayedMonth,
+    required this.onPreviousMonth,
+    required this.onNextMonth,
     required this.onSelected,
   });
 
   @override
-  State<_AvailableDateCalendar> createState() => _AvailableDateCalendarState();
-}
-
-class _AvailableDateCalendarState extends State<_AvailableDateCalendar> {
-  late DateTime _displayedMonth;
-
-  static const _monthNames = [
-    'January',
-    'February',
-    'March',
-    'April',
-    'May',
-    'June',
-    'July',
-    'August',
-    'September',
-    'October',
-    'November',
-    'December',
-  ];
-
-  static const _weekdays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-
-  @override
-  void initState() {
-    super.initState();
-    _displayedMonth = DateTime(
-      widget.selectedDate.year,
-      widget.selectedDate.month,
-    );
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final firstDay = _displayedMonth;
+    final firstDay = displayedMonth;
     final daysInMonth = DateUtils.getDaysInMonth(
-      _displayedMonth.year,
-      _displayedMonth.month,
+      displayedMonth.year,
+      displayedMonth.month,
     );
     final leadingEmptyCells = firstDay.weekday % 7;
     final totalCells = leadingEmptyCells + daysInMonth;
     final rowCount = (totalCells / 7).ceil();
+    final weekdays = List.generate(
+      7,
+      (index) => intl.DateFormat(
+        'EEE',
+      ).format(DateTime(2024, 1, 7 + index)).toUpperCase(),
+    );
 
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 14, 12, 16),
@@ -1672,17 +1576,12 @@ class _AvailableDateCalendarState extends State<_AvailableDateCalendar> {
             children: [
               IconButton(
                 visualDensity: VisualDensity.compact,
-                onPressed: () => setState(
-                  () => _displayedMonth = DateTime(
-                    _displayedMonth.year,
-                    _displayedMonth.month - 1,
-                  ),
-                ),
+                onPressed: onPreviousMonth,
                 icon: const Icon(Icons.chevron_left),
               ),
               Expanded(
                 child: Text(
-                  '${_monthNames[_displayedMonth.month - 1]} ${_displayedMonth.year}',
+                  intl.DateFormat('MMMM yyyy').format(displayedMonth),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: appTheme.gray_900,
@@ -1693,19 +1592,14 @@ class _AvailableDateCalendarState extends State<_AvailableDateCalendar> {
               ),
               IconButton(
                 visualDensity: VisualDensity.compact,
-                onPressed: () => setState(
-                  () => _displayedMonth = DateTime(
-                    _displayedMonth.year,
-                    _displayedMonth.month + 1,
-                  ),
-                ),
+                onPressed: onNextMonth,
                 icon: const Icon(Icons.chevron_right),
               ),
             ],
           ),
           const SizedBox(height: 12),
           Row(
-            children: _weekdays
+            children: weekdays
                 .map(
                   (weekday) => Expanded(
                     child: Center(
@@ -1733,8 +1627,8 @@ class _AvailableDateCalendarState extends State<_AvailableDateCalendar> {
                       ? const SizedBox(height: 40)
                       : _buildDay(
                           DateTime(
-                            _displayedMonth.year,
-                            _displayedMonth.month,
+                            displayedMonth.year,
+                            displayedMonth.month,
                             day,
                           ),
                         ),
@@ -1747,8 +1641,8 @@ class _AvailableDateCalendarState extends State<_AvailableDateCalendar> {
   }
 
   Widget _buildDay(DateTime date) {
-    final isSelected = _isSameDate(date, widget.selectedDate);
-    final isAvailable = widget.availableDates.any(
+    final isSelected = _isSameDate(date, selectedDate);
+    final isAvailable = availableDates.any(
       (availableDate) => _isSameDate(date, availableDate),
     );
     final backgroundColor = isSelected
@@ -1764,7 +1658,7 @@ class _AvailableDateCalendarState extends State<_AvailableDateCalendar> {
 
     return Center(
       child: GestureDetector(
-        onTap: isAvailable ? () => widget.onSelected(date) : null,
+        onTap: isAvailable ? () => onSelected(date) : null,
         child: Container(
           width: 36,
           height: 36,
@@ -1791,20 +1685,4 @@ class _AvailableDateCalendarState extends State<_AvailableDateCalendar> {
         first.month == second.month &&
         first.day == second.day;
   }
-}
-
-class _CategoryBudget {
-  final String name;
-  final double budget;
-  final double expense;
-  final Color color;
-
-  const _CategoryBudget({
-    required this.name,
-    required this.budget,
-    required this.expense,
-    required this.color,
-  });
-
-  bool get isOverspent => expense > budget;
 }
