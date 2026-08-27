@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as path;
 
+import '../../utils/id_generator.dart';
 import '../configurations/supabase_config.dart';
 import '../entities/expense.dart';
 import '../entities/expense_item.dart';
@@ -13,6 +14,8 @@ class ExpenseRepository implements IExpenseRepository {
   static const String _expenseItemsTable = 'expense_item';
   static const String _receiptImagesBucket = 'receipt_images';
   static const int _maximumReceiptSizeInBytes = 15 * 1024 * 1024;
+  static const String _expenseIdPrefix = 'EX';
+  static const String _expenseItemIdPrefix = 'EI';
 
   /// Retrieves every confirmed Expense recorded for one Activity.
   Future<List<Expense>> getExpensesByActivityId(String activityId) async {
@@ -58,12 +61,19 @@ class ExpenseRepository implements IExpenseRepository {
     }
   }
 
-  /// Records the parent expense and returns it with the Supabase-generated ID.
+  /// Records the parent expense with the next formatted EX ID.
   Future<Expense> insertExpense(Expense expense) async {
     try {
+      final expenseId = await _nextFormattedId(
+        table: _expensesTable,
+        idColumn: 'expense_id',
+        prefix: _expenseIdPrefix,
+      );
+      final expenseWithId = expense.copyWith(expenseId: expenseId);
+
       final response = await SupabaseConfig.client
           .from(_expensesTable)
-          .insert(expense.toJson())
+          .insert(expenseWithId.toJson())
           .select()
           .single();
 
@@ -90,12 +100,56 @@ class ExpenseRepository implements IExpenseRepository {
     }
 
     try {
-      final itemsJson = expenseItems.map((item) => item.toJson()).toList();
+      String? lastExpenseItemId = await _latestFormattedId(
+        table: _expenseItemsTable,
+        idColumn: 'expense_item_id',
+        prefix: _expenseItemIdPrefix,
+      );
+      final itemsWithIds = expenseItems.map((item) {
+        lastExpenseItemId = IdGenerator.generateNextFormattedId(
+          _expenseItemIdPrefix,
+          lastExpenseItemId,
+        );
+        return item.copyWith(expenseItemId: lastExpenseItemId);
+      }).toList();
+      final itemsJson = itemsWithIds.map((item) => item.toJson()).toList();
 
       await SupabaseConfig.client.from(_expenseItemsTable).insert(itemsJson);
     } catch (error) {
       throw Exception('Unable to record expense items: $error');
     }
+  }
+
+  /// Follows the team's formatted-ID approach used by the itinerary repository.
+  Future<String> _nextFormattedId({
+    required String table,
+    required String idColumn,
+    required String prefix,
+  }) async {
+    final lastId = await _latestFormattedId(
+      table: table,
+      idColumn: idColumn,
+      prefix: prefix,
+    );
+    return IdGenerator.generateNextFormattedId(prefix, lastId);
+  }
+
+  /// Ignores old UUID records so only IDs with the requested prefix determine
+  /// the next formatted ID, for example EX0001 then EX0002.
+  Future<String?> _latestFormattedId({
+    required String table,
+    required String idColumn,
+    required String prefix,
+  }) async {
+    final response = await SupabaseConfig.client
+        .from(table)
+        .select(idColumn)
+        .like(idColumn, '$prefix%')
+        .order(idColumn, ascending: false)
+        .limit(1)
+        .maybeSingle();
+
+    return response?[idColumn] as String?;
   }
 
   /// Stores the optional receipt reference after its image has been uploaded.
