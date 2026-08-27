@@ -9,13 +9,21 @@ import '../entities/whole_trip.dart';
 abstract class IDashboardRepository {
   Future<WholeTrip?> getCurrentTrip(DateTime date);
 
+  Future<WholeTrip?> getWholeTrip(String tripId);
+
   Future<DayTrip?> getDayTrip(String tripId, DateTime date);
 
+  Future<List<DayTrip>> getDayTrips(String tripId);
+
   Future<List<Activity>> getActivities(String dayTripId);
+
+  Future<List<Activity>> getActivitiesForDayTrips(List<String> dayTripIds);
 
   Future<List<Expense>> getExpenses(List<String> activityIds);
 
   Future<List<DateTime>> getAvailableDates(String userId);
+
+  Future<List<WholeTrip>> getTripsForUser(String userId);
 }
 
 class DashboardRepository implements IDashboardRepository {
@@ -60,6 +68,25 @@ class DashboardRepository implements IDashboardRepository {
   }
 
   @override
+  Future<WholeTrip?> getWholeTrip(String tripId) async {
+    try {
+      final response = await SupabaseConfig.client
+          .from('whole_trips')
+          .select()
+          .eq('trip_id', tripId)
+          .limit(1)
+          .maybeSingle()
+          .timeout(_timeout);
+
+      return response == null ? null : WholeTrip.fromJson(response);
+    } on TimeoutException {
+      rethrow;
+    } catch (error) {
+      throw Exception('Unable to retrieve the trip: $error');
+    }
+  }
+
+  @override
   Future<DayTrip?> getDayTrip(String tripId, DateTime date) async {
     try {
       final response = await SupabaseConfig.client
@@ -80,6 +107,26 @@ class DashboardRepository implements IDashboardRepository {
   }
 
   @override
+  Future<List<DayTrip>> getDayTrips(String tripId) async {
+    try {
+      final response = await SupabaseConfig.client
+          .from('day_trips')
+          .select()
+          .eq('trip_id', tripId)
+          .order('date')
+          .timeout(_timeout);
+
+      return response
+          .map((json) => DayTrip.fromJson(Map<String, dynamic>.from(json)))
+          .toList();
+    } on TimeoutException {
+      rethrow;
+    } catch (error) {
+      throw Exception('Unable to retrieve the trip days: $error');
+    }
+  }
+
+  @override
   Future<List<Activity>> getActivities(String dayTripId) async {
     try {
       final response = await SupabaseConfig.client
@@ -96,6 +143,31 @@ class DashboardRepository implements IDashboardRepository {
       rethrow;
     } catch (error) {
       throw Exception("Unable to retrieve today's activities: $error");
+    }
+  }
+
+  @override
+  Future<List<Activity>> getActivitiesForDayTrips(
+    List<String> dayTripIds,
+  ) async {
+    if (dayTripIds.isEmpty) return const [];
+
+    try {
+      final response = await SupabaseConfig.client
+          .from('activities')
+          .select()
+          .inFilter('day_trip_id', dayTripIds)
+          .order('date')
+          .order('start_time')
+          .timeout(_timeout);
+
+      return response
+          .map((json) => Activity.fromJson(Map<String, dynamic>.from(json)))
+          .toList();
+    } on TimeoutException {
+      rethrow;
+    } catch (error) {
+      throw Exception('Unable to retrieve the trip activities: $error');
     }
   }
 
@@ -154,6 +226,26 @@ class DashboardRepository implements IDashboardRepository {
       rethrow;
     } catch (error) {
       throw Exception('Unable to retrieve available dates: $error');
+    }
+  }
+
+  @override
+  Future<List<WholeTrip>> getTripsForUser(String userId) async {
+    try {
+      final response = await SupabaseConfig.client
+          .from('whole_trips')
+          .select()
+          .eq('user_id', userId)
+          .order('end_date', ascending: false)
+          .timeout(_timeout);
+
+      return response
+          .map((json) => WholeTrip.fromJson(Map<String, dynamic>.from(json)))
+          .toList();
+    } on TimeoutException {
+      rethrow;
+    } catch (error) {
+      throw Exception('Unable to retrieve trips: $error');
     }
   }
 

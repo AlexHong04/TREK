@@ -1,24 +1,30 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
 import '../theme/app_theme.dart';
+import '../view_models/presentation_logic/trip_summary_view_model.dart';
+import '../view_models/ui_state/trip_summary_ui_state.dart';
 
-class TripSummaryScreen extends StatefulWidget {
-  const TripSummaryScreen({super.key});
+class TripSummaryScreen extends StatelessWidget {
+  final String tripId;
 
-  @override
-  State<TripSummaryScreen> createState() => _TripSummaryScreenState();
-}
+  const TripSummaryScreen({super.key, required this.tripId});
 
-class _TripSummaryScreenState extends State<TripSummaryScreen> {
-  bool _showRecommendations = false;
-  double _attractionPercentage = 30;
-  double _transportPercentage = 15;
-  double _foodPercentage = 55;
+  static Widget builder(BuildContext context, {required String tripId}) {
+    return ChangeNotifierProvider<TripSummaryViewModel>(
+      create: (_) => TripSummaryViewModel(tripId: tripId)..loadTripSummary(),
+      child: TripSummaryScreen(tripId: tripId),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final viewModel = context.watch<TripSummaryViewModel>();
+    final uiState = viewModel.uiState;
+
     return Scaffold(
       backgroundColor: appTheme.gray_50_02,
       appBar: AppBar(
@@ -38,95 +44,140 @@ class _TripSummaryScreenState extends State<TripSummaryScreen> {
           ),
         ),
       ),
-      body: SafeArea(
-        top: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 28, 16, 24),
+      body: SafeArea(top: false, child: _buildBody(viewModel, uiState)),
+    );
+  }
+
+  Widget _buildBody(
+    TripSummaryViewModel viewModel,
+    TripSummaryUiState uiState,
+  ) {
+    if (uiState.isLoading) {
+      return Center(
+        child: CircularProgressIndicator(color: appTheme.teal_A700),
+      );
+    }
+
+    if (uiState.errorMessage != null || !uiState.hasTrip) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'From 14-20 Dec, 2026',
-                style: TextStyle(color: appTheme.gray_400, fontSize: 14),
+              Icon(
+                Icons.cloud_off_outlined,
+                color: appTheme.gray_400,
+                size: 42,
               ),
-              const SizedBox(height: 34),
-              _buildBudgetOverview(),
-              const SizedBox(height: 28),
-              _buildFinancialHealth(),
               const SizedBox(height: 12),
-              _buildSpendingBreakdown(),
-              const SizedBox(height: 28),
-              _buildCostSavingTips(),
-              const SizedBox(height: 22),
-              _buildRecommendations(),
+              Text(
+                uiState.errorMessage ?? 'This trip could not be found.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: appTheme.gray_800, fontSize: 14),
+              ),
+              const SizedBox(height: 14),
+              FilledButton(
+                onPressed: viewModel.loadTripSummary,
+                style: FilledButton.styleFrom(
+                  backgroundColor: appTheme.teal_A700,
+                ),
+                child: const Text('Try Again'),
+              ),
             ],
           ),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      color: appTheme.teal_A700,
+      onRefresh: viewModel.loadTripSummary,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              uiState.destination,
+              style: TextStyle(
+                color: appTheme.gray_900,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _formatDateRange(uiState.startDate!, uiState.endDate!),
+              style: TextStyle(color: appTheme.gray_400, fontSize: 14),
+            ),
+            const SizedBox(height: 28),
+            _buildBudgetOverview(uiState),
+            const SizedBox(height: 26),
+            _buildFinancialHealth(uiState),
+            const SizedBox(height: 18),
+            _buildSpendingBreakdown(uiState),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildBudgetOverview() {
-    return Row(
-      children: [
-        SizedBox(
-          width: 148,
-          height: 148,
+  Widget _buildBudgetOverview(TripSummaryUiState uiState) {
+    final isOverspent = uiState.remainingBudget < 0;
+    final progress = (uiState.spentPercentage / 100).clamp(0.0, 1.0);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final donut = SizedBox(
+          width: 138,
+          height: 138,
           child: CustomPaint(
             painter: _HealthDonutPainter(
-              progress: 0.8,
-              progressColor: appTheme.teal_800,
-              remainderColor: appTheme.teal_A700,
+              progress: progress,
+              progressColor: isOverspent
+                  ? appTheme.errorRed
+                  : appTheme.teal_800,
+              remainderColor: appTheme.gray_200,
             ),
             child: Center(
               child: Text(
-                '80%',
+                '${uiState.spentPercentage.round()}%',
                 style: TextStyle(
-                  color: appTheme.gray_900,
-                  fontSize: 27,
+                  color: isOverspent ? appTheme.errorRed : appTheme.gray_900,
+                  fontSize: 25,
                   fontWeight: FontWeight.w800,
                 ),
               ),
             ),
           ),
-        ),
-        const SizedBox(width: 20),
-        Expanded(
-          child: Container(
-            decoration: BoxDecoration(
-              color: appTheme.white_A700,
-              border: Border.all(color: appTheme.gray_200),
-              borderRadius: BorderRadius.circular(5),
-            ),
-            child: Column(
-              children: [
-                Row(
-                  children: const [
-                    Expanded(
-                      child: _BudgetMetric(
-                        amount: 'RM3500',
-                        label: 'Allocated Budget',
-                      ),
-                    ),
-                    Expanded(
-                      child: _BudgetMetric(
-                        amount: 'RM2800',
-                        label: 'Expense',
-                      ),
-                    ),
-                  ],
-                ),
-                Divider(color: appTheme.gray_200, height: 1),
-                const _BudgetMetric(amount: 'RM700', label: 'Remain'),
-              ],
-            ),
-          ),
-        ),
-      ],
+        );
+        final metrics = _BudgetMetricsCard(uiState: uiState);
+
+        if (constraints.maxWidth < 340) {
+          return Column(children: [donut, const SizedBox(height: 18), metrics]);
+        }
+        return Row(
+          children: [
+            donut,
+            const SizedBox(width: 16),
+            Expanded(child: metrics),
+          ],
+        );
+      },
     );
   }
 
-  Widget _buildFinancialHealth() {
+  Widget _buildFinancialHealth(TripSummaryUiState uiState) {
+    final isOverspent = uiState.financialHealth == 'Overspent';
+    final isWarning = uiState.financialHealth == 'Warning';
+    final color = isOverspent
+        ? appTheme.errorRed
+        : isWarning
+        ? appTheme.warningPopupHeader
+        : appTheme.wholeGoodBudgetProgress;
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -134,11 +185,11 @@ class _TripSummaryScreenState extends State<TripSummaryScreen> {
           'Financial Health',
           style: TextStyle(color: appTheme.gray_900, fontSize: 15),
         ),
-        const SizedBox(width: 28),
+        const SizedBox(width: 22),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
           decoration: BoxDecoration(
-            color: appTheme.wholeGoodBudgetBg,
+            color: color.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
@@ -147,18 +198,12 @@ class _TripSummaryScreenState extends State<TripSummaryScreen> {
               Container(
                 width: 11,
                 height: 11,
-                decoration: BoxDecoration(
-                  color: appTheme.wholeGoodBudgetProgress,
-                  shape: BoxShape.circle,
-                ),
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
               ),
               const SizedBox(width: 7),
               Text(
-                'Healthy',
-                style: TextStyle(
-                  color: appTheme.wholeGoodBudgetProgress,
-                  fontSize: 14,
-                ),
+                uiState.financialHealth,
+                style: TextStyle(color: color, fontSize: 14),
               ),
             ],
           ),
@@ -167,169 +212,101 @@ class _TripSummaryScreenState extends State<TripSummaryScreen> {
     );
   }
 
-  Widget _buildSpendingBreakdown() {
-    const spending = [
-      _SpendingBar('Attraction', 1225, 35),
-      _SpendingBar('Food', 1750, 50),
-      _SpendingBar('Transport', 525, 15),
-    ];
+  Widget _buildSpendingBreakdown(TripSummaryUiState uiState) {
     final colors = [
       appTheme.teal_A200,
       appTheme.teal_A700,
-      appTheme.gray_400,
+      appTheme.blue_gray_300,
     ];
+    final highest = uiState.categories.isEmpty
+        ? null
+        : uiState.categories.reduce(
+            (current, next) => next.expense > current.expense ? next : current,
+          );
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Center(
-          child: Text(
-            'Spending Breakdown by Category',
-            style: TextStyle(
-              color: appTheme.gray_900,
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        const SizedBox(height: 18),
-        SizedBox(
-          height: 194,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: List.generate(
-              spending.length,
-              (index) => _SpendingBarWidget(
-                spending: spending[index],
-                color: colors[index],
+    return _SectionCard(
+      title: 'Spending Breakdown by Category',
+      child: Column(
+        children: [
+          SizedBox(
+            height: 220,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: List.generate(
+                uiState.categories.length,
+                (index) => Expanded(
+                  child: _SpendingBarWidget(
+                    category: uiState.categories[index],
+                    color: colors[index % colors.length],
+                  ),
+                ),
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 14),
-        Center(
-          child: Text(
-            'Highest Expenditure: Food (RM1750)',
+          const SizedBox(height: 18),
+          Text(
+            highest == null || highest.expense == 0
+                ? 'No expenses recorded for this trip'
+                : 'Highest Expenditure: ${highest.name} (${_formatMoney(highest.expense)})',
+            textAlign: TextAlign.center,
             style: TextStyle(color: appTheme.gray_900, fontSize: 14),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCostSavingTips() {
-    return _SectionCard(
-      title: 'Cost-Saving Tips',
-      child: Column(
-        children: [
-          _TipRow(
-            icon: Icons.directions_bus_outlined,
-            iconBackground: appTheme.teal_A200,
-            title: 'Use Local Subway Pass',
-            subtitle: 'Save 15% on Transport',
-          ),
-          const SizedBox(height: 10),
-          _TipRow(
-            icon: Icons.confirmation_number_outlined,
-            iconBackground: appTheme.amber_200,
-            title: 'Book Temple Tickets Online',
-            subtitle: 'Pre-booking discounts available',
-          ),
-          const SizedBox(height: 10),
-          _TipRow(
-            icon: Icons.water_drop_outlined,
-            iconBackground: AppThemeData.expenseBg,
-            title: 'Drink More Water',
-            subtitle: 'Since you very like eat spicy',
           ),
         ],
       ),
     );
   }
 
-  Widget _buildRecommendations() {
-    return _SectionCard(
-      title: 'Recommendations',
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 250),
-        child: _showRecommendations
-            ? Column(
-                key: const ValueKey('recommendation-controls'),
-                children: [
-                  _RecommendationSlider(
-                    label: 'Attraction',
-                    value: _attractionPercentage,
-                    minimum: 25,
-                    maximum: 35,
-                    onChanged: (value) =>
-                        setState(() => _attractionPercentage = value),
-                  ),
-                  _RecommendationSlider(
-                    label: 'Transport',
-                    value: _transportPercentage,
-                    minimum: 10,
-                    maximum: 20,
-                    onChanged: (value) =>
-                        setState(() => _transportPercentage = value),
-                  ),
-                  _RecommendationSlider(
-                    label: 'Food',
-                    value: _foodPercentage,
-                    minimum: 50,
-                    maximum: 60,
-                    onChanged: (value) =>
-                        setState(() => _foodPercentage = value),
-                  ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: 248,
-                    height: 42,
-                    child: FilledButton(
-                      onPressed: () {},
-                      style: FilledButton.styleFrom(
-                        backgroundColor: appTheme.teal_A700,
-                        foregroundColor: appTheme.white_A700,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                      child: const Text(
-                        'Accept',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              )
-            : SizedBox(
-                key: const ValueKey('recommendation-button'),
-                width: double.infinity,
-                height: 42,
-                child: FilledButton(
-                  onPressed: () => setState(() => _showRecommendations = true),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: appTheme.teal_A700,
-                    foregroundColor: appTheme.white_A700,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(13),
-                    ),
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Get Future Budget Recommendations',
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      Icon(Icons.keyboard_arrow_down),
-                    ],
-                  ),
+  String _formatDateRange(DateTime startDate, DateTime endDate) {
+    if (startDate.year == endDate.year && startDate.month == endDate.month) {
+      if (startDate.day == endDate.day) {
+        return 'On ${DateFormat('d MMM, yyyy').format(startDate)}';
+      }
+      return 'From ${startDate.day}-${DateFormat('d MMM, yyyy').format(endDate)}';
+    }
+    return 'From ${DateFormat('d MMM, yyyy').format(startDate)} - ${DateFormat('d MMM, yyyy').format(endDate)}';
+  }
+}
+
+class _BudgetMetricsCard extends StatelessWidget {
+  final TripSummaryUiState uiState;
+
+  const _BudgetMetricsCard({required this.uiState});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: appTheme.white_A700,
+        border: Border.all(color: appTheme.gray_200),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _BudgetMetric(
+                  amount: _formatMoney(uiState.allocatedBudget),
+                  label: 'Allocated Budget',
                 ),
               ),
+              Container(width: 1, height: 58, color: appTheme.gray_200),
+              Expanded(
+                child: _BudgetMetric(
+                  amount: _formatMoney(uiState.totalExpense),
+                  label: 'Expense',
+                ),
+              ),
+            ],
+          ),
+          Divider(color: appTheme.gray_200, height: 1),
+          _BudgetMetric(
+            amount: _formatMoney(uiState.remainingBudget),
+            label: 'Remain',
+            amountColor: uiState.remainingBudget < 0 ? appTheme.errorRed : null,
+          ),
+        ],
       ),
     );
   }
@@ -338,24 +315,37 @@ class _TripSummaryScreenState extends State<TripSummaryScreen> {
 class _BudgetMetric extends StatelessWidget {
   final String amount;
   final String label;
+  final Color? amountColor;
 
-  const _BudgetMetric({required this.amount, required this.label});
+  const _BudgetMetric({
+    required this.amount,
+    required this.label,
+    this.amountColor,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 13),
       child: Column(
         children: [
-          Text(
-            amount,
-            style: TextStyle(color: appTheme.gray_900, fontSize: 14),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              amount,
+              maxLines: 1,
+              style: TextStyle(
+                color: amountColor ?? appTheme.gray_900,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
           const SizedBox(height: 6),
           Text(
             label,
             textAlign: TextAlign.center,
-            style: TextStyle(color: appTheme.gray_900, fontSize: 11),
+            style: TextStyle(color: appTheme.gray_900, fontSize: 10),
           ),
         ],
       ),
@@ -364,46 +354,60 @@ class _BudgetMetric extends StatelessWidget {
 }
 
 class _SpendingBarWidget extends StatelessWidget {
-  final _SpendingBar spending;
+  final TripSummaryCategoryUiState category;
   final Color color;
 
-  const _SpendingBarWidget({required this.spending, required this.color});
+  const _SpendingBarWidget({required this.category, required this.color});
 
   @override
   Widget build(BuildContext context) {
+    final barHeight = category.percentage == 0
+        ? 4.0
+        : (category.percentage * 2.45).clamp(18.0, 145.0);
+
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        Text(
-          'RM${spending.amount.toStringAsFixed(0)}',
-          style: TextStyle(
-            color: appTheme.gray_800,
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        Container(
-          width: 60,
-          height: 2.8 * spending.percentage,
-          alignment: Alignment.topCenter,
-          padding: const EdgeInsets.only(top: 8),
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(7),
-          ),
+        FittedBox(
+          fit: BoxFit.scaleDown,
           child: Text(
-            '${spending.percentage.toStringAsFixed(0)}%',
+            _formatMoney(category.expense),
+            maxLines: 1,
             style: TextStyle(
-              color: appTheme.white_A700,
-              fontSize: 14,
+              color: appTheme.gray_800,
+              fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
           ),
         ),
+        const SizedBox(height: 5),
+        Container(
+          width: 54,
+          height: barHeight,
+          alignment: Alignment.topCenter,
+          padding: EdgeInsets.only(top: barHeight < 30 ? 0 : 7),
+          decoration: BoxDecoration(
+            color: category.percentage == 0 ? appTheme.gray_200 : color,
+            borderRadius: BorderRadius.circular(7),
+          ),
+          child: barHeight < 30
+              ? null
+              : Text(
+                  '${category.percentage.round()}%',
+                  style: TextStyle(
+                    color: appTheme.white_A700,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+        ),
         const SizedBox(height: 8),
-        Text(
-          spending.label,
-          style: TextStyle(color: appTheme.gray_400, fontSize: 12),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            category.name,
+            style: TextStyle(color: appTheme.gray_400, fontSize: 11),
+          ),
         ),
       ],
     );
@@ -424,7 +428,7 @@ class _SectionCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: appTheme.white_A700,
         border: Border.all(color: appTheme.gray_200),
-        borderRadius: BorderRadius.circular(5),
+        borderRadius: BorderRadius.circular(8),
         boxShadow: [
           BoxShadow(
             color: appTheme.black_900_0c,
@@ -436,144 +440,21 @@ class _SectionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: TextStyle(
-              color: appTheme.gray_900,
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
+          Center(
+            child: Text(
+              title,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: appTheme.gray_900,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
           const SizedBox(height: 16),
           child,
         ],
       ),
-    );
-  }
-}
-
-class _TipRow extends StatelessWidget {
-  final IconData icon;
-  final Color iconBackground;
-  final String title;
-  final String subtitle;
-
-  const _TipRow({
-    required this.icon,
-    required this.iconBackground,
-    required this.title,
-    required this.subtitle,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 30,
-          height: 30,
-          decoration: BoxDecoration(
-            color: iconBackground,
-            borderRadius: BorderRadius.circular(5),
-          ),
-          child: Icon(icon, color: appTheme.teal_800, size: 20),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  color: appTheme.gray_900,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              Text(
-                subtitle,
-                style: TextStyle(color: appTheme.blue_gray_700, fontSize: 9),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _RecommendationSlider extends StatelessWidget {
-  final String label;
-  final double value;
-  final double minimum;
-  final double maximum;
-  final ValueChanged<double> onChanged;
-
-  const _RecommendationSlider({
-    required this.label,
-    required this.value,
-    required this.minimum,
-    required this.maximum,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        SizedBox(
-          width: 68,
-          child: Column(
-            children: [
-              Icon(Icons.account_balance_outlined, color: appTheme.gray_900),
-              Text(label, style: TextStyle(color: appTheme.gray_900, fontSize: 11)),
-            ],
-          ),
-        ),
-        Container(
-          width: 44,
-          height: 34,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: appTheme.teal_A700,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Text(
-            '${value.round()}%',
-            style: TextStyle(color: appTheme.white_A700, fontSize: 12),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('${minimum.round()}%', style: const TextStyle(fontSize: 10)),
-                  Text('${maximum.round()}%', style: const TextStyle(fontSize: 10)),
-                ],
-              ),
-              SliderTheme(
-                data: SliderThemeData(
-                  activeTrackColor: appTheme.teal_800,
-                  inactiveTrackColor: appTheme.gray_200,
-                  thumbColor: appTheme.teal_A700,
-                  trackHeight: 3,
-                  overlayShape: SliderComponentShape.noOverlay,
-                ),
-                child: Slider(
-                  value: value,
-                  min: minimum,
-                  max: maximum,
-                  onChanged: onChanged,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }
@@ -596,7 +477,7 @@ class _HealthDonutPainter extends CustomPainter {
     final rect = Rect.fromCircle(center: center, radius: radius);
     final paint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 25;
+      ..strokeWidth = 24;
 
     canvas.drawArc(
       rect,
@@ -622,10 +503,7 @@ class _HealthDonutPainter extends CustomPainter {
   }
 }
 
-class _SpendingBar {
-  final String label;
-  final double amount;
-  final double percentage;
-
-  const _SpendingBar(this.label, this.amount, this.percentage);
+String _formatMoney(double amount) {
+  final absolute = NumberFormat('#,##0.00').format(amount.abs());
+  return amount < 0 ? 'RM -$absolute' : 'RM $absolute';
 }

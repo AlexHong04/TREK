@@ -31,7 +31,6 @@ import 'views/home_screen.dart';
 import 'views/travel_information_input_screen.dart';
 import 'views/activity_screen.dart';
 import 'views/financial_dashboard_screen.dart';
-import 'views/trip_summary_screen.dart';
 
 class AppRoutes {
   static const String loginScreen = '/login';
@@ -46,7 +45,6 @@ class AppRoutes {
       '/wholeItineraryDetailScreen';
   static const String activityScreen = '/activityScreen';
   static const String financialDashboardScreen = '/financialDashboardScreen';
-  static const String tripSummaryScreen = '/tripSummaryScreen';
   // static const String initialRoute = loginScreen;
   static const String initialRoute = homeScreen;
 }
@@ -157,7 +155,6 @@ class MyApp extends StatelessWidget {
         AppRoutes.activityScreen: (context) => ActivityScreen.builder(context),
         AppRoutes.financialDashboardScreen: (context) =>
             FinancialDashboardScreen.builder(context),
-        AppRoutes.tripSummaryScreen: (context) => const TripSummaryScreen(),
       },
     );
   }

@@ -119,6 +119,54 @@ class FinancialDashboardViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> loadCompletedTrips() async {
+    if (_uiState.userId.isEmpty) {
+      _uiState = _uiState.copyWith(
+        completedTripsErrorMessage: 'No user trip data is available.',
+      );
+      notifyListeners();
+      return;
+    }
+
+    _uiState = _uiState.copyWith(
+      isLoadingCompletedTrips: true,
+      clearCompletedTripsError: true,
+    );
+    notifyListeners();
+
+    try {
+      final trips = await _service.getCompletedTrips(_uiState.userId);
+      _uiState = _uiState.copyWith(
+        isLoadingCompletedTrips: false,
+        completedTrips: trips
+            .map(
+              (trip) => DashboardTripUiState(
+                tripId: trip.tripId ?? '',
+                destination: trip.destination,
+                imageUrl: trip.imgUrl ?? '',
+                startDate: trip.startDate,
+                endDate: trip.endDate,
+                totalBudget: trip.totalBudget,
+                travelPreference: trip.travelPreference,
+              ),
+            )
+            .toList(),
+      );
+    } on TimeoutException {
+      _uiState = _uiState.copyWith(
+        isLoadingCompletedTrips: false,
+        completedTripsErrorMessage: 'Connection timed out. Please try again.',
+      );
+    } catch (_) {
+      _uiState = _uiState.copyWith(
+        isLoadingCompletedTrips: false,
+        completedTripsErrorMessage:
+            'Unable to load completed trips. Please try again.',
+      );
+    }
+    notifyListeners();
+  }
+
   String _formatTime(String? value, DateTime date) {
     final time = value?.trim() ?? '';
     if (time.isEmpty) return 'Scheduled';

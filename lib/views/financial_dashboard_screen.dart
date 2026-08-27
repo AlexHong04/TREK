@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' as intl;
 import 'package:provider/provider.dart';
 
-import '../main.dart';
 import '../theme/app_theme.dart';
 import '../view_models/presentation_logic/financial_dashboard_view_model.dart';
 import '../view_models/ui_state/financial_dashboard_ui_state.dart';
+import 'trip_summary_screen.dart';
 
 class FinancialDashboardScreen extends StatelessWidget {
   final VoidCallback? onHomeSelected;
@@ -272,15 +272,26 @@ class FinancialDashboardScreen extends StatelessWidget {
   }
 
   Future<void> _showCompletedTripDialog(BuildContext context) async {
-    final selectedTrip = await showDialog<_CompletedTripPreview>(
+    final viewModel = context.read<FinancialDashboardViewModel>();
+    viewModel.loadCompletedTrips();
+
+    final selectedTrip = await showDialog<DashboardTripUiState>(
       context: context,
       barrierColor: appTheme.gray_900.withValues(alpha: 0.25),
-      builder: (context) => const _CompletedTripDialog(),
+      builder: (_) => ChangeNotifierProvider.value(
+        value: viewModel,
+        child: const _CompletedTripDialog(),
+      ),
     );
 
     if (selectedTrip != null && context.mounted) {
-      //navigate to tripsummary
-      Navigator.pushNamed(context, AppRoutes.tripSummaryScreen);
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) =>
+              TripSummaryScreen.builder(context, tripId: selectedTrip.tripId),
+        ),
+      );
     }
   }
 
@@ -1184,51 +1195,20 @@ enum _DashboardFilter { byDate, byTrip }
 class _CompletedTripDialog extends StatelessWidget {
   const _CompletedTripDialog();
 
-  static const _completedTrips = [
-    _CompletedTripPreview(
-      title: 'Kyoto Autumn Retreat',
-      budget: 'RM2,450',
-      dateRange: 'Oct 12 - Oct 19, 2023',
-      travelers: '2 Travelers',
-      description:
-          'A serene 7-day journey exploring historic temples, traditional tea houses, and the bamboo forest.',
-      imageUrl:
-          'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=900&q=80',
-    ),
-    _CompletedTripPreview(
-      title: 'Icelandic Ring Road',
-      budget: 'RM3,120',
-      dateRange: 'Mar 5 - Mar 15, 2023',
-      travelers: 'Road Trip',
-      description:
-          'An unforgettable road trip through waterfalls, glaciers, hot springs, and northern lights.',
-      imageUrl:
-          'https://images.unsplash.com/photo-1504893524553-b855bce32c67?auto=format&fit=crop&w=900&q=80',
-    ),
-    _CompletedTripPreview(
-      title: 'Bali Island Escape',
-      budget: 'RM1,980',
-      dateRange: 'Jun 8 - Jun 13, 2022',
-      travelers: '3 Travelers',
-      description:
-          'A relaxing tropical break filled with beaches, local food, rice terraces, and cultural sights.',
-      imageUrl:
-          'https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&w=900&q=80',
-    ),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final viewModel = context.watch<FinancialDashboardViewModel>();
+    final uiState = viewModel.uiState;
     final screenHeight = MediaQuery.sizeOf(context).height;
 
     return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 48),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 32),
       backgroundColor: appTheme.white_A700,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth: 380,
-          maxHeight: screenHeight * 0.82,
+          maxWidth: 520,
+          maxHeight: screenHeight * 0.88,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1246,20 +1226,46 @@ class _CompletedTripDialog extends StatelessWidget {
             ),
             Divider(color: appTheme.gray_200, height: 1),
             Expanded(
-              child: Scrollbar(
-                thumbVisibility: true,
-                child: ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-                  itemCount: _completedTrips.length,
-                  separatorBuilder: (context, index) =>
-                      const SizedBox(height: 24),
-                  itemBuilder: (context, index) => _CompletedTripCard(
-                    trip: _completedTrips[index],
-                    onSelected: () =>
-                        Navigator.pop(context, _completedTrips[index]),
-                  ),
-                ),
-              ),
+              child: uiState.isLoadingCompletedTrips
+                  ? const Center(child: CircularProgressIndicator())
+                  : uiState.completedTripsErrorMessage != null
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              uiState.completedTripsErrorMessage!,
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 12),
+                            FilledButton(
+                              onPressed: viewModel.loadCompletedTrips,
+                              child: const Text('Try Again'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : uiState.completedTrips.isEmpty
+                  ? const Center(child: Text('No completed trips found.'))
+                  : Scrollbar(
+                      thumbVisibility: true,
+                      child: ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                        itemCount: uiState.completedTrips.length,
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(height: 24),
+                        itemBuilder: (context, index) => _CompletedTripCard(
+                          trip: uiState.completedTrips[index],
+                          onSelected: () => Navigator.pop(
+                            context,
+                            uiState.completedTrips[index],
+                          ),
+                        ),
+                      ),
+                    ),
             ),
           ],
         ),
@@ -1269,7 +1275,7 @@ class _CompletedTripDialog extends StatelessWidget {
 }
 
 class _CompletedTripCard extends StatelessWidget {
-  final _CompletedTripPreview trip;
+  final DashboardTripUiState trip;
   final VoidCallback onSelected;
 
   const _CompletedTripCard({required this.trip, required this.onSelected});
@@ -1295,18 +1301,7 @@ class _CompletedTripCard extends StatelessWidget {
         children: [
           Stack(
             children: [
-              Image.network(
-                trip.imageUrl,
-                width: double.infinity,
-                height: 190,
-                fit: BoxFit.cover,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return _buildImagePlaceholder();
-                },
-                errorBuilder: (context, error, stackTrace) =>
-                    _buildImagePlaceholder(),
-              ),
+              _buildTripImage(),
               Positioned(
                 top: 14,
                 left: 16,
@@ -1351,7 +1346,7 @@ class _CompletedTripCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        trip.title,
+                        trip.destination,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -1363,7 +1358,7 @@ class _CompletedTripCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 10),
                     Text(
-                      trip.budget,
+                      'RM ${trip.totalBudget.toStringAsFixed(2)}',
                       style: TextStyle(
                         color: appTheme.blueGray900,
                         fontSize: 15,
@@ -1379,19 +1374,20 @@ class _CompletedTripCard extends StatelessWidget {
                   children: [
                     _TripInformationChip(
                       icon: Icons.calendar_today_outlined,
-                      label: trip.dateRange,
+                      label:
+                          '${intl.DateFormat('MMM d').format(trip.startDate)} - ${intl.DateFormat('MMM d, yyyy').format(trip.endDate)}',
                     ),
                     _TripInformationChip(
-                      icon: Icons.group_outlined,
-                      label: trip.travelers,
+                      icon: Icons.favorite_outline,
+                      label: trip.travelPreference.isEmpty
+                          ? 'General'
+                          : trip.travelPreference,
                     ),
                   ],
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  trip.description,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
+                  'Trip ID: ${trip.tripId}',
                   style: TextStyle(
                     color: appTheme.blue_gray_700,
                     fontSize: 13,
@@ -1424,6 +1420,32 @@ class _CompletedTripCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Widget _buildTripImage() {
+    if (trip.imageUrl.startsWith('http')) {
+      return Image.network(
+        trip.imageUrl,
+        width: double.infinity,
+        height: 190,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return _buildImagePlaceholder();
+        },
+        errorBuilder: (_, _, _) => _buildImagePlaceholder(),
+      );
+    }
+    if (trip.imageUrl.isNotEmpty) {
+      return Image.asset(
+        trip.imageUrl,
+        width: double.infinity,
+        height: 190,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => _buildImagePlaceholder(),
+      );
+    }
+    return _buildImagePlaceholder();
   }
 
   Widget _buildImagePlaceholder() {
@@ -1628,20 +1650,6 @@ class _AvailableDateCalendarState extends State<_AvailableDateCalendar> {
     final leadingEmptyCells = firstDay.weekday % 7;
     final totalCells = leadingEmptyCells + daysInMonth;
     final rowCount = (totalCells / 7).ceil();
-    final firstAvailable = widget.availableDates.reduce(
-      (first, date) => date.isBefore(first) ? date : first,
-    );
-    final lastAvailable = widget.availableDates.reduce(
-      (last, date) => date.isAfter(last) ? date : last,
-    );
-    final canGoPrevious = _isMonthAfter(
-      _displayedMonth,
-      DateTime(firstAvailable.year, firstAvailable.month),
-    );
-    final canGoNext = _isMonthAfter(
-      DateTime(lastAvailable.year, lastAvailable.month),
-      _displayedMonth,
-    );
 
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 14, 12, 16),
@@ -1664,14 +1672,12 @@ class _AvailableDateCalendarState extends State<_AvailableDateCalendar> {
             children: [
               IconButton(
                 visualDensity: VisualDensity.compact,
-                onPressed: canGoPrevious
-                    ? () => setState(
-                        () => _displayedMonth = DateTime(
-                          _displayedMonth.year,
-                          _displayedMonth.month - 1,
-                        ),
-                      )
-                    : null,
+                onPressed: () => setState(
+                  () => _displayedMonth = DateTime(
+                    _displayedMonth.year,
+                    _displayedMonth.month - 1,
+                  ),
+                ),
                 icon: const Icon(Icons.chevron_left),
               ),
               Expanded(
@@ -1687,14 +1693,12 @@ class _AvailableDateCalendarState extends State<_AvailableDateCalendar> {
               ),
               IconButton(
                 visualDensity: VisualDensity.compact,
-                onPressed: canGoNext
-                    ? () => setState(
-                        () => _displayedMonth = DateTime(
-                          _displayedMonth.year,
-                          _displayedMonth.month + 1,
-                        ),
-                      )
-                    : null,
+                onPressed: () => setState(
+                  () => _displayedMonth = DateTime(
+                    _displayedMonth.year,
+                    _displayedMonth.month + 1,
+                  ),
+                ),
                 icon: const Icon(Icons.chevron_right),
               ),
             ],
@@ -1787,11 +1791,6 @@ class _AvailableDateCalendarState extends State<_AvailableDateCalendar> {
         first.month == second.month &&
         first.day == second.day;
   }
-
-  bool _isMonthAfter(DateTime first, DateTime second) {
-    return first.year > second.year ||
-        (first.year == second.year && first.month > second.month);
-  }
 }
 
 class _CategoryBudget {
@@ -1808,22 +1807,4 @@ class _CategoryBudget {
   });
 
   bool get isOverspent => expense > budget;
-}
-
-class _CompletedTripPreview {
-  final String title;
-  final String budget;
-  final String dateRange;
-  final String travelers;
-  final String description;
-  final String imageUrl;
-
-  const _CompletedTripPreview({
-    required this.title,
-    required this.budget,
-    required this.dateRange,
-    required this.travelers,
-    required this.description,
-    required this.imageUrl,
-  });
 }

@@ -45,14 +45,38 @@ class CurrentDayFinancialSummary {
   });
 }
 
+class TripCategorySummary {
+  final String category;
+  final double expense;
+
+  const TripCategorySummary({required this.category, required this.expense});
+}
+
+class WholeTripFinancialSummary {
+  final WholeTrip trip;
+  final double totalExpense;
+  final List<TripCategorySummary> categories;
+
+  const WholeTripFinancialSummary({
+    required this.trip,
+    required this.totalExpense,
+    required this.categories,
+  });
+}
+
 abstract class IFinancialDashboardService {
   Future<CurrentDayFinancialSummary?> getCurrentDaySummary(DateTime date);
 
+  Future<WholeTripFinancialSummary?> getTripSummary(String tripId);
+
   Future<List<DateTime>> getAvailableDates(String userId);
+
+  Future<List<WholeTrip>> getCompletedTrips(String userId);
 }
 
 class FinancialDashboardService implements IFinancialDashboardService {
   static const _dashboardCategories = ['Restaurant', 'Transport', 'Attraction'];
+  static const _tripSummaryCategories = ['Attraction', 'Food', 'Transport'];
 
   final IDashboardRepository _repository;
 
@@ -139,6 +163,57 @@ class FinancialDashboardService implements IFinancialDashboardService {
   }
 
   @override
+  Future<WholeTripFinancialSummary?> getTripSummary(String tripId) async {
+    final trip = await _repository.getWholeTrip(tripId);
+    if (trip == null) return null;
+
+    final dayTrips = await _repository.getDayTrips(tripId);
+    final activities = await _repository.getActivitiesForDayTrips(
+      dayTrips
+          .map((dayTrip) => dayTrip.dayTripId ?? '')
+          .where((id) => id.isNotEmpty)
+          .toList(),
+    );
+    final expenses = await _repository.getExpenses(
+      activities.map((activity) => activity.activitiesId).toList(),
+    );
+
+    final activityById = {
+      for (final activity in activities) activity.activitiesId: activity,
+    };
+    final totals = {
+      for (final category in _tripSummaryCategories) category: 0.0,
+    };
+
+    for (final expense in expenses) {
+      final activity = activityById[expense.activitiesId];
+      if (activity == null) continue;
+      final dashboardCategory = _normalizedCategory(activity);
+      if (dashboardCategory == null) continue;
+      final tripCategory = dashboardCategory == 'Restaurant'
+          ? 'Food'
+          : dashboardCategory;
+      totals[tripCategory] = totals[tripCategory]! + expense.totalAmount;
+    }
+
+    return WholeTripFinancialSummary(
+      trip: trip,
+      totalExpense: expenses.fold(
+        0,
+        (total, expense) => total + expense.totalAmount,
+      ),
+      categories: _tripSummaryCategories
+          .map(
+            (category) => TripCategorySummary(
+              category: category,
+              expense: totals[category]!,
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  @override
   Future<List<DateTime>> getAvailableDates(String userId) async {
     final dates = await _repository.getAvailableDates(userId);
     final now = DateTime.now();
@@ -147,6 +222,15 @@ class FinancialDashboardService implements IFinancialDashboardService {
     return dates.where((date) {
       final dateOnly = DateTime(date.year, date.month, date.day);
       return !dateOnly.isAfter(today);
+    }).toList();
+  }
+
+  @override
+  Future<List<WholeTrip>> getCompletedTrips(String userId) async {
+    final trips = await _repository.getTripsForUser(userId);
+    return trips.where((trip) {
+      return trip.status.toLowerCase() != 'terminated' &&
+          trip.computedStatus == 'completed';
     }).toList();
   }
 

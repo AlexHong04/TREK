@@ -31,30 +31,56 @@ class DashboardCategoryUiState {
   bool get isOverspent => expense > budget;
 }
 
+class DashboardTripUiState {
+  final String tripId;
+  final String destination;
+  final String imageUrl;
+  final DateTime startDate;
+  final DateTime endDate;
+  final double totalBudget;
+  final String travelPreference;
+
+  const DashboardTripUiState({
+    required this.tripId,
+    required this.destination,
+    required this.imageUrl,
+    required this.startDate,
+    required this.endDate,
+    required this.totalBudget,
+    required this.travelPreference,
+  });
+}
+
 class FinancialDashboardUiState {
   final bool isLoading;
   final bool isLoadingAvailableDates;
+  final bool isLoadingCompletedTrips;
   final String? errorMessage;
   final String? availableDatesErrorMessage;
+  final String? completedTripsErrorMessage;
   final bool hasCurrentTrip;
   final DateTime selectedDate;
   final String tripId;
   final String userId;
   final String destination;
   final List<DateTime> availableDates;
+  final List<DashboardTripUiState> completedTrips;
   final List<DashboardCategoryUiState> categories;
 
   const FinancialDashboardUiState({
     this.isLoading = false,
     this.isLoadingAvailableDates = false,
+    this.isLoadingCompletedTrips = false,
     this.errorMessage,
     this.availableDatesErrorMessage,
+    this.completedTripsErrorMessage,
     this.hasCurrentTrip = false,
     required this.selectedDate,
     this.tripId = '',
     this.userId = '',
     this.destination = '',
     this.availableDates = const [],
+    this.completedTrips = const [],
     this.categories = const [],
   });
 
@@ -69,32 +95,42 @@ class FinancialDashboardUiState {
   FinancialDashboardUiState copyWith({
     bool? isLoading,
     bool? isLoadingAvailableDates,
+    bool? isLoadingCompletedTrips,
     String? errorMessage,
     bool clearError = false,
     String? availableDatesErrorMessage,
     bool clearAvailableDatesError = false,
+    String? completedTripsErrorMessage,
+    bool clearCompletedTripsError = false,
     bool? hasCurrentTrip,
     DateTime? selectedDate,
     String? tripId,
     String? userId,
     String? destination,
     List<DateTime>? availableDates,
+    List<DashboardTripUiState>? completedTrips,
     List<DashboardCategoryUiState>? categories,
   }) {
     return FinancialDashboardUiState(
       isLoading: isLoading ?? this.isLoading,
       isLoadingAvailableDates:
           isLoadingAvailableDates ?? this.isLoadingAvailableDates,
+      isLoadingCompletedTrips:
+          isLoadingCompletedTrips ?? this.isLoadingCompletedTrips,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
       availableDatesErrorMessage: clearAvailableDatesError
           ? null
           : availableDatesErrorMessage ?? this.availableDatesErrorMessage,
+      completedTripsErrorMessage: clearCompletedTripsError
+          ? null
+          : completedTripsErrorMessage ?? this.completedTripsErrorMessage,
       hasCurrentTrip: hasCurrentTrip ?? this.hasCurrentTrip,
       selectedDate: selectedDate ?? this.selectedDate,
       tripId: tripId ?? this.tripId,
       userId: userId ?? this.userId,
       destination: destination ?? this.destination,
       availableDates: availableDates ?? this.availableDates,
+      completedTrips: completedTrips ?? this.completedTrips,
       categories: categories ?? this.categories,
     );
   }
