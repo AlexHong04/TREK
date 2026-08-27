@@ -74,10 +74,39 @@ class GooglePlacesApiConfig {
               'CORS Proxy error ($proxyUrlStr): ${response.statusCode}',
             );
           }
+        } on PlacesApiDeniedException {
+          rethrow;
         } catch (e) {
           debugPrint('CORS Proxy Exception ($proxyUrlStr): $e');
         }
       }
+
+      // Web direct request fallback (works if browser CORS is disabled via startup flags)
+      // try {
+      //   final response = await http.get(
+      //     Uri.parse(directUrlStr),
+      //     headers: headers,
+      //   );
+      //   if (response.statusCode == 200) {
+      //     final data = jsonDecode(response.body);
+      //     final status = data['status'] as String? ?? '';
+      //     if (status == 'REQUEST_DENIED' || status == 'OVER_QUERY_LIMIT') {
+      //       throw PlacesApiDeniedException(
+      //         status,
+      //         data['error_message'] as String? ?? 'Unknown error',
+      //       );
+      //     }
+      //     final results = data['results'] as List?;
+      //     if (results != null && results.isNotEmpty) {
+      //       return results.first as Map<String, dynamic>;
+      //     }
+      //   }
+      // } on PlacesApiDeniedException {
+      //   rethrow;
+      // } catch (e) {
+      //   debugPrint('Web Direct Fallback Exception (CORS might be active): $e');
+      // }
+
       return null;
     }
 
@@ -104,6 +133,8 @@ class GooglePlacesApiConfig {
           'Google Places API Error: ${response.statusCode} - ${response.body}',
         );
       }
+    } on PlacesApiDeniedException {
+      rethrow;
     } catch (e) {
       debugPrint('Google Places API Exception: $e');
     }
