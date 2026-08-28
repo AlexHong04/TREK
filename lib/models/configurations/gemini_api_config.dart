@@ -141,51 +141,160 @@ class GeminiApiConfig {
     throw Exception('Failed to generate itinerary after retries.');
   }
 
-  //yan bin
-  static Future<String> askGeminiForDashboardRecommendation(
-    String prompt,
-  ) async {
+  // yan bin - cost-tips recommendation
+  static Future<String> askGeminiForCostSavingTips({
+    required String destination,
+    required double allocatedBudget,
+    required double totalExpense,
+    required double remainingBudget,
+    required Map<String, double> categoryExpenses,
+  }) async {
+    final categoryText = categoryExpenses.entries
+        .map((entry) => '- ${entry.key}: RM ${entry.value.toStringAsFixed(2)}')
+        .join('\n');
+    final prompt =
+        '''
+    You are a practical travel budget assistant. Generate exactly THREE concise cost-saving tips for this completed trip.
+
+    Trip Financial Data:
+    - Destination: $destination
+    - Total Allocated Budget: RM ${allocatedBudget.toStringAsFixed(2)}
+    - Total Expense: RM ${totalExpense.toStringAsFixed(2)}
+    - Remaining Budget: RM ${remainingBudget.toStringAsFixed(2)}
+    - Expenses By Category:
+    $categoryText
+
+    CRITICAL RULES:
+    - Base every tip only on the supplied financial data.
+    - Focus first on the category with the highest expense.
+    - Do NOT invent venue names, discount percentages, travel passes, prices, or facts.
+    - Each title MUST contain 6 words or fewer.
+    - Each description MUST contain 12 words or fewer.
+    - "category" MUST be exactly one of: "Attraction", "Food", "Transport", or "General".
+    - Return exactly 3 objects in the "tips" array.
+
+    Format your response as this valid JSON object:
+    {
+      "tips": [
+        {
+          "category": "Transport",
+          "title": "Short action title",
+          "description": "Short practical explanation"
+        }
+      ]
+    }
+
+    Return ONLY the raw JSON object with no markdown formatting.
+    ''';
+
     final url = Uri.parse(
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=$_apiKey',
     );
+
     final response = await http.post(
       url,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
-        'contents': [
+        "contents": [
           {
-            'parts': [
-              {'text': prompt},
+            "parts": [
+              {"text": prompt},
             ],
           },
         ],
-        'generationConfig': {
-          'responseMimeType': 'application/json',
-          'temperature': 0.4,
-          'maxOutputTokens': 512,
-        },
+        "generationConfig": {"responseMimeType": "application/json"},
       }),
     );
 
-    if (response.statusCode != 200) {
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      final candidates = data['candidates'] as List?;
+      if (candidates != null && candidates.isNotEmpty) {
+        final content = candidates[0]['content'];
+        final parts = content['parts'] as List?;
+        if (parts != null && parts.isNotEmpty) {
+          return parts[0]['text'] ?? '{"tips":[]}';
+        }
+      }
+      return '{"tips":[]}';
+    } else {
       throw GeminiApiRequestException(response.statusCode);
     }
+  }
 
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    final candidates = data['candidates'] as List?;
-    if (candidates == null || candidates.isEmpty) {
-      throw const FormatException('Gemini returned an empty response.');
+  // yan bin - future budget recommendation
+  static Future<String> askGeminiForFutureBudgetRecommendations({
+    required String destination,
+    required double allocatedBudget,
+    required double totalExpense,
+    required Map<String, double> categoryExpenses,
+  }) async {
+    final categoryText = categoryExpenses.entries
+        .map((entry) => '- ${entry.key}: RM ${entry.value.toStringAsFixed(2)}')
+        .join('\n');
+    final prompt =
+        '''
+    You are a travel financial planning assistant. Recommend how this user should distribute a future trip budget across exactly THREE categories, based only on the completed trip data below.
+
+    Completed Trip Financial Data:
+    - Destination: $destination
+    - Total Allocated Budget: RM ${allocatedBudget.toStringAsFixed(2)}
+    - Total Expense: RM ${totalExpense.toStringAsFixed(2)}
+    - Expenses By Category:
+    $categoryText
+
+    CRITICAL RULES:
+    - Return exactly one recommendation for each category: "Attraction", "Transport", and "Food".
+    - "percentage" MUST be a whole number from 0 to 100.
+    - The three percentages MUST add up to exactly 100.
+    - Recommend a practical future allocation using the completed trip's spending pattern.
+    - Do NOT return currency amounts, explanations, extra categories, or additional fields.
+
+    Format your response as this valid JSON object:
+    {
+      "recommendations": [
+        {"category": "Attraction", "percentage": 30},
+        {"category": "Transport", "percentage": 15},
+        {"category": "Food", "percentage": 55}
+      ]
     }
 
-    final content = candidates.first['content'] as Map<String, dynamic>?;
-    final parts = content?['parts'] as List?;
-    final text = parts?.isNotEmpty == true
-        ? (parts!.first as Map<String, dynamic>)['text']?.toString().trim()
-        : null;
-    if (text == null || text.isEmpty) {
-      throw const FormatException('Gemini returned an empty response.');
+    Return ONLY the raw JSON object with no markdown formatting.
+    ''';
+
+    final url = Uri.parse(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=$_apiKey',
+    );
+
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        "contents": [
+          {
+            "parts": [
+              {"text": prompt},
+            ],
+          },
+        ],
+        "generationConfig": {"responseMimeType": "application/json"},
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      final candidates = data['candidates'] as List?;
+      if (candidates != null && candidates.isNotEmpty) {
+        final content = candidates[0]['content'];
+        final parts = content['parts'] as List?;
+        if (parts != null && parts.isNotEmpty) {
+          return parts[0]['text'] ?? '{"recommendations":[]}';
+        }
+      }
+      return '{"recommendations":[]}';
+    } else {
+      throw GeminiApiRequestException(response.statusCode);
     }
-    return text;
   }
 
   // kok hong
@@ -210,7 +319,8 @@ class GeminiApiConfig {
     return null;
   }
 
-  // weisong
+  // wei song
+  // TODO: another function to generate alternative for removed activity
   static Future<String> askGeminiForAlternative({
     required String destinationCity,
     required String targetAreaOrNeighborhood,

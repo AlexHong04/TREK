@@ -206,6 +206,7 @@ class FinancialDashboardScreen extends StatelessWidget {
           style: TextStyle(color: appTheme.gray_400, fontSize: 18),
         ),
         PopupMenuButton<DashboardFilter>(
+          tooltip: 'Filter dashboard',
           onSelected: (filter) async {
             if (filter == DashboardFilter.byDate) {
               await _showAvailableDateDialog(context);
@@ -214,25 +215,52 @@ class FinancialDashboardScreen extends StatelessWidget {
             }
           },
           color: appTheme.white_A700,
-          elevation: 3,
+          surfaceTintColor: appTheme.white_A700,
+          shadowColor: appTheme.gray_900.withValues(alpha: 0.16),
+          elevation: 8,
           position: PopupMenuPosition.under,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-          itemBuilder: (context) => const [
+          offset: const Offset(0, 8),
+          constraints: const BoxConstraints(minWidth: 132, maxWidth: 140),
+          menuPadding: const EdgeInsets.symmetric(vertical: 6),
+          clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: appTheme.gray_200),
+          ),
+          itemBuilder: (context) => [
             PopupMenuItem(
               value: DashboardFilter.byDate,
-              child: Text('By Date'),
+              height: 46,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: _DashboardFilterMenuItem(
+                icon: Icons.calendar_month_outlined,
+                label: 'By Date',
+              ),
             ),
+            PopupMenuDivider(height: 1, color: appTheme.gray_200),
             PopupMenuItem(
               value: DashboardFilter.byTrip,
-              child: Text('By Trip'),
+              height: 46,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: _DashboardFilterMenuItem(
+                icon: Icons.luggage_outlined,
+                label: 'By Trip',
+              ),
             ),
           ],
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
             decoration: BoxDecoration(
               color: appTheme.white_A700,
               border: Border.all(color: appTheme.gray_200),
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(9),
+              boxShadow: [
+                BoxShadow(
+                  color: appTheme.black_900_0c,
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -312,9 +340,26 @@ class FinancialDashboardScreen extends StatelessWidget {
                   categories,
                   uiState,
                 ),
-                child: CustomPaint(
-                  size: chartSize,
-                  painter: DashboardDonutChartPainter(categories),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    CustomPaint(
+                      size: chartSize,
+                      painter: DashboardDonutChartPainter(categories),
+                    ),
+                    if (uiState.totalExpense <= 0)
+                      Center(
+                        child: Text(
+                          'No expense\nrecords yet',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: appTheme.gray_800,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               );
             },
@@ -496,6 +541,39 @@ class FinancialDashboardScreen extends StatelessWidget {
       }
       accumulatedAngle += sweep;
     }
+  }
+}
+
+class _DashboardFilterMenuItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _DashboardFilterMenuItem({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: appTheme.teal_50,
+            borderRadius: BorderRadius.circular(7),
+          ),
+          child: Icon(icon, color: appTheme.teal_800, size: 16),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: TextStyle(
+            color: appTheme.gray_900,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
   }
 }
 

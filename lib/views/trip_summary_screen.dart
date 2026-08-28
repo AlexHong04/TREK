@@ -41,11 +41,15 @@ class TripSummaryScreen extends StatelessWidget {
           ),
         ),
       ),
-      body: SafeArea(top: false, child: _buildBody(viewModel, uiState)),
+      body: SafeArea(
+        top: false,
+        child: _buildBody(context, viewModel, uiState),
+      ),
     );
   }
 
   Widget _buildBody(
+    BuildContext context,
     TripSummaryViewModel viewModel,
     TripSummaryUiState uiState,
   ) {
@@ -117,6 +121,8 @@ class TripSummaryScreen extends StatelessWidget {
             _buildSpendingBreakdown(uiState),
             const SizedBox(height: 22),
             _buildCostSavingTips(viewModel, uiState),
+            const SizedBox(height: 18),
+            _buildFutureBudgetRecommendations(context, viewModel, uiState),
           ],
         ),
       ),
@@ -326,6 +332,276 @@ class TripSummaryScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildFutureBudgetRecommendations(
+    BuildContext context,
+    TripSummaryViewModel viewModel,
+    TripSummaryUiState uiState,
+  ) {
+    return _SectionCard(
+      title: 'Recommendations',
+      centerTitle: false,
+      trailing: uiState.isFutureRecommendationsExpanded
+          ? IconButton(
+              onPressed: uiState.isSavingFutureRecommendations
+                  ? null
+                  : viewModel.toggleFutureRecommendations,
+              tooltip: 'Collapse recommendations',
+              visualDensity: VisualDensity.compact,
+              icon: Icon(Icons.keyboard_arrow_up, color: appTheme.teal_800),
+            )
+          : null,
+      child: !uiState.isFutureRecommendationsExpanded
+          ? SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: viewModel.toggleFutureRecommendations,
+                style: FilledButton.styleFrom(
+                  backgroundColor: appTheme.teal_A700,
+                  foregroundColor: appTheme.white_A700,
+                  minimumSize: const Size.fromHeight(46),
+                  padding: EdgeInsets.zero,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const SizedBox(
+                  height: 46,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 40),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text('Get Future Budget Recommendations'),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        right: 14,
+                        top: 0,
+                        bottom: 0,
+                        child: Icon(Icons.keyboard_arrow_down, size: 20),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            )
+          : Column(
+              children: [
+                if (uiState.isLoadingFutureRecommendations)
+                  SizedBox(
+                    width: double.infinity,
+                    height: 120,
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          CircularProgressIndicator(
+                            color: appTheme.teal_A700,
+                            strokeWidth: 2.5,
+                          ),
+                          const SizedBox(height: 14),
+                          Text(
+                            'Generating future budget recommendations...',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: appTheme.gray_800,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else if (uiState.futureRecommendations.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Column(
+                      children: [
+                        Text(
+                          uiState.futureRecommendationsErrorMessage ??
+                              'No future budget recommendations are available.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color:
+                                uiState.futureRecommendationsErrorMessage ==
+                                    null
+                                ? appTheme.gray_400
+                                : appTheme.errorRed,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        OutlinedButton.icon(
+                          onPressed: viewModel.loadFutureBudgetRecommendations,
+                          icon: const Icon(Icons.refresh, size: 18),
+                          label: const Text('Try Again'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: appTheme.teal_A700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else ...[
+                  ...uiState.futureRecommendations.map(
+                    (recommendation) => Padding(
+                      padding: const EdgeInsets.only(bottom: 14),
+                      child: _FutureBudgetRecommendationRow(
+                        recommendation: recommendation,
+                        onChanged: uiState.areFutureRecommendationsSaved
+                            ? null
+                            : (percentage) => viewModel
+                                  .updateFutureRecommendationPercentage(
+                                    recommendation.category,
+                                    percentage,
+                                  ),
+                      ),
+                    ),
+                  ),
+                  if (uiState.futureRecommendationsErrorMessage != null) ...[
+                    Text(
+                      uiState.futureRecommendationsErrorMessage!,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: appTheme.errorRed, fontSize: 12),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                  if (uiState.areFutureRecommendationsSaved)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: appTheme.teal_50,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.check_circle,
+                            color: appTheme.teal_800,
+                            size: 19,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Saved recommendation',
+                            style: TextStyle(
+                              color: appTheme.teal_800,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: uiState.isSavingFutureRecommendations
+                            ? null
+                            : () => _acceptFutureBudgetRecommendations(
+                                context,
+                                viewModel,
+                              ),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: appTheme.teal_A700,
+                          foregroundColor: appTheme.white_A700,
+                          disabledBackgroundColor: appTheme.gray_200,
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: uiState.isSavingFutureRecommendations
+                            ? SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  color: appTheme.white_A700,
+                                  strokeWidth: 2.4,
+                                ),
+                              )
+                            : const Text(
+                                'Accept',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                      ),
+                    ),
+                ],
+              ],
+            ),
+    );
+  }
+
+  Future<void> _acceptFutureBudgetRecommendations(
+    BuildContext context,
+    TripSummaryViewModel viewModel,
+  ) async {
+    final result = await viewModel.acceptFutureBudgetRecommendations();
+    if (!context.mounted) return;
+
+    if (result == FutureRecommendationAcceptResult.invalidTotal) {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Invalid Percentage Total'),
+          content: Text(
+            'The three categories currently total '
+            '${viewModel.futureRecommendationTotal.round()}%. '
+            'Please adjust them so the total is exactly 100%.',
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              style: FilledButton.styleFrom(
+                backgroundColor: appTheme.teal_A700,
+              ),
+              child: const Text('Adjust Again'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    if (result == FutureRecommendationAcceptResult.saved) {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.check_circle, color: appTheme.teal_A700),
+              const SizedBox(width: 10),
+              const Text('Saved Successfully'),
+            ],
+          ),
+          content: const Text(
+            'Your future budget recommendations have been saved.',
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              style: FilledButton.styleFrom(
+                backgroundColor: appTheme.teal_A700,
+              ),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
   String _formatDateRange(DateTime startDate, DateTime endDate) {
     if (startDate.year == endDate.year && startDate.month == endDate.month) {
       if (startDate.day == endDate.day) {
@@ -475,7 +751,11 @@ class _SpendingBarWidget extends StatelessWidget {
           fit: BoxFit.scaleDown,
           child: Text(
             category.name,
-            style: TextStyle(color: appTheme.gray_400, fontSize: 11),
+            style: TextStyle(
+              color: appTheme.gray_800,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
       ],
@@ -535,15 +815,130 @@ class _CostSavingTipRow extends StatelessWidget {
   }
 }
 
+class _FutureBudgetRecommendationRow extends StatelessWidget {
+  final FutureBudgetRecommendationUiState recommendation;
+  final ValueChanged<double>? onChanged;
+
+  const _FutureBudgetRecommendationRow({
+    required this.recommendation,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = switch (recommendation.category) {
+      'Transport' => Icons.directions_bus_outlined,
+      'Food' => Icons.restaurant_outlined,
+      _ => Icons.account_balance_outlined,
+    };
+    final divisions =
+        (recommendation.maximumPercentage - recommendation.minimumPercentage)
+            .round();
+
+    return Row(
+      children: [
+        SizedBox(
+          width: 62,
+          child: Column(
+            children: [
+              Icon(icon, color: appTheme.gray_900, size: 22),
+              const SizedBox(height: 2),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  recommendation.category,
+                  maxLines: 1,
+                  style: TextStyle(color: appTheme.gray_900, fontSize: 11),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Container(
+          width: 52,
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 9),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: appTheme.teal_A700,
+            borderRadius: BorderRadius.circular(9),
+          ),
+          child: Text(
+            '${recommendation.aiPercentage.round()}%',
+            style: TextStyle(
+              color: appTheme.white_A700,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '${recommendation.minimumPercentage.round()}%',
+                    style: TextStyle(color: appTheme.gray_800, fontSize: 10),
+                  ),
+                  Text(
+                    '${recommendation.selectedPercentage.round()}%',
+                    style: TextStyle(
+                      color: appTheme.teal_800,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  Text(
+                    '${recommendation.maximumPercentage.round()}%',
+                    style: TextStyle(color: appTheme.gray_800, fontSize: 10),
+                  ),
+                ],
+              ),
+              SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  trackHeight: 3,
+                  thumbShape: const RoundSliderThumbShape(
+                    enabledThumbRadius: 6,
+                  ),
+                  overlayShape: const RoundSliderOverlayShape(
+                    overlayRadius: 12,
+                  ),
+                  disabledActiveTrackColor: appTheme.teal_800,
+                  disabledInactiveTrackColor: appTheme.gray_200,
+                  disabledThumbColor: appTheme.teal_800,
+                ),
+                child: Slider(
+                  value: recommendation.selectedPercentage,
+                  min: recommendation.minimumPercentage,
+                  max: recommendation.maximumPercentage,
+                  divisions: divisions == 0 ? null : divisions,
+                  activeColor: appTheme.teal_800,
+                  inactiveColor: appTheme.gray_200,
+                  onChanged: onChanged,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _SectionCard extends StatelessWidget {
   final String title;
   final Widget child;
   final bool centerTitle;
+  final Widget? trailing;
 
   const _SectionCard({
     required this.title,
     required this.child,
     this.centerTitle = true,
+    this.trailing,
   });
 
   @override
@@ -566,17 +961,26 @@ class _SectionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Align(
-            alignment: centerTitle ? Alignment.center : Alignment.centerLeft,
-            child: Text(
-              title,
-              textAlign: centerTitle ? TextAlign.center : TextAlign.left,
-              style: TextStyle(
-                color: appTheme.gray_900,
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
+          Row(
+            children: [
+              Expanded(
+                child: Align(
+                  alignment: centerTitle
+                      ? Alignment.center
+                      : Alignment.centerLeft,
+                  child: Text(
+                    title,
+                    textAlign: centerTitle ? TextAlign.center : TextAlign.left,
+                    style: TextStyle(
+                      color: appTheme.gray_900,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
               ),
-            ),
+              ?trailing,
+            ],
           ),
           const SizedBox(height: 16),
           child,
