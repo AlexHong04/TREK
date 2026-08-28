@@ -350,6 +350,21 @@ class ItineraryRepository implements IItineraryRepository {
     }
   }
 
+  //zhiqin
+  Future<List<DayTrip>> fetchDaysByTripId(String tripId) async {
+    try {
+      final res = await SupabaseConfig.client
+          .from('day_trips')
+          .select()
+          .eq('trip_id', tripId);
+
+      return (res as List).map((json) => DayTrip.fromJson(json)).toList();
+    } catch (e) {
+      debugPrint('Error fetching days by trip ID: $e');
+      rethrow;
+    }
+  }
+
   // zhiqin
   Future<WholeTrip> getTripByActivityId(String activityId) async {
     try {
@@ -428,7 +443,7 @@ class ItineraryRepository implements IItineraryRepository {
     }
   }
 
-    Future<Activity> generateAlternativeActivity({
+  Future<Activity> generateAlternativeActivity({
     required String destination,
     required DateTime slotDate,
     required String startTime,
@@ -519,8 +534,8 @@ class ItineraryRepository implements IItineraryRepository {
     // Fallback image resolvers (Wikipedia -> Wikimedia Commons -> LoremFlickr)
     if (imgUrl.isEmpty && !resolvedByGooglePlaces) {
       final imageKeyword =
-      (item['imageKeyword'] ?? item['image_keyword'] ?? destTitle)
-      as String;
+          (item['imageKeyword'] ?? item['image_keyword'] ?? destTitle)
+              as String;
       final query = Uri.encodeComponent(imageKeyword);
       const wikiHeaders = {
         'User-Agent': 'TrekApp/1.0 (Flutter; travel itinerary generator)',
@@ -573,8 +588,8 @@ class ItineraryRepository implements IItineraryRepository {
 
     if (imgUrl.isEmpty) {
       final imageKeyword =
-      (item['imageKeyword'] ?? item['image_keyword'] ?? destTitle)
-      as String;
+          (item['imageKeyword'] ?? item['image_keyword'] ?? destTitle)
+              as String;
       final keywordQuery = Uri.encodeComponent(
         imageKeyword.replaceAll(RegExp(r'\s+'), ','),
       );

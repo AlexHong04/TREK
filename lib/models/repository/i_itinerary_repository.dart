@@ -31,6 +31,8 @@ abstract interface class IItineraryRepository {
 
   Future<WholeTrip> getTripByActivityId(String activityId);
 
+  Future<List<DayTrip>> fetchDaysByTripId(String tripId);
+
   Future<WholeTrip?> getLatestTrip();
 
   Future<List<Activity>> fetchAllActivitiesByTrip(String tripId);
