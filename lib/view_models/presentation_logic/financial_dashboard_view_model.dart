@@ -8,7 +8,6 @@ import 'package:intl/intl.dart';
 import '../../models/services/financial_dashboard_service.dart';
 import '../../theme/app_theme.dart';
 import '../ui_state/financial_dashboard_ui_state.dart';
-
 export '../ui_state/financial_dashboard_ui_state.dart';
 
 class FinancialDashboardViewModel extends ChangeNotifier {
@@ -236,7 +235,19 @@ class DashboardDonutChartPainter extends CustomPainter {
     const strokeWidth = 24.0;
     final rect = Rect.fromCircle(center: center, radius: radius);
     final total = categories.fold<double>(0, (sum, item) => sum + item.expense);
-    if (total <= 0) return;
+    if (total <= 0) {
+      canvas.drawArc(
+        rect,
+        -math.pi / 2,
+        math.pi * 2,
+        false,
+        Paint()
+          ..color = appTheme.gray_400
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = strokeWidth,
+      );
+      return;
+    }
     var startAngle = -math.pi / 2;
 
     for (final category in categories) {

@@ -24,6 +24,34 @@ class CostSavingTipUiState {
   });
 }
 
+enum FutureRecommendationAcceptResult { saved, invalidTotal, failed }
+
+class FutureBudgetRecommendationUiState {
+  final String category;
+  final double aiPercentage;
+  final double selectedPercentage;
+  final double minimumPercentage;
+  final double maximumPercentage;
+
+  const FutureBudgetRecommendationUiState({
+    required this.category,
+    required this.aiPercentage,
+    required this.selectedPercentage,
+    required this.minimumPercentage,
+    required this.maximumPercentage,
+  });
+
+  FutureBudgetRecommendationUiState copyWith({double? selectedPercentage}) {
+    return FutureBudgetRecommendationUiState(
+      category: category,
+      aiPercentage: aiPercentage,
+      selectedPercentage: selectedPercentage ?? this.selectedPercentage,
+      minimumPercentage: minimumPercentage,
+      maximumPercentage: maximumPercentage,
+    );
+  }
+}
+
 class TripSummaryUiState {
   final bool isLoading;
   final bool isLoadingCostSavingTips;
@@ -44,6 +72,13 @@ class TripSummaryUiState {
   final String financialHealth;
   final List<TripSummaryCategoryUiState> categories;
   final List<CostSavingTipUiState> costSavingTips;
+  final bool isFutureRecommendationsExpanded;
+  final bool isLoadingFutureRecommendations;
+  final bool isSavingFutureRecommendations;
+  final bool hasAdjustedFutureRecommendations;
+  final bool areFutureRecommendationsSaved;
+  final String? futureRecommendationsErrorMessage;
+  final List<FutureBudgetRecommendationUiState> futureRecommendations;
 
   const TripSummaryUiState({
     this.isLoading = false,
@@ -65,6 +100,13 @@ class TripSummaryUiState {
     this.financialHealth = 'Healthy',
     this.categories = const [],
     this.costSavingTips = const [],
+    this.isFutureRecommendationsExpanded = false,
+    this.isLoadingFutureRecommendations = false,
+    this.isSavingFutureRecommendations = false,
+    this.hasAdjustedFutureRecommendations = false,
+    this.areFutureRecommendationsSaved = false,
+    this.futureRecommendationsErrorMessage,
+    this.futureRecommendations = const [],
   });
 
   TripSummaryUiState copyWith({
@@ -89,6 +131,14 @@ class TripSummaryUiState {
     String? financialHealth,
     List<TripSummaryCategoryUiState>? categories,
     List<CostSavingTipUiState>? costSavingTips,
+    bool? isFutureRecommendationsExpanded,
+    bool? isLoadingFutureRecommendations,
+    bool? isSavingFutureRecommendations,
+    bool? hasAdjustedFutureRecommendations,
+    bool? areFutureRecommendationsSaved,
+    String? futureRecommendationsErrorMessage,
+    bool clearFutureRecommendationsError = false,
+    List<FutureBudgetRecommendationUiState>? futureRecommendations,
   }) {
     return TripSummaryUiState(
       isLoading: isLoading ?? this.isLoading,
@@ -113,6 +163,24 @@ class TripSummaryUiState {
       financialHealth: financialHealth ?? this.financialHealth,
       categories: categories ?? this.categories,
       costSavingTips: costSavingTips ?? this.costSavingTips,
+      isFutureRecommendationsExpanded:
+          isFutureRecommendationsExpanded ??
+          this.isFutureRecommendationsExpanded,
+      isLoadingFutureRecommendations:
+          isLoadingFutureRecommendations ?? this.isLoadingFutureRecommendations,
+      isSavingFutureRecommendations:
+          isSavingFutureRecommendations ?? this.isSavingFutureRecommendations,
+      hasAdjustedFutureRecommendations:
+          hasAdjustedFutureRecommendations ??
+          this.hasAdjustedFutureRecommendations,
+      areFutureRecommendationsSaved:
+          areFutureRecommendationsSaved ?? this.areFutureRecommendationsSaved,
+      futureRecommendationsErrorMessage: clearFutureRecommendationsError
+          ? null
+          : futureRecommendationsErrorMessage ??
+                this.futureRecommendationsErrorMessage,
+      futureRecommendations:
+          futureRecommendations ?? this.futureRecommendations,
     );
   }
 }
