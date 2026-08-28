@@ -285,41 +285,32 @@ class ItineraryRepository implements IItineraryRepository {
   }
 
   //zhiqin
-  Future<bool> updateDayOverspendDetails(DayTrip current) async {
+  Future<bool> updateOverspendDetails(DayTrip day, Activity activity) async {
     try {
+      // Update day_trips
       await SupabaseConfig.client
           .from('day_trips')
           .update({
-            'overspend_amount': current.overspendAmount,
-            'overspend_category': current.overspendCategory,
-            'is_overspend': current.isOverspend,
+            'overspend_amount': day.overspendAmount,
+            'overspend_category': day.overspendCategory,
+            'is_overspend': day.isOverspend,
           })
-          .eq('day_trip_id', current.dayTripId as Object);
+          .eq('day_trip_id', day.dayTripId as Object);
 
-      return true;
-    } on Exception catch (e) {
-      print('Error updating current day overspend: $e');
-      throw Exception('DB Error during updating current day overspend: $e');
-    }
-  }
-
-  //zhiqin
-  Future<bool> updateOverspendDetails(Activity current) async {
-    try {
+      // Update activities
       await SupabaseConfig.client
           .from('activities')
           .update({
-            'overspend_amount': current.overspendAmount,
-            'is_overspend': current.isOverspend,
+            'overspend_amount': activity.overspendAmount,
+            'is_overspend': activity.isOverspend,
           })
-          .eq('activities_id', current.activitiesId);
+          .eq('activities_id', activity.activitiesId);
 
       return true;
     } on Exception catch (e) {
-      print('Error updating current activity overspend: $e');
-      throw Exception(
-        'DB Error during updating current activity overspend: $e',
-      );
+      debugPrint('Error updating overspend details: $e');
+
+      throw Exception('DB Error during updating overspend details: $e');
     }
   }
 

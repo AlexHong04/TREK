@@ -23,9 +23,7 @@ abstract interface class IItineraryRepository {
 
   Future<DayTrip> getCurrentDay(String dayId);
 
-  Future<bool> updateDayOverspendDetails(DayTrip current);
-
-  Future<bool> updateOverspendDetails(Activity current);
+  Future<bool> updateOverspendDetails(DayTrip day, Activity activity);
 
   Future<bool> updateActivities(List<Activity> activities);
 
