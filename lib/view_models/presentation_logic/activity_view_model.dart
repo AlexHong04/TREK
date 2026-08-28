@@ -170,7 +170,7 @@ class ActivityViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> takeReceiptPhoto() async {
+  Future<bool> takeReceiptPhoto() async {
     _uiState = _uiState.copyWith(
       isPickingReceipt: true,
       errorMessage: '',
@@ -180,21 +180,31 @@ class ActivityViewModel extends ChangeNotifier {
 
     try {
       final localPath = await _cameraSource.takePhoto();
+      if (localPath == null) {
+        _uiState = _uiState.copyWith(isPickingReceipt: false);
+        notifyListeners();
+        return false;
+      }
+
+      await _expenseTrackingService.validateReceiptImage(localPath);
       _uiState = _uiState.copyWith(
         isPickingReceipt: false,
-        receiptLocalPath: localPath ?? _uiState.receiptLocalPath,
-        clearOcrData: localPath != null,
+        receiptLocalPath: localPath,
+        clearOcrData: true,
       );
+      notifyListeners();
+      return true;
     } catch (error) {
       _uiState = _uiState.copyWith(
         isPickingReceipt: false,
         errorMessage: _readableError(error),
       );
+      notifyListeners();
+      return false;
     }
-    notifyListeners();
   }
 
-  Future<void> chooseReceiptFromGallery() async {
+  Future<bool> chooseReceiptFromGallery() async {
     _uiState = _uiState.copyWith(
       isPickingReceipt: true,
       errorMessage: '',
@@ -204,10 +214,51 @@ class ActivityViewModel extends ChangeNotifier {
 
     try {
       final localPath = await _cameraSource.pickPhotoFromGallery();
+      if (localPath == null) {
+        _uiState = _uiState.copyWith(isPickingReceipt: false);
+        notifyListeners();
+        return false;
+      }
+
+      await _expenseTrackingService.validateReceiptImage(localPath);
       _uiState = _uiState.copyWith(
         isPickingReceipt: false,
-        receiptLocalPath: localPath ?? _uiState.receiptLocalPath,
-        clearOcrData: localPath != null,
+        receiptLocalPath: localPath,
+        clearOcrData: true,
+      );
+      notifyListeners();
+      return true;
+    } catch (error) {
+      _uiState = _uiState.copyWith(
+        isPickingReceipt: false,
+        errorMessage: _readableError(error),
+      );
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Replaces the temporary receipt path only when the tourist finishes the
+  /// device crop flow. Cancelling leaves the validated original image in use.
+  Future<void> cropSelectedReceipt() async {
+    final originalPath = _uiState.receiptLocalPath;
+    if (originalPath.isEmpty) {
+      _setExpenseError('Choose a receipt image before cropping it.');
+      return;
+    }
+
+    _uiState = _uiState.copyWith(isPickingReceipt: true, errorMessage: '');
+    notifyListeners();
+
+    try {
+      final croppedPath = await _cameraSource.cropReceiptImage(originalPath);
+      if (croppedPath != null) {
+        await _expenseTrackingService.validateReceiptImage(croppedPath);
+      }
+      _uiState = _uiState.copyWith(
+        isPickingReceipt: false,
+        receiptLocalPath: croppedPath ?? originalPath,
+        clearOcrData: croppedPath != null,
       );
     } catch (error) {
       _uiState = _uiState.copyWith(

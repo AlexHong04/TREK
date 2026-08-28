@@ -9,7 +9,7 @@ import 'package:provider/provider.dart';
 import '../models/entities/activity.dart';
 import '../models/entities/expense.dart';
 import '../models/entities/expense_item.dart';
-import '../theme/app_colors.dart';
+import '../theme/app_theme.dart';
 import '../view_models/presentation_logic/activity_view_model.dart';
 import '../view_models/ui_state/activity_ui_state.dart';
 
@@ -24,8 +24,8 @@ Future<void> showExpenseBottomSheet({
     isScrollControlled: true,
     isDismissible: true,
     enableDrag: true,
-    barrierColor: AppColors.black.withOpacity(0.20),
-    backgroundColor: AppColors.transparent,
+    barrierColor: appTheme.black.withOpacity(0.20),
+    backgroundColor: appTheme.transparentCustom,
     builder: (_) => ChangeNotifierProvider.value(
       value: viewModel,
       child: ExpenseBottomSheet(activity: activity),
@@ -36,7 +36,7 @@ Future<void> showExpenseBottomSheet({
 class ExpenseBottomSheet extends StatefulWidget {
   final Activity activity;
 
-  const ExpenseBottomSheet({required this.activity});
+  ExpenseBottomSheet({required this.activity});
 
   @override
   State<ExpenseBottomSheet> createState() => _ExpenseBottomSheetState();
@@ -93,24 +93,24 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
       maxChildSize: canExpandSheet ? 0.90 : recordedExpensesHeight,
       snap: true,
       snapSizes: isExpenseFormMode
-          ? const [0.50, 0.78, 0.90]
+          ? [0.50, 0.78, 0.90]
           : hasMoreRecordedExpensesThanFit
-          ? const [0.50, 0.74, 0.90]
+          ? [0.50, 0.74, 0.90]
           : hasOneRecordedExpense
-          ? const [0.50, 0.65]
-          : const [0.50, 0.74],
+          ? [0.50, 0.65]
+          : [0.50, 0.74],
       shouldCloseOnMinExtent: true,
       builder: (context, scrollController) => Stack(
         children: [
           ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
             child: Material(
-              color: AppColors.white,
+              color: appTheme.white_A700,
               child: SafeArea(
                 top: false,
                 child: SingleChildScrollView(
                   controller: scrollController,
-                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+                  padding: EdgeInsets.fromLTRB(24, 16, 24, 32),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -119,33 +119,33 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                           width: 64,
                           height: 6,
                           decoration: BoxDecoration(
-                            color: AppColors.gray200,
+                            color: appTheme.gray_200,
                             borderRadius: BorderRadius.circular(999),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      SizedBox(height: 20),
                       Text(
                         showRecordedExpenses
                             ? 'Recorded Expenses'
                             : 'Add Expense',
                         style: TextStyle(
-                          color: AppColors.blueGray900,
+                          color: appTheme.blueGray900,
                           fontFamily: 'Inter',
                           fontSize: 20,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      SizedBox(height: 20),
                       _ExpenseActivitySummary(
                         activity: activity,
                         timeText: timeText,
                       ),
-                      const SizedBox(height: 10),
+                      SizedBox(height: 10),
                       _ExpenseCategoryCard(category: activity.activityCategory),
-                      const SizedBox(height: 10),
+                      SizedBox(height: 10),
                       if (uiState.isLoadingRecordedExpenses)
-                        const Padding(
+                        Padding(
                           padding: EdgeInsets.symmetric(vertical: 48),
                           child: Center(child: CircularProgressIndicator()),
                         )
@@ -178,27 +178,27 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     return Column(
       children: [
         _buildExpenseItemsSection(uiState),
-        const SizedBox(height: 10),
+        SizedBox(height: 10),
         _buildTotalAmountSection(uiState),
-        const SizedBox(height: 10),
+        SizedBox(height: 10),
         _buildPaymentMethodSection(uiState),
-        const SizedBox(height: 10),
+        SizedBox(height: 10),
         _buildReceiptSection(uiState),
         if (uiState.isScanningReceipt ||
             uiState.ocrRawText.isNotEmpty ||
             uiState.errorMessage.startsWith('Unable to read the receipt.')) ...[
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           _buildOcrReviewSection(uiState),
         ],
         if (uiState.errorMessage.isNotEmpty) ...[
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           _buildMessage(uiState.errorMessage, true),
         ],
         if (uiState.successMessage.isNotEmpty) ...[
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           _buildMessage(uiState.successMessage, false),
         ],
-        const SizedBox(height: 18),
+        SizedBox(height: 18),
         SizedBox(
           width: double.infinity,
           height: 60,
@@ -207,25 +207,25 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                 ? null
                 : _showConfirmExpenseDialog,
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.tealA700,
-              foregroundColor: AppColors.white,
+              backgroundColor: appTheme.teal_A700,
+              foregroundColor: appTheme.white_A700,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
             ),
             icon: uiState.isSavingExpense
-                ? const SizedBox(
+                ? SizedBox(
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(
-                      color: AppColors.white,
+                      color: appTheme.white_A700,
                       strokeWidth: 2,
                     ),
                   )
-                : const Icon(Icons.save_outlined),
+                : Icon(Icons.save_outlined),
             label: Text(
               uiState.isSavingExpense ? 'Saving Expense...' : 'Confirm Expense',
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'Inter',
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
@@ -242,41 +242,41 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Previously Recorded',
           style: TextStyle(
-            color: AppColors.gray400,
+            color: appTheme.gray_400,
             fontFamily: 'Inter',
             fontSize: 12,
             fontWeight: FontWeight.w700,
             letterSpacing: 1.2,
           ),
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: 10),
         for (var index = 0; index < expenses.length; index++) ...[
           _buildRecordedExpenseCard(expenses[index], index + 1),
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
         ],
         if (uiState.isLoadingRecordedExpenseItems)
-          const Padding(
+          Padding(
             padding: EdgeInsets.only(bottom: 10),
             child: Center(child: CircularProgressIndicator()),
           ),
-        const SizedBox(height: 8),
+        SizedBox(height: 8),
         SizedBox(
           width: double.infinity,
           height: 56,
           child: ElevatedButton.icon(
             onPressed: () => setState(() => _isRecordingNewExpense = true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.tealA700,
-              foregroundColor: AppColors.white,
+              backgroundColor: appTheme.teal_A700,
+              foregroundColor: appTheme.white_A700,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
             ),
-            icon: const Icon(Icons.add),
-            label: const Text(
+            icon: Icon(Icons.add),
+            label: Text(
               'Record New Expense',
               style: TextStyle(
                 fontFamily: 'Inter',
@@ -295,42 +295,42 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         : DateFormat('dd MMM yyyy, hh:mm a').format(expense.createdAt!);
 
     return Material(
-      color: AppColors.transparent,
+      color: appTheme.transparentCustom,
       child: InkWell(
         onTap: () => _showRecordedExpenseDetails(expense, expenseNumber),
         borderRadius: BorderRadius.circular(16),
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.white,
-            border: Border.all(color: AppColors.gray200),
+            color: appTheme.white_A700,
+            border: Border.all(color: appTheme.gray_200),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.receipt_long_outlined,
-                color: AppColors.tealA700,
+                color: appTheme.teal_A700,
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Expense #$expenseNumber',
-                      style: const TextStyle(
-                        color: AppColors.blueGray900,
+                      style: TextStyle(
+                        color: appTheme.blueGray900,
                         fontFamily: 'Inter',
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: 4),
                     Text(
                       recordedOn,
-                      style: const TextStyle(
-                        color: AppColors.gray400,
+                      style: TextStyle(
+                        color: appTheme.gray_400,
                         fontFamily: 'Inter',
                         fontSize: 12,
                       ),
@@ -340,14 +340,14 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
               ),
               Text(
                 'RM${expense.totalAmount.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  color: AppColors.blueGray900,
+                style: TextStyle(
+                  color: appTheme.blueGray900,
                   fontFamily: 'Inter',
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              const SizedBox(width: 4),
-              const Icon(Icons.chevron_right, color: AppColors.gray400),
+              SizedBox(width: 4),
+              Icon(Icons.chevron_right, color: appTheme.gray_400),
             ],
           ),
         ),
@@ -398,20 +398,20 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                       ? 'Receipt: Not attached'
                       : 'Receipt: Attached',
                 ),
-                const SizedBox(height: 16),
-                const Text(
+                SizedBox(height: 16),
+                Text(
                   'ITEMS',
                   style: TextStyle(
-                    color: AppColors.gray400,
+                    color: appTheme.gray_400,
                     fontFamily: 'Inter',
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 1.2,
                   ),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: 8),
                 if (expenseItems.isEmpty)
-                  const Text('No expense items were found.')
+                  Text('No expense items were found.')
                 else
                   for (final item in expenseItems)
                     ListTile(
@@ -430,7 +430,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Close'),
+            child: Text('Close'),
           ),
         ],
       ),
@@ -440,14 +440,14 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   Widget _buildExpenseItemsSection(ActivityUiState uiState) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+      padding: EdgeInsets.fromLTRB(16, 20, 16, 16),
       decoration: BoxDecoration(
-        color: AppColors.white,
-        border: Border.all(color: AppColors.gray100),
+        color: appTheme.white_A700,
+        border: Border.all(color: appTheme.gray_100),
         borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: const Color(0x14000000),
+            color: Color(0x14000000),
             blurRadius: 16,
             offset: Offset(0, 6),
           ),
@@ -456,44 +456,44 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'EXPENSE ITEMS',
             style: TextStyle(
-              color: AppColors.blueGray300,
+              color: appTheme.blue_gray_300,
               fontFamily: 'Inter',
               fontSize: 12,
               fontWeight: FontWeight.w700,
               letterSpacing: 1.5,
             ),
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           for (var index = 0; index < uiState.draftExpenseItems.length; index++)
             _buildSavedItemCard(uiState.draftExpenseItems[index], index),
           if (_showItemForm) _buildItemForm(),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           InkWell(
             onTap: _startNewItem,
             borderRadius: BorderRadius.circular(16),
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              padding: EdgeInsets.symmetric(vertical: 16),
               decoration: BoxDecoration(
                 border: Border.all(
-                  color: AppColors.gray200,
+                  color: appTheme.gray_200,
                   width: 2,
                   style: BorderStyle.solid,
                 ),
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.add, color: AppColors.blueGray300, size: 18),
+                  Icon(Icons.add, color: appTheme.blue_gray_300, size: 18),
                   SizedBox(width: 6),
                   Text(
                     'Add Another Item',
                     style: TextStyle(
-                      color: AppColors.blueGray300,
+                      color: appTheme.blue_gray_300,
                       fontFamily: 'Inter',
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
@@ -510,15 +510,15 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
 
   Widget _buildSavedItemCard(ExpenseItem item, int index) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: 12),
       child: ListTile(
-        leading: const CircleAvatar(
-          backgroundColor: AppColors.tealA700,
-          child: Icon(Icons.receipt_long_outlined, color: AppColors.white),
+        leading: CircleAvatar(
+          backgroundColor: appTheme.teal_A700,
+          child: Icon(Icons.receipt_long_outlined, color: appTheme.white_A700),
         ),
         title: Text(
           item.itemName,
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: 'Inter',
             fontWeight: FontWeight.w600,
           ),
@@ -530,11 +530,11 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
           children: [
             IconButton(
               onPressed: () => _editItem(item, index),
-              icon: const Icon(Icons.edit_outlined),
+              icon: Icon(Icons.edit_outlined),
             ),
             IconButton(
               onPressed: () => _confirmDeleteItem(index),
-              icon: const Icon(Icons.delete_outline, color: AppColors.errorRed),
+              icon: Icon(Icons.delete_outline, color: appTheme.errorRed),
             ),
           ],
         ),
@@ -549,16 +549,16 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
 
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: AppColors.gray200),
+        border: Border.all(color: appTheme.gray_200),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              color: const Color(0x08F9FAFB),
-              border: Border(bottom: BorderSide(color: AppColors.gray100)),
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Color(0x08F9FAFB),
+              border: Border(bottom: BorderSide(color: appTheme.gray_100)),
             ),
             child: Row(
               children: [
@@ -566,23 +566,23 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: AppColors.tealA700,
+                    color: appTheme.teal_A700,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.receipt_long_outlined,
-                    color: AppColors.white,
+                    color: appTheme.white_A700,
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'ITEM ENTRY',
                         style: TextStyle(
-                          color: AppColors.blueGray300,
+                          color: appTheme.blue_gray_300,
                           fontFamily: 'Inter',
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
@@ -593,12 +593,12 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                         controller: _itemNameController,
                         readOnly: !_isEditingItem,
                         onChanged: (_) => setState(() {}),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                         ),
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           hintText: 'Item Entry',
                           isDense: true,
                           border: InputBorder.none,
@@ -610,9 +610,9 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                 ),
                 IconButton(
                   onPressed: () => setState(() => _isEditingItem = true),
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.edit_outlined,
-                    color: const Color(0xFFB3B3B3),
+                    color: Color(0xFFB3B3B3),
                   ),
                 ),
                 IconButton(
@@ -622,32 +622,32 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                           _editingItemIndex!,
                           clearEditor: true,
                         ),
-                  icon: const Icon(Icons.close, color: const Color(0xFFB3B3B3)),
+                  icon: Icon(Icons.close, color: Color(0xFFB3B3B3)),
                 ),
               ],
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildTextField('Item Description', _descriptionController, ''),
-                const SizedBox(height: 14),
+                SizedBox(height: 14),
                 _buildTextField(
                   'Merchant Name (Optional)',
                   _merchantController,
                   '',
                 ),
-                const SizedBox(height: 14),
+                SizedBox(height: 14),
                 Row(
                   children: [
                     Expanded(child: _buildDatePicker()),
-                    const SizedBox(width: 12),
+                    SizedBox(width: 12),
                     Expanded(child: _buildTimePicker()),
                   ],
                 ),
-                const SizedBox(height: 14),
+                SizedBox(height: 14),
                 Row(
                   children: [
                     Expanded(
@@ -658,33 +658,33 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                         TextInputType.number,
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: 12),
                     Expanded(
                       child: _buildTextField(
                         'Unit Price',
                         _unitPriceController,
                         '',
-                        const TextInputType.numberWithOptions(decimal: true),
+                        TextInputType.numberWithOptions(decimal: true),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 14),
+                SizedBox(height: 14),
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(16),
+                  padding: EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: AppColors.gray100,
-                    border: Border.all(color: AppColors.gray200),
+                    color: appTheme.gray_100,
+                    border: Border.all(color: appTheme.gray_200),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
+                      Text(
                         'Subtotal',
                         style: TextStyle(
-                          color: AppColors.blueGray300,
+                          color: appTheme.blue_gray_300,
                           fontFamily: 'Inter',
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
@@ -693,10 +693,10 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          const Text(
+                          Text(
                             'AMOUNT',
                             style: TextStyle(
-                              color: AppColors.blueGray300,
+                              color: appTheme.blue_gray_300,
                               fontFamily: 'Inter',
                               fontSize: 9,
                               fontWeight: FontWeight.w700,
@@ -705,7 +705,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                           ),
                           Text(
                             'RM${subtotal.toStringAsFixed(2)}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontFamily: 'Inter',
                               fontSize: 20,
                             ),
@@ -715,26 +715,26 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 14),
+                SizedBox(height: 14),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     OutlinedButton(
                       onPressed: _discardItem,
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.blueGray300,
-                        side: const BorderSide(color: AppColors.gray200),
-                        minimumSize: const Size(100, 44),
+                        foregroundColor: appTheme.blue_gray_300,
+                        side: BorderSide(color: appTheme.gray_200),
+                        minimumSize: Size(100, 44),
                       ),
-                      child: const Text('Discard'),
+                      child: Text('Discard'),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: 12),
                     ElevatedButton(
                       onPressed: _isEditingItem ? _saveItem : null,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.tealA700,
-                        foregroundColor: AppColors.white,
-                        minimumSize: const Size(98, 44),
+                        backgroundColor: appTheme.teal_A700,
+                        foregroundColor: appTheme.white_A700,
+                        minimumSize: Size(98, 44),
                       ),
                       child: Text(
                         _editingItemIndex == null ? 'Save Item' : 'Update Item',
@@ -760,7 +760,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label.toUpperCase(), style: _fieldLabelStyle),
-        const SizedBox(height: 6),
+        SizedBox(height: 6),
         TextField(
           controller: controller,
           readOnly: !_isEditingItem,
@@ -778,14 +778,14 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('DATE', style: _fieldLabelStyle),
-        const SizedBox(height: 6),
+        SizedBox(height: 6),
         SizedBox(
           width: double.infinity,
           height: 43,
           child: OutlinedButton.icon(
             onPressed: _isEditingItem ? _pickDate : null,
             style: _dateTimeButtonStyle,
-            icon: const Icon(Icons.calendar_today_outlined, size: 18),
+            icon: Icon(Icons.calendar_today_outlined, size: 18),
             label: Text(DateFormat('dd MMM yyyy').format(_selectedDate)),
           ),
         ),
@@ -798,14 +798,14 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('TIME', style: _fieldLabelStyle),
-        const SizedBox(height: 6),
+        SizedBox(height: 6),
         SizedBox(
           width: double.infinity,
           height: 43,
           child: OutlinedButton.icon(
             onPressed: _isEditingItem ? _pickTime : null,
             style: _dateTimeButtonStyle,
-            icon: const Icon(Icons.access_time_outlined, size: 18),
+            icon: Icon(Icons.access_time_outlined, size: 18),
             label: Text(_selectedTime.format(context)),
           ),
         ),
@@ -816,30 +816,30 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   Widget _buildTotalAmountSection(ActivityUiState uiState) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.white,
-        border: Border.all(color: AppColors.gray200),
+        color: appTheme.white_A700,
+        border: Border.all(color: appTheme.gray_200),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'TOTAL AMOUNT',
             style: TextStyle(
-              color: AppColors.blueGray300,
+              color: appTheme.blue_gray_300,
               fontFamily: 'Inter',
               fontSize: 11,
               fontWeight: FontWeight.w700,
               letterSpacing: 1,
             ),
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: 4),
           Text(
             'RM${uiState.draftTotalAmount.toStringAsFixed(2)}',
-            style: const TextStyle(
-              color: AppColors.gray900,
+            style: TextStyle(
+              color: appTheme.gray_900,
               fontFamily: 'Inter',
               fontSize: 24,
               fontWeight: FontWeight.w700,
@@ -851,14 +851,14 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   }
 
   Widget _buildPaymentMethodSection(ActivityUiState uiState) {
-    const methods = ['Debit/Credit Card', 'Cash', 'E-wallet', 'Bank Transfer'];
+    final methods = ['Debit/Credit Card', 'Cash', 'E-wallet', 'Bank Transfer'];
     return _ExpenseSectionCard(
       title: 'PAYMENT METHOD',
       child: DropdownButtonFormField<String>(
         value: uiState.paymentMethod.isEmpty ? null : uiState.paymentMethod,
         decoration: _fieldDecoration(
           'Optional',
-        ).copyWith(prefixIcon: const Icon(Icons.credit_card_outlined)),
+        ).copyWith(prefixIcon: Icon(Icons.credit_card_outlined)),
         items: methods
             .map(
               (method) => DropdownMenuItem(value: method, child: Text(method)),
@@ -880,40 +880,43 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
               children: [
                 Row(
                   children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.file(
-                        File(uiState.receiptLocalPath),
-                        width: 56,
-                        height: 56,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => const SizedBox(
+                    GestureDetector(
+                      onTap: () => _showReceiptPreview(uiState.receiptLocalPath),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(
+                          File(uiState.receiptLocalPath),
                           width: 56,
                           height: 56,
-                          child: Icon(Icons.broken_image_outlined),
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => SizedBox(
+                            width: 56,
+                            height: 56,
+                            child: Icon(Icons.broken_image_outlined),
+                          ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    const Expanded(child: Text('Receipt selected')),
+                    SizedBox(width: 12),
+                    Expanded(child: Text('Receipt selected')),
                     IconButton(
                       onPressed: uiState.isScanningReceipt
                           ? null
                           : context.read<ActivityViewModel>().removeReceipt,
-                      icon: const Icon(Icons.close, color: AppColors.errorRed),
+                      icon: Icon(Icons.close, color: appTheme.errorRed),
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                SizedBox(height: 10),
                 OutlinedButton.icon(
                   onPressed: uiState.isScanningReceipt ? null : _scanReceipt,
                   icon: uiState.isScanningReceipt
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 18,
                           height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(Icons.document_scanner_outlined),
+                      : Icon(Icons.document_scanner_outlined),
                   label: Text(
                     uiState.isScanningReceipt
                         ? 'Scanning receipt...'
@@ -925,12 +928,12 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
           : OutlinedButton.icon(
               onPressed: uiState.isPickingReceipt ? null : _chooseReceipt,
               icon: uiState.isPickingReceipt
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 18,
                       height: 18,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Icon(Icons.upload_outlined),
+                  : Icon(Icons.upload_outlined),
               label: Text(
                 uiState.isPickingReceipt
                     ? 'Opening...'
@@ -940,9 +943,43 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     );
   }
 
+  Future<void> _showReceiptPreview(String receiptLocalPath) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        child: Stack(
+          children: [
+            Padding(
+              padding: EdgeInsets.all(16),
+              child: InteractiveViewer(
+                child: Image.file(
+                  File(receiptLocalPath),
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, _, _) => SizedBox(
+                    height: 180,
+                    child: Center(child: Text('Unable to display receipt image.')),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 4,
+              right: 4,
+              child: IconButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                icon: Icon(Icons.close, color: appTheme.errorRed),
+                tooltip: 'Close receipt preview',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildOcrReviewSection(ActivityUiState uiState) {
     if (uiState.isScanningReceipt) {
-      return const _ExpenseSectionCard(
+      return _ExpenseSectionCard(
         title: 'RECEIPT OCR',
         child: Row(
           children: [
@@ -972,20 +1009,20 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
             Expanded(
               child: OutlinedButton(
                 onPressed: _scanReceipt,
-                child: const Text('Retry OCR'),
+                child: Text('Retry OCR'),
               ),
             ),
-            const SizedBox(width: 10),
+            SizedBox(width: 10),
             Expanded(
               child: ElevatedButton(
                 onPressed: context
                     .read<ActivityViewModel>()
                     .clearExpenseMessage,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.tealA700,
-                  foregroundColor: AppColors.white,
+                  backgroundColor: appTheme.teal_A700,
+                  foregroundColor: appTheme.white_A700,
                 ),
-                child: const Text('Manual Entry'),
+                child: Text('Manual Entry'),
               ),
             ),
           ],
@@ -1019,39 +1056,26 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                 : 'Not detected',
           ),
           if (uiState.ocrItemLines.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            const Text('Possible receipt items', style: _fieldLabelStyle),
-            const SizedBox(height: 4),
+            SizedBox(height: 8),
+            Text('Possible receipt items', style: _fieldLabelStyle),
+            SizedBox(height: 4),
             ...uiState.ocrItemLines.map(
               (line) => Padding(
-                padding: const EdgeInsets.only(bottom: 2),
+                padding: EdgeInsets.only(bottom: 2),
                 child: Text('- $line'),
               ),
             ),
           ],
-          const SizedBox(height: 8),
-          const Text(
+          SizedBox(height: 8),
+          Text(
             'Review and edit these values in the item form before saving.',
-            style: TextStyle(color: AppColors.blueGray300, fontSize: 12),
+            style: TextStyle(color: appTheme.blue_gray_300, fontSize: 12),
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           if (_hasAppliedOcrValues)
-            const Text(
-              'OCR values were copied to the editable item form below.',
-              style: TextStyle(color: AppColors.tealA700, fontSize: 12),
-            )
-          else
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _applyOcrValuesToItemForm,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.tealA700,
-                  foregroundColor: AppColors.white,
-                ),
-                icon: const Icon(Icons.edit_note_outlined),
-                label: const Text('Use OCR Values in Item Form'),
-              ),
+            Text(
+              'OCR values were filled into the editable item form below.',
+              style: TextStyle(color: appTheme.teal_A700, fontSize: 12),
             ),
         ],
       ),
@@ -1060,10 +1084,10 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
 
   Widget _buildOcrValue(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
+      padding: EdgeInsets.only(bottom: 6),
       child: RichText(
         text: TextSpan(
-          style: const TextStyle(color: AppColors.gray900, fontSize: 14),
+          style: TextStyle(color: appTheme.gray_900, fontSize: 14),
           children: [
             TextSpan(text: '$label: ', style: _fieldLabelStyle),
             TextSpan(text: value),
@@ -1076,9 +1100,9 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   Widget _buildMessage(String message, bool isError) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isError ? const Color(0xFFFFE4E6) : AppColors.teal50,
+        color: isError ? Color(0xFFFFE4E6) : appTheme.teal_50,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(message),
@@ -1176,7 +1200,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   void _showValidationMessage(String message) {
     _topMessageTimer?.cancel();
     setState(() => _topMessage = message);
-    _topMessageTimer = Timer(const Duration(seconds: 5), _dismissTopMessage);
+    _topMessageTimer = Timer(Duration(seconds: 5), _dismissTopMessage);
   }
 
   void _dismissTopMessage() {
@@ -1236,7 +1260,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         _unitPriceController.text.trim().isNotEmpty;
   }
 
-  void _applyOcrValuesToItemForm() {
+  void _fillItemFormFromOcr() {
     final uiState = context.read<ActivityViewModel>().uiState;
     if (uiState.ocrRawText.isEmpty) {
       return;
@@ -1281,7 +1305,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     final nameWithoutAmount = line
         .replaceFirst(
           RegExp(
-            r'(?:RM\s*)?\d{1,3}(?:,\d{3})*(?:\.\d{2})?\s*$',
+            r'(?:RM|\$|S)?\s*\d{1,3}(?:,\d{3})*(?:\.\d{2})?\s*$',
             caseSensitive: false,
           ),
           '',
@@ -1317,8 +1341,13 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
 
     setState(() => _hasAppliedOcrValues = false);
 
-    if (viewModel.uiState.errorMessage.isNotEmpty) {
-      _showValidationMessage(viewModel.uiState.errorMessage);
+    final uiState = viewModel.uiState;
+    if (uiState.errorMessage.isNotEmpty) {
+      _showValidationMessage(uiState.errorMessage);
+    }
+
+    if (uiState.ocrRawText.isNotEmpty) {
+      _fillItemFormFromOcr();
     }
   }
 
@@ -1329,27 +1358,61 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         child: Wrap(
           children: [
             ListTile(
-              leading: const Icon(Icons.camera_alt_outlined),
-              title: const Text('Take photo'),
+              leading: Icon(Icons.camera_alt_outlined),
+              title: Text('Take photo'),
               onTap: () async {
                 Navigator.pop(sheetContext);
-                await context.read<ActivityViewModel>().takeReceiptPhoto();
+                final didSelectReceipt = await context
+                    .read<ActivityViewModel>()
+                    .takeReceiptPhoto();
+                if (didSelectReceipt && mounted) {
+                  await _offerReceiptCropThenScan();
+                }
               },
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('Choose from gallery'),
+              leading: Icon(Icons.photo_library_outlined),
+              title: Text('Choose from gallery'),
               onTap: () async {
                 Navigator.pop(sheetContext);
-                await context
+                final didSelectReceipt = await context
                     .read<ActivityViewModel>()
                     .chooseReceiptFromGallery();
+                if (didSelectReceipt && mounted) {
+                  await _offerReceiptCropThenScan();
+                }
               },
             ),
           ],
         ),
       ),
     );
+  }
+
+  /// Receipt validation has already succeeded before this dialog is shown.
+  /// The tourist may crop the image or keep the original before OCR starts.
+  Future<void> _offerReceiptCropThenScan() async {
+    final shouldCrop = await _showConfirmationDialog(
+      title: 'Crop Receipt Before Scanning?',
+      message:
+          'You can crop the receipt to remove unnecessary background and improve text recognition.',
+      confirmLabel: 'Crop Receipt',
+      cancelLabel: 'Skip Cropping',
+    );
+    if (!mounted) return;
+
+    if (shouldCrop) {
+      await context.read<ActivityViewModel>().cropSelectedReceipt();
+      if (!mounted) return;
+
+      final errorMessage = context.read<ActivityViewModel>().uiState.errorMessage;
+      if (errorMessage.isNotEmpty) {
+        _showValidationMessage(errorMessage);
+        return;
+      }
+    }
+
+    await _scanReceipt();
   }
 
   Future<void> _confirmExpense() async {
@@ -1432,6 +1495,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     required String title,
     required String message,
     required String confirmLabel,
+    String cancelLabel = 'No',
     bool isDestructive = false,
   }) async {
     final isConfirmed = await showDialog<bool>(
@@ -1442,15 +1506,15 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('No'),
+            child: Text(cancelLabel),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: isDestructive
-                  ? AppColors.errorRed
-                  : AppColors.tealA700,
-              foregroundColor: AppColors.white,
+                  ? appTheme.errorRed
+                  : appTheme.teal_A700,
+              foregroundColor: appTheme.white_A700,
             ),
             child: Text(confirmLabel),
           ),
@@ -1461,8 +1525,8 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     return isConfirmed ?? false;
   }
 
-  static const _fieldLabelStyle = TextStyle(
-    color: AppColors.blueGray300,
+  static final _fieldLabelStyle = TextStyle(
+    color: appTheme.blue_gray_300,
     fontFamily: 'Inter',
     fontSize: 11,
     fontWeight: FontWeight.w600,
@@ -1471,27 +1535,27 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
 
   static final _dateTimeButtonStyle = OutlinedButton.styleFrom(
     alignment: Alignment.centerLeft,
-    foregroundColor: AppColors.gray900,
-    backgroundColor: AppColors.gray50,
-    padding: const EdgeInsets.symmetric(horizontal: 12),
-    side: const BorderSide(color: AppColors.gray100),
+    foregroundColor: appTheme.gray_900,
+    backgroundColor: appTheme.gray_50,
+    padding: EdgeInsets.symmetric(horizontal: 12),
+    side: BorderSide(color: appTheme.gray_100),
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
   );
 
   InputDecoration _fieldDecoration(String? hint) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: const TextStyle(color: const Color(0xFFBFC4CC)),
+      hintStyle: TextStyle(color: Color(0xFFBFC4CC)),
       filled: true,
-      fillColor: AppColors.gray50,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      fillColor: appTheme.gray_50,
+      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.gray100),
+        borderSide: BorderSide(color: appTheme.gray_100),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.gray100),
+        borderSide: BorderSide(color: appTheme.gray_100),
       ),
     );
   }
@@ -1501,28 +1565,28 @@ class _TopMessageAlert extends StatelessWidget {
   final String message;
   final VoidCallback onClose;
 
-  const _TopMessageAlert({required this.message, required this.onClose});
+  _TopMessageAlert({required this.message, required this.onClose});
 
   @override
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
-      duration: const Duration(milliseconds: 250),
+      duration: Duration(milliseconds: 250),
       tween: Tween(begin: 0, end: 1),
       builder: (context, value, child) => Transform.translate(
         offset: Offset(0, -36 * (1 - value)),
         child: Opacity(opacity: value, child: child),
       ),
       child: Material(
-        color: AppColors.transparent,
+        color: appTheme.transparentCustom,
         child: Container(
-          padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
+          padding: EdgeInsets.fromLTRB(14, 12, 6, 12),
           decoration: BoxDecoration(
-            color: const Color(0xFFFFE4E6),
-            border: Border.all(color: AppColors.errorRed),
+            color: Color(0xFFFFE4E6),
+            border: Border.all(color: appTheme.errorRed),
             borderRadius: BorderRadius.circular(12),
-            boxShadow: const [
+            boxShadow: [
               BoxShadow(
-                color: const Color(0x24000000),
+                color: Color(0x24000000),
                 blurRadius: 12,
                 offset: Offset(0, 4),
               ),
@@ -1530,13 +1594,13 @@ class _TopMessageAlert extends StatelessWidget {
           ),
           child: Row(
             children: [
-              const Icon(Icons.error_outline, color: AppColors.errorRed),
-              const SizedBox(width: 10),
+              Icon(Icons.error_outline, color: appTheme.errorRed),
+              SizedBox(width: 10),
               Expanded(
                 child: Text(
                   message,
-                  style: const TextStyle(
-                    color: const Color(0xFF7F1D1D),
+                  style: TextStyle(
+                    color: Color(0xFF7F1D1D),
                     fontFamily: 'Inter',
                     fontWeight: FontWeight.w600,
                   ),
@@ -1544,7 +1608,7 @@ class _TopMessageAlert extends StatelessWidget {
               ),
               IconButton(
                 onPressed: onClose,
-                icon: const Icon(Icons.close, color: const Color(0xFF7F1D1D)),
+                icon: Icon(Icons.close, color: Color(0xFF7F1D1D)),
                 tooltip: 'Close message',
               ),
             ],
@@ -1559,20 +1623,20 @@ class _ExpenseSectionCard extends StatelessWidget {
   final String title;
   final Widget child;
 
-  const _ExpenseSectionCard({required this.title, required this.child});
+  _ExpenseSectionCard({required this.title, required this.child});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.white,
-        border: Border.all(color: AppColors.gray100),
+        color: appTheme.white_A700,
+        border: Border.all(color: appTheme.gray_100),
         borderRadius: BorderRadius.circular(16),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: const Color(0x0D000000),
+            color: Color(0x0D000000),
             blurRadius: 15,
             offset: Offset(0, 4),
           ),
@@ -1583,15 +1647,15 @@ class _ExpenseSectionCard extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
-              color: AppColors.blueGray300,
+            style: TextStyle(
+              color: appTheme.blue_gray_300,
               fontFamily: 'Inter',
               fontSize: 12,
               fontWeight: FontWeight.w700,
               letterSpacing: 1.5,
             ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           child,
         ],
       ),
@@ -1603,7 +1667,7 @@ class _ExpenseActivitySummary extends StatelessWidget {
   final Activity activity;
   final String timeText;
 
-  const _ExpenseActivitySummary({
+  _ExpenseActivitySummary({
     required this.activity,
     required this.timeText,
   });
@@ -1611,9 +1675,9 @@ class _ExpenseActivitySummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
-        border: Border.all(color: AppColors.gray100),
+        border: Border.all(color: appTheme.gray_100),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -1622,23 +1686,23 @@ class _ExpenseActivitySummary extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             child: _ExpenseActivityImage(imageUrl: activity.activityImgUrl),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   activity.destination,
-                  style: const TextStyle(
-                    color: AppColors.gray900,
+                  style: TextStyle(
+                    color: appTheme.gray_900,
                     fontFamily: 'Inter',
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: 8),
                 _detail(Icons.access_time_outlined, timeText),
-                const SizedBox(height: 6),
+                SizedBox(height: 6),
                 _detail(
                   Icons.account_balance_wallet_outlined,
                   'RM${activity.allocatedBudget.toStringAsFixed(2)}',
@@ -1654,12 +1718,12 @@ class _ExpenseActivitySummary extends StatelessWidget {
   Widget _detail(IconData icon, String text) {
     return Row(
       children: [
-        Icon(icon, size: 18, color: AppColors.blueGray300),
-        const SizedBox(width: 8),
+        Icon(icon, size: 18, color: appTheme.blue_gray_300),
+        SizedBox(width: 8),
         Text(
           text,
-          style: const TextStyle(
-            color: AppColors.blueGray300,
+          style: TextStyle(
+            color: appTheme.blue_gray_300,
             fontFamily: 'Inter',
             fontSize: 14,
           ),
@@ -1672,12 +1736,12 @@ class _ExpenseActivitySummary extends StatelessWidget {
 class _ExpenseActivityImage extends StatelessWidget {
   final String imageUrl;
 
-  const _ExpenseActivityImage({required this.imageUrl});
+  _ExpenseActivityImage({required this.imageUrl});
 
   @override
   Widget build(BuildContext context) {
-    const placeholder = ColoredBox(
-      color: AppColors.gray100,
+    final placeholder = ColoredBox(
+      color: appTheme.gray_100,
       child: SizedBox(width: 120, height: 90),
     );
 
@@ -1708,20 +1772,20 @@ class _ExpenseActivityImage extends StatelessWidget {
 class _ExpenseCategoryCard extends StatelessWidget {
   final String category;
 
-  const _ExpenseCategoryCard({required this.category});
+  _ExpenseCategoryCard({required this.category});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+      padding: EdgeInsets.fromLTRB(16, 20, 16, 16),
       decoration: BoxDecoration(
-        color: AppColors.white,
-        border: Border.all(color: AppColors.gray100),
+        color: appTheme.white_A700,
+        border: Border.all(color: appTheme.gray_100),
         borderRadius: BorderRadius.circular(16),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: const Color(0x14000000),
+            color: Color(0x14000000),
             blurRadius: 16,
             offset: Offset(0, 6),
           ),
@@ -1730,34 +1794,34 @@ class _ExpenseCategoryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'CATEGORY',
             style: TextStyle(
-              color: AppColors.blueGray300,
+              color: appTheme.blue_gray_300,
               fontFamily: 'Inter',
               fontSize: 12,
               fontWeight: FontWeight.w700,
               letterSpacing: 1,
             ),
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(16),
             decoration: BoxDecoration(
-              border: Border.all(color: AppColors.gray200),
+              border: Border.all(color: appTheme.gray_200),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.category_outlined,
-                  color: AppColors.blueGray900,
+                  color: appTheme.blueGray900,
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: 12),
                 Text(
                   category,
-                  style: const TextStyle(fontFamily: 'Inter', fontSize: 14),
+                  style: TextStyle(fontFamily: 'Inter', fontSize: 14),
                 ),
               ],
             ),

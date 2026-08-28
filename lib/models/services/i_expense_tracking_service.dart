@@ -11,6 +11,8 @@ enum ExpenseProcessingResult {
 }
 
 abstract interface class IExpenseTrackingService {
+  Future<void> validateReceiptImage(String receiptLocalPath);
+
   Future<String> readReceiptText(String receiptLocalPath);
 
   String? extractMerchantName(String receiptText);
