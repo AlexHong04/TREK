@@ -20,7 +20,7 @@ class GeminiApiConfig {
   static late final GenerativeModel _model;
 
   static void initialize() {
-    _model = GenerativeModel(model: 'gemini-3.6-flash', apiKey: _apiKey);
+    _model = GenerativeModel(model: 'gemini-3.5-flash-lite', apiKey: _apiKey);
   }
 
   // kokhong
@@ -71,13 +71,12 @@ class GeminiApiConfig {
       - "destination": (String) The EXACT, FULL official business name or landmark name as it appears on Google Maps. Examples of CORRECT values: "Village Park Restaurant", "Madam Kwan's KLCC", "Petronas Twin Towers", "Jalan Alor", "Lot 10 Hutong", "Din Tai Fung Pavilion KL". Examples of WRONG values: "Nasi Lemak Breakfast", "Local Coffee Shop", "Relaxation Spa", "Street Food Tour".
       - "imageKeyword": (String) IF it's a famous landmark, use its exact name (e.g. "Petronas Towers"). IF it's a specific restaurant/cafe, DO NOT use its name; instead, use the generic famous food/drink type (e.g. "Nasi Lemak", "Latte Art", "Seafood") so the generated image matches the activity context perfectly.
       - "description": (String) Short description
-      - "allocatedBudget": (double) Estimated cost
+      - "allocatedBudget": (double) The maximum estimated cost or upper bound of the price range (e.g., if price is RM 15-35, allocatedBudget is 35.0). For free activities, set to 0.0.
       - "duration": (String) e.g., "60-90 min"
       - "activityCategory": (String) You MUST classify the activity into exactly one of these THREE categories ONLY: "Transportation", "Attraction", or "Restaurant". Do NOT use any other categories (e.g., NO "Food", NO "Culture").
       - "startTime": (String) e.g., "09:00"
       - "endTime": (String) e.g., "11:00"
-      - "minPrice": (double, optional) ONLY if activityCategory is "Restaurant", the estimated minimum food price per person (in RM). Otherwise, do not include or set to null.
-      - "maxPrice": (double, optional) ONLY if activityCategory is "Restaurant", the estimated maximum food price per person (in RM). Otherwise, do not include or set to null.
+      - "minPrice": (double, optional) The minimum estimated cost or lower bound of the price range (e.g., if price is RM 15-35, minPrice is 15.0). For free activities or fixed price activities, do not include or set to null.
 
     Return ONLY the JSON object, with no markdown formatting and no extra text.
     ''';
@@ -86,7 +85,7 @@ class GeminiApiConfig {
     while (retries > 0) {
       try {
         final url = Uri.parse(
-          'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=$_apiKey',
+          'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=$_apiKey',
         );
 
         final response = await http.post(
@@ -188,7 +187,7 @@ class GeminiApiConfig {
     ''';
 
     final url = Uri.parse(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=$_apiKey',
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=$_apiKey',
     );
 
     final response = await http.post(
@@ -335,7 +334,8 @@ class GeminiApiConfig {
         ? existingOrExcludedPlaces.map((e) => '- "$e"').join('\n')
         : 'None';
 
-    final prompt = '''
+    final prompt =
+        '''
     You are an expert travel planner in Malaysia. A user removed an activity from their Day $dayNumber itinerary in $destinationCity and needs ONE replacement activity to fill the empty time slot.
 
     Parameters:
@@ -361,7 +361,8 @@ class GeminiApiConfig {
       "destination": "Exact Business Name or Landmark",
       "imageKeyword": "Famous landmark name or generic food item (e.g. 'Nasi Lemak', 'Aquarium')",
       "description": "Short 1-2 sentence description",
-      "allocatedBudget": 0.0,
+      "allocatedBudget": 0.0, // Representing the MAX price if there is a price range
+      "minPrice": 0.0, // Representing the MIN price if range, else null
       "duration": "60-90 min",
       "activityCategory": "Attraction",
       "startTime": "$startTime",
@@ -403,7 +404,9 @@ class GeminiApiConfig {
         }
         return '{}';
       } else {
-        throw Exception('Gemini Error: ${response.statusCode} - ${response.body}');
+        throw Exception(
+          'Gemini Error: ${response.statusCode} - ${response.body}',
+        );
       }
     } catch (e) {
       debugPrint('Gemini API Alternative Error: $e');
