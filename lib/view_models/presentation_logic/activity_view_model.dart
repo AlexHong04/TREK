@@ -25,11 +25,12 @@ class ActivityViewModel extends ChangeNotifier {
     IBudgetService? budgetService,
     IExpenseTrackingService? expenseTrackingService,
     IExpenseRepository? expenseRepository,
-  }) : _itineraryService = itineraryService ?? ItineraryService(),
-       _budgetService = budgetService ?? BudgetService(),
-       _expenseTrackingService =
-           expenseTrackingService ?? ExpenseTrackingService(),
-       _expenseRepository = expenseRepository ?? ExpenseRepository() {
+  })
+      : _itineraryService = itineraryService ?? ItineraryService(),
+        _budgetService = budgetService ?? BudgetService(),
+        _expenseTrackingService =
+            expenseTrackingService ?? ExpenseTrackingService(),
+        _expenseRepository = expenseRepository ?? ExpenseRepository() {
     initialize();
   }
 
@@ -255,7 +256,7 @@ class ActivityViewModel extends ChangeNotifier {
           _expenseTrackingService.validateTotalAmount(extractedTotal);
         } on ArgumentError {
           extractedTotalError =
-              'The extracted amount is invalid. Please correct it.';
+          'The extracted amount is invalid. Please correct it.';
         }
       }
 
@@ -263,7 +264,7 @@ class ActivityViewModel extends ChangeNotifier {
         isScanningReceipt: false,
         ocrRawText: receiptText,
         ocrMerchantName:
-            _expenseTrackingService.extractMerchantName(receiptText) ?? '',
+        _expenseTrackingService.extractMerchantName(receiptText) ?? '',
         ocrTransactionDateTime: extractedDateTime,
         clearOcrTransactionDateTime: extractedDateTime == null,
         ocrExtractedTotal: extractedTotal,
@@ -324,7 +325,7 @@ class ActivityViewModel extends ChangeNotifier {
         clearOcrData: true,
         successMessage: 'The expense record has been successfully saved.',
         spentBudget:
-            _uiState.spentBudget +
+        _uiState.spentBudget +
             expenseAmount, // remainingBudget updates automatically
       );
       await loadRecordedExpensesForSelectedActivity();
@@ -343,13 +344,14 @@ class ActivityViewModel extends ChangeNotifier {
   void _updateDraftExpenseItems(List<ExpenseItem> items) {
     final itemsWithCalculatedSubtotals = items
         .map(
-          (item) => item.copyWith(
+          (item) =>
+          item.copyWith(
             subtotal: _expenseTrackingService.calculateItemSubtotal(
               item.quantity,
               item.unitPrice,
             ),
           ),
-        )
+    )
         .toList();
 
     _uiState = _uiState.copyWith(
@@ -543,10 +545,18 @@ class ActivityViewModel extends ChangeNotifier {
 
       debugPrint("result: ${response}");
 
-      // _uiState = _uiState.copyWith(
-      //   overspentBudget: response.overspentBudget,
-      //   shortageAmount: response.shortageAmount,
-      // );
+      final days = await _itineraryService.getDaysByTripId(_uiState.tripId);
+
+      double overspend = 0.00;
+
+      for (var day in days) {
+        overspend += day.overspendAmount!;
+      }
+
+      _uiState = _uiState.copyWith(
+        overspentBudget: overspend,
+        shortageAmount: overspend
+      );
 
       switch (response) {
         case ExpenseProcessingResult.withinBudget:
