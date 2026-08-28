@@ -541,16 +541,14 @@ class ActivityViewModel extends ChangeNotifier {
         expense: expense,
       );
 
-      debugPrint("result: ${response.result}");
-      debugPrint("overspent budget: ${response.overspentBudget}");
-      debugPrint("shortage amount: ${response.shortageAmount}");
+      debugPrint("result: ${response}");
 
       // _uiState = _uiState.copyWith(
       //   overspentBudget: response.overspentBudget,
       //   shortageAmount: response.shortageAmount,
       // );
 
-      switch (response.result) {
+      switch (response) {
         case ExpenseProcessingResult.withinBudget:
           _uiState = _uiState.copyWith(popupAction: '');
           break;
