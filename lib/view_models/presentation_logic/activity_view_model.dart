@@ -367,6 +367,11 @@ class ActivityViewModel extends ChangeNotifier {
             : _uiState.receiptLocalPath,
       );
 
+      final updatedTrip = await _budgetService.deductRemainingBudget(
+        tripId: _uiState.tripId,
+        expenseAmount: expenseAmount,
+      );
+
       _uiState = _uiState.copyWith(
         isSavingExpense: false,
         draftExpenseItems: const [],
@@ -375,9 +380,9 @@ class ActivityViewModel extends ChangeNotifier {
         receiptLocalPath: '',
         clearOcrData: true,
         successMessage: 'The expense record has been successfully saved.',
+        totalBudget: updatedTrip.totalBudget,
         spentBudget:
-        _uiState.spentBudget +
-            expenseAmount, // remainingBudget updates automatically
+            updatedTrip.totalBudget - (updatedTrip.remainingBalance ?? 0.0),
       );
       await loadRecordedExpensesForSelectedActivity();
 

@@ -9,6 +9,28 @@ import 'i_budget_service.dart';
 class BudgetService implements IBudgetService {
   final IItineraryRepository _itineraryRepository = ItineraryRepository();
 
+  @override
+  Future<WholeTrip> deductRemainingBudget({
+    required String tripId,
+    required double expenseAmount,
+  }) async {
+    if (tripId.trim().isEmpty) {
+      throw ArgumentError('A trip must be selected before recording an expense.');
+    }
+    if (expenseAmount <= 0) {
+      throw ArgumentError('Expense amount must be greater than zero.');
+    }
+
+    final currentTrip = await _itineraryRepository.getTrip(tripId);
+    final updatedTrip = currentTrip.copyWith(
+      remainingBalance: (currentTrip.remainingBalance ?? 0.0) - expenseAmount,
+    );
+
+    await _itineraryRepository.updateTripBudget(updatedTrip);
+    return updatedTrip;
+  }
+
+  @override
   Future<WholeTrip?> topUpBudget({
     required String tripId,
     required String currentActivityId,
