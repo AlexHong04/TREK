@@ -3,20 +3,6 @@ import 'package:Trek/models/entities/day_trip.dart';
 import '../entities/activity.dart';
 import '../entities/whole_trip.dart';
 
-class ItineraryGenerationResult {
-  final List<Activity> activities;
-  final double totalAllocatedBudget;
-  final int wishlistItemsCoveredCount;
-  final double estimatedExtraBudgetNeeded;
-
-  ItineraryGenerationResult({
-    required this.activities,
-    required this.totalAllocatedBudget,
-    required this.wishlistItemsCoveredCount,
-    required this.estimatedExtraBudgetNeeded,
-  });
-}
-
 abstract interface class IItineraryService {
   Future<ItineraryGenerationResult> generateItinerary({
     required String destination,
@@ -40,14 +26,6 @@ abstract interface class IItineraryService {
     int dayNumber = 1,
   });
 
-  Activity createEmptyActivity({
-    required String activitiesId,
-    required String dayTripId,
-    required DateTime date,
-    required String? startTime,
-    required String? endTime,
-  });
-
   Future<bool> saveItinerary(
     List<dynamic> activities, {
     required String destination,
@@ -64,4 +42,6 @@ abstract interface class IItineraryService {
   Future<void> updateTripStatus(String tripId, String newStatus);
 
   Future<List<DayTrip>> getDaysByTripId(String tripId);
+
+  Future<List<String>> getAutocompleteSuggestions(String query);
 }

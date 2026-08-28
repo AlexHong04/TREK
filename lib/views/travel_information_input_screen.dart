@@ -96,6 +96,8 @@ class _TravelInformationInputScreenState
                                   return ListTile(
                                     title: Text(
                                       suggestion,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         fontSize: 14.0,
                                         fontFamily: 'Inter',
@@ -361,13 +363,16 @@ class _TravelInformationInputScreenState
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            item,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              fontFamily: 'Inter',
-              color: appTheme.teal_A700,
+          Flexible(
+            child: Text(
+              item,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                fontFamily: 'Inter',
+                color: appTheme.teal_A700,
+              ),
             ),
           ),
           const SizedBox(width: 6.0),

@@ -15,7 +15,9 @@ class BudgetService implements IBudgetService {
     required double expenseAmount,
   }) async {
     if (tripId.trim().isEmpty) {
-      throw ArgumentError('A trip must be selected before recording an expense.');
+      throw ArgumentError(
+        'A trip must be selected before recording an expense.',
+      );
     }
     if (expenseAmount <= 0) {
       throw ArgumentError('Expense amount must be greater than zero.');
@@ -122,14 +124,15 @@ class BudgetService implements IBudgetService {
       debugPrint(
         "${activity.activitiesId}: "
         "current=${activity.allocatedBudget}, "
-        "min=${activity.minPrice}, "
+        "min=${activity.minAllocatedBudget}, "
         "new=$newBudget",
       );
 
-      if (activity.minPrice != null && newBudget < activity.minPrice!) {
+      if (activity.minAllocatedBudget != null &&
+          newBudget < activity.minAllocatedBudget!) {
         debugPrint(
           "Cannot reallocate: activity "
-          "${activity.activitiesId} would fall below minimum price.",
+          "${activity.activitiesId} would fall below minimum allocated budget.",
         );
 
         return [];

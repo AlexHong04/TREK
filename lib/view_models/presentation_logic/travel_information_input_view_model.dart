@@ -1,11 +1,15 @@
 import 'dart:async';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
-
+import '../../models/services/i_itinerary_service.dart';
+import '../../models/services/itinerary_service.dart';
 import '../ui_state/travel_information_ui_state.dart';
 
 class TravelInformationInputViewModel extends ChangeNotifier {
+  final IItineraryService _itineraryService;
+
+  TravelInformationInputViewModel({IItineraryService? itineraryService})
+    : _itineraryService = itineraryService ?? ItineraryService();
+
   final TextEditingController destinationController = TextEditingController();
   final TextEditingController dateController = TextEditingController();
   final TextEditingController budgetController = TextEditingController();
@@ -106,11 +110,7 @@ class TravelInformationInputViewModel extends ChangeNotifier {
 
     final trimmed = value.trim();
     if (trimmed.isEmpty) {
-      _uiState = _uiState.copyWith(
-        suggestions: const [],
-        isSearchingSuggestions: false,
-      );
-      notifyListeners();
+      clearSuggestions();
       return;
     }
 
@@ -119,46 +119,17 @@ class TravelInformationInputViewModel extends ChangeNotifier {
       notifyListeners();
 
       try {
-        final encodedQuery = Uri.encodeComponent(trimmed);
-        final url = Uri.parse(
-          'https://nominatim.openstreetmap.org/search?q=$encodedQuery&format=json&limit=5&addressdetails=1',
-        );
-        final response = await http.get(
-          url,
-          headers: {
-            'User-Agent':
-                'TrekApp/1.0 (Flutter; travel wishlist suggestion search)',
-          },
+        final results = await _itineraryService.getAutocompleteSuggestions(
+          trimmed,
         );
 
-        if (response.statusCode == 200) {
-          final List data = jsonDecode(response.body);
-          final List<String> results = [];
-          for (var item in data) {
-            final displayName = item['display_name'] as String?;
-            if (displayName != null && displayName.isNotEmpty) {
-              final parts = displayName.split(',');
-              if (parts.isNotEmpty) {
-                final cleanedName = parts.length > 1
-                    ? '${parts[0].trim()}, ${parts[1].trim()}'
-                    : parts[0].trim();
-                if (!results.contains(cleanedName)) {
-                  results.add(cleanedName);
-                }
-              }
-            }
-          }
-          _uiState = _uiState.copyWith(
-            suggestions: results,
-            isSearchingSuggestions: false,
-          );
-          notifyListeners();
-        } else {
-          _uiState = _uiState.copyWith(isSearchingSuggestions: false);
-          notifyListeners();
-        }
+        _uiState = _uiState.copyWith(
+          suggestions: results,
+          isSearchingSuggestions: false,
+        );
+        notifyListeners();
       } catch (e) {
-        debugPrint('OSM Suggestion search error: $e');
+        debugPrint('Autocomplete search error: $e');
         _uiState = _uiState.copyWith(isSearchingSuggestions: false);
         notifyListeners();
       }

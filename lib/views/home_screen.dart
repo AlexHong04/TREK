@@ -272,7 +272,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       child: Material(
-        color: Colors.transparent,
+        color: appTheme.white_A700,
         borderRadius: BorderRadius.circular(24),
         child: InkWell(
           borderRadius: BorderRadius.circular(24),

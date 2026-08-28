@@ -637,26 +637,27 @@ class _WholeItineraryDetailScreenState
                     backgroundColor: appTheme.blue_gray_50,
                     textColor: appTheme.blue_gray_700,
                   ),
-                if (activity.activityCategory.toLowerCase() == 'restaurant' &&
-                    activity.minPrice != null &&
-                    activity.maxPrice != null)
-                  _buildChip(
-                    label:
-                        'RM${activity.minPrice!.toStringAsFixed(0)} - RM${activity.maxPrice!.toStringAsFixed(0)} / pax',
-                    backgroundColor: appTheme.expenseBg,
-                    textColor: appTheme.expenseText,
-                  ),
                 if (activity.duration != null && activity.duration!.isNotEmpty)
                   _buildChip(
                     label: activity.duration!,
-                    backgroundColor: appTheme.teal_A200, // Neon cyan/green
+                    backgroundColor: appTheme.teal_A200,
                     textColor: appTheme.teal_700,
                   ),
-                _buildChip(
-                  label: 'RM${activity.allocatedBudget.toStringAsFixed(0)}',
-                  backgroundColor: appTheme.amber_200,
-                  textColor: appTheme.lime_900,
-                ),
+                if (activity.minAllocatedBudget != null &&
+                    activity.minAllocatedBudget! < activity.allocatedBudget)
+                  _buildChip(
+                    label:
+                        'RM${activity.minAllocatedBudget!.toStringAsFixed(0)} - RM${activity.allocatedBudget.toStringAsFixed(0)}${activity.activityCategory.toLowerCase() == 'restaurant' ? ' / pax' : ''}',
+                    backgroundColor: appTheme.amber_200,
+
+                    textColor: appTheme.lime_900,
+                  )
+                else
+                  _buildChip(
+                    label: 'RM${activity.allocatedBudget.toStringAsFixed(0)}',
+                    backgroundColor: appTheme.amber_200,
+                    textColor: appTheme.lime_900,
+                  ),
                 if (activity.isOverspend == true &&
                     activity.overspendAmount != null)
                   _buildChip(

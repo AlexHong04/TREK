@@ -9,11 +9,43 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
   final IItineraryService _itineraryService;
 
   WholeItineraryDetailViewModel({IItineraryService? itineraryService})
-      : _itineraryService = itineraryService ?? ItineraryService();
+    : _itineraryService = itineraryService ?? ItineraryService();
 
   WholeItineraryUiState _uiState = const WholeItineraryUiState();
 
   WholeItineraryUiState get uiState => _uiState;
+
+  // -- Computed Properties (Presentation Logic) --
+  double get totalBudget => double.tryParse(_uiState.budgetText) ?? 0.0;
+
+  double get spentBudget =>
+      _uiState.activities.fold(0.0, (sum, a) => sum + a.allocatedBudget);
+
+  double get remainingBudget => totalBudget - spentBudget;
+
+  double get overspentBudget => _uiState.activities
+      .where((a) => a.isOverspend == true)
+      .fold(0.0, (sum, a) => sum + (a.overspendAmount ?? 0.0));
+
+  String get usedPercentageString {
+    if (totalBudget == 0) return '0% Used';
+    return '${((spentBudget / totalBudget) * 100).toStringAsFixed(0)}% Used';
+  }
+
+  double get usedPercentageValue {
+    if (totalBudget == 0) return 0.0;
+    return (spentBudget / totalBudget).clamp(0.0, 1.0);
+  }
+
+  double get totalRestaurantMinPrice => _uiState.activities
+      .where((a) => a.activityCategory.toLowerCase() == 'restaurant')
+      .fold(0.0, (sum, a) => sum + (a.minAllocatedBudget ?? a.allocatedBudget));
+
+  double get totalRestaurantMaxPrice => _uiState.activities
+      .where((a) => a.activityCategory.toLowerCase() == 'restaurant')
+      .fold(0.0, (sum, a) => sum + a.allocatedBudget);
+
+  int get sufficientDays => 7;
 
   Future<void> initialize({
     required String destination,
@@ -48,6 +80,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         totalAllocatedBudget: fetchedResult.totalAllocatedBudget,
         wishlistItemsCoveredCount: fetchedResult.wishlistItemsCoveredCount,
         estimatedExtraBudgetNeeded: fetchedResult.estimatedExtraBudgetNeeded,
+        showWishlistWarning: fetchedResult.estimatedExtraBudgetNeeded > 0,
         errorMessage: null,
       );
     } catch (e) {
@@ -59,6 +92,11 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  void dismissWishlistWarning() {
+    _uiState = _uiState.copyWith(showWishlistWarning: false);
+    notifyListeners();
+  }
+
   // Remove the activity from the trip but retain the card placeholder
   void removeActivity(String activitiesId) {
     Activity? targetActivity;
@@ -66,18 +104,29 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     final updatedActivities = _uiState.activities.map((activity) {
       if (activity.activitiesId == activitiesId) {
         targetActivity = activity;
-        return _itineraryService.createEmptyActivity(
+        return Activity(
           activitiesId: activitiesId,
           dayTripId: activity.dayTripId,
           date: activity.date,
+          destination: '',
+          description: '',
+          activityImgUrl: '',
+          allocatedBudget: 0.0,
+          overspendAmount: null,
+          status: 'empty',
           startTime: activity.startTime,
           endTime: activity.endTime,
+          duration: '',
+          activityCategory: '',
+          isOverspend: false,
         );
       }
       return activity;
     }).toList();
 
-    List<Activity> updatedStash = List<Activity>.from(_uiState.stashedActivities);
+    List<Activity> updatedStash = List<Activity>.from(
+      _uiState.stashedActivities,
+    );
     if (targetActivity != null && targetActivity!.destination.isNotEmpty) {
       updatedStash.add(targetActivity!);
     }
@@ -96,7 +145,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     required String destination,
   }) async {
     final slotIndex = _uiState.activities.indexWhere(
-          (a) => a.activitiesId == slotActivityId,
+      (a) => a.activitiesId == slotActivityId,
     );
     if (slotIndex == -1) return;
 

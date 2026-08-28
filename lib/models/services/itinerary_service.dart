@@ -1,12 +1,13 @@
 import 'dart:convert';
 import 'dart:developer' as developer;
+import 'package:flutter/foundation.dart';
 import 'package:Trek/models/entities/day_trip.dart';
-import 'package:http/http.dart' as http;
 
 import '../entities/activity.dart';
 import '../entities/whole_trip.dart';
 import '../configurations/gemini_api_config.dart';
 import '../configurations/google_places_api_config.dart';
+import '../configurations/image_resolver_config.dart';
 import '../repository/itinerary_repository.dart';
 import '../repository/i_itinerary_repository.dart';
 import '../../utils/id_generator.dart';
@@ -15,7 +16,7 @@ import 'i_itinerary_service.dart';
 class ItineraryService implements IItineraryService {
   final IItineraryRepository _itineraryRepository = ItineraryRepository();
 
-  // kokhong
+  // kokhong - Gemini API + Google Places validation + image resolution
   Future<ItineraryGenerationResult> generateItinerary({
     required String destination,
     required String dates,
@@ -76,7 +77,6 @@ class ItineraryService implements IItineraryService {
         final jsonList = parsedObj['activities'] as List? ?? [];
 
         if (!GooglePlacesApiConfig.isConfigured) {
-          // If Google Places API is not configured, we cannot verify, so just break and use the results
           validatedList = jsonList;
           responseTotalAllocatedBudget =
               (parsedObj['totalAllocatedBudget'] as num?)?.toDouble() ?? 0.0;
@@ -101,7 +101,6 @@ class ItineraryService implements IItineraryService {
               final place = await GooglePlacesApiConfig.searchPlace(destName);
               searchCache[destName] = place;
             } on PlacesApiDeniedException catch (e) {
-              // API key is not valid / Places API not enabled — skip all validation
               developer.log(
                 'Google Places API denied ($e). Skipping validation and using Gemini results directly.',
               );
@@ -123,7 +122,6 @@ class ItineraryService implements IItineraryService {
         }
 
         if (apiDenied) {
-          // API is not usable, accept Gemini results without verification
           validatedList = jsonList;
           responseTotalAllocatedBudget =
               (parsedObj['totalAllocatedBudget'] as num?)?.toDouble() ?? 0.0;
@@ -150,7 +148,6 @@ class ItineraryService implements IItineraryService {
             'Google Places validation failed. The following places are not searchable: $currentFailed',
           );
           failedDestinations.addAll(currentFailed);
-          // remove duplicates
           failedDestinations = failedDestinations.toSet().toList();
           retries--;
           await Future.delayed(const Duration(milliseconds: 500));
@@ -186,21 +183,16 @@ class ItineraryService implements IItineraryService {
         String finalDestinationTitle = destName;
         bool resolvedByGooglePlaces = false;
 
-        // ──────────────────────────────────────────────────
         // Google Places API
-        // Provides official name correction + high-quality photos
-        // ──────────────────────────────────────────────────
         if (GooglePlacesApiConfig.isConfigured) {
           try {
             final place = searchCache[destName];
             if (place != null) {
               resolvedByGooglePlaces = true;
-              // Correct name to official Google Places name
               if (place['name'] != null &&
                   place['name'].toString().isNotEmpty) {
                 finalDestinationTitle = place['name'];
               }
-              // Fetch official high-resolution photo
               final photos = place['photos'] as List?;
               if (photos != null && photos.isNotEmpty) {
                 final firstPhoto = photos.first as Map<String, dynamic>;
@@ -215,79 +207,15 @@ class ItineraryService implements IItineraryService {
           }
         }
 
-        // ──────────────────────────────────────────────────
-        // Wikipedia + Wikimedia Commons
-        // Only used when Google Places is NOT configured or
-        // did NOT find the place at all. Skipped if Google
-        // Places found the place (even without a photo),
-        // because Wikipedia returns irrelevant results for
-        // specific Malaysian restaurants/cafes.
-        // ──────────────────────────────────────────────────
+        // Wikipedia + Wikimedia Commons + LoremFlickr fallback
         if (imgUrl.isEmpty && !resolvedByGooglePlaces) {
-          final query = Uri.encodeComponent(imageKeyword);
-          const wikiHeaders = {
-            'User-Agent': 'TrekApp/1.0 (Flutter; travel itinerary generator)',
-          };
-
-          // English Wikipedia
-          try {
-            final wikiUrl = Uri.parse(
-              'https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=$query&gsrlimit=1&prop=pageimages&format=json&pithumbsize=600&origin=*',
-            );
-            final wikiRes = await http.get(wikiUrl, headers: wikiHeaders);
-            if (wikiRes.statusCode == 200) {
-              final data = jsonDecode(wikiRes.body);
-              final pages = data['query']?['pages'] as Map<String, dynamic>?;
-              if (pages != null && pages.isNotEmpty) {
-                final page = pages.values.first;
-                if (page['title'] != null &&
-                    !page['title'].toString().startsWith('File:')) {
-                  finalDestinationTitle = page['title'];
-                }
-                if (page.containsKey('thumbnail')) {
-                  imgUrl = page['thumbnail']['source'] as String? ?? '';
-                }
-              }
-            }
-          } catch (_) {}
-
-          // Wikimedia Commons (if Wikipedia had no image)
-          if (imgUrl.isEmpty) {
-            try {
-              final commonsQuery = Uri.encodeComponent(finalDestinationTitle);
-              final commonsUrl = Uri.parse(
-                'https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=$commonsQuery&gsrnamespace=6&gsrlimit=1&prop=imageinfo&iiprop=url&iiurlwidth=600&format=json&origin=*',
-              );
-              final commonsRes = await http.get(
-                commonsUrl,
-                headers: wikiHeaders,
-              );
-              if (commonsRes.statusCode == 200) {
-                final data = jsonDecode(commonsRes.body);
-                final pages = data['query']?['pages'] as Map<String, dynamic>?;
-                if (pages != null && pages.isNotEmpty) {
-                  final page = pages.values.first;
-                  if (page.containsKey('imageinfo')) {
-                    final imageInfo = page['imageinfo'] as List;
-                    if (imageInfo.isNotEmpty &&
-                        imageInfo[0]['thumburl'] != null) {
-                      imgUrl = imageInfo[0]['thumburl'] as String;
-                    }
-                  }
-                }
-              }
-            } catch (_) {}
-          }
-        }
-
-        // ──────────────────────────────────────────────────
-        // LoremFlickr placeholder
-        // ──────────────────────────────────────────────────
-        if (imgUrl.isEmpty) {
-          final keywordQuery = Uri.encodeComponent(
-            imageKeyword.replaceAll(RegExp(r'\s+'), ','),
+          final resolved = await ImageResolverConfig.resolveImage(
+            keyword: imageKeyword,
+            fallbackTitle: finalDestinationTitle,
+            lockIndex: index,
           );
-          imgUrl = 'https://loremflickr.com/600/400/$keywordQuery?lock=$index';
+          imgUrl = resolved.imageUrl;
+          finalDestinationTitle = resolved.correctedTitle;
         }
 
         int dayNumber = item['dayNumber'] as int? ?? 1;
@@ -297,7 +225,6 @@ class ItineraryService implements IItineraryService {
         DateTime parsedDate = baseDate;
 
         try {
-          // Try parsing "09:00" assuming it's HH:mm
           final parts = startTimeStr.split(':');
           final h = int.parse(parts[0]);
           final m = int.parse(parts[1]);
@@ -308,9 +235,7 @@ class ItineraryService implements IItineraryService {
             h,
             m,
           );
-        } catch (_) {
-          // keep baseDate if fail
-        }
+        } catch (_) {}
 
         newActivities.add(
           Activity(
@@ -328,8 +253,7 @@ class ItineraryService implements IItineraryService {
             duration: item['duration'] as String? ?? '60 min',
             activityCategory: item['activityCategory'] as String? ?? 'General',
             isOverspend: false,
-            minPrice: minPriceLocal,
-            maxPrice: maxPriceLocal,
+            minAllocatedBudget: minPriceLocal,
           ),
         );
         index++;
@@ -344,7 +268,7 @@ class ItineraryService implements IItineraryService {
         estimatedExtraBudgetNeeded: responseEstimatedExtraBudgetNeeded,
       );
     } catch (e) {
-      developer.log('Service Error generating itinerary: $e');
+      debugPrint('Service Error generating itinerary: $e');
       return ItineraryGenerationResult(
         activities: [
           Activity(
@@ -384,41 +308,113 @@ class ItineraryService implements IItineraryService {
     double budgetLimit = 0.0,
     int dayNumber = 1,
   }) async {
-    return await _itineraryRepository.generateAlternativeActivity(
-      destination: destination,
-      slotDate: slotDate,
-      startTime: startTime,
-      endTime: endTime,
-      category: category,
-      excludedActivity: excludedActivity,
-      existingActivityId: existingActivityId,
-      dayTripId: dayTripId,
-      budgetLimit: budgetLimit,
-      dayNumber: dayNumber,
-    );
-  }
+    int retries = 3;
+    final List<String> localExcluded = List.from(excludedActivity);
+    Map<String, dynamic>? item;
+    String destTitle = '';
+    String imgUrl = '';
+    Map<String, dynamic>? place;
 
-  Activity createEmptyActivity({
-    required String activitiesId,
-    required String dayTripId,
-    required DateTime date,
-    required String? startTime,
-    required String? endTime,
-  }) {
+    while (retries > 0) {
+      final rawJson = await GeminiApiConfig.askGeminiForAlternative(
+        destinationCity: destination,
+        targetAreaOrNeighborhood: destination,
+        category: category,
+        startTime: startTime,
+        endTime: endTime,
+        budgetLimit: budgetLimit,
+        dayNumber: dayNumber,
+        existingOrExcludedPlaces: localExcluded,
+      );
+      try {
+        item = jsonDecode(rawJson);
+        destTitle = item?['destination'] as String? ?? '';
+      } catch (e) {
+        developer.log('Error decoding alternative itinerary JSON: $e');
+        retries--;
+        continue;
+      }
+      if (destTitle.isEmpty) {
+        retries--;
+        continue;
+      }
+
+      if (GooglePlacesApiConfig.isConfigured) {
+        try {
+          place = await GooglePlacesApiConfig.searchPlace(destTitle);
+          if (place == null) {
+            developer.log(
+              'Alternative destination "$destTitle" not found in Google Places. Exclude and retry...',
+            );
+            localExcluded.add(destTitle);
+            retries--;
+            continue;
+          }
+        } on PlacesApiDeniedException catch (e) {
+          developer.log(
+            'Google Places API denied ($e). Skipping validation for alternative activity.',
+          );
+          place = null;
+        }
+      }
+      break;
+    }
+
+    if (item == null || destTitle.isEmpty) {
+      throw Exception(
+        'Failed to generate a valid alternative activity searchable on Google Places.',
+      );
+    }
+
+    String finalDestinationTitle = destTitle;
+    bool resolvedByGooglePlaces = false;
+
+    if (place != null) {
+      resolvedByGooglePlaces = true;
+      if (place['name'] != null && place['name'].toString().isNotEmpty) {
+        finalDestinationTitle = place['name'];
+      }
+      final photos = place['photos'] as List?;
+      if (photos != null && photos.isNotEmpty) {
+        final firstPhoto = photos.first as Map<String, dynamic>;
+        final photoReference = firstPhoto['photo_reference'] as String?;
+        if (photoReference != null && photoReference.isNotEmpty) {
+          imgUrl = GooglePlacesApiConfig.getPhotoUrl(photoReference);
+        }
+      }
+    }
+
+    // Fallback image resolvers (Wikipedia -> Wikimedia Commons -> LoremFlickr)
+    if (imgUrl.isEmpty && !resolvedByGooglePlaces) {
+      final imageKeyword =
+          (item['imageKeyword'] ?? item['image_keyword'] ?? destTitle)
+              as String;
+      final resolved = await ImageResolverConfig.resolveImage(
+        keyword: imageKeyword,
+        fallbackTitle: finalDestinationTitle,
+        lockIndex: 0,
+      );
+      imgUrl = resolved.imageUrl;
+      finalDestinationTitle = resolved.correctedTitle;
+    }
+
+    final double allocatedBudget =
+        (item['allocatedBudget'] as num?)?.toDouble() ?? 0.0;
+
     return Activity(
-      activitiesId: activitiesId,
+      activitiesId: existingActivityId,
       dayTripId: dayTripId,
-      destination: '',
-      description: '',
-      activityImgUrl: '',
-      date: date,
-      allocatedBudget: 0.0,
-      overspendAmount: null,
-      status: 'empty',
+      destination: finalDestinationTitle,
+      description: item['description'] as String? ?? '',
+      activityImgUrl: imgUrl,
+      date: slotDate,
+      allocatedBudget: allocatedBudget,
+      overspendAmount: allocatedBudget > 0 ? 0 : null,
+      status: 'pending',
       startTime: startTime,
       endTime: endTime,
-      duration: '',
-      activityCategory: '',
+      duration: item['duration'] as String? ?? '60 min',
+      activityCategory: item['activityCategory'] as String? ?? category,
       isOverspend: false,
     );
   }
@@ -443,6 +439,7 @@ class ItineraryService implements IItineraryService {
         destination: destination,
         datesText: datesText,
         totalBudget: budget,
+        remainingBalance: budget,
         activities: activityList,
       );
       return true;
@@ -495,5 +492,11 @@ class ItineraryService implements IItineraryService {
       );
     }
     await _itineraryRepository.updateTripStatus(tripId, newStatus);
+  }
+
+  // kokhong
+  @override
+  Future<List<String>> getAutocompleteSuggestions(String query) async {
+    return await GooglePlacesApiConfig.getAutocompleteSuggestions(query);
   }
 }
