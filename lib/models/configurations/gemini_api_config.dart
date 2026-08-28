@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:flutter/foundation.dart';
 
 class GeminiApiRequestException implements Exception {
   final int statusCode;
@@ -322,75 +323,91 @@ class GeminiApiConfig {
   // TODO: another function to generate alternative for removed activity
   static Future<String> askGeminiForAlternative({
     required String destinationCity,
+    required String targetAreaOrNeighborhood,
     required String category,
     required String startTime,
     required String endTime,
-    required List<String> excludedActivities,
+    required double budgetLimit,
+    required int dayNumber,
+    required List<String> existingOrExcludedPlaces,
   }) async {
-    final excludedListText = excludedActivities.isNotEmpty
-        ? excludedActivities.map((e) => '-$e').join('\n')
+    final excludedListText = existingOrExcludedPlaces.isNotEmpty
+        ? existingOrExcludedPlaces.map((e) => '- "$e"').join('\n')
         : 'None';
-    final prompt =
-        '''
-    You are a travel assistant in Malaysia. Suggest ONE replacement activity for a trip in $destinationCity.
+
+    final prompt = '''
+    You are an expert travel planner in Malaysia. A user removed an activity from their Day $dayNumber itinerary in $destinationCity and needs ONE replacement activity to fill the empty time slot.
 
     Parameters:
-    - Category: ${category.isNotEmpty ? category : "Attraction or Restaurant"}
-    - Time Window: $startTime to $endTime
-    
-    CRITICAL EXCLUSIONS:
-    The user explicitly removed/visited these places. You MUST NOT suggest any of these places or direct variations of them:
+    - City: $destinationCity
+    - Target Area / Neighborhood: $targetAreaOrNeighborhood (Must be located nearby this neighborhood to minimize travel time)
+    - Preferred Category: ${category.isNotEmpty ? category : "Attraction or Restaurant"}
+    - Time Slot: $startTime to $endTime
+    - Budget Ceiling: RM ${budgetLimit.toStringAsFixed(2)}
+
+    CRITICAL EXCLUSION LIST (DUPLICATES PROHIBITED):
+    The user already has the following places in their itinerary or explicitly rejected them. You MUST NOT suggest any of these places or slight variations of them:
     $excludedListText
-    
-    Format your response as a valid single JSON object:
+
+    CRITICAL RULES FOR DESTINATION & BUDGET:
+    - The destination MUST be an EXACT, FULL official business name or landmark on Google Maps (e.g., "Museum of Illusions Kuala Lumpur", "Limapulo: Baba Can Cook"). Do NOT use generic names (e.g., "Local Cafe", "Museum Visit").
+    - Public parks, sightseeing of landmarks, walking tours, and free attractions MUST have an "allocatedBudget" of 0.
+    - Only assign costs to food/dining, transportation, and places that explicitly require entrance tickets.
+    - "activityCategory" MUST strictly be one of: "Transportation", "Attraction", or "Restaurant".
+
+    Format your response as a valid single JSON object with the following fields:
     {
-      "destination": "Name of Landmark or Venue (MUST be a specific, real-world venue/attraction searchable on Google Places, e.g. 'Museum of Illusions Kuala Lumpur')",
+      "dayNumber": $dayNumber,
+      "destination": "Exact Business Name or Landmark",
+      "imageKeyword": "Famous landmark name or generic food item (e.g. 'Nasi Lemak', 'Aquarium')",
       "description": "Short 1-2 sentence description",
-      "imageUrl": "https://picsum.photos/600/400",
       "allocatedBudget": 0.0,
-      "duration": "60 min",
+      "duration": "60-90 min",
       "activityCategory": "Attraction",
       "startTime": "$startTime",
       "endTime": "$endTime"
     }
-    
-    Return ONLY the raw JSON object with no markdown formatting.
+
+    Return ONLY the raw JSON object with no markdown fences, no backticks, and no extra commentary.
     ''';
 
     final url = Uri.parse(
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=$_apiKey',
     );
 
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        "contents": [
-          {
-            "parts": [
-              {"text": prompt},
-            ],
-          },
-        ],
-        "generationConfig": {"responseMimeType": "application/json"},
-      }),
-    );
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final candidates = data['candidates'] as List?;
-      if (candidates != null && candidates.isNotEmpty) {
-        final content = candidates[0]['content'];
-        final parts = content['parts'] as List?;
-        if (parts != null && parts.isNotEmpty) {
-          return parts[0]['text'] ?? '{}';
-        }
-      }
-      return '{}';
-    } else {
-      throw Exception(
-        'Gemini Error: ${response.statusCode} - ${response.body}',
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          "contents": [
+            {
+              "parts": [
+                {"text": prompt},
+              ],
+            },
+          ],
+          "generationConfig": {"responseMimeType": "application/json"},
+        }),
       );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = jsonDecode(response.body);
+        final candidates = data['candidates'] as List?;
+        if (candidates != null && candidates.isNotEmpty) {
+          final content = candidates[0]['content'];
+          final parts = content['parts'] as List?;
+          if (parts != null && parts.isNotEmpty) {
+            return parts[0]['text'] ?? '{}';
+          }
+        }
+        return '{}';
+      } else {
+        throw Exception('Gemini Error: ${response.statusCode} - ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('Gemini API Alternative Error: $e');
+      throw Exception('Failed to generate alternative activity: $e');
     }
   }
 }

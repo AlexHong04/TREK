@@ -26,10 +26,10 @@ class ActivityViewModel extends ChangeNotifier {
     IExpenseTrackingService? expenseTrackingService,
     IExpenseRepository? expenseRepository,
   }) : _itineraryService = itineraryService ?? ItineraryService(),
-       _budgetService = budgetService ?? BudgetService(),
-       _expenseTrackingService =
-           expenseTrackingService ?? ExpenseTrackingService(),
-       _expenseRepository = expenseRepository ?? ExpenseRepository() {
+        _budgetService = budgetService ?? BudgetService(),
+        _expenseTrackingService =
+            expenseTrackingService ?? ExpenseTrackingService(),
+        _expenseRepository = expenseRepository ?? ExpenseRepository() {
     initialize();
   }
 
@@ -255,7 +255,7 @@ class ActivityViewModel extends ChangeNotifier {
           _expenseTrackingService.validateTotalAmount(extractedTotal);
         } on ArgumentError {
           extractedTotalError =
-              'The extracted amount is invalid. Please correct it.';
+          'The extracted amount is invalid. Please correct it.';
         }
       }
 
@@ -263,7 +263,7 @@ class ActivityViewModel extends ChangeNotifier {
         isScanningReceipt: false,
         ocrRawText: receiptText,
         ocrMerchantName:
-            _expenseTrackingService.extractMerchantName(receiptText) ?? '',
+        _expenseTrackingService.extractMerchantName(receiptText) ?? '',
         ocrTransactionDateTime: extractedDateTime,
         clearOcrTransactionDateTime: extractedDateTime == null,
         ocrExtractedTotal: extractedTotal,
@@ -323,7 +323,7 @@ class ActivityViewModel extends ChangeNotifier {
         receiptLocalPath: '',
         clearOcrData: true,
         successMessage: 'The expense record has been successfully saved.',
-        remainingBudget: _uiState.remainingBudget - expenseAmount,
+        spentBudget: _uiState.spentBudget + expenseAmount, // remainingBudget updates automatically
       );
       await loadRecordedExpensesForSelectedActivity();
 
@@ -342,12 +342,12 @@ class ActivityViewModel extends ChangeNotifier {
     final itemsWithCalculatedSubtotals = items
         .map(
           (item) => item.copyWith(
-            subtotal: _expenseTrackingService.calculateItemSubtotal(
-              item.quantity,
-              item.unitPrice,
-            ),
-          ),
-        )
+        subtotal: _expenseTrackingService.calculateItemSubtotal(
+          item.quantity,
+          item.unitPrice,
+        ),
+      ),
+    )
         .toList();
 
     _uiState = _uiState.copyWith(
@@ -402,23 +402,29 @@ class ActivityViewModel extends ChangeNotifier {
   }
 
   Future<void> loadTripItinerary(String tripId, {DateTime? filterDate}) async {
-    _uiState = _uiState.copyWith(
-      isLoading: true,
-      tripId: tripId,
-      filterDate: filterDate,
-      clearFilterDate: filterDate == null,
-    );
+    _uiState = _uiState.copyWith(isLoading: true);
     notifyListeners();
 
     try {
-      final activities = await _itineraryService.fetchAllActivitiesByTrip(
-        tripId,
-      );
+      final allActivities =
+      await _itineraryService.fetchAllActivitiesByTrip(tripId);
+      final tripResult = await _itineraryService.fetchLatestTrip();
 
-      _uiState = _uiState.copyWith(isLoading: false, activities: activities);
+      final now = DateTime.now();
+      final targetDate = filterDate ?? DateTime(now.year, now.month, now.day);
+
+      _uiState = _uiState.copyWith(
+        isLoading: false,
+        activities: allActivities,
+        totalBudget: tripResult?.trip.totalBudget ?? _uiState.totalBudget,
+        filterDate: targetDate,
+        tripId: tripId,
+      );
     } catch (e) {
-      _uiState = _uiState.copyWith(isLoading: false);
-      debugPrint('DEBUG: Error in loadTripItinerary: $e');
+      _uiState = _uiState.copyWith(
+        isLoading: false,
+        errorMessage: e.toString(),
+      );
     }
     notifyListeners();
   }
@@ -436,58 +442,6 @@ class ActivityViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void initializeHardcoded() {
-    _uiState = _uiState.copyWith(isLoading: true);
-    notifyListeners();
-
-    final List<Activity> newActivities = [
-      Activity(
-        activitiesId: '1',
-        dayTripId: 'day1',
-        destination: 'Kinkaku-ji Temple',
-        description:
-            'Marvel at the Zen Buddhist temple whose top two floors are completely covered in gold leaf.',
-        activityImgUrl: 'assets/images/placeholder.png',
-        date: DateTime(2026, 8, 12, 9, 0),
-        allocatedBudget: 25.0,
-        overspendAmount: 25.0,
-        status: 'planned',
-        duration: '60-90 min',
-        activityCategory: 'Culture',
-        isOverspend: true,
-      ),
-      Activity(
-        activitiesId: '2',
-        dayTripId: 'day1',
-        destination: 'Traditional Kaiseki Lunch',
-        description:
-            'Experience a multi-course dinner that balances taste, texture, and appearance in the historic Gion district.',
-        activityImgUrl: 'assets/images/placeholder.png',
-        date: DateTime(2026, 8, 12, 12, 0),
-        allocatedBudget: 25.0,
-        overspendAmount: 0.0,
-        status: 'planned',
-        duration: '60-90 min',
-        activityCategory: 'Food',
-        isOverspend: false,
-      ),
-    ];
-
-    _uiState = _uiState.copyWith(
-      isLoading: false,
-      activities: newActivities,
-      totalBudget: 2450.00,
-      spentBudget: 2425.00,
-      remainingBudget: 25.00,
-      overspentBudget: 0.00,
-      sufficientDays: 7,
-      usedPercentageString: '1% Used',
-      usedPercentageValue: 0.01,
-    );
-
-    notifyListeners();
-  }
-
   Future<void> endTrip() async {
     final id = _uiState.tripId;
 
@@ -498,7 +452,7 @@ class ActivityViewModel extends ChangeNotifier {
       final update = await _itineraryService.endTrip(id);
 
       if (update) {
-        _uiState = _uiState.copyWith(isLoading: true, tripId: '');
+        _uiState = _uiState.copyWith(isLoading: false, tripId: '');
       }
     } catch (e) {
       _uiState = _uiState.copyWith(isLoading: false);
@@ -531,9 +485,6 @@ class ActivityViewModel extends ChangeNotifier {
       );
 
       if (updatedTrip != null) {
-        final percentage =
-            (updatedTrip.remainingBalance ?? 0.0) / updatedTrip.totalBudget;
-
         final days = await _budgetService.calculateSufficientDays(
           updatedTrip,
           activityId,
@@ -542,12 +493,8 @@ class ActivityViewModel extends ChangeNotifier {
         _uiState = _uiState.copyWith(
           isLoading: false,
           totalBudget: updatedTrip.totalBudget,
-          remainingBudget: updatedTrip.remainingBalance,
-          overspentBudget: _uiState.overspentBudget - additionalAmount,
+          overspentBudget: (_uiState.overspentBudget - additionalAmount).clamp(0.0, double.infinity),
           sufficientDays: days.toInt(),
-          usedPercentageValue: percentage,
-          usedPercentageString:
-              '${(percentage * 100).toStringAsFixed(0)}% Used',
           errorMessage: '',
         );
 
@@ -575,11 +522,7 @@ class ActivityViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> handleExpenseSubmission(
-    double expense,
-  ) async {
-    debugPrint("zq handleExpenseSubmission");
-
+  Future<void> handleExpenseSubmission(double expense) async {
     _uiState = _uiState.copyWith(isLoading: true);
     notifyListeners();
 
@@ -588,8 +531,6 @@ class ActivityViewModel extends ChangeNotifier {
       currentActivityId: _uiState.currentActivityId,
       expense: expense,
     );
-
-    debugPrint("zq result: $result");
 
     switch (result) {
       case ExpenseProcessingResult.withinBudget:

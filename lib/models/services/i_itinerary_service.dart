@@ -34,6 +34,8 @@ abstract interface class IItineraryService {
     required List<String> excludedActivity,
     required String existingActivityId,
     required String dayTripId,
+    double budgetLimit = 0.0,
+    int dayNumber = 1,
   });
 
   Activity createEmptyActivity({

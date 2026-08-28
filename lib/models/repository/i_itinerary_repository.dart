@@ -38,4 +38,17 @@ abstract interface class IItineraryRepository {
   Future<List<Activity>> fetchAllActivitiesByTrip(String tripId);
 
   Future<void> updateTripStatus(String tripId, String newStatus);
+
+  Future<Activity> generateAlternativeActivity({
+    required String destination,
+    required DateTime slotDate,
+    required String startTime,
+    required String endTime,
+    required String category,
+    required List<String> excludedActivity,
+    required String existingActivityId,
+    required String dayTripId,
+    double budgetLimit = 0.0,
+    int dayNumber = 1,
+  });
 }
