@@ -26,10 +26,10 @@ class ActivityViewModel extends ChangeNotifier {
     IExpenseTrackingService? expenseTrackingService,
     IExpenseRepository? expenseRepository,
   }) : _itineraryService = itineraryService ?? ItineraryService(),
-        _budgetService = budgetService ?? BudgetService(),
-        _expenseTrackingService =
-            expenseTrackingService ?? ExpenseTrackingService(),
-        _expenseRepository = expenseRepository ?? ExpenseRepository() {
+       _budgetService = budgetService ?? BudgetService(),
+       _expenseTrackingService =
+           expenseTrackingService ?? ExpenseTrackingService(),
+       _expenseRepository = expenseRepository ?? ExpenseRepository() {
     initialize();
   }
 
@@ -255,7 +255,7 @@ class ActivityViewModel extends ChangeNotifier {
           _expenseTrackingService.validateTotalAmount(extractedTotal);
         } on ArgumentError {
           extractedTotalError =
-          'The extracted amount is invalid. Please correct it.';
+              'The extracted amount is invalid. Please correct it.';
         }
       }
 
@@ -263,7 +263,7 @@ class ActivityViewModel extends ChangeNotifier {
         isScanningReceipt: false,
         ocrRawText: receiptText,
         ocrMerchantName:
-        _expenseTrackingService.extractMerchantName(receiptText) ?? '',
+            _expenseTrackingService.extractMerchantName(receiptText) ?? '',
         ocrTransactionDateTime: extractedDateTime,
         clearOcrTransactionDateTime: extractedDateTime == null,
         ocrExtractedTotal: extractedTotal,
@@ -323,7 +323,9 @@ class ActivityViewModel extends ChangeNotifier {
         receiptLocalPath: '',
         clearOcrData: true,
         successMessage: 'The expense record has been successfully saved.',
-        spentBudget: _uiState.spentBudget + expenseAmount, // remainingBudget updates automatically
+        spentBudget:
+            _uiState.spentBudget +
+            expenseAmount, // remainingBudget updates automatically
       );
       await loadRecordedExpensesForSelectedActivity();
 
@@ -342,12 +344,12 @@ class ActivityViewModel extends ChangeNotifier {
     final itemsWithCalculatedSubtotals = items
         .map(
           (item) => item.copyWith(
-        subtotal: _expenseTrackingService.calculateItemSubtotal(
-          item.quantity,
-          item.unitPrice,
-        ),
-      ),
-    )
+            subtotal: _expenseTrackingService.calculateItemSubtotal(
+              item.quantity,
+              item.unitPrice,
+            ),
+          ),
+        )
         .toList();
 
     _uiState = _uiState.copyWith(
@@ -406,8 +408,9 @@ class ActivityViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final allActivities =
-      await _itineraryService.fetchAllActivitiesByTrip(tripId);
+      final allActivities = await _itineraryService.fetchAllActivitiesByTrip(
+        tripId,
+      );
       final tripResult = await _itineraryService.fetchLatestTrip();
 
       final now = DateTime.now();
@@ -493,7 +496,10 @@ class ActivityViewModel extends ChangeNotifier {
         _uiState = _uiState.copyWith(
           isLoading: false,
           totalBudget: updatedTrip.totalBudget,
-          overspentBudget: (_uiState.overspentBudget - additionalAmount).clamp(0.0, double.infinity),
+          overspentBudget: (_uiState.overspentBudget - additionalAmount).clamp(
+            0.0,
+            double.infinity,
+          ),
           sufficientDays: days.toInt(),
           errorMessage: '',
         );
@@ -523,43 +529,57 @@ class ActivityViewModel extends ChangeNotifier {
   }
 
   Future<void> handleExpenseSubmission(double expense) async {
+    debugPrint("zq handleExpenseSubmission");
+
     _uiState = _uiState.copyWith(isLoading: true);
     notifyListeners();
 
-    final result = await _expenseTrackingService.processExpense(
-      tripId: _uiState.tripId,
-      currentActivityId: _uiState.currentActivityId,
-      expense: expense,
-    );
+    try {
+      final response = await _expenseTrackingService.processExpense(
+        tripId: _uiState.tripId,
+        currentActivityId: _uiState.currentActivityId,
+        expense: expense,
+      );
 
-    switch (result) {
-      case ExpenseProcessingResult.withinBudget:
-        _uiState = _uiState.copyWith(popupAction: '');
-        break;
+      debugPrint("result: ${response.result}");
+      debugPrint("overspent budget: ${response.overspentBudget}");
+      debugPrint("shortage amount: ${response.shortageAmount}");
 
-      case ExpenseProcessingResult.reallocatedSuccessfully:
-        _uiState = _uiState.copyWith(popupAction: 'successful');
-        break;
+      _uiState = _uiState.copyWith(
+        overspentBudget: response.overspentBudget,
+        shortageAmount: response.shortageAmount,
+      );
 
-      case ExpenseProcessingResult.reallocatedFailed:
-        _uiState = _uiState.copyWith(popupAction: 'fail');
-        break;
+      switch (response.result) {
+        case ExpenseProcessingResult.withinBudget:
+          _uiState = _uiState.copyWith(popupAction: '');
+          break;
 
-      case ExpenseProcessingResult.exceedsThresholdTriggerRecommendation:
-        _uiState = _uiState.copyWith(popupAction: 'recommendation');
-        break;
+        case ExpenseProcessingResult.reallocatedSuccessfully:
+          _uiState = _uiState.copyWith(popupAction: 'successful');
+          break;
 
-      case ExpenseProcessingResult.critical:
-        _uiState = _uiState.copyWith(popupAction: 'critical');
-        break;
+        case ExpenseProcessingResult.reallocatedFailed:
+          _uiState = _uiState.copyWith(popupAction: 'fail');
+          break;
 
-      case ExpenseProcessingResult.updateFailed:
-        _uiState = _uiState.copyWith(popupAction: 'error');
-        break;
+        case ExpenseProcessingResult.exceedsThresholdTriggerRecommendation:
+          _uiState = _uiState.copyWith(popupAction: 'recommendation');
+          break;
+
+        case ExpenseProcessingResult.critical:
+          _uiState = _uiState.copyWith(popupAction: 'critical');
+          break;
+      }
+    } catch (e) {
+      debugPrint("Error handling expense submission: $e");
+
+      _uiState = _uiState.copyWith(isLoading: false);
+    } finally {
+      _uiState = _uiState.copyWith(isLoading: false);
+
+      notifyListeners();
     }
-
-    _uiState = _uiState.copyWith(isLoading: false);
-    notifyListeners();
   }
 
   void clearPopupAction() {
