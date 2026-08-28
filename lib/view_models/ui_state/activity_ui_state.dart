@@ -1,4 +1,5 @@
 import '../../models/entities/activity.dart';
+export '../../models/entities/activity.dart';
 import '../../models/entities/expense.dart';
 import '../../models/entities/expense_item.dart';
 
@@ -34,7 +35,6 @@ class ActivityUiState {
 
   final double totalBudget;
   final double spentBudget;
-  final double remainingBudget;
   final double overspentBudget;
   final int sufficientDays;
   final String usedPercentageString;
@@ -70,7 +70,6 @@ class ActivityUiState {
     this.isLoadingRecordedExpenseItems = false,
     this.totalBudget = 0.0,
     this.spentBudget = 0.0,
-    this.remainingBudget = 0.0,
     this.overspentBudget = 0.0,
     this.sufficientDays = 0,
     this.usedPercentageString = '0% Used',
@@ -79,6 +78,11 @@ class ActivityUiState {
     this.popupAction = '',
   });
 
+  double get remainingBudget => totalBudget - spentBudget;
+
+  double get usedPercentageValues => totalBudget <= 0 ? 0.0 : (spentBudget / totalBudget).clamp(0.0, 1.0);
+
+  // Computed Getter automatically filters activities
   List<Activity> get displayActivities {
     if (filterDate == null) {
       return activities;
@@ -123,7 +127,6 @@ class ActivityUiState {
     bool? isLoadingRecordedExpenseItems,
     double? totalBudget,
     double? spentBudget,
-    double? remainingBudget,
     double? overspentBudget,
     int? sufficientDays,
     String? usedPercentageString,
@@ -160,14 +163,13 @@ class ActivityUiState {
       successMessage: successMessage ?? this.successMessage,
       recordedExpenses: recordedExpenses ?? this.recordedExpenses,
       isLoadingRecordedExpenses:
-          isLoadingRecordedExpenses ?? this.isLoadingRecordedExpenses,
+      isLoadingRecordedExpenses ?? this.isLoadingRecordedExpenses,
       selectedRecordedExpenseItems:
-          selectedRecordedExpenseItems ?? this.selectedRecordedExpenseItems,
+      selectedRecordedExpenseItems ?? this.selectedRecordedExpenseItems,
       isLoadingRecordedExpenseItems:
-          isLoadingRecordedExpenseItems ?? this.isLoadingRecordedExpenseItems,
+      isLoadingRecordedExpenseItems ?? this.isLoadingRecordedExpenseItems,
       totalBudget: totalBudget ?? this.totalBudget,
       spentBudget: spentBudget ?? this.spentBudget,
-      remainingBudget: remainingBudget ?? this.remainingBudget,
       overspentBudget: overspentBudget ?? this.overspentBudget,
       sufficientDays: sufficientDays ?? this.sufficientDays,
       usedPercentageString: usedPercentageString ?? this.usedPercentageString,

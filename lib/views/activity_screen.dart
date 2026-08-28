@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
-import '../models/entities/activity.dart';
 import '../theme/app_theme.dart';
 import '../utils/date_time_formatter.dart';
 import '../view_models/presentation_logic/activity_view_model.dart';
@@ -47,8 +46,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
           if (innerTrip is Map) {
             extractedTripId =
                 (innerTrip['tripId'] ??
-                        innerTrip['trip_id'] ??
-                        innerTrip['dayTripId'])
+                    innerTrip['trip_id'] ??
+                    innerTrip['dayTripId'])
                     ?.toString();
             if (innerTrip['destination'] != null) {
               _destination = innerTrip['destination'].toString();
@@ -56,7 +55,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
           } else {
             extractedTripId =
                 (innerTrip as dynamic).tripId ??
-                (innerTrip as dynamic).dayTripId;
+                    (innerTrip as dynamic).dayTripId;
             try {
               if ((innerTrip as dynamic).destination != null) {
                 _destination = (innerTrip as dynamic).destination.toString();
@@ -136,13 +135,13 @@ class _ActivityScreenState extends State<ActivityScreen> {
     showBudgetExceededDialog(
       context: context,
       allocatedBudget:
-          'RM ${state.selectedActivity?.allocatedBudget.toStringAsFixed(2)}',
+      'RM ${state.selectedActivity?.allocatedBudget.toStringAsFixed(2)}',
       remainingBudget: state.remainingBudget.toString(),
       exceededAmount: state.overspentBudget.toString(),
       warningText1:
-          'You have overspent ${state.overspentBudget} so far on this trip.',
+      'You have overspent ${state.overspentBudget} so far on this trip.',
       warningText2:
-          'The budget allocated for remaining restaurants have been modified.',
+      'The budget allocated for remaining restaurants have been modified.',
       onContinue: () {
         Navigator.pop(context);
       },
@@ -154,15 +153,14 @@ class _ActivityScreenState extends State<ActivityScreen> {
   }
 
   void _showExceedsThresholdDialog(ActivityUiState state) {
-    // show your Budget Recovery dialog
     showBudgetExceeded20Dialog(
       context: context,
       allocatedBudget:
-          'RM ${state.selectedActivity?.allocatedBudget.toStringAsFixed(2)}',
+      'RM ${state.selectedActivity?.allocatedBudget.toStringAsFixed(2)}',
       remainingBudget: state.remainingBudget.toStringAsFixed(2),
       exceededAmount: state.shortageAmount.toStringAsFixed(2),
       warningText1:
-          'You have overspent ${state.overspentBudget} so far on this trip.',
+      'You have overspent ${state.overspentBudget} so far on this trip.',
       estimatedDays: state.sufficientDays.toString(),
       warningText3: 'Plan will be modified automatically.',
       onContinue: () {
@@ -172,16 +170,16 @@ class _ActivityScreenState extends State<ActivityScreen> {
   }
 
   void _showBudgetRecoveryDialog(
-    ActivityUiState uiState, {
-    required VoidCallback onEndTrip,
-    required Future<bool> Function(double amount) onTopUpBudget,
-  }) {
+      ActivityUiState uiState, {
+        required VoidCallback onEndTrip,
+        required Future<bool> Function(double amount) onTopUpBudget,
+      }) {
     showBudgetRecoveryDialog(
       context: context,
       shortageAmount: uiState.shortageAmount.toString(),
       remainingBudget: uiState.remainingBudget.toString(),
       warningText:
-          'Insufficient top-up amount will trigger alternative recommendation directly.',
+      'Insufficient top-up amount will trigger alternative recommendation directly.',
       onEndTrip: onEndTrip,
       onTopUpBudget: (amount) async {
         final success = await onTopUpBudget(amount);
@@ -338,34 +336,13 @@ class _ActivityScreenState extends State<ActivityScreen> {
             ],
           ),
           const SizedBox(height: 8.0),
-          Container(
-            height: 8.0,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: appTheme.gray_200,
-              borderRadius: BorderRadius.circular(4.0),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  flex: (uiState.usedPercentageValue * 100).toInt().clamp(
-                    0,
-                    100,
-                  ),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: appTheme.teal_A700,
-                      borderRadius: BorderRadius.circular(4.0),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  flex:
-                      100 -
-                      (uiState.usedPercentageValue * 100).toInt().clamp(0, 100),
-                  child: const SizedBox(),
-                ),
-              ],
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4.0),
+            child: LinearProgressIndicator(
+              value: uiState.usedPercentageValue,
+              minHeight: 8.0,
+              backgroundColor: appTheme.gray_200,
+              valueColor: AlwaysStoppedAnimation<Color>(appTheme.teal_A700),
             ),
           ),
           const SizedBox(height: 24.0),
@@ -578,10 +555,10 @@ class _ActivityScreenState extends State<ActivityScreen> {
   }
 
   Widget _buildActivityCard(
-    Activity activity,
-    ActivityUiState uiState, {
-    VoidCallback? onTap,
-  }) {
+      Activity activity,
+      ActivityUiState uiState, {
+        VoidCallback? onTap,
+      }) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -662,7 +639,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                         activity.overspendAmount != null)
                       _buildChip(
                         label:
-                            'RM${activity.overspendAmount!.toStringAsFixed(0)}',
+                        'RM${activity.overspendAmount!.toStringAsFixed(0)}',
                         backgroundColor: appTheme.blue_gray_50,
                         textColor: appTheme.blueGray900,
                       ),

@@ -380,165 +380,20 @@ class ItineraryService implements IItineraryService {
     required List<String> excludedActivity,
     required String existingActivityId,
     required String dayTripId,
+    double budgetLimit = 0.0,
+    int dayNumber = 1,
   }) async {
-    int retries = 3;
-    List<String> localExcluded = List.from(excludedActivity);
-    Map<String, dynamic>? item;
-    String destTitle = '';
-    String imgUrl = '';
-    Map<String, dynamic>? place;
-
-    while (retries > 0) {
-      final rawJson = await GeminiApiConfig.askGeminiForAlternative(
-        destinationCity: destination,
-        category: category,
-        startTime: startTime,
-        endTime: endTime,
-        excludedActivities: localExcluded,
-      );
-
-      try {
-        item = jsonDecode(rawJson);
-        destTitle = item?['destination'] as String? ?? '';
-      } catch (e) {
-        developer.log('Error decoding alternative itinerary JSON: $e');
-        retries--;
-        continue;
-      }
-
-      if (destTitle.isEmpty) {
-        retries--;
-        continue;
-      }
-
-      if (GooglePlacesApiConfig.isConfigured) {
-        try {
-          place = await GooglePlacesApiConfig.searchPlace(destTitle);
-          if (place == null) {
-            developer.log(
-              'Alternative destination "$destTitle" not found in Google Places. Exclude and retry...',
-            );
-            localExcluded.add(destTitle);
-            retries--;
-            continue;
-          }
-        } on PlacesApiDeniedException catch (e) {
-          // API key not valid / not enabled — skip validation, accept Gemini result
-          developer.log(
-            'Google Places API denied ($e). Skipping validation for alternative activity.',
-          );
-          place = null;
-        }
-      }
-      break;
-    }
-
-    if (item == null || destTitle.isEmpty) {
-      throw Exception(
-        'Failed to generate a valid alternative activity searchable on Google Places.',
-      );
-    }
-
-    String finalDestinationTitle = destTitle;
-    bool resolvedByGooglePlaces = false;
-
-    if (place != null) {
-      resolvedByGooglePlaces = true;
-      if (place['name'] != null && place['name'].toString().isNotEmpty) {
-        finalDestinationTitle = place['name'];
-      }
-      final photos = place['photos'] as List?;
-      if (photos != null && photos.isNotEmpty) {
-        final firstPhoto = photos.first as Map<String, dynamic>;
-        final photoReference = firstPhoto['photo_reference'] as String?;
-        if (photoReference != null && photoReference.isNotEmpty) {
-          imgUrl = GooglePlacesApiConfig.getPhotoUrl(photoReference);
-        }
-      }
-    }
-
-    if (imgUrl.isEmpty && !resolvedByGooglePlaces) {
-      final imageKeyword =
-          (item['imageKeyword'] ?? item['image_keyword'] ?? destTitle)
-              as String;
-      final query = Uri.encodeComponent(imageKeyword);
-      const wikiHeaders = {
-        'User-Agent': 'TrekApp/1.0 (Flutter; travel itinerary generator)',
-      };
-
-      try {
-        final wikiUrl = Uri.parse(
-          'https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=$query&gsrlimit=1&prop=pageimages&format=json&pithumbsize=600&origin=*',
-        );
-        final wikiRes = await http.get(wikiUrl, headers: wikiHeaders);
-        if (wikiRes.statusCode == 200) {
-          final data = jsonDecode(wikiRes.body);
-          final pages = data['query']?['pages'] as Map<String, dynamic>?;
-          if (pages != null && pages.isNotEmpty) {
-            final page = pages.values.first;
-            if (page['title'] != null &&
-                !page['title'].toString().startsWith('File:')) {
-              finalDestinationTitle = page['title'];
-            }
-            if (page.containsKey('thumbnail')) {
-              imgUrl = page['thumbnail']['source'] as String? ?? '';
-            }
-          }
-        }
-      } catch (_) {}
-
-      if (imgUrl.isEmpty) {
-        try {
-          final commonsQuery = Uri.encodeComponent(finalDestinationTitle);
-          final commonsUrl = Uri.parse(
-            'https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=$commonsQuery&gsrnamespace=6&gsrlimit=1&prop=imageinfo&iiprop=url&iiurlwidth=600&format=json&origin=*',
-          );
-          final commonsRes = await http.get(commonsUrl, headers: wikiHeaders);
-          if (commonsRes.statusCode == 200) {
-            final data = jsonDecode(commonsRes.body);
-            final pages = data['query']?['pages'] as Map<String, dynamic>?;
-            if (pages != null && pages.isNotEmpty) {
-              final page = pages.values.first;
-              if (page.containsKey('imageinfo')) {
-                final imageInfo = page['imageinfo'] as List;
-                if (imageInfo.isNotEmpty && imageInfo[0]['thumburl'] != null) {
-                  imgUrl = imageInfo[0]['thumburl'] as String;
-                }
-              }
-            }
-          }
-        } catch (_) {}
-      }
-    }
-
-    if (imgUrl.isEmpty) {
-      final imageKeyword =
-          (item['imageKeyword'] ?? item['image_keyword'] ?? destTitle)
-              as String;
-      final keywordQuery = Uri.encodeComponent(
-        imageKeyword.replaceAll(RegExp(r'\s+'), ','),
-      );
-      imgUrl = 'https://loremflickr.com/600/400/$keywordQuery?lock=0';
-    }
-
-    final double allocatedBudget =
-        (item['allocatedBudget'] as num?)?.toDouble() ?? 0.0;
-
-    return Activity(
-      activitiesId: existingActivityId,
-      dayTripId: dayTripId,
-      destination: finalDestinationTitle,
-      description: item['description'] as String? ?? '',
-      activityImgUrl: imgUrl,
-      date: slotDate,
-      allocatedBudget: allocatedBudget,
-      overspendAmount: allocatedBudget > 0 ? 0 : null,
-      status: 'pending',
+    return await _itineraryRepository.generateAlternativeActivity(
+      destination: destination,
+      slotDate: slotDate,
       startTime: startTime,
       endTime: endTime,
-      duration: item['duration'] as String? ?? '60 min',
-      activityCategory: item['activityCategory'] as String? ?? category,
-      isOverspend: false,
+      category: category,
+      excludedActivity: excludedActivity,
+      existingActivityId: existingActivityId,
+      dayTripId: dayTripId,
+      budgetLimit: budgetLimit,
+      dayNumber: dayNumber,
     );
   }
 
