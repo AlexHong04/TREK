@@ -8,7 +8,6 @@ enum ExpenseProcessingResult {
   reallocatedFailed,
   exceedsThresholdTriggerRecommendation,
   critical,
-  updateFailed,
 }
 
 abstract interface class IExpenseTrackingService {

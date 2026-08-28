@@ -292,38 +292,25 @@ class ExpenseTrackingService implements IExpenseTrackingService {
   }) async {
     debugPrint("process expense");
 
+    // Get trip and activities
     final currentTrip = await _itineraryRepository.getTrip(tripId);
+
     final activities = await _itineraryRepository.fetchAllActivitiesByTrip(
       tripId,
     );
 
     double totalAllocatedBudget = 0.00;
 
-    for (var activity in activities) {
+    for (final activity in activities) {
       totalAllocatedBudget += activity.allocatedBudget;
     }
-    final remainingBudget = currentTrip.remainingBalance;
 
-    final bool isCritical = await detectCriticalOverspend(
-      totalAllocatedBudget,
-      remainingBudget!,
-    );
+    final remainingBudget = currentTrip.remainingBalance ?? 0.00;
 
-    if (isCritical) {
-      return ExpenseProcessingResult.critical;
-    }
-    debugPrint("Expense: $expense");
-    debugPrint("trip Id: $tripId");
-    debugPrint("current activity id: $currentActivityId");
-    debugPrint("total allocated budget: $totalAllocatedBudget");
-    debugPrint("remaining budget: $remainingBudget");
-    debugPrint("is critical: $isCritical");
-
+    // Get current activity and day
     final currentActivity = await _itineraryRepository.getCurrentActivity(
       currentActivityId,
     );
-
-    debugPrint("current activity: $currentActivity");
 
     final currentDay = await _itineraryRepository.getCurrentDay(
       currentActivity.dayTripId,
@@ -335,23 +322,40 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       currentActivity,
       expense,
     );
-    debugPrint("is overspend: $isOverspend");
+
+    debugPrint("Is overspend: $isOverspend");
 
     if (!isOverspend) {
       return ExpenseProcessingResult.withinBudget;
     }
 
+    // Calculate overspend and shortage
     final double overspentAmount = expense - currentActivity.allocatedBudget;
 
-    debugPrint("overspend amount $overspentAmount");
+    final double shortageAmount = overspentAmount;
 
+    debugPrint("Overspent amount: $overspentAmount");
+    debugPrint("Shortage amount: $shortageAmount");
+
+    // Check critical overspend
+    final bool isCritical = await detectCriticalOverspend(
+      totalAllocatedBudget,
+      remainingBudget,
+    );
+
+    debugPrint("Is critical: $isCritical");
+
+    if (isCritical) {
+      return ExpenseProcessingResult.critical;
+    }
+
+    // Update current activity
     final updatedActivity = currentActivity.copyWith(
       overspendAmount: overspentAmount,
       isOverspend: true,
     );
 
-    debugPrint("updated activity $updatedActivity");
-
+    // Update current day
     final existingCategories =
         currentDay.overspendCategory
             ?.split(',')
@@ -366,64 +370,60 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       existingCategories.add(newCategory);
     }
 
-    debugPrint("existing categories $existingCategories");
-
     final updatedDay = currentDay.copyWith(
       overspendAmount: (currentDay.overspendAmount ?? 0.00) + overspentAmount,
       overspendCategory: existingCategories.join(', '),
       isOverspend: true,
     );
-    debugPrint("updated day $updatedDay");
 
-    final success = await _itineraryRepository.updateDayOverspendDetails(
+    // Update database
+    final success = await _itineraryRepository.updateOverspendDetails(
       updatedDay,
-    );
-    final success2 = await _itineraryRepository.updateOverspendDetails(
       updatedActivity,
     );
 
-    debugPrint("update day success: $success");
-    debugPrint("update activity success: $success2");
+    debugPrint("Update overspend details success: $success");
 
-    if (!success || !success2) {
-      debugPrint("Failed to update overspend details");
-      return ExpenseProcessingResult.updateFailed;
+    if (!success) {
+      throw Exception('Update overspend details failed: $success');
     }
-    // Check if overspend exceeds defined threshold
+
+    // Check threshold
     final bool isAboveThreshold = await calculateOverspendPercentage(
       tripId,
       currentActivity,
       overspentAmount,
     );
 
-    debugPrint("is above threshold $isAboveThreshold");
+    debugPrint("Is above threshold: $isAboveThreshold");
 
+    // Trigger recommendation
     if (isAboveThreshold) {
-      // Above threshold -> Trigger recommendation flow
       return ExpenseProcessingResult.exceedsThresholdTriggerRecommendation;
-    } else {
-      // Within threshold -> Reallocate budget among remaining restaurants
-      final updatedActivities = await reallocateBudget(
-        tripId,
-        currentActivity,
-        overspentAmount,
-      );
-
-      if (updatedActivities == []) {
-        return ExpenseProcessingResult.reallocatedFailed;
-      }
-
-      // Update database
-      final updateSuccessful = await _itineraryRepository.updateActivities(
-        updatedActivities,
-      );
-
-      if (updateSuccessful) {
-        return ExpenseProcessingResult.reallocatedSuccessfully;
-      } else {
-        return ExpenseProcessingResult.reallocatedFailed;
-      }
     }
+
+    // Reallocate budget
+    final updatedActivities = await reallocateBudget(
+      tripId,
+      currentActivity,
+      overspentAmount,
+    );
+
+    if (updatedActivities.isEmpty) {
+      return ExpenseProcessingResult.reallocatedFailed;
+    }
+
+    // Update reallocated activities
+    final updateSuccessful = await _itineraryRepository.updateActivities(
+      updatedActivities,
+    );
+
+    if (!updateSuccessful) {
+      return ExpenseProcessingResult.reallocatedFailed;
+    }
+
+    // Success
+    return ExpenseProcessingResult.reallocatedSuccessfully;
   }
 
   // zhiqin
