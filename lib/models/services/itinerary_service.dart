@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:developer' as developer;
+import 'package:Trek/models/entities/day_trip.dart';
 import 'package:http/http.dart' as http;
 
 import '../entities/activity.dart';
@@ -467,10 +468,20 @@ class ItineraryService implements IItineraryService {
     return await _itineraryRepository.fetchAllActivitiesByTrip(tripId);
   }
 
+  // zhiqin
   Future<bool> endTrip(String id) async {
     try {
       await _itineraryRepository.terminateTrip(id, 'terminated');
       return true;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  // zhiqin
+  Future<List<DayTrip>> getDaysByTripId(String id) async {
+    try {
+      return await _itineraryRepository.fetchDaysByTripId(id);
     } catch (e) {
       rethrow;
     }

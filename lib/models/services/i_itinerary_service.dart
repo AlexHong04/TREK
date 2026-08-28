@@ -1,3 +1,5 @@
+import 'package:Trek/models/entities/day_trip.dart';
+
 import '../entities/activity.dart';
 import '../entities/whole_trip.dart';
 
@@ -60,4 +62,6 @@ abstract interface class IItineraryService {
   Future<bool> endTrip(String id);
 
   Future<void> updateTripStatus(String tripId, String newStatus);
+
+  Future<List<DayTrip>> getDaysByTripId(String tripId);
 }
