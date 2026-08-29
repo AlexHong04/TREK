@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../models/entities/activity.dart';
 import '../../models/entities/expense_item.dart';
 import '../../models/local_data_source/camera_source.dart';
+import '../../models/local_data_source/notification_source.dart';
 import '../../models/repository/expense_repository.dart';
 import '../../models/repository/i_expense_repository.dart';
 import '../../models/services/budget_service.dart';
@@ -19,6 +22,7 @@ class ActivityViewModel extends ChangeNotifier {
   final IExpenseTrackingService _expenseTrackingService;
   final IExpenseRepository _expenseRepository;
   final CameraSource _cameraSource = CameraSource();
+  final NotificationSource _notificationSource = NotificationSource();
 
   ActivityViewModel({
     IItineraryService? itineraryService,
@@ -372,6 +376,8 @@ class ActivityViewModel extends ChangeNotifier {
         expenseAmount: expenseAmount,
       );
 
+      await _cancelActivityExpenseReminder(selectedActivity);
+
       _uiState = _uiState.copyWith(
         isSavingExpense: false,
         draftExpenseItems: const [],
@@ -451,6 +457,7 @@ class ActivityViewModel extends ChangeNotifier {
           activities: result.activities,
           totalBudget: result.trip.totalBudget,
         );
+        unawaited(_prepareActivityEndExpenseReminders(result.activities));
       } else {
         _uiState = _uiState.copyWith(isLoading: false);
       }
@@ -481,6 +488,7 @@ class ActivityViewModel extends ChangeNotifier {
         filterDate: targetDate,
         tripId: tripId,
       );
+      unawaited(_prepareActivityEndExpenseReminders(allActivities));
     } catch (e) {
       _uiState = _uiState.copyWith(
         isLoading: false,
@@ -488,6 +496,121 @@ class ActivityViewModel extends ChangeNotifier {
       );
     }
     notifyListeners();
+  }
+
+  /// Requests notification and exact-alarm permission, then schedules one
+  /// reminder for each future activity that has no confirmed expense.
+  Future<void> _prepareActivityEndExpenseReminders(
+    List<Activity> activities,
+  ) async {
+    try {
+      final hasNotificationPermission =
+          await _notificationSource.requestPermission();
+      if (!hasNotificationPermission) {
+        debugPrint('[Expense reminder] Notification permission was not granted.');
+        return;
+      }
+
+      final hasExactAlarmPermission =
+          await _notificationSource.requestExactAlarmPermission();
+      if (!hasExactAlarmPermission) {
+        debugPrint('[Expense reminder] Exact-alarm permission was not granted.');
+        return;
+      }
+
+      await _scheduleActivityEndExpenseReminders(activities);
+    } catch (error) {
+      debugPrint('[Expense reminder] Unable to prepare reminders: $error');
+    }
+  }
+
+  /// Schedules one reminder for each future activity that has no confirmed
+  /// expense yet. This method is intentionally best-effort: notification
+  /// setup must never stop the daily plan from loading.
+  Future<void> _scheduleActivityEndExpenseReminders(
+    List<Activity> activities,
+  ) async {
+    for (final activity in activities) {
+      final reminderTime = _activityEndDateTime(activity);
+      if (reminderTime == null || !reminderTime.isAfter(DateTime.now())) {
+        continue;
+      }
+
+      try {
+        final recordedExpenses = await _expenseRepository
+            .getExpensesByActivityId(activity.activitiesId);
+        final reminderId = _activityReminderId(activity.activitiesId);
+
+        if (recordedExpenses.isNotEmpty) {
+          await _notificationSource.cancelExpenseReminder(reminderId);
+          continue;
+        }
+
+        await _notificationSource.scheduleExpenseReminder(
+          id: reminderId,
+          scheduledAt: reminderTime,
+          title: 'Expense reminder',
+          body: 'Did you spend at ${activity.destination}? '
+              'Record your expense now.',
+          payload: activity.activitiesId,
+        );
+      } catch (error) {
+        debugPrint(
+          'Unable to schedule the expense reminder for '
+          '${activity.activitiesId}: $error',
+        );
+      }
+    }
+  }
+
+  /// Cancels the selected activity's future reminder after persistence succeeds.
+  Future<void> _cancelActivityExpenseReminder(Activity activity) async {
+    try {
+      await _notificationSource.cancelExpenseReminder(
+        _activityReminderId(activity.activitiesId),
+      );
+    } catch (error) {
+      debugPrint(
+        'Unable to cancel the expense reminder for '
+        '${activity.activitiesId}: $error',
+      );
+    }
+  }
+
+  /// Combines the database activity date with a stored HH:mm end time.
+  /// Activities without a valid end time cannot have an end-time reminder.
+  DateTime? _activityEndDateTime(Activity activity) {
+    final endTime = activity.endTime;
+    if (endTime == null || endTime.trim().isEmpty) {
+      return null;
+    }
+
+    final timeParts = endTime.trim().split(':');
+    if (timeParts.length < 2) {
+      return null;
+    }
+
+    final hour = int.tryParse(timeParts[0]);
+    final minute = int.tryParse(timeParts[1]);
+    if (hour == null || minute == null || hour < 0 || hour > 23 ||
+        minute < 0 || minute > 59) {
+      return null;
+    }
+
+    return DateTime(
+      activity.date.year,
+      activity.date.month,
+      activity.date.day,
+      hour,
+      minute,
+    );
+  }
+
+  /// Produces a stable device notification ID from the team's AC#### ID.
+  int _activityReminderId(String activityId) {
+    final numericPart = activityId.replaceAll(RegExp(r'[^0-9]'), '');
+    final activityNumber = int.tryParse(numericPart) ?? 0;
+    return 100000 + activityNumber;
   }
 
   void setDateFilter(DateTime? filterDate) {
