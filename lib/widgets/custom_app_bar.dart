@@ -47,3 +47,21 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Size get preferredSize => const Size.fromHeight(68);
 }
+
+void showThreeSecondMessage(
+    BuildContext context,
+    String message, {
+      bool isError = false,
+    }) {
+  final messenger = ScaffoldMessenger.of(context);
+  messenger
+    ..hideCurrentSnackBar()
+    ..showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: isError ? appTheme.errorRed : appTheme.teal_700,
+      ),
+    );
+}

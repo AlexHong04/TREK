@@ -8,6 +8,7 @@ class HomeUiState {
   final String? errorMessage;
   final WholeTrip? latestTrip;
   final String? bannerImgUrl;
+  final String? profilePictureUrl;
 
   const HomeUiState({
     this.isLoading = false,
@@ -17,6 +18,7 @@ class HomeUiState {
     this.errorMessage,
     this.latestTrip,
     this.bannerImgUrl,
+    this.profilePictureUrl,
   });
 
   String get displayName =>
@@ -29,7 +31,9 @@ class HomeUiState {
     bool? hasPlan,
     String? errorMessage,
     WholeTrip? latestTrip,
-    String? bannerImgUrl
+    String? bannerImgUrl,
+    String? profilePictureUrl,
+    bool clearProfilePicture = false,
   }) {
     return HomeUiState(
       isLoading: isLoading ?? this.isLoading,
@@ -39,6 +43,9 @@ class HomeUiState {
       errorMessage: errorMessage ?? this.errorMessage,
       latestTrip: latestTrip ?? this.latestTrip,
       bannerImgUrl: bannerImgUrl ?? this.bannerImgUrl,
+      profilePictureUrl: clearProfilePicture
+          ? null
+          : (profilePictureUrl ?? this.profilePictureUrl),
     );
   }
 }

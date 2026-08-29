@@ -1,7 +1,11 @@
 import 'dart:io';
 
 import '../entities/personal_constraint.dart';
+import '../local_data_source/camera_source.dart';
+import '../local_data_source/gallery_source.dart';
 import '../repository/i_user_repository.dart';
+
+enum ProfilePictureSource { gallery, camera }
 
 class InvalidImageFormatException implements Exception {
   const InvalidImageFormatException();
@@ -11,12 +15,17 @@ class ImageTooLargeException implements Exception {
   const ImageTooLargeException();
 }
 
-/// Profile business rules. Camera/gallery selection remains in the supplied
-/// local-data-source classes; the selected [File] is passed into this service.
 class ProfileService {
   final IUserRepository _userRepository;
+  final CameraSource _cameraSource;
+  final GallerySource _gallerySource;
 
-  ProfileService(this._userRepository);
+  ProfileService(
+      this._userRepository, {
+        CameraSource? cameraSource,
+        GallerySource? gallerySource,
+      })  : _cameraSource = cameraSource ?? CameraSource(),
+        _gallerySource = gallerySource ?? GallerySource();
 
   static const int _maxImageBytes = 5 * 1024 * 1024;
   static const Set<String> _allowedExtensions = {'jpg', 'jpeg', 'png'};
@@ -36,6 +45,20 @@ class ProfileService {
     );
   }
 
+  Future<String?> pickAndSaveProfilePicture({
+    required String userId,
+    required ProfilePictureSource source,
+  }) async {
+    final selectedPath = source == ProfilePictureSource.gallery
+        ? await _gallerySource.pickPhoto()
+        : await _cameraSource.takePhoto();
+    if (selectedPath == null) return null;
+    return saveProfilePicture(
+      userId: userId,
+      imageFile: File(selectedPath),
+    );
+  }
+
   Future<String> saveProfilePicture({
     required String userId,
     required File imageFile,
@@ -44,10 +67,7 @@ class ProfileService {
     if (await imageFile.length() > _maxImageBytes) {
       throw const ImageTooLargeException();
     }
-    final header = await imageFile
-        .openRead(0, 8)
-        .expand((bytes) => bytes)
-        .toList();
+    final header = await imageFile.openRead(0, 8).expand((bytes) => bytes).toList();
     if (!_allowedExtensions.contains(extension) || !_hasValidHeader(header)) {
       throw const InvalidImageFormatException();
     }
@@ -55,6 +75,10 @@ class ProfileService {
       userId: userId,
       imageFile: imageFile,
     );
+  }
+
+  Future<void> removeProfilePicture({required String userId}) {
+    return _userRepository.removeProfilePicture(userId: userId);
   }
 
   Future<List<PersonalConstraint>> getAllConstraints() {

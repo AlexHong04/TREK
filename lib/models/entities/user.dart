@@ -11,7 +11,7 @@ class User {
   final DateTime? lockedUntil;
   final DateTime createdAt;
   final DateTime updatedAt;
-  final bool isEmailVerified;
+  final DateTime? emailVerifiedAt;
   final List<PersonalConstraint> personalConstraints;
 
   const User({
@@ -25,16 +25,17 @@ class User {
     this.lockedUntil,
     required this.createdAt,
     required this.updatedAt,
-    this.isEmailVerified = false,
+    this.emailVerifiedAt,
     this.personalConstraints = const [],
   });
 
   bool get isLocked => lockedUntil != null && lockedUntil!.isAfter(DateTime.now());
 
+  bool get isEmailVerified => emailVerifiedAt != null;
+
   // get from supabase
   factory User.fromMap(
       Map<String, dynamic> map, {
-        bool isEmailVerified = false,
         List<PersonalConstraint> constraints = const [],
       }) {
     return User(
@@ -50,7 +51,9 @@ class User {
           : null,
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
-      isEmailVerified: isEmailVerified,
+      emailVerifiedAt: map['email_verified_at'] == null
+          ? null
+          : DateTime.parse(map['email_verified_at'] as String),
       personalConstraints: constraints,
     );
   }
@@ -64,6 +67,7 @@ class User {
       'email': email,
       'currency': currency,
       'profile_picture': profilePicture,
+      'email_verified_at': emailVerifiedAt?.toUtc().toIso8601String(), // standard utc format
     };
   }
 
@@ -74,7 +78,8 @@ class User {
     int? failedLoginAttempts,
     DateTime? lockedUntil,
     bool clearLockedUntil = false,
-    bool? isEmailVerified,
+    DateTime? emailVerifiedAt,
+    bool clearEmailVerifiedAt = false,
     List<PersonalConstraint>? personalConstraints,
   }) {
     return User(
@@ -88,7 +93,9 @@ class User {
       lockedUntil: clearLockedUntil ? null : (lockedUntil ?? this.lockedUntil),
       createdAt: createdAt,
       updatedAt: updatedAt,
-      isEmailVerified: isEmailVerified ?? this.isEmailVerified,
+      emailVerifiedAt: clearEmailVerifiedAt
+          ? null
+          : (emailVerifiedAt ?? this.emailVerifiedAt),
       personalConstraints: personalConstraints ?? this.personalConstraints,
     );
   }

@@ -1,19 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../models/services/i_auth_service.dart';
-import '../theme/app_colors.dart';
 import '../view_models/presentation_logic/email_submission_view_model.dart';
-import '../widgets/custom_app_bar.dart';
+import '../widgets/auth_form_widgets.dart';
 
 class EmailSubmissionScreen extends StatelessWidget {
   const EmailSubmissionScreen({super.key});
 
   static Widget builder(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => EmailSubmissionViewModel(context.read<IAuthService>()),
-      child: const EmailSubmissionScreen(),
-    );
+    return const EmailSubmissionViewModelScope(child: EmailSubmissionScreen());
   }
 
   @override
@@ -21,140 +16,94 @@ class EmailSubmissionScreen extends StatelessWidget {
     return Consumer<EmailSubmissionViewModel>(
       builder: (context, viewModel, _) {
         final state = viewModel.uiState;
-        return Scaffold(
-          backgroundColor: AppColors.gray50_02,
-          appBar: const CustomAppBar(title: 'Forgot Password'),
-          body: SafeArea(
-            top: false,
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 500),
+        if (state.errorMessage != null) {
+          final message = state.errorMessage!;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!context.mounted) return;
+            viewModel.consumeErrorMessage();
+            showAuthToast(context, message, isError: true);
+          });
+        }
+
+        void goToLogin() {
+          Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
+        }
+
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop && !state.isLoading) goToLogin();
+          },
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              child: state.linkSent
+                  ? AuthPage(
+                key: const ValueKey('link-sent'),
+                title: 'Password Reset Link Sent',
+                subtitle:
+                'If an account exists for ${state.email.trim()}, a reset link has been sent. Open it on this device to return to TREK.',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 44),
+                    AuthPrimaryButton(
+                      label: 'Resend',
+                      isLoading: state.isLoading,
+                      onPressed: viewModel.onResendPressed,
+                    ),
+                    const SizedBox(height: 7),
+                    AuthLinkLine(
+                      text: 'Enter another email? ',
+                      linkText: 'Click here.',
+                      onTap: state.isLoading
+                          ? null
+                          : viewModel.onUseAnotherEmailPressed,
+                    ),
+                  ],
+                ),
+              )
+                  : AuthPage(
+                key: const ValueKey('email-entry'),
+                title: 'Forgot Password',
+                subtitle:
+                'Enter your account email and we will send a reset link.',
+                child: AutofillGroup(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Icon(
-                        Icons.lock_reset_outlined,
-                        size: 72,
-                        color: AppColors.tealA700,
-                      ),
-                      const SizedBox(height: 24),
-                      const Text(
-                        'Reset your password',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: AppColors.blueGray900,
-                          fontSize: 26,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Enter your registered email address. If an account exists, we will send a secure reset link.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: AppColors.blueGray700,
-                          height: 1.45,
-                        ),
-                      ),
-                      const SizedBox(height: 28),
-                      TextFormField(
-                        enabled: !state.isLoading && !state.linkSent,
-                        keyboardType: TextInputType.emailAddress,
-                        textInputAction: TextInputAction.done,
-                        autofillHints: const [AutofillHints.email],
-                        autocorrect: false,
-                        onChanged: viewModel.onEmailChanged,
-                        onFieldSubmitted: (_) => viewModel.onSendPressed(),
-                        decoration: InputDecoration(
-                          labelText: 'Email address',
-                          hintText: 'name@example.com',
-                          prefixIcon: const Icon(Icons.email_outlined),
-                          errorText: state.emailError,
-                          filled: true,
-                          fillColor: AppColors.white,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide:
-                            const BorderSide(color: AppColors.gray200),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                              color: AppColors.tealA700,
-                              width: 1.5,
-                            ),
+                      const AuthFieldLabel('EMAIL ADDRESS'),
+                      Focus(
+                        onFocusChange: (hasFocus) {
+                          if (!hasFocus) viewModel.onEmailFocusLost();
+                        },
+                        child: TextFormField(
+                          enabled: !state.isLoading,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.done,
+                          autofillHints: const [AutofillHints.email],
+                          autocorrect: false,
+                          onChanged: viewModel.onEmailChanged,
+                          onFieldSubmitted: (_) => viewModel.onSendPressed(),
+                          decoration: authFieldDecoration(
+                            hint: 'Enter your email address',
+                            errorText: state.emailError,
                           ),
                         ),
                       ),
-                      if (state.errorMessage != null) ...[
-                        const SizedBox(height: 16),
-                        Text(
-                          state.errorMessage!,
-                          style: const TextStyle(color: AppColors.errorRed),
-                        ),
-                      ],
-                      if (state.linkSent) ...[
-                        const SizedBox(height: 20),
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: AppColors.goodPercentageBg,
-                            border: Border.all(
-                              color: AppColors.goodPercentageStroke,
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Icon(
-                                Icons.mark_email_read_outlined,
-                                color: AppColors.goodPercentageText,
-                              ),
-                              SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  'If an account is registered with that email, a reset link has been sent. Please also check your spam folder.',
-                                  style: TextStyle(
-                                    color: AppColors.goodPercentageText,
-                                    height: 1.4,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 24),
-                      FilledButton(
-                        onPressed: state.isLoading || state.linkSent
-                            ? null
-                            : viewModel.onSendPressed,
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size.fromHeight(52),
-                          backgroundColor: AppColors.tealA700,
-                        ),
-                        child: state.isLoading
-                            ? const SizedBox.square(
-                          dimension: 22,
-                          child: CircularProgressIndicator(
-                            color: AppColors.white,
-                            strokeWidth: 2.5,
-                          ),
-                        )
-                            : const Text('Send Reset Link'),
+                      const SizedBox(height: 42),
+                      AuthPrimaryButton(
+                        label: 'Send',
+                        isLoading: state.isLoading,
+                        onPressed: viewModel.onSendPressed,
                       ),
-                      const SizedBox(height: 12),
-                      TextButton(
-                        onPressed: state.isLoading
-                            ? null
-                            : () => Navigator.maybePop(context),
-                        child: const Text('Back to Login'),
+                      const SizedBox(height: 7),
+                      AuthLinkLine(
+                        text: 'Back to sign in? ',
+                        linkText: 'Click here.',
+                        onTap: state.isLoading ? null : goToLogin,
                       ),
                     ],
                   ),

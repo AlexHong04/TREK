@@ -1,82 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
+import 'package:url_launcher/url_launcher.dart';
 
-class AuthUserData {
-  final String id;
-  final String email;
-  final bool isEmailVerified;
-  final Map<String, dynamic> metadata;
+import 'i_user_repository.dart';
 
-  const AuthUserData({
-    required this.id,
-    required this.email,
-    required this.isEmailVerified,
-    this.metadata = const {},
-  });
-}
-
-class AuthSessionSnapshot {
-  final AuthUserData? user;
-  final bool isPasswordRecovery;
-
-  const AuthSessionSnapshot({
-    this.user,
-    this.isPasswordRecovery = false,
-  });
-}
-
-class AuthRegistrationData {
-  final String userId;
-  final bool requiresEmailVerification;
-
-  const AuthRegistrationData({
-    required this.userId,
-    required this.requiresEmailVerification,
-  });
-}
-
-abstract interface class IAuthRepository {
-  AuthUserData? get currentUser;
-
-  Stream<AuthSessionSnapshot> get authStateChanges;
-
-  Future<AuthRegistrationData> signUpWithEmail({
-    required String fullName,
-    required String email,
-    required String password,
-    required String currency,
-  });
-
-  Future<AuthUserData> signInWithEmail({
-    required String email,
-    required String password,
-  });
-
-  Future<void> signInWithGoogle();
-
-  Future<void> sendMagicLink({required String email});
-
-  Future<void> sendPasswordResetEmail({required String email});
-
-  Future<void> resendEmailVerification({required String email});
-
-  Future<void> updatePassword({required String newPassword});
-
-  Future<void> signOut({bool allSessions = false});
-}
-
-class RepositoryEmailAlreadyExistsException implements Exception {
-  const RepositoryEmailAlreadyExistsException();
-}
-
-class RepositoryInvalidCredentialsException implements Exception {
-  const RepositoryInvalidCredentialsException();
-}
-
-class RepositoryEmailNotVerifiedException implements Exception {
-  const RepositoryEmailNotVerifiedException();
-}
-
-class AuthRepository implements IAuthRepository {
+/// Supabase Auth adapter used internally by UserRepository.
+class AuthRepository {
   final supabase.SupabaseClient _client;
   final String authCallbackUrl;
   final String passwordResetCallbackUrl;
@@ -87,23 +16,20 @@ class AuthRepository implements IAuthRepository {
         required this.passwordResetCallbackUrl,
       });
 
-  @override
   AuthUserData? get currentUser => _mapUser(_client.auth.currentUser);
 
-  @override
   Stream<AuthSessionSnapshot> get authStateChanges {
     return _client.auth.onAuthStateChange.map(
           (state) => AuthSessionSnapshot(
         user: _mapUser(state.session?.user),
         isPasswordRecovery:
         state.event == supabase.AuthChangeEvent.passwordRecovery,
+        isSignedInEvent: state.event == supabase.AuthChangeEvent.signedIn,
       ),
     );
   }
 
-  @override
   Future<AuthRegistrationData> signUpWithEmail({
-    required String fullName,
     required String email,
     required String password,
     required String currency,
@@ -112,23 +38,19 @@ class AuthRepository implements IAuthRepository {
       final response = await _client.auth.signUp(
         email: email.trim().toLowerCase(),
         password: password,
-        emailRedirectTo: authCallbackUrl,
         data: {
-          'full_name': fullName.trim(),
           'currency': currency,
           'role': 'tourist',
         },
       );
       final user = response.user;
-      if (user == null) {
+      if (user == null || response.session == null) {
         throw const supabase.AuthException(
-          'Registration failed. Please try again.',
+          'Registration did not create a session. Disable Confirm email for '
+              'TREK deferred verification.',
         );
       }
-      return AuthRegistrationData(
-        userId: user.id,
-        requiresEmailVerification: user.emailConfirmedAt == null,
-      );
+      return AuthRegistrationData(userId: user.id);
     } on supabase.AuthException catch (error) {
       final message = error.message.toLowerCase();
       if (message.contains('already registered') ||
@@ -139,7 +61,6 @@ class AuthRepository implements IAuthRepository {
     }
   }
 
-  @override
   Future<AuthUserData> signInWithEmail({
     required String email,
     required String password,
@@ -150,24 +71,12 @@ class AuthRepository implements IAuthRepository {
         password: password,
       );
       final user = response.user;
-      if (user == null) {
-        throw const RepositoryInvalidCredentialsException();
-      }
-      if (user.emailConfirmedAt == null) {
-        await _client.auth.signOut();
-        throw const RepositoryEmailNotVerifiedException();
-      }
+      if (user == null) throw const RepositoryInvalidCredentialsException();
       return _mapUser(user)!;
     } on RepositoryInvalidCredentialsException {
       rethrow;
-    } on RepositoryEmailNotVerifiedException {
-      rethrow;
     } on supabase.AuthException catch (error) {
       final message = error.message.toLowerCase();
-      if (message.contains('email not confirmed') ||
-          message.contains('email not verified')) {
-        throw const RepositoryEmailNotVerifiedException();
-      }
       if (message.contains('invalid login credentials') ||
           message.contains('invalid credentials')) {
         throw const RepositoryInvalidCredentialsException();
@@ -176,11 +85,12 @@ class AuthRepository implements IAuthRepository {
     }
   }
 
-  @override
   Future<void> signInWithGoogle() async {
     final started = await _client.auth.signInWithOAuth(
       supabase.OAuthProvider.google,
       redirectTo: authCallbackUrl,
+      authScreenLaunchMode:
+      kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication,
     );
     if (!started) {
       throw const supabase.AuthException(
@@ -189,7 +99,6 @@ class AuthRepository implements IAuthRepository {
     }
   }
 
-  @override
   Future<void> sendMagicLink({required String email}) async {
     await _client.auth.signInWithOtp(
       email: email.trim().toLowerCase(),
@@ -198,7 +107,6 @@ class AuthRepository implements IAuthRepository {
     );
   }
 
-  @override
   Future<void> sendPasswordResetEmail({required String email}) async {
     await _client.auth.resetPasswordForEmail(
       email.trim().toLowerCase(),
@@ -206,23 +114,32 @@ class AuthRepository implements IAuthRepository {
     );
   }
 
-  @override
-  Future<void> resendEmailVerification({required String email}) async {
-    await _client.auth.resend(
-      type: supabase.OtpType.signup,
-      email: email.trim().toLowerCase(),
-      emailRedirectTo: authCallbackUrl,
-    );
+  Future<void> updatePassword({
+    required String newPassword,
+    String? currentPassword,
+  }) async {
+    try {
+      await _client.auth.updateUser(
+        supabase.UserAttributes(
+          password: newPassword,
+          currentPassword: currentPassword,
+        ),
+      );
+    } on supabase.AuthException catch (error) {
+      final code = error.code?.toLowerCase();
+      final message = error.message.toLowerCase();
+      if (code == 'same_password' || message.contains('same password')) {
+        throw const RepositorySamePasswordException();
+      }
+      if (code == 'invalid_credentials' ||
+          message.contains('current password') ||
+          message.contains('invalid login credentials')) {
+        throw const RepositoryIncorrectCurrentPasswordException();
+      }
+      rethrow;
+    }
   }
 
-  @override
-  Future<void> updatePassword({required String newPassword}) async {
-    await _client.auth.updateUser(
-      supabase.UserAttributes(password: newPassword),
-    );
-  }
-
-  @override
   Future<void> signOut({bool allSessions = false}) async {
     await _client.auth.signOut(
       scope: allSessions
@@ -236,7 +153,7 @@ class AuthRepository implements IAuthRepository {
     return AuthUserData(
       id: user.id,
       email: user.email ?? '',
-      isEmailVerified: user.emailConfirmedAt != null,
+      provider: user.appMetadata['provider'] as String? ?? 'email',
       metadata: Map<String, dynamic>.from(user.userMetadata ?? const {}),
     );
   }

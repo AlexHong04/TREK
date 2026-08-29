@@ -1,3 +1,5 @@
+import 'package:Trek/views/edit_profile_screen.dart';
+import 'package:Trek/views/password_reset_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -8,11 +10,11 @@ import 'models/configurations/gemini_api_config.dart';
 import 'models/local_data_source/location_source.dart';
 
 import 'models/repository/auth_repository.dart';
-import 'models/repository/i_user_repository.dart';
 import 'models/repository/user_repository.dart';
 
 import 'models/services/auth_service.dart';
 import 'models/services/i_auth_service.dart';
+import 'models/services/profile_service.dart';
 
 import 'views/login_screen.dart';
 import 'views/registration_screen.dart';
@@ -38,8 +40,7 @@ class AppRoutes {
   static const String activityScreen = '/activityScreen';
   static const String financialDashboardScreen = '/financialDashboardScreen';
   static const String tripSummaryScreen = '/tripSummaryScreen';
-  // static const String initialRoute = loginScreen;
-  static const String initialRoute = homeScreen;
+  static const String initialRoute = loginScreen;
 }
 
 class NavigatorService {
@@ -55,13 +56,20 @@ Future<void> main() async {
 
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
+  // sys nav bar solid white back + dark icons
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      systemNavigationBarColor: Colors.white,
+      systemNavigationBarIconBrightness: Brightness.dark,
+      systemNavigationBarContrastEnforced: false,
+    ),
+  );
+
   // Initialize Supabase config
   await SupabaseConfig.initialize();
 
   // Initialize Gemini config
   GeminiApiConfig.initialize();
-
-  final IUserRepository userRepository = UserRepository(SupabaseConfig.client);
 
   final authRepository = AuthRepository(
     SupabaseConfig.client,
@@ -69,65 +77,109 @@ Future<void> main() async {
     passwordResetCallbackUrl: SupabaseConfig.passwordResetCallbackUrl,
   );
 
-  final IAuthService authService = AuthService(authRepository, userRepository);
+  final userRepository = UserRepository(
+      SupabaseConfig.client,
+    authRepository
+  );
+
+  final profileService = ProfileService(userRepository);
+
+  final authService = AuthService(
+    userRepository,
+    profileService,
+  );
+
+  await authService.restoreSession();
 
   runApp(
     ChangeNotifierProvider<IAuthService>.value(
       value: authService,
-      child: const MyApp(),
+      child: MyApp(authService: authService),
     ),
   );
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class MyApp extends StatefulWidget {
+  final IAuthService authService;
+
+  const MyApp({super.key, required this.authService});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  late bool _wasLoggedIn;
+  late bool _wasPasswordRecovery;
+
+  @override
+  void initState() {
+    super.initState();
+    _wasLoggedIn = widget.authService.isLoggedIn;
+    _wasPasswordRecovery = widget.authService.isPasswordRecovery;
+    widget.authService.addListener(_handleAuthChange);
+  }
+
+  @override
+  void dispose() {
+    widget.authService.removeListener(_handleAuthChange);
+    super.dispose();
+  }
+
+  void _handleAuthChange() {
+    final isLoggedIn = widget.authService.isLoggedIn;
+    final isRecovery = widget.authService.isPasswordRecovery;
+    final shouldOpenRecovery = isRecovery && !_wasPasswordRecovery;
+    final shouldOpenHome = !isRecovery && isLoggedIn && !_wasLoggedIn;
+    final shouldOpenLogin = !isRecovery && !isLoggedIn && _wasLoggedIn;
+
+    _wasLoggedIn = isLoggedIn;
+    _wasPasswordRecovery = isRecovery;
+
+    if (!shouldOpenRecovery && !shouldOpenHome && !shouldOpenLogin) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final navigator = NavigatorService.navigatorKey.currentState;
+      if (navigator == null) return;
+      final route = shouldOpenRecovery
+          ? AppRoutes.resetPasswordScreen
+          : shouldOpenHome
+          ? AppRoutes.homeScreen
+          : AppRoutes.loginScreen;
+      navigator.pushNamedAndRemoveUntil(route, (_) => false);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    final initialRoute = widget.authService.isPasswordRecovery
+        ? AppRoutes.resetPasswordScreen
+        : widget.authService.isLoggedIn
+        ? AppRoutes.homeScreen
+        : AppRoutes.loginScreen;
+
     return MaterialApp(
-      title: 'Trek',
+      title: 'TREK',
       debugShowCheckedModeBanner: false,
       theme: theme,
+      navigatorKey: NavigatorService.navigatorKey,
+      scaffoldMessengerKey: globalMessengerKey,
+      initialRoute: initialRoute,
       builder: (context, child) {
         return MediaQuery(
-          data: MediaQuery.of(
-            context,
-          ).copyWith(textScaler: TextScaler.linear(1.0)),
+          data: MediaQuery.of(context).copyWith(
+            textScaler: TextScaler.linear(1.0),
+          ),
           child: child!,
         );
       },
-      navigatorKey: NavigatorService.navigatorKey,
-      initialRoute: AppRoutes.initialRoute,
-
       routes: {
-        AppRoutes.loginScreen: (context) => LoginScreen.builder(
-          context,
-          onLoginSuccess: () {
-            Navigator.pushNamedAndRemoveUntil(
-              context,
-              AppRoutes.homeScreen,
-              (route) => false,
-            );
-          },
-          onRegister: () {
-            Navigator.pushNamed(
-              context,
-              AppRoutes.registrationScreen,
-            );
-          },
-          onForgotPassword: () {
-            Navigator.pushNamed(
-              context,
-              AppRoutes.forgotPasswordScreen,
-            );
-          },
-        ),
-
-        AppRoutes.registrationScreen: (context) =>
-            RegistrationScreen.builder(context),
-
+        AppRoutes.loginScreen: (context) => LoginScreen.builder(context),
+        AppRoutes.registrationScreen: (context) => RegistrationScreen.builder(context),
         AppRoutes.forgotPasswordScreen: (context) =>
             EmailSubmissionScreen.builder(context),
+        AppRoutes.resetPasswordScreen: (context) =>
+            PasswordResetScreen.builder(context),
+        AppRoutes.editProfileScreen: (context) => EditProfileScreen.builder(context),
 
         AppRoutes.homeScreen: (context) => HomeScreen.builder(context),
 

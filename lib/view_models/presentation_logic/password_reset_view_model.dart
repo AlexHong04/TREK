@@ -1,4 +1,5 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../models/services/i_auth_service.dart';
 import '../ui_state/password_reset_ui_state.dart';
@@ -10,6 +11,7 @@ class PasswordResetViewModel extends ChangeNotifier {
 
   PasswordResetUiState _uiState = const PasswordResetUiState();
   PasswordResetUiState get uiState => _uiState;
+  bool _passwordTouched = false;
 
   static final RegExp _uppercase = RegExp(r'[A-Z]');
   static final RegExp _lowercase = RegExp(r'[a-z]');
@@ -18,10 +20,23 @@ class PasswordResetViewModel extends ChangeNotifier {
   RegExp(r'[!@#$%^&*(),.?":{}|<>_\-+=/\\;\[\]~`]');
 
   void onNewPasswordChanged(String value) {
+    final passwordError =
+    _passwordTouched ? _validatePassword(value) : null;
     _uiState = _uiState.copyWith(
       newPassword: value,
-      clearPasswordError: true,
+      passwordError: passwordError,
+      clearPasswordError: passwordError == null,
       clearErrorMessage: true,
+    );
+    notifyListeners();
+  }
+
+  void onNewPasswordFocusLost() {
+    _passwordTouched = true;
+    final error = _validatePassword(_uiState.newPassword);
+    _uiState = _uiState.copyWith(
+      passwordError: error,
+      clearPasswordError: error == null,
     );
     notifyListeners();
   }
@@ -34,6 +49,7 @@ class PasswordResetViewModel extends ChangeNotifier {
   }
 
   Future<void> onResetPressed() async {
+    _passwordTouched = true;
     final passwordError = _validatePassword(_uiState.newPassword);
     if (passwordError != null) {
       _uiState = _uiState.copyWith(passwordError: passwordError);
@@ -54,6 +70,12 @@ class PasswordResetViewModel extends ChangeNotifier {
         isLoading: false,
         resetSucceeded: true,
       );
+    } on PasswordReusedException {
+      _uiState = _uiState.copyWith(
+        isLoading: false,
+        passwordError:
+        'Your new password must be different from your old password.',
+      );
     } catch (_) {
       _uiState = _uiState.copyWith(
         isLoading: false,
@@ -69,6 +91,10 @@ class PasswordResetViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  void consumeErrorMessage() {
+    _uiState = _uiState.copyWith(clearErrorMessage: true);
+  }
+
   String? _validatePassword(String password) {
     if (password.isEmpty) return 'New password is required.';
     if (password.length < 8 ||
@@ -76,9 +102,22 @@ class PasswordResetViewModel extends ChangeNotifier {
         !_lowercase.hasMatch(password) ||
         !_digit.hasMatch(password) ||
         !_special.hasMatch(password)) {
-      return 'Password must have at least 8 characters, one uppercase letter, one lowercase letter, one digit, and one special character.';
+      return 'Complete the password requirements shown below.';
     }
     return null;
   }
 }
 
+class PasswordResetViewModelScope extends StatelessWidget {
+  final Widget child;
+
+  const PasswordResetViewModelScope({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (_) => PasswordResetViewModel(context.read<IAuthService>()),
+      child: child,
+    );
+  }
+}

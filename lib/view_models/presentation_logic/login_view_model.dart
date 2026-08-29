@@ -1,4 +1,5 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../models/services/i_auth_service.dart';
 import '../ui_state/login_ui_state.dart';
@@ -10,29 +11,56 @@ class LoginViewModel extends ChangeNotifier {
 
   LoginUiState _uiState = const LoginUiState();
   LoginUiState get uiState => _uiState;
+  bool _emailTouched = false;
+  bool _passwordTouched = false;
 
   static final RegExp _emailPattern = RegExp(
     r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$",
   );
 
   void onEmailChanged(String value) {
+    final emailError = _emailTouched ? _validateEmail(value) : null;
     _uiState = _uiState.copyWith(
       email: value,
       canResendVerification: false,
       verificationEmailSent: false,
       showMagicLinkOption: false,
       magicLinkSent: false,
-      clearEmailError: true,
+      emailError: emailError,
+      clearEmailError: emailError == null,
       clearErrorMessage: true,
     );
     notifyListeners();
   }
 
   void onPasswordChanged(String value) {
+    final passwordError =
+    _passwordTouched ? _validatePassword(value) : null;
     _uiState = _uiState.copyWith(
       password: value,
-      clearPasswordError: true,
+      passwordError: passwordError,
+      clearPasswordError: passwordError == null,
       clearErrorMessage: true,
+    );
+    notifyListeners();
+  }
+
+  void onEmailFocusLost() {
+    _emailTouched = true;
+    final error = _validateEmail(_uiState.email);
+    _uiState = _uiState.copyWith(
+      emailError: error,
+      clearEmailError: error == null,
+    );
+    notifyListeners();
+  }
+
+  void onPasswordFocusLost() {
+    _passwordTouched = true;
+    final error = _validatePassword(_uiState.password);
+    _uiState = _uiState.copyWith(
+      passwordError: error,
+      clearPasswordError: error == null,
     );
     notifyListeners();
   }
@@ -79,7 +107,8 @@ class LoginViewModel extends ChangeNotifier {
       _uiState = _uiState.copyWith(
         isLoading: false,
         showMagicLinkOption: true,
-        errorMessage: 'Your account has been temporarily locked. $suffix',
+        errorMessage:
+        'Your account has been temporarily locked. $suffix You can also continue with an email magic link.',
       );
     } on EmailNotVerifiedException {
       _uiState = _uiState.copyWith(
@@ -168,16 +197,10 @@ class LoginViewModel extends ChangeNotifier {
   }
 
   bool _validate() {
-    final email = _uiState.email.trim();
-    String? emailError;
-    if (email.isEmpty) {
-      emailError = 'Email address is required.';
-    } else if (!_emailPattern.hasMatch(email)) {
-      emailError =
-      'Invalid email address. Email must follow local@domain.com format.';
-    }
-    final passwordError =
-    _uiState.password.isEmpty ? 'Password is required.' : null;
+    _emailTouched = true;
+    _passwordTouched = true;
+    final emailError = _validateEmail(_uiState.email);
+    final passwordError = _validatePassword(_uiState.password);
     final isValid = emailError == null && passwordError == null;
 
     _uiState = _uiState.copyWith(
@@ -191,10 +214,44 @@ class LoginViewModel extends ChangeNotifier {
     return isValid;
   }
 
+  void consumeErrorMessage() {
+    _uiState = _uiState.copyWith(clearErrorMessage: true);
+  }
+
+  String? _validateEmail(String value) {
+    final email = value.trim();
+    if (email.isEmpty) return 'Email address is required.';
+    if (!_emailPattern.hasMatch(email)) {
+      return 'Invalid email address. Email must follow local@domain.com format.';
+    }
+    return null;
+  }
+
+  String? _validatePassword(String value) {
+    return value.isEmpty ? 'Password is required.' : null;
+  }
+
   static String _formatTime(DateTime value) {
     final local = value.toLocal();
     final hour = local.hour.toString().padLeft(2, '0');
     final minute = local.minute.toString().padLeft(2, '0');
     return '$hour:$minute';
+  }
+}
+
+class LoginViewModelScope extends StatelessWidget {
+  final Widget child;
+
+  const LoginViewModelScope({
+    super.key,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider<LoginViewModel>(
+      create: (_) => LoginViewModel(context.read<IAuthService>()),
+      child: child,
+    );
   }
 }

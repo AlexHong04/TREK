@@ -38,12 +38,15 @@ dependencies:
   supabase_flutter: ^2.5.4
   google_generative_ai: ^0.4.6
   http: ^1.2.1
+  shared_preferences: ^2.5.5
+  sign_in_button: ^5.0.0
   intl: ^0.20.3
   image_picker: ^1.2.3
   permission_handler: ^13.0.1
   path_provider: ^2.1.4
   path: ^1.8.4
   geolocator: ^14.0.3
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:

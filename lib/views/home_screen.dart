@@ -9,13 +9,13 @@ import '../models/local_data_source/location_source.dart';
 import 'package:geolocator/geolocator.dart';
 import '../main.dart';
 import 'financial_dashboard_screen.dart';
+import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   static Widget builder(BuildContext context) {
-    return ChangeNotifierProvider<HomeViewModel>(
-      create: (context) => HomeViewModel(),
+    return const HomeViewModelScope(
       child: const HomeScreen(),
     );
   }
@@ -80,6 +80,28 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildTopBar(BuildContext context) {
+    final profilePictureUrl = context.select<HomeViewModel, String?>(
+          (viewModel) => viewModel.uiState.profilePictureUrl,
+    );
+    final profileName = context.select<HomeViewModel, String?>(
+          (viewModel) => viewModel.uiState.userName,
+    );
+    final trimmedName = profileName?.trim() ?? '';
+    final initial = trimmedName.isEmpty ? 'T' : trimmedName[0].toUpperCase();
+
+    Widget initialAvatar() {
+      return Center(
+        child: Text(
+          initial,
+          style: TextStyle(
+            color: appTheme.teal_800,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
       child: Row(
@@ -111,25 +133,49 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           // Profile avatar
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: appTheme.gray_200,
-              border: Border.all(color: appTheme.gray_100, width: 1),
-            ),
-            child: ClipOval(
-              child: Icon(
-                Icons.person,
-                color: appTheme.blue_gray_300,
-                size: 24,
+          Semantics(
+            button: true,
+            label: 'Open profile',
+            child: Material(
+              color: appTheme.teal_50,
+              shape: CircleBorder(
+                side: BorderSide(color: appTheme.gray_100, width: 1),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: () => _openProfile(context),
+                child: SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: profilePictureUrl?.isNotEmpty == true
+                      ? Image.network(
+                    profilePictureUrl!,
+                    fit: BoxFit.cover,
+                    loadingBuilder: (_, child, loadingProgress) =>
+                    loadingProgress == null ? child : initialAvatar(),
+                    errorBuilder: (_, __, ___) => initialAvatar(),
+                  )
+                      : initialAvatar(),
+                ),
               ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _openProfile(BuildContext context) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (routeContext) => ProfileScreen.builder(
+          routeContext,
+        ),
+      ),
+    );
+    if (context.mounted) {
+      await context.read<HomeViewModel>().refreshProfile();
+    }
   }
 
   Widget _buildPageIndicator() {
