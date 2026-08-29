@@ -1,27 +1,46 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../models/entities/activity.dart';
 import '../../models/entities/expense_item.dart';
 import '../../models/local_data_source/camera_source.dart';
+import '../../models/local_data_source/notification_source.dart';
+import '../../models/repository/expense_repository.dart';
+import '../../models/repository/i_expense_repository.dart';
 import '../../models/services/budget_service.dart';
+import '../../models/services/i_budget_service.dart';
 import '../../models/services/expense_tracking_service.dart';
+import '../../models/services/i_expense_tracking_service.dart';
 import '../../models/services/itinerary_service.dart';
+import '../../models/services/i_itinerary_service.dart';
 import '../ui_state/activity_ui_state.dart';
 
 class ActivityViewModel extends ChangeNotifier {
-  final ItineraryService _itineraryService = ItineraryService();
-  final BudgetService _budgetService = BudgetService();
-  final ExpenseTrackingService _expenseTrackingService =
-      ExpenseTrackingService();
+  final IItineraryService _itineraryService;
+  final IBudgetService _budgetService;
+  final IExpenseTrackingService _expenseTrackingService;
+  final IExpenseRepository _expenseRepository;
   final CameraSource _cameraSource = CameraSource();
+  final NotificationSource _notificationSource = NotificationSource();
+
+  ActivityViewModel({
+    IItineraryService? itineraryService,
+    IBudgetService? budgetService,
+    IExpenseTrackingService? expenseTrackingService,
+    IExpenseRepository? expenseRepository,
+  })
+      : _itineraryService = itineraryService ?? ItineraryService(),
+        _budgetService = budgetService ?? BudgetService(),
+        _expenseTrackingService =
+            expenseTrackingService ?? ExpenseTrackingService(),
+        _expenseRepository = expenseRepository ?? ExpenseRepository() {
+    initialize();
+  }
 
   ActivityUiState _uiState = const ActivityUiState();
 
   ActivityUiState get uiState => _uiState;
-
-  ActivityViewModel() {
-    initialize();
-  }
 
   void selectActivityForExpense(Activity activity) {
     _uiState = _uiState.copyWith(
@@ -31,9 +50,81 @@ class ActivityViewModel extends ChangeNotifier {
       draftTotalAmount: 0.0,
       paymentMethod: '',
       receiptLocalPath: '',
+      clearOcrData: true,
       errorMessage: '',
       successMessage: '',
+      recordedExpenses: const [],
+      isLoadingRecordedExpenses: true,
+      selectedRecordedExpenseItems: const [],
+      isLoadingRecordedExpenseItems: false,
     );
+    notifyListeners();
+
+    loadRecordedExpensesForSelectedActivity();
+  }
+
+  /// Loads the confirmed Expense records for the currently selected Activity.
+  Future<void> loadRecordedExpensesForSelectedActivity() async {
+    final selectedActivity = _uiState.selectedActivity;
+    if (selectedActivity == null) {
+      _uiState = _uiState.copyWith(
+        recordedExpenses: const [],
+        isLoadingRecordedExpenses: false,
+      );
+      notifyListeners();
+      return;
+    }
+
+    _uiState = _uiState.copyWith(
+      isLoadingRecordedExpenses: true,
+      errorMessage: '',
+    );
+    notifyListeners();
+
+    try {
+      final recordedExpenses = await _expenseRepository.getExpensesByActivityId(
+        selectedActivity.activitiesId,
+      );
+
+      _uiState = _uiState.copyWith(
+        recordedExpenses: recordedExpenses,
+        isLoadingRecordedExpenses: false,
+      );
+    } catch (error) {
+      _uiState = _uiState.copyWith(
+        recordedExpenses: const [],
+        isLoadingRecordedExpenses: false,
+        errorMessage: _readableError(error),
+      );
+    }
+    notifyListeners();
+  }
+
+  /// Loads the child items of one confirmed Expense for read-only display.
+  Future<void> loadRecordedExpenseItems(String expenseId) async {
+    _uiState = _uiState.copyWith(
+      selectedRecordedExpenseItems: const [],
+      isLoadingRecordedExpenseItems: true,
+      errorMessage: '',
+    );
+    notifyListeners();
+
+    try {
+      final expenseItems = await _expenseRepository.getExpenseItemsByExpenseId(
+        expenseId,
+      );
+
+      _uiState = _uiState.copyWith(
+        selectedRecordedExpenseItems: expenseItems,
+        isLoadingRecordedExpenseItems: false,
+      );
+    } catch (error) {
+      _uiState = _uiState.copyWith(
+        selectedRecordedExpenseItems: const [],
+        isLoadingRecordedExpenseItems: false,
+        errorMessage: _readableError(error),
+      );
+    }
     notifyListeners();
   }
 
@@ -62,6 +153,18 @@ class ActivityViewModel extends ChangeNotifier {
     _updateDraftExpenseItems(updatedItems);
   }
 
+  /// Removes only unsaved draft items after the tourist agrees to replace them
+  /// with OCR results. Confirmed Expense records are never changed here.
+  void clearDraftExpenseItemsForOcr() {
+    _uiState = _uiState.copyWith(
+      draftExpenseItems: const [],
+      draftTotalAmount: 0.0,
+      errorMessage: '',
+      successMessage: '',
+    );
+    notifyListeners();
+  }
+
   void setPaymentMethod(String paymentMethod) {
     _uiState = _uiState.copyWith(
       paymentMethod: paymentMethod,
@@ -71,7 +174,7 @@ class ActivityViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> takeReceiptPhoto() async {
+  Future<bool> takeReceiptPhoto() async {
     _uiState = _uiState.copyWith(
       isPickingReceipt: true,
       errorMessage: '',
@@ -81,20 +184,31 @@ class ActivityViewModel extends ChangeNotifier {
 
     try {
       final localPath = await _cameraSource.takePhoto();
+      if (localPath == null) {
+        _uiState = _uiState.copyWith(isPickingReceipt: false);
+        notifyListeners();
+        return false;
+      }
+
+      await _expenseTrackingService.validateReceiptImage(localPath);
       _uiState = _uiState.copyWith(
         isPickingReceipt: false,
-        receiptLocalPath: localPath ?? _uiState.receiptLocalPath,
+        receiptLocalPath: localPath,
+        clearOcrData: true,
       );
+      notifyListeners();
+      return true;
     } catch (error) {
       _uiState = _uiState.copyWith(
         isPickingReceipt: false,
         errorMessage: _readableError(error),
       );
+      notifyListeners();
+      return false;
     }
-    notifyListeners();
   }
 
-  Future<void> chooseReceiptFromGallery() async {
+  Future<bool> chooseReceiptFromGallery() async {
     _uiState = _uiState.copyWith(
       isPickingReceipt: true,
       errorMessage: '',
@@ -104,9 +218,51 @@ class ActivityViewModel extends ChangeNotifier {
 
     try {
       final localPath = await _cameraSource.pickPhotoFromGallery();
+      if (localPath == null) {
+        _uiState = _uiState.copyWith(isPickingReceipt: false);
+        notifyListeners();
+        return false;
+      }
+
+      await _expenseTrackingService.validateReceiptImage(localPath);
       _uiState = _uiState.copyWith(
         isPickingReceipt: false,
-        receiptLocalPath: localPath ?? _uiState.receiptLocalPath,
+        receiptLocalPath: localPath,
+        clearOcrData: true,
+      );
+      notifyListeners();
+      return true;
+    } catch (error) {
+      _uiState = _uiState.copyWith(
+        isPickingReceipt: false,
+        errorMessage: _readableError(error),
+      );
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Replaces the temporary receipt path only when the tourist finishes the
+  /// device crop flow. Cancelling leaves the validated original image in use.
+  Future<void> cropSelectedReceipt() async {
+    final originalPath = _uiState.receiptLocalPath;
+    if (originalPath.isEmpty) {
+      _setExpenseError('Choose a receipt image before cropping it.');
+      return;
+    }
+
+    _uiState = _uiState.copyWith(isPickingReceipt: true, errorMessage: '');
+    notifyListeners();
+
+    try {
+      final croppedPath = await _cameraSource.cropReceiptImage(originalPath);
+      if (croppedPath != null) {
+        await _expenseTrackingService.validateReceiptImage(croppedPath);
+      }
+      _uiState = _uiState.copyWith(
+        isPickingReceipt: false,
+        receiptLocalPath: croppedPath ?? originalPath,
+        clearOcrData: croppedPath != null,
       );
     } catch (error) {
       _uiState = _uiState.copyWith(
@@ -118,7 +274,67 @@ class ActivityViewModel extends ChangeNotifier {
   }
 
   void removeReceipt() {
-    _uiState = _uiState.copyWith(receiptLocalPath: '');
+    _uiState = _uiState.copyWith(receiptLocalPath: '', clearOcrData: true);
+    notifyListeners();
+  }
+
+  /// Scans the selected receipt and keeps the extracted values temporary until
+  /// the tourist has reviewed and confirmed the whole expense.
+  Future<void> scanReceipt() async {
+    final receiptLocalPath = _uiState.receiptLocalPath;
+    if (receiptLocalPath.isEmpty) {
+      _setExpenseError('Choose a receipt image before scanning it.');
+      return;
+    }
+
+    _uiState = _uiState.copyWith(
+      isScanningReceipt: true,
+      errorMessage: '',
+      successMessage: '',
+    );
+    notifyListeners();
+
+    try {
+      final receiptText = await _expenseTrackingService.readReceiptText(
+        receiptLocalPath,
+      );
+      final extractedTotal = _expenseTrackingService.extractReceiptTotal(
+        receiptText,
+      );
+      final extractedDateTime = _expenseTrackingService.extractReceiptDateTime(
+        receiptText,
+      );
+      String extractedTotalError = '';
+
+      if (extractedTotal != null) {
+        try {
+          _expenseTrackingService.validateTotalAmount(extractedTotal);
+        } on ArgumentError {
+          extractedTotalError =
+          'The extracted amount is invalid. Please correct it.';
+        }
+      }
+
+      _uiState = _uiState.copyWith(
+        isScanningReceipt: false,
+        ocrRawText: receiptText,
+        ocrMerchantName:
+        _expenseTrackingService.extractMerchantName(receiptText) ?? '',
+        ocrTransactionDateTime: extractedDateTime,
+        clearOcrTransactionDateTime: extractedDateTime == null,
+        ocrExtractedTotal: extractedTotal,
+        clearOcrExtractedTotal: extractedTotal == null,
+        ocrItemLines: _expenseTrackingService.extractReceiptItemLines(
+          receiptText,
+        ),
+        errorMessage: extractedTotalError,
+      );
+    } catch (error) {
+      _uiState = _uiState.copyWith(
+        isScanningReceipt: false,
+        errorMessage: _readableError(error),
+      );
+    }
     notifyListeners();
   }
 
@@ -141,6 +357,8 @@ class ActivityViewModel extends ChangeNotifier {
     );
     notifyListeners();
 
+    final expenseAmount = _uiState.draftTotalAmount;
+
     try {
       await _expenseTrackingService.recordExpense(
         activitiesId: selectedActivity.activitiesId,
@@ -153,14 +371,29 @@ class ActivityViewModel extends ChangeNotifier {
             : _uiState.receiptLocalPath,
       );
 
+      final updatedTrip = await _budgetService.deductRemainingBudget(
+        tripId: _uiState.tripId,
+        expenseAmount: expenseAmount,
+      );
+
+      await _cancelActivityExpenseReminder(selectedActivity);
+
       _uiState = _uiState.copyWith(
         isSavingExpense: false,
         draftExpenseItems: const [],
         draftTotalAmount: 0.0,
         paymentMethod: '',
         receiptLocalPath: '',
+        clearOcrData: true,
         successMessage: 'The expense record has been successfully saved.',
+        totalBudget: updatedTrip.totalBudget,
+        spentBudget:
+            updatedTrip.totalBudget - (updatedTrip.remainingBalance ?? 0.0),
       );
+      await loadRecordedExpensesForSelectedActivity();
+
+      // detect overspend
+      await handleExpenseSubmission(expenseAmount);
     } catch (error) {
       _uiState = _uiState.copyWith(
         isSavingExpense: false,
@@ -173,13 +406,14 @@ class ActivityViewModel extends ChangeNotifier {
   void _updateDraftExpenseItems(List<ExpenseItem> items) {
     final itemsWithCalculatedSubtotals = items
         .map(
-          (item) => item.copyWith(
+          (item) =>
+          item.copyWith(
             subtotal: _expenseTrackingService.calculateItemSubtotal(
               item.quantity,
               item.unitPrice,
             ),
           ),
-        )
+    )
         .toList();
 
     _uiState = _uiState.copyWith(
@@ -205,8 +439,12 @@ class ActivityViewModel extends ChangeNotifier {
         .replaceFirst('Invalid argument(s): ', '');
   }
 
-  Future<void> initialize() async {
-    _uiState = _uiState.copyWith(isLoading: true);
+  Future<void> initialize({DateTime? filterDate}) async {
+    _uiState = _uiState.copyWith(
+      isLoading: true,
+      filterDate: filterDate,
+      clearFilterDate: filterDate == null,
+    );
     notifyListeners();
 
     try {
@@ -219,6 +457,7 @@ class ActivityViewModel extends ChangeNotifier {
           activities: result.activities,
           totalBudget: result.trip.totalBudget,
         );
+        unawaited(_prepareActivityEndExpenseReminders(result.activities));
       } else {
         _uiState = _uiState.copyWith(isLoading: false);
       }
@@ -229,76 +468,161 @@ class ActivityViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> loadTripItinerary(String tripId) async {
+  Future<void> loadTripItinerary(String tripId, {DateTime? filterDate}) async {
     _uiState = _uiState.copyWith(isLoading: true);
     notifyListeners();
 
     try {
-      final activities = await _itineraryService.fetchAllActivitiesByTrip(
+      final allActivities = await _itineraryService.fetchAllActivitiesByTrip(
         tripId,
       );
+      final tripResult = await _itineraryService.fetchLatestTrip();
 
-      _uiState = _uiState.copyWith(isLoading: false, activities: activities);
+      final now = DateTime.now();
+      final targetDate = filterDate ?? DateTime(now.year, now.month, now.day);
+
+      _uiState = _uiState.copyWith(
+        isLoading: false,
+        activities: allActivities,
+        totalBudget: tripResult?.trip.totalBudget ?? _uiState.totalBudget,
+        filterDate: targetDate,
+        tripId: tripId,
+      );
+      unawaited(_prepareActivityEndExpenseReminders(allActivities));
     } catch (e) {
-      _uiState = _uiState.copyWith(isLoading: false);
-      debugPrint('DEBUG: Error in loadTripItinerary: $e');
+      _uiState = _uiState.copyWith(
+        isLoading: false,
+        errorMessage: e.toString(),
+      );
     }
     notifyListeners();
   }
 
-  void initializeHardcoded() {
-    _uiState = _uiState.copyWith(isLoading: true);
-    notifyListeners();
+  /// Requests notification and exact-alarm permission, then schedules one
+  /// reminder for each future activity that has no confirmed expense.
+  Future<void> _prepareActivityEndExpenseReminders(
+    List<Activity> activities,
+  ) async {
+    try {
+      final hasNotificationPermission =
+          await _notificationSource.requestPermission();
+      if (!hasNotificationPermission) {
+        debugPrint('[Expense reminder] Notification permission was not granted.');
+        return;
+      }
 
-    // Mock data matching the UI
-    final List<Activity> newActivities = [
-      Activity(
-        activitiesId: '1',
-        dayTripId: 'day1',
-        destination: 'Kinkaku-ji Temple',
-        description:
-            'Marvel at the Zen Buddhist temple whose top two floors are completely covered in gold leaf.',
-        activityImgUrl: 'assets/images/placeholder.png',
-        // dummy
-        date: DateTime(2026, 8, 12, 9, 0),
-        allocatedBudget: 25.0,
-        overspendAmount: 25.0,
-        status: 'planned',
-        duration: '60-90 min',
-        activityCategory: 'Culture',
-        isOverspend: true, // triggers the blue badge in UI
-      ),
-      Activity(
-        activitiesId: '2',
-        dayTripId: 'day1',
-        destination: 'Traditional Kaiseki Lunch',
-        description:
-            'Experience a multi-course dinner that balances taste, texture, and appearance in the historic Gion district.',
-        activityImgUrl: 'assets/images/placeholder.png',
-        // dummy
-        date: DateTime(2026, 8, 12, 12, 0),
-        allocatedBudget: 25.0,
-        overspendAmount: 0.0,
-        status: 'planned',
-        duration: '60-90 min',
-        activityCategory: 'Food',
-        isOverspend: false,
-      ),
-    ];
+      final hasExactAlarmPermission =
+          await _notificationSource.requestExactAlarmPermission();
+      if (!hasExactAlarmPermission) {
+        debugPrint('[Expense reminder] Exact-alarm permission was not granted.');
+        return;
+      }
 
-    _uiState = _uiState.copyWith(
-      isLoading: false,
-      activities: newActivities,
-      totalBudget: 2450.00,
-      spentBudget: 2425.00,
-      remainingBudget: 25.00,
-      overspentBudget: 0.00,
-      sufficientDays: 7,
-      usedPercentageString: '1% Used',
-      // Matching the design text
-      usedPercentageValue: 0.01,
+      await _scheduleActivityEndExpenseReminders(activities);
+    } catch (error) {
+      debugPrint('[Expense reminder] Unable to prepare reminders: $error');
+    }
+  }
+
+  /// Schedules one reminder for each future activity that has no confirmed
+  /// expense yet. This method is intentionally best-effort: notification
+  /// setup must never stop the daily plan from loading.
+  Future<void> _scheduleActivityEndExpenseReminders(
+    List<Activity> activities,
+  ) async {
+    for (final activity in activities) {
+      final reminderTime = _activityEndDateTime(activity);
+      if (reminderTime == null || !reminderTime.isAfter(DateTime.now())) {
+        continue;
+      }
+
+      try {
+        final recordedExpenses = await _expenseRepository
+            .getExpensesByActivityId(activity.activitiesId);
+        final reminderId = _activityReminderId(activity.activitiesId);
+
+        if (recordedExpenses.isNotEmpty) {
+          await _notificationSource.cancelExpenseReminder(reminderId);
+          continue;
+        }
+
+        await _notificationSource.scheduleExpenseReminder(
+          id: reminderId,
+          scheduledAt: reminderTime,
+          title: 'Expense reminder',
+          body: 'Did you spend at ${activity.destination}? '
+              'Record your expense now.',
+          payload: activity.activitiesId,
+        );
+      } catch (error) {
+        debugPrint(
+          'Unable to schedule the expense reminder for '
+          '${activity.activitiesId}: $error',
+        );
+      }
+    }
+  }
+
+  /// Cancels the selected activity's future reminder after persistence succeeds.
+  Future<void> _cancelActivityExpenseReminder(Activity activity) async {
+    try {
+      await _notificationSource.cancelExpenseReminder(
+        _activityReminderId(activity.activitiesId),
+      );
+    } catch (error) {
+      debugPrint(
+        'Unable to cancel the expense reminder for '
+        '${activity.activitiesId}: $error',
+      );
+    }
+  }
+
+  /// Combines the database activity date with a stored HH:mm end time.
+  /// Activities without a valid end time cannot have an end-time reminder.
+  DateTime? _activityEndDateTime(Activity activity) {
+    final endTime = activity.endTime;
+    if (endTime == null || endTime.trim().isEmpty) {
+      return null;
+    }
+
+    final timeParts = endTime.trim().split(':');
+    if (timeParts.length < 2) {
+      return null;
+    }
+
+    final hour = int.tryParse(timeParts[0]);
+    final minute = int.tryParse(timeParts[1]);
+    if (hour == null || minute == null || hour < 0 || hour > 23 ||
+        minute < 0 || minute > 59) {
+      return null;
+    }
+
+    return DateTime(
+      activity.date.year,
+      activity.date.month,
+      activity.date.day,
+      hour,
+      minute,
     );
+  }
 
+  /// Produces a stable device notification ID from the team's AC#### ID.
+  int _activityReminderId(String activityId) {
+    final numericPart = activityId.replaceAll(RegExp(r'[^0-9]'), '');
+    final activityNumber = int.tryParse(numericPart) ?? 0;
+    return 100000 + activityNumber;
+  }
+
+  void setDateFilter(DateTime? filterDate) {
+    _uiState = _uiState.copyWith(
+      filterDate: filterDate,
+      clearFilterDate: filterDate == null,
+    );
+    notifyListeners();
+  }
+
+  void clearDateFilter() {
+    _uiState = _uiState.copyWith(clearFilterDate: true);
     notifyListeners();
   }
 
@@ -312,17 +636,12 @@ class ActivityViewModel extends ChangeNotifier {
       final update = await _itineraryService.endTrip(id);
 
       if (update) {
-        _uiState = _uiState.copyWith(isLoading: true, tripId: '');
+        _uiState = _uiState.copyWith(isLoading: false, tripId: '');
       }
     } catch (e) {
       _uiState = _uiState.copyWith(isLoading: false);
     }
 
-    notifyListeners();
-  }
-
-  void setCurrentActivityId(String activityId) {
-    _uiState = _uiState.copyWith(currentActivityId: activityId);
     notifyListeners();
   }
 
@@ -350,9 +669,6 @@ class ActivityViewModel extends ChangeNotifier {
       );
 
       if (updatedTrip != null) {
-        final percentage =
-            (updatedTrip.remainingBalance ?? 0.0) / updatedTrip.totalBudget;
-
         final days = await _budgetService.calculateSufficientDays(
           updatedTrip,
           activityId,
@@ -361,12 +677,11 @@ class ActivityViewModel extends ChangeNotifier {
         _uiState = _uiState.copyWith(
           isLoading: false,
           totalBudget: updatedTrip.totalBudget,
-          remainingBudget: updatedTrip.remainingBalance,
-          overspentBudget: _uiState.overspentBudget - additionalAmount,
+          overspentBudget: (_uiState.overspentBudget - additionalAmount).clamp(
+            0.0,
+            double.infinity,
+          ),
           sufficientDays: days.toInt(),
-          usedPercentageValue: percentage,
-          usedPercentageString:
-              '${(percentage * 100).toStringAsFixed(0)}% Used',
           errorMessage: '',
         );
 
@@ -394,45 +709,68 @@ class ActivityViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> handleExpenseSubmission(
-    Activity activity,
-    double expense,
-  ) async {
+  Future<void> handleExpenseSubmission(double expense) async {
+    debugPrint("zq handleExpenseSubmission");
+
     _uiState = _uiState.copyWith(isLoading: true);
     notifyListeners();
 
-    final result = await _expenseTrackingService.processExpense(
-      tripId: _uiState.tripId,
-      currentActivityId: _uiState.currentActivityId,
-      expense: expense,
-    );
+    try {
+      final response = await _expenseTrackingService.processExpense(
+        tripId: _uiState.tripId,
+        currentActivityId: _uiState.currentActivityId,
+        expense: expense,
+      );
 
-    switch (result) {
-      case ExpenseProcessingResult.withinBudget:
-        _uiState.copyWith(popupAction: '');
-        break;
+      debugPrint("result: ${response}");
 
-      case ExpenseProcessingResult.reallocatedSuccessfully:
-        _uiState = _uiState.copyWith(popupAction: 'successful');
-        break;
+      final days = await _itineraryService.getDaysByTripId(_uiState.tripId);
 
-      case ExpenseProcessingResult.reallocatedFailed:
-        _uiState = _uiState.copyWith(popupAction: 'fail');
-        break;
+      double overspend = 0.00;
 
-      case ExpenseProcessingResult.exceedsThresholdTriggerRecommendation:
-        _uiState = _uiState.copyWith(popupAction: 'recommendation');
-        break;
+      for (var day in days) {
+        overspend += day.overspendAmount!;
+      }
+
+      _uiState = _uiState.copyWith(
+        overspentBudget: overspend,
+        shortageAmount: overspend
+      );
+
+      switch (response) {
+        case ExpenseProcessingResult.withinBudget:
+          _uiState = _uiState.copyWith(popupAction: '');
+          break;
+
+        case ExpenseProcessingResult.reallocatedSuccessfully:
+          _uiState = _uiState.copyWith(popupAction: 'successful');
+          break;
+
+        case ExpenseProcessingResult.reallocatedFailed:
+          _uiState = _uiState.copyWith(popupAction: 'fail');
+          break;
+
+        case ExpenseProcessingResult.exceedsThresholdTriggerRecommendation:
+          _uiState = _uiState.copyWith(popupAction: 'recommendation');
+          break;
+
+        case ExpenseProcessingResult.critical:
+          _uiState = _uiState.copyWith(popupAction: 'critical');
+          break;
+      }
+    } catch (e) {
+      debugPrint("Error handling expense submission: $e");
+
+      _uiState = _uiState.copyWith(isLoading: false);
+    } finally {
+      _uiState = _uiState.copyWith(isLoading: false);
+
+      notifyListeners();
     }
-
-    _uiState = _uiState.copyWith(isLoading: false);
-    notifyListeners();
   }
 
   void clearPopupAction() {
-    _uiState = _uiState.copyWith(
-      popupAction: '',
-    );
+    _uiState = _uiState.copyWith(popupAction: '');
     notifyListeners();
   }
 }

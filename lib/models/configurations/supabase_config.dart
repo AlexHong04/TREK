@@ -5,7 +5,8 @@ class SupabaseConfig {
 
   // deep linking
   static const String authCallbackUrl = 'io.supabase.trek://login-callback/';
-  static const String passwordResetCallbackUrl = 'io.supabase.trek://reset-password-callback/';
+  static const String passwordResetCallbackUrl =
+      'io.supabase.trek://reset-password-callback/';
 
   static Future<void> initialize() async {
     const supabaseUrl = 'https://viworhiiejptvsjajgit.supabase.co';

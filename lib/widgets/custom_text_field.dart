@@ -9,9 +9,11 @@ class CustomTextField extends StatelessWidget {
   final String? Function(String?)? validator;
   final VoidCallback? onTap;
   final Function(String)? onFieldSubmitted;
+  final Function(String)? onChanged;
   final bool readOnly;
   final TextInputType? keyboardType;
   final Widget? bottomWidget;
+  final Widget? suffixIcon;
 
   const CustomTextField({
     super.key,
@@ -22,9 +24,11 @@ class CustomTextField extends StatelessWidget {
     this.validator,
     this.onTap,
     this.onFieldSubmitted,
+    this.onChanged,
     this.readOnly = false,
     this.keyboardType,
     this.bottomWidget,
+    this.suffixIcon,
   });
 
   @override
@@ -62,6 +66,7 @@ class CustomTextField extends StatelessWidget {
             readOnly: readOnly,
             onTap: onTap,
             onFieldSubmitted: onFieldSubmitted,
+            onChanged: onChanged,
             keyboardType: keyboardType,
             style: TextStyle(
               fontSize: 16,
@@ -82,6 +87,7 @@ class CustomTextField extends StatelessWidget {
                 minWidth: 44.0,
                 minHeight: 34.0,
               ),
+              suffixIcon: suffixIcon,
               contentPadding: const EdgeInsets.symmetric(
                 vertical: 6.0,
                 horizontal: 12.0,
@@ -120,4 +126,3 @@ class CustomTextField extends StatelessWidget {
     );
   }
 }
-

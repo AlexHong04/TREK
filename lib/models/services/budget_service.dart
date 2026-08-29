@@ -2,21 +2,43 @@ import 'package:flutter/cupertino.dart';
 
 import '../entities/activity.dart';
 import '../entities/whole_trip.dart';
+import '../repository/i_itinerary_repository.dart';
 import '../repository/itinerary_repository.dart';
+import 'i_budget_service.dart';
 
-class BudgetService {
-  final ItineraryRepository _itineraryRepository = ItineraryRepository();
+class BudgetService implements IBudgetService {
+  final IItineraryRepository _itineraryRepository = ItineraryRepository();
 
+  @override
+  Future<WholeTrip> deductRemainingBudget({
+    required String tripId,
+    required double expenseAmount,
+  }) async {
+    if (tripId.trim().isEmpty) {
+      throw ArgumentError(
+        'A trip must be selected before recording an expense.',
+      );
+    }
+    if (expenseAmount <= 0) {
+      throw ArgumentError('Expense amount must be greater than zero.');
+    }
+
+    final currentTrip = await _itineraryRepository.getTrip(tripId);
+    final updatedTrip = currentTrip.copyWith(
+      remainingBalance: (currentTrip.remainingBalance ?? 0.0) - expenseAmount,
+    );
+
+    await _itineraryRepository.updateTripBudget(updatedTrip);
+    return updatedTrip;
+  }
+
+  @override
   Future<WholeTrip?> topUpBudget({
     required String tripId,
     required String currentActivityId,
     required double topupAmount,
   }) async {
     final currentTrip = await _itineraryRepository.getTrip(tripId);
-
-    if (currentTrip == null) {
-      return null;
-    }
 
     final oldRemaining = currentTrip.remainingBalance ?? 0.0;
     final oldTotal = currentTrip.totalBudget;
@@ -66,38 +88,68 @@ class BudgetService {
     double overspendAmount,
   ) async {
     // Fetch remaining activities occurring after currentActivity
-    List<Activity> remainingActivities = await _itineraryRepository
+    final List<Activity> remainingActivities = await _itineraryRepository
         .fetchRemainingActivity(tripId, currentActivity.activitiesId);
 
-    // Filter remaining activities that belong to the 'restaurant' category
+    debugPrint("current activity: $currentActivity");
+    debugPrint("trip id: $tripId");
+    debugPrint("remaining activities: $remainingActivities");
+    debugPrint("remaining overspend: $overspendAmount");
+
+    // Get remaining restaurant activities
     final restaurantActivities = remainingActivities
-        .where((activity) => activity.activityCategory == 'restaurant')
+        .where(
+          (activity) => activity.activityCategory.toLowerCase() == 'restaurant',
+        )
         .toList();
 
-    // If no restaurants are remaining to absorb the overspend, trigger recommendation
+    debugPrint("restaurant activities: $restaurantActivities");
+
+    // No restaurants available for reallocation
     if (restaurantActivities.isEmpty) {
       return [];
-      throw Exception('Trigger Recommendation'); // trigger recommendation
     }
 
-    // Divide overspend amount equally among remaining restaurants
+    // Divide overspend equally among remaining restaurants
     final double deductionPerRestaurant =
         overspendAmount / restaurantActivities.length;
 
-    // Deduct divided amount
+    debugPrint("deduction per restaurant: $deductionPerRestaurant");
+
+    // Check all restaurants before making any changes
+    for (final activity in restaurantActivities) {
+      final double newBudget =
+          activity.allocatedBudget - deductionPerRestaurant;
+
+      debugPrint(
+        "${activity.activitiesId}: "
+        "current=${activity.allocatedBudget}, "
+        "min=${activity.minAllocatedBudget}, "
+        "new=$newBudget",
+      );
+
+      if (activity.minAllocatedBudget != null &&
+          newBudget < activity.minAllocatedBudget!) {
+        debugPrint(
+          "Cannot reallocate: activity "
+          "${activity.activitiesId} would fall below minimum allocated budget.",
+        );
+
+        return [];
+      }
+    }
+
+    // All restaurants can accept the deduction
     final List<Activity> updatedRemainingActivities = remainingActivities.map((
       activity,
     ) {
-      if (activity.activityCategory == 'restaurant') {
+      if (activity.activityCategory.toLowerCase() == 'restaurant') {
         final double newBudget =
             activity.allocatedBudget - deductionPerRestaurant;
 
-        if (newBudget <= 0.00) { // min price range
-          throw Exception('Trigger Recommendation'); // trigger recommendation
-        }
-
         return activity.copyWith(allocatedBudget: newBudget);
       }
+
       return activity;
     }).toList();
 

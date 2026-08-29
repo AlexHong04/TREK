@@ -2,16 +2,25 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+/// Thrown when the Google Places API returns REQUEST_DENIED or similar
+/// non-recoverable API-level errors (e.g. key not enabled).
+class PlacesApiDeniedException implements Exception {
+  final String status;
+  final String message;
+  PlacesApiDeniedException(this.status, this.message);
+  @override
+  String toString() => 'PlacesApiDeniedException: $status - $message';
+}
+
 class GooglePlacesApiConfig {
   // Google Places API Key.
-  // Developers should replace this placeholder with their own valid Google Maps Platform API Key.
   static const String _apiKey = 'AIzaSyAro7bHvmh72uWZCKqLkl4-tizXJHiO_k0';
 
   /// Check if the API key has been properly configured.
   static bool get isConfigured =>
       _apiKey.isNotEmpty && !_apiKey.startsWith('YOUR_');
 
-  /// Searches for a place by name/query using the Google Places Text Search API.
+  /// Searches for a place by name/query using the Google Places (New) Text Search API.
   /// Returns the first matching result object, or null if no matches or not configured.
   static Future<Map<String, dynamic>?> searchPlace(String query) async {
     if (!isConfigured) {
@@ -21,64 +30,85 @@ class GooglePlacesApiConfig {
       return null;
     }
 
-    final encodedQuery = Uri.encodeComponent(query);
     final String directUrlStr =
-        'https://maps.googleapis.com/maps/api/place/textsearch/json?query=$encodedQuery&key=$_apiKey';
+        'https://places.googleapis.com/v1/places:searchText';
 
-    final Map<String, String> headers = {};
+    final Map<String, String> headers = {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': _apiKey,
+      'X-Goog-FieldMask': 'places.displayName,places.photos',
+    };
+
     if (!kIsWeb) {
       headers['X-Android-Package'] = 'com.example.trek';
       headers['X-Android-Cert'] = '817279A922D846277D95205DE133CEB38DBA0D65';
     }
 
-    if (kIsWeb) {
-      // Web CORS workaround: try corsproxy.io first (generally faster/more stable),
-      // and fall back to api.allorigins.win if it fails.
-      final proxyUrls = [
-        'https://corsproxy.io/?${Uri.encodeComponent(directUrlStr)}',
-        'https://api.allorigins.win/raw?url=${Uri.encodeComponent(directUrlStr)}',
-      ];
-
-      for (final proxyUrlStr in proxyUrls) {
-        try {
-          final response = await http.get(
-            Uri.parse(proxyUrlStr),
-            headers: headers,
-          );
-          if (response.statusCode == 200) {
-            final data = jsonDecode(response.body);
-            final results = data['results'] as List?;
-            if (results != null && results.isNotEmpty) {
-              return results.first as Map<String, dynamic>;
-            }
-            return null;
-          } else {
-            debugPrint(
-              'CORS Proxy error ($proxyUrlStr): ${response.statusCode}',
-            );
-          }
-        } catch (e) {
-          debugPrint('CORS Proxy Exception ($proxyUrlStr): $e');
-        }
-      }
-      return null;
-    }
+    final String body = jsonEncode({"textQuery": query});
 
     try {
-      final response = await http.get(
-        Uri.parse(directUrlStr),
-        headers: headers,
-      );
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final results = data['results'] as List?;
-        if (results != null && results.isNotEmpty) {
-          return results.first as Map<String, dynamic>;
+      if (kIsWeb) {
+        // Web CORS workaround
+        final proxyUrlStr =
+            'https://corsproxy.io/?${Uri.encodeComponent(directUrlStr)}';
+        final response = await http.post(
+          Uri.parse(proxyUrlStr),
+          headers: headers,
+          body: body,
+        );
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          final places = data['places'] as List?;
+          if (places != null && places.isNotEmpty) {
+            final raw = places.first as Map<String, dynamic>;
+            return {
+              'name': raw['displayName']?['text'],
+              'photos': (raw['photos'] as List?)
+                  ?.map(
+                    (p) => {
+                      'photo_reference':
+                          p['name'], // New API uses 'name' for photo reference
+                    },
+                  )
+                  .toList(),
+            };
+          }
+        } else {
+          debugPrint(
+            'Google Places API (Web proxy) Error: ${response.statusCode} - ${response.body}',
+          );
         }
       } else {
-        debugPrint(
-          'Google Places API Error: ${response.statusCode} - ${response.body}',
+        // Direct request for mobile
+        final response = await http.post(
+          Uri.parse(directUrlStr),
+          headers: headers,
+          body: body,
         );
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          final places = data['places'] as List?;
+          if (places != null && places.isNotEmpty) {
+            final raw = places.first as Map<String, dynamic>;
+            return {
+              'name': raw['displayName']?['text'],
+              'photos': (raw['photos'] as List?)
+                  ?.map((p) => {'photo_reference': p['name']})
+                  .toList(),
+            };
+          }
+        } else {
+          try {
+            final err = jsonDecode(response.body);
+            debugPrint(
+              'Google Places API Error: ${response.statusCode} - ${err["error"]["status"]} - ${err["error"]["message"]}',
+            );
+          } catch (_) {
+            debugPrint(
+              'Google Places API Error: ${response.statusCode} - ${response.body}',
+            );
+          }
+        }
       }
     } catch (e) {
       debugPrint('Google Places API Exception: $e');
@@ -86,15 +116,111 @@ class GooglePlacesApiConfig {
     return null;
   }
 
+  /// Searches Google Places (New) Autocomplete for a query and returns a list of suggested place names.
+  static Future<List<String>> getAutocompleteSuggestions(String query) async {
+    if (!isConfigured) return [];
+
+    final String directUrlStr =
+        'https://places.googleapis.com/v1/places:autocomplete';
+
+    final Map<String, String> headers = {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': _apiKey,
+    };
+    if (!kIsWeb) {
+      headers['X-Android-Package'] = 'com.example.trek';
+      headers['X-Android-Cert'] = '817279A922D846277D95205DE133CEB38DBA0D65';
+    }
+
+    final String body = jsonEncode({"input": query});
+
+    try {
+      if (kIsWeb) {
+        final proxyUrlStr =
+            'https://corsproxy.io/?${Uri.encodeComponent(directUrlStr)}';
+        final response = await http.post(
+          Uri.parse(proxyUrlStr),
+          headers: headers,
+          body: body,
+        );
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          final suggestions = data['suggestions'] as List?;
+          if (suggestions != null) {
+            return suggestions
+                .map((s) {
+                  final mainText =
+                      s['placePrediction']?['structuredFormat']?['mainText']?['text']
+                          as String?;
+                  final fullText =
+                      s['placePrediction']?['text']?['text'] as String?;
+                  return mainText ?? fullText;
+                })
+                .where((text) => text != null)
+                .cast<String>()
+                .take(5)
+                .toList();
+          }
+        } else {
+          debugPrint(
+            'Google Places Autocomplete (Web proxy) Error: ${response.statusCode} - ${response.body}',
+          );
+        }
+      } else {
+        final response = await http.post(
+          Uri.parse(directUrlStr),
+          headers: headers,
+          body: body,
+        );
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          final suggestions = data['suggestions'] as List?;
+          if (suggestions != null) {
+            return suggestions
+                .map((s) {
+                  final mainText =
+                      s['placePrediction']?['structuredFormat']?['mainText']?['text']
+                          as String?;
+                  final fullText =
+                      s['placePrediction']?['text']?['text'] as String?;
+                  return mainText ?? fullText;
+                })
+                .where((text) => text != null)
+                .cast<String>()
+                .take(5)
+                .toList();
+          }
+        } else {
+          try {
+            final err = jsonDecode(response.body);
+            debugPrint(
+              'Google Places Autocomplete Error: ${response.statusCode} - ${err["error"]["status"]} - ${err["error"]["message"]}',
+            );
+          } catch (_) {
+            debugPrint(
+              'Google Places Autocomplete HTTP Error: ${response.statusCode} - ${response.body}',
+            );
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Google Places Autocomplete Exception: $e');
+    }
+    return [];
+  }
+
   /// Builds and returns the HTTP URL for retrieving a Place Photo.
   /// Note that this URL can be directly passed to Image.network().
+  /// For the New Places API, `photoReference` is the `name` field from the photo object (e.g. `places/XYZ/photos/ABC`).
   static String getPhotoUrl(String photoReference, {int maxWidth = 600}) {
     if (!isConfigured) return '';
+
+    // In New API, photoReference includes 'places/.../photos/...'
     final directUrl =
-        'https://maps.googleapis.com/maps/api/place/photo?maxwidth=$maxWidth&photo_reference=$photoReference&key=$_apiKey';
+        'https://places.googleapis.com/v1/$photoReference/media?maxHeightPx=$maxWidth&maxWidthPx=$maxWidth&key=$_apiKey';
+
     if (kIsWeb) {
       // Use CORS proxy for images on web to avoid Canvas/CORS paint exceptions.
-      // corsproxy.io is faster and more reliable than api.allorigins.win.
       return 'https://corsproxy.io/?${Uri.encodeComponent(directUrl)}';
     }
     return directUrl;
@@ -109,6 +235,7 @@ class GooglePlacesApiConfig {
     final photos = placeDetails['photos'] as List?;
     if (photos != null && photos.isNotEmpty) {
       final firstPhoto = photos.first as Map<String, dynamic>;
+      // We mapped the New API 'name' to 'photo_reference' for backwards compatibility
       final photoReference = firstPhoto['photo_reference'] as String?;
       if (photoReference != null && photoReference.isNotEmpty) {
         return getPhotoUrl(photoReference);

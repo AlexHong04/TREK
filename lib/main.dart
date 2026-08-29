@@ -7,13 +7,22 @@ import 'package:provider/provider.dart';
 import 'theme/app_theme.dart';
 import 'models/configurations/supabase_config.dart';
 import 'models/configurations/gemini_api_config.dart';
-import 'models/local_data_source/location_source.dart';
 
 import 'models/repository/auth_repository.dart';
 import 'models/repository/user_repository.dart';
+import 'models/repository/i_itinerary_repository.dart';
+import 'models/repository/itinerary_repository.dart';
+import 'models/repository/i_expense_repository.dart';
+import 'models/repository/expense_repository.dart';
 
 import 'models/services/auth_service.dart';
 import 'models/services/i_auth_service.dart';
+import 'models/services/i_itinerary_service.dart';
+import 'models/services/itinerary_service.dart';
+import 'models/services/i_budget_service.dart';
+import 'models/services/budget_service.dart';
+import 'models/services/i_expense_tracking_service.dart';
+import 'models/services/expense_tracking_service.dart';
 import 'models/services/profile_service.dart';
 
 import 'views/login_screen.dart';
@@ -24,7 +33,6 @@ import 'views/home_screen.dart';
 import 'views/travel_information_input_screen.dart';
 import 'views/activity_screen.dart';
 import 'views/financial_dashboard_screen.dart';
-import 'views/trip_summary_screen.dart';
 
 class AppRoutes {
   static const String loginScreen = '/login';
@@ -90,11 +98,24 @@ Future<void> main() async {
   );
 
   await authService.restoreSession();
+  final IItineraryRepository itineraryRepository = ItineraryRepository();
+  final IExpenseRepository expenseRepository = ExpenseRepository();
+  final IItineraryService itineraryService = ItineraryService();
+  final IBudgetService budgetService = BudgetService();
+  final IExpenseTrackingService expenseTrackingService =
+      ExpenseTrackingService();
 
   runApp(
-    ChangeNotifierProvider<IAuthService>.value(
-      value: authService,
-      child: MyApp(authService: authService),
+    MultiProvider(
+      providers: [
+        Provider<IItineraryRepository>.value(value: itineraryRepository),
+        Provider<IExpenseRepository>.value(value: expenseRepository),
+        Provider<IItineraryService>.value(value: itineraryService),
+        Provider<IBudgetService>.value(value: budgetService),
+        Provider<IExpenseTrackingService>.value(value: expenseTrackingService),
+        ChangeNotifierProvider<IAuthService>.value(value: authService),
+      ],
+        child: MyApp(authService: authService)
     ),
   );
 }
@@ -191,8 +212,7 @@ class _MyAppState extends State<MyApp> {
 
         AppRoutes.activityScreen: (context) => ActivityScreen.builder(context),
         AppRoutes.financialDashboardScreen: (context) =>
-            const FinancialDashboardScreen(),
-        AppRoutes.tripSummaryScreen: (context) => const TripSummaryScreen(),
+            FinancialDashboardScreen.builder(context),
       },
     );
   }

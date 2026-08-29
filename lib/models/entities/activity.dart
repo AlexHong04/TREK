@@ -13,6 +13,7 @@ class Activity {
   final bool? isOverspend;
   final double? overspendAmount;
   final String dayTripId;
+  final double? minAllocatedBudget;
 
   Activity({
     required this.activitiesId,
@@ -29,6 +30,7 @@ class Activity {
     required this.isOverspend,
     required this.overspendAmount,
     required this.dayTripId,
+    this.minAllocatedBudget,
   });
 
   Activity copyWith({
@@ -46,6 +48,7 @@ class Activity {
     bool? isOverspend,
     double? overspendAmount,
     String? dayTripId,
+    double? minAllocatedBudget,
   }) {
     return Activity(
       activitiesId: activitiesId ?? this.activitiesId,
@@ -62,6 +65,7 @@ class Activity {
       isOverspend: isOverspend ?? this.isOverspend,
       overspendAmount: overspendAmount ?? this.overspendAmount,
       dayTripId: dayTripId ?? this.dayTripId,
+      minAllocatedBudget: minAllocatedBudget ?? this.minAllocatedBudget,
     );
   }
 
@@ -82,6 +86,11 @@ class Activity {
       isOverspend: null,
       overspendAmount: null,
       dayTripId: json['day_trip_id'],
+      minAllocatedBudget: json['min_allocated_budget'] != null
+          ? (json['min_allocated_budget'] as num).toDouble()
+          : (json['minAllocatedBudget'] != null
+                ? (json['minAllocatedBudget'] as num).toDouble()
+                : null),
     );
   }
 
@@ -99,6 +108,21 @@ class Activity {
       'duration': duration,
       'activity_category': activityCategory,
       'day_trip_id': dayTripId,
+      'min_allocated_budget': minAllocatedBudget,
     };
   }
+}
+
+class ItineraryGenerationResult {
+  final List<Activity> activities;
+  final double totalAllocatedBudget;
+  final int wishlistItemsCoveredCount;
+  final double estimatedExtraBudgetNeeded;
+
+  ItineraryGenerationResult({
+    required this.activities,
+    required this.totalAllocatedBudget,
+    required this.wishlistItemsCoveredCount,
+    required this.estimatedExtraBudgetNeeded,
+  });
 }

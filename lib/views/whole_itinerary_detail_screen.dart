@@ -1,4 +1,4 @@
-﻿import '../theme/app_theme.dart';
+import '../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -22,6 +22,9 @@ class WholeItineraryDetailScreen extends StatefulWidget {
           budget: args?['budget'] as String? ?? '0',
           preference: args?['preference'] as String?,
           emergencyFund: args?['emergencyFund'] as String?,
+          wishlist: (args?['wishlist'] as List?)
+              ?.map((e) => e.toString())
+              .toList(),
         );
         return vm;
       },
@@ -174,6 +177,82 @@ class _WholeItineraryDetailScreenState
               ),
             ],
           ),
+          const SizedBox(height: 12.0),
+          Divider(color: appTheme.gray_100, height: 1.0),
+          const SizedBox(height: 12.0),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'AI Allocated Budget',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Inter',
+                  color: appTheme.blue_gray_700,
+                ),
+              ),
+              Text(
+                'RM${viewModel.uiState.totalAllocatedBudget.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  fontFamily: 'Inter',
+                  color: appTheme.teal_800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6.0),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Wishlist Covered',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Inter',
+                  color: appTheme.blue_gray_700,
+                ),
+              ),
+              Text(
+                '${viewModel.uiState.wishlistItemsCoveredCount} Items',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  fontFamily: 'Inter',
+                  color: appTheme.teal_800,
+                ),
+              ),
+            ],
+          ),
+          if (viewModel.uiState.estimatedExtraBudgetNeeded > 0.0) ...[
+            const SizedBox(height: 6.0),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Extra Budget Needed',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Inter',
+                    color: appTheme.errorRed,
+                  ),
+                ),
+                Text(
+                  'RM${viewModel.uiState.estimatedExtraBudgetNeeded.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    fontFamily: 'Inter',
+                    color: appTheme.errorRed,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -265,7 +344,7 @@ class _WholeItineraryDetailScreenState
 
   Widget _buildTimelineItem({
     required BuildContext context,
-    required Activity activity,
+    required dynamic activity,
     required bool isLast,
     required VoidCallback onRemove,
   }) {
@@ -435,7 +514,7 @@ class _WholeItineraryDetailScreenState
     );
   }
 
-  Widget _buildActivityCard(Activity activity) {
+  Widget _buildActivityCard(dynamic activity) {
     // Check if the activity has been cleared (empty slot state)
     if (activity.status == 'empty' ||
         (activity.destination.isEmpty && activity.description.isEmpty)) {
@@ -561,14 +640,24 @@ class _WholeItineraryDetailScreenState
                 if (activity.duration != null && activity.duration!.isNotEmpty)
                   _buildChip(
                     label: activity.duration!,
-                    backgroundColor: appTheme.teal_A200, // Neon cyan/green
+                    backgroundColor: appTheme.teal_A200,
                     textColor: appTheme.teal_700,
                   ),
-                _buildChip(
-                  label: 'RM${activity.allocatedBudget.toStringAsFixed(0)}',
-                  backgroundColor: appTheme.amber_200,
-                  textColor: appTheme.lime_900,
-                ),
+                if (activity.minAllocatedBudget != null &&
+                    activity.minAllocatedBudget! < activity.allocatedBudget)
+                  _buildChip(
+                    label:
+                        'RM${activity.minAllocatedBudget!.toStringAsFixed(0)} - RM${activity.allocatedBudget.toStringAsFixed(0)}${activity.activityCategory.toLowerCase() == 'restaurant' ? ' / pax' : ''}',
+                    backgroundColor: appTheme.amber_200,
+
+                    textColor: appTheme.lime_900,
+                  )
+                else
+                  _buildChip(
+                    label: 'RM${activity.allocatedBudget.toStringAsFixed(0)}',
+                    backgroundColor: appTheme.amber_200,
+                    textColor: appTheme.lime_900,
+                  ),
                 if (activity.isOverspend == true &&
                     activity.overspendAmount != null)
                   _buildChip(

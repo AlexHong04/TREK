@@ -81,8 +81,8 @@ class AppThemeData {
   // Activity Expense Usage
   final Color expenseOverspendBg = AppColors.expenseOverspendBg;
   final Color expenseOverspendText = AppColors.expenseOverspendText;
-  static Color expenseBg = AppColors.expenseBg;
-  static Color expenseText = AppColors.expenseText;
+  final Color expenseBg = AppColors.expenseBg;
+  final Color expenseText = AppColors.expenseText;
 
   // Budget Popup Usage
   final Color redButton = AppColors.redButton;

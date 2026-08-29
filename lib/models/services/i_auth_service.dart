@@ -42,10 +42,7 @@ abstract class IAuthService extends ChangeNotifier {
     required String currency,
   });
 
-  Future<void> login({
-    required String email,
-    required String password,
-  });
+  Future<void> login({required String email, required String password});
 
   Future<void> signInWithGoogle();
 
