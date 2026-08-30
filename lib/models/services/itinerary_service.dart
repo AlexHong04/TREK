@@ -484,6 +484,14 @@ class ItineraryService implements IItineraryService {
     }
   }
 
+  Future<List<Activity>> getRemainingActivities(String tripId, String currentActivityId) async {
+    try {
+      return await _itineraryRepository.fetchRemainingActivity(tripId, currentActivityId);
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   Future<void> updateTripStatus(String tripId, String newStatus) async {
     final allowedStatus = ['Pending', 'Ongoing', 'Completed'];
     if (!allowedStatus.contains(newStatus)) {
