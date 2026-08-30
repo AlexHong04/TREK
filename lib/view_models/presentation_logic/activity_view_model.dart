@@ -17,6 +17,9 @@ import '../../models/services/i_itinerary_service.dart';
 import '../ui_state/activity_ui_state.dart';
 
 class ActivityViewModel extends ChangeNotifier {
+  static const int _eveningExpenseReviewReminderId = 200000;
+  static const int _eveningReviewHour = 20;
+
   final IItineraryService _itineraryService;
   final IBudgetService _budgetService;
   final IExpenseTrackingService _expenseTrackingService;
@@ -377,6 +380,7 @@ class ActivityViewModel extends ChangeNotifier {
       );
 
       await _cancelActivityExpenseReminder(selectedActivity);
+      unawaited(_scheduleEveningExpenseReviewReminder(_uiState.activities));
 
       _uiState = _uiState.copyWith(
         isSavingExpense: false,
@@ -457,7 +461,7 @@ class ActivityViewModel extends ChangeNotifier {
           activities: result.activities,
           totalBudget: result.trip.totalBudget,
         );
-        unawaited(_prepareActivityEndExpenseReminders(result.activities));
+        unawaited(_prepareExpenseReminders(result.activities));
       } else {
         _uiState = _uiState.copyWith(isLoading: false);
       }
@@ -488,7 +492,7 @@ class ActivityViewModel extends ChangeNotifier {
         filterDate: targetDate,
         tripId: tripId,
       );
-      unawaited(_prepareActivityEndExpenseReminders(allActivities));
+      unawaited(_prepareExpenseReminders(allActivities));
     } catch (e) {
       _uiState = _uiState.copyWith(
         isLoading: false,
@@ -498,9 +502,9 @@ class ActivityViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Requests notification and exact-alarm permission, then schedules one
-  /// reminder for each future activity that has no confirmed expense.
-  Future<void> _prepareActivityEndExpenseReminders(
+  /// Requests notification and exact-alarm permission, then prepares the
+  /// activity-end and evening expense-review reminders.
+  Future<void> _prepareExpenseReminders(
     List<Activity> activities,
   ) async {
     try {
@@ -519,6 +523,7 @@ class ActivityViewModel extends ChangeNotifier {
       }
 
       await _scheduleActivityEndExpenseReminders(activities);
+      await _scheduleEveningExpenseReviewReminder(activities);
     } catch (error) {
       debugPrint('[Expense reminder] Unable to prepare reminders: $error');
     }
@@ -563,6 +568,70 @@ class ActivityViewModel extends ChangeNotifier {
     }
   }
 
+  /// Schedules one 8 PM summary for today's completed activities that still
+  /// have no confirmed expense. The count is refreshed after every successful
+  /// expense record so the reminder does not use a stale number.
+  Future<void> _scheduleEveningExpenseReviewReminder(
+    List<Activity> activities,
+  ) async {
+    final now = DateTime.now();
+    final reviewTime = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      _eveningReviewHour,
+    );
+
+    if (!reviewTime.isAfter(now)) {
+      return;
+    }
+
+    var activitiesWithoutExpenses = 0;
+    for (final activity in activities) {
+      final activityEnd = _activityEndDateTime(activity);
+      final isToday = _isSameDate(activity.date, now);
+      if (!isToday || activityEnd == null || activityEnd.isAfter(reviewTime)) {
+        continue;
+      }
+
+      try {
+        final recordedExpenses = await _expenseRepository
+            .getExpensesByActivityId(activity.activitiesId);
+        if (recordedExpenses.isEmpty) {
+          activitiesWithoutExpenses++;
+        }
+      } catch (error) {
+        debugPrint(
+          'Unable to check the evening expense reminder for '
+          '${activity.activitiesId}: $error',
+        );
+      }
+    }
+
+    try {
+      if (activitiesWithoutExpenses == 0) {
+        await _notificationSource.cancelExpenseReminder(
+          _eveningExpenseReviewReminderId,
+        );
+        return;
+      }
+
+      final activityLabel =
+          activitiesWithoutExpenses == 1 ? 'activity' : 'activities';
+      await _notificationSource.scheduleExpenseReminder(
+        id: _eveningExpenseReviewReminderId,
+        scheduledAt: reviewTime,
+        title: 'Expense review reminder',
+        body: 'You have $activitiesWithoutExpenses $activityLabel without '
+            'recorded expenses today. Today ends in 4 hours. '
+            'Review your expenses.',
+        payload: 'evening_expense_review',
+      );
+    } catch (error) {
+      debugPrint('Unable to schedule the evening expense reminder: $error');
+    }
+  }
+
   /// Cancels the selected activity's future reminder after persistence succeeds.
   Future<void> _cancelActivityExpenseReminder(Activity activity) async {
     try {
@@ -604,6 +673,12 @@ class ActivityViewModel extends ChangeNotifier {
       hour,
       minute,
     );
+  }
+
+  bool _isSameDate(DateTime first, DateTime second) {
+    return first.year == second.year &&
+        first.month == second.month &&
+        first.day == second.day;
   }
 
   /// Produces a stable device notification ID from the team's AC#### ID.
