@@ -43,7 +43,10 @@ abstract interface class IItineraryService {
 
   Future<List<DayTrip>> getDaysByTripId(String tripId);
 
-  Future<List<Activity>> getRemainingActivities(String tripId, String activityId);
+  Future<List<Activity>> getRemainingActivities(
+    String tripId,
+    DateTime currentDateTime,
+  );
 
   Future<List<String>> getAutocompleteSuggestions(String query);
 

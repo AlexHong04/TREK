@@ -484,13 +484,52 @@ class ItineraryService implements IItineraryService {
     }
   }
 
-  Future<List<Activity>> getRemainingActivities(String tripId, String currentActivityId) async {
+  Future<List<Activity>> getRemainingActivities(
+      String tripId,
+      DateTime currentDateTime,
+      ) async {
     try {
-      return await _itineraryRepository.fetchRemainingActivity(tripId, currentActivityId);
+      final activities =
+      await _itineraryRepository.fetchAllActivitiesByTrip(
+        tripId,
+      );
+
+      activities.sort((a, b) {
+        final aDateTime = _getActivityStartDateTime(a);
+        final bDateTime = _getActivityStartDateTime(b);
+
+        return aDateTime.compareTo(bDateTime);
+      });
+
+      return activities.where((activity) {
+        final activityStart =
+        _getActivityStartDateTime(activity);
+
+        return activityStart.isAfter(currentDateTime);
+      }).toList();
     } catch (e) {
+      print('Calculating Remaining Activities Error: $e');
       rethrow;
     }
   }
+
+  DateTime _getActivityStartDateTime(Activity activity) {
+    final date = activity.date;
+
+    final timeParts = activity.startTime?.split(':');
+
+    final hour = int.parse(timeParts![0]);
+    final minute = int.parse(timeParts[1]);
+
+    return DateTime(
+      date.year,
+      date.month,
+      date.day,
+      hour,
+      minute,
+    );
+  }
+
 
   Future<void> updateTripStatus(String tripId, String newStatus) async {
     final allowedStatus = ['Pending', 'Ongoing', 'Completed'];
