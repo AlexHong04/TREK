@@ -13,11 +13,11 @@ abstract interface class IBudgetService {
     required double topupAmount,
   });
 
-  Future<bool> checkBudgetSufficiency({
-    required WholeTrip trip,
-    required String currentActivityId,
-    required double topupAmount,
-  });
+  // Future<bool> checkBudgetSufficiency({
+  //   required WholeTrip trip,
+  //   required String currentActivityId,
+  //   required double topupAmount,
+  // });
 
   Future<List<Activity>> reallocateBudget(
     String tripId,
