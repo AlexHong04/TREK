@@ -46,4 +46,16 @@ abstract interface class IItineraryService {
   Future<List<Activity>> getRemainingActivities(String tripId, String activityId);
 
   Future<List<String>> getAutocompleteSuggestions(String query);
+
+  Future<List<Activity>> generateBudgetRecoveryItinerary({
+    required String tripId,
+    required double newTotalBudget,
+    required double currentSpentBudget,
+    required double topUpAmount,
+    required List<Activity> remainingActivities,
+    required String tripDestination,
+    DateTime? currentDate,
+  });
+
+  Future<void> saveRevisedItineraryActivities(List<Activity> activities);
 }

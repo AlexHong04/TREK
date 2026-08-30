@@ -319,7 +319,6 @@ class GeminiApiConfig {
   }
 
   // wei song
-  // TODO: another function to generate alternative for removed activity
   static Future<String> askGeminiForAlternative({
     required String destinationCity,
     required String targetAreaOrNeighborhood,
@@ -411,6 +410,101 @@ class GeminiApiConfig {
     } catch (e) {
       debugPrint('Gemini API Alternative Error: $e');
       throw Exception('Failed to generate alternative activity: $e');
+    }
+  }
+
+  // weisong
+  static Future<List<Map<String, dynamic>>> generateRecoveryItinerary({
+    required double newTotalBudget,
+    required double currentSpentBudget,
+    required double topUpAmount,
+    required List<Map<String, dynamic>> remainingActivities,
+    required String tripDestination,
+    DateTime? currentDate,
+  }) async {
+    final effectiveRemainingBudget =
+        (newTotalBudget + topUpAmount) - currentSpentBudget;
+
+    final prompt = '''
+    You are an AI travel itinerary and budget optimizer.
+    A tourist has hit a critical budget threshold and needs a revised schedule for their remaining trip.
+
+    Trip Constraints:
+    - Destination: $tripDestination
+    - Current Date/Time: ${currentDate?.toIso8601String() ?? DateTime.now().toIso8601String()}
+    - Total Spent So Far: RM ${currentSpentBudget.toStringAsFixed(2)}
+    - Added Top-Up: RM ${topUpAmount.toStringAsFixed(2)}
+    - Max Usable Budget for Remaining Plan: RM ${effectiveRemainingBudget.toStringAsFixed(2)}
+
+    Remaining Activities Before Re-planning:
+    ${jsonEncode(remainingActivities)}
+
+    Instructions:
+    1. Re-adjust and optimize the remaining activities to fit STRICTLY within the max usable budget of RM ${effectiveRemainingBudget.toStringAsFixed(2)}.
+    2. You may replace high-cost attractions or restaurants with affordable or free alternatives (e.g., public parks, free cultural spots, hawker centres).
+    3. Ensure logical time scheduling (startTime, endTime) and maintain sequential flow.
+    4. Output MUST be a valid JSON array of objects with the exact schema below.
+
+    JSON Schema:
+    [
+      {
+        "activitiesId": "keep original ID if retained, or generate a new unique string if replaced",
+        "destination": "Activity / Place Name",
+        "description": "Brief description of the activity",
+        "date": "YYYY-MM-DDTHH:mm:ss",
+        "startTime": "HH:mm",
+        "endTime": "HH:mm",
+        "allocatedBudget": 0.0,
+        "activityImgUrl": "placeholder or original URL"
+      }
+    ]
+    ''';
+
+    final url = Uri.parse(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=$_apiKey',
+    );
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          "contents": [
+            {
+              "parts": [
+                {"text": prompt},
+              ],
+            },
+          ],
+          "generationConfig": {"responseMimeType": "application/json"},
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = jsonDecode(response.body);
+        final candidates = data['candidates'] as List?;
+        if (candidates != null && candidates.isNotEmpty) {
+          final content = candidates[0]['content'];
+          final parts = content['parts'] as List?;
+          if (parts != null && parts.isNotEmpty) {
+            final rawText = parts[0]['text'] as String?;
+            if (rawText != null && rawText.isNotEmpty) {
+              final decoded = jsonDecode(rawText);
+              if (decoded is List) {
+                return List<Map<String, dynamic>>.from(decoded);
+              }
+            }
+          }
+        }
+        return [];
+      } else {
+        throw Exception(
+          'Gemini Error: ${response.statusCode} - ${response.body}',
+        );
+      }
+    } catch (e) {
+      debugPrint('Error generating recovery itinerary: $e');
+      rethrow;
     }
   }
 }
