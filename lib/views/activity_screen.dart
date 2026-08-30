@@ -141,10 +141,10 @@ class _ActivityScreenState extends State<ActivityScreen> {
       context: context,
       allocatedBudget:
       'RM ${state.selectedActivity?.allocatedBudget.toStringAsFixed(2)}',
-      remainingBudget: state.remainingBudget.toString(),
-      exceededAmount: state.overspentBudget.toString(),
+      remainingBudget: state.remainingBudget.toStringAsFixed(2),
+      exceededAmount: state.overspentBudget.toStringAsFixed(2),
       warningText1:
-      'You have overspent ${state.overspentBudget} so far on this trip.',
+      'You have overspent ${state.overspentBudget.toStringAsFixed(2)} so far on this trip.',
       warningText2:
       'The budget allocated for remaining restaurants have been modified.',
     );
@@ -167,7 +167,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
       remainingBudget: state.remainingBudget.toStringAsFixed(2),
       exceededAmount: state.exceededAmount.toStringAsFixed(2),
       warningText1:
-      'You have overspent ${state.overspentBudget} so far on this trip.',
+      'You have overspent ${state.overspentBudget.toStringAsFixed(2)} so far on this trip.',
       estimatedDays: state.sufficientDays.toString(),
       warningText3: 'Plan will be modified automatically.',
       onContinue: () {
@@ -182,8 +182,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
   }) {
     showBudgetRecoveryDialog(
       context: context,
-      shortageAmount: uiState.shortageAmount.toString(),
-      remainingBudget: uiState.remainingBudget.toString(),
+      shortageAmount: uiState.shortageAmount.toStringAsFixed(2),
+      remainingBudget: uiState.remainingBudget.toStringAsFixed(2),
       warningText:
       'Insufficient top-up amount will trigger alternative recommendation directly.',
       onEndTrip: onEndTrip,
