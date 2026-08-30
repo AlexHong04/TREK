@@ -454,4 +454,50 @@ class ItineraryRepository implements IItineraryRepository {
       throw Exception('DB Error: $e');
     }
   }
+
+  // weisong
+  @override
+  Future<void> replaceTripActivities({
+    required String tripId,
+    required List<Activity> newActivities,
+  }) async {
+    if (newActivities.isEmpty) return;
+
+    try {
+      // 1. Extract target activity IDs to replace
+      final newActivityIds = newActivities.map((a) => a.activitiesId).toList();
+
+      // 2. Delete existing records for these activity IDs
+      await SupabaseConfig.client
+          .from('activities')
+          .delete()
+          .inFilter('activities_id', newActivityIds); // Use your column name: 'activities_id' or 'activitiesId'
+
+      // 3. Prepare payload mapped to Supabase database columns
+      final records = newActivities.map((activity) => {
+        'activities_id': activity.activitiesId,
+        'day_trip_id': activity.dayTripId,
+        'destination': activity.destination,
+        'description': activity.description,
+        'activity_img_url': activity.activityImgUrl,
+        'date': activity.date.toIso8601String(),
+        'allocated_budget': activity.allocatedBudget,
+        'overspend_amount': activity.overspendAmount,
+        'status': activity.status,
+        'start_time': activity.startTime,
+        'end_time': activity.endTime,
+        'duration': activity.duration,
+        'activity_category': activity.activityCategory,
+        'is_overspend': activity.isOverspend,
+      }).toList();
+
+      // 4. Batch insert the replacement activities into Supabase
+      await SupabaseConfig.client
+          .from('activities')
+          .insert(records);
+    } catch (e) {
+      debugPrint('Error in replaceTripActivities: $e');
+      throw Exception('DB Error: $e');
+    }
+  }
 }
