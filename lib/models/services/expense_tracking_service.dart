@@ -84,9 +84,10 @@ class ExpenseTrackingService implements IExpenseTrackingService {
 
     if (merchantCandidates.isNotEmpty) {
       merchantCandidates.sort(
-        (first, second) => second.split(RegExp(r'\s+')).length.compareTo(
-          first.split(RegExp(r'\s+')).length,
-        ),
+        (first, second) => second
+            .split(RegExp(r'\s+'))
+            .length
+            .compareTo(first.split(RegExp(r'\s+')).length),
       );
       return merchantCandidates.first;
     }
@@ -425,16 +426,30 @@ class ExpenseTrackingService implements IExpenseTrackingService {
   Future<ExpenseProcessingResult> processExpense({
     required String tripId,
     required String currentActivityId,
-    required double expense,
   }) async {
     debugPrint("process expense");
 
-    // Get trip and activities
+    // Get current trip
     final currentTrip = await _itineraryRepository.getTrip(tripId);
 
+    // get remaining activities
     final activities = await _itineraryRepository.fetchAllActivitiesByTrip(
       tripId,
     );
+
+    // Get ALL confirmed expenses for this activity
+    final expenses = await _expenseRepository.getExpensesByActivityId(
+      currentActivityId,
+    );
+
+    // Calculate total spending for this activity
+    double totalActivityExpense = 0.0;
+
+    for (final expense in expenses) {
+      totalActivityExpense += expense.totalAmount;
+    }
+
+    debugPrint('Total activity expense: RM$totalActivityExpense');
 
     double totalAllocatedBudget = 0.00;
 
@@ -442,13 +457,14 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       totalAllocatedBudget += activity.allocatedBudget;
     }
 
-    final remainingBudget = currentTrip.remainingBalance ?? 0.00;
+    final double remainingBudget = currentTrip.remainingBalance ?? 0.00;
 
-    // Get current activity and day
+    // Get current activity
     final currentActivity = await _itineraryRepository.getCurrentActivity(
       currentActivityId,
     );
 
+    // Get current day
     final currentDay = await _itineraryRepository.getCurrentDay(
       currentActivity.dayTripId,
     );
@@ -457,7 +473,7 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     final bool isOverspend = await detectOverspend(
       tripId,
       currentActivity,
-      expense,
+      totalActivityExpense,
     );
 
     debugPrint("Is overspend: $isOverspend");
@@ -466,25 +482,10 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       return ExpenseProcessingResult.withinBudget;
     }
 
-    // Calculate overspend and shortage
-    final double overspentAmount = expense - currentActivity.allocatedBudget;
-
-    final double shortageAmount = overspentAmount;
+    // Calculate overspent amount
+    final double overspentAmount = totalActivityExpense - currentActivity.allocatedBudget;
 
     debugPrint("Overspent amount: $overspentAmount");
-    debugPrint("Shortage amount: $shortageAmount");
-
-    // Check critical overspend
-    final bool isCritical = await detectCriticalOverspend(
-      totalAllocatedBudget,
-      remainingBudget,
-    );
-
-    debugPrint("Is critical: $isCritical");
-
-    if (isCritical) {
-      return ExpenseProcessingResult.critical;
-    }
 
     // Update current activity
     final updatedActivity = currentActivity.copyWith(
@@ -513,7 +514,7 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       isOverspend: true,
     );
 
-    // Update database
+    // Save overspend details
     final success = await _itineraryRepository.updateOverspendDetails(
       updatedDay,
       updatedActivity,
@@ -525,21 +526,32 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       throw Exception('Update overspend details failed: $success');
     }
 
-    // Check threshold
+    // Check critical overspend
+    final bool isCritical = await detectCriticalOverspend(
+      totalAllocatedBudget,
+      remainingBudget,
+    );
+
+    debugPrint("Is critical: $isCritical");
+
+    if (isCritical) {
+      return ExpenseProcessingResult.critical;
+    }
+
+    // Check overspend threshold
     final bool isAboveThreshold = await calculateOverspendPercentage(
-      tripId,
       currentActivity,
       overspentAmount,
     );
 
     debugPrint("Is above threshold: $isAboveThreshold");
 
-    // Trigger recommendation
+    // Above threshold - trigger recommendation
     if (isAboveThreshold) {
       return ExpenseProcessingResult.exceedsThresholdTriggerRecommendation;
     }
 
-    // Reallocate budget
+    // Within threshold - reallocate budget
     final updatedActivities = await reallocateBudget(
       tripId,
       currentActivity,
@@ -559,7 +571,7 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       return ExpenseProcessingResult.reallocatedFailed;
     }
 
-    // Success
+    // Reallocation successful
     return ExpenseProcessingResult.reallocatedSuccessfully;
   }
 
@@ -589,93 +601,35 @@ class ExpenseTrackingService implements IExpenseTrackingService {
   Future<List<Activity>> reallocateBudget(
     String tripId,
     Activity currentActivity,
-    double overspendAmount,
+    double overspentAmount,
   ) async {
-    debugPrint("reallocate budget");
-    List<Activity> modifiedActivities = await _budgetService.reallocateBudget(
-      tripId,
-      currentActivity,
-      overspendAmount,
-    );
+    debugPrint("Reallocating budget...");
+
+    final List<Activity> modifiedActivities = await _budgetService
+        .reallocateBudget(tripId, currentActivity, overspentAmount);
+
     return modifiedActivities;
   }
 
+  // zhiqin
   Future<bool> calculateOverspendPercentage(
-    String tripId,
     Activity currentActivity,
     double overspentAmount,
   ) async {
-    final allRemainingActivities = await _itineraryRepository
-        .fetchRemainingActivity(tripId, currentActivity.activitiesId);
+    final double allocatedBudget = currentActivity.allocatedBudget;
 
-    // Only keep activities from the same date as the current activity
-    final remainingActivities = allRemainingActivities.where((activity) {
-      return activity.date.year == currentActivity.date.year &&
-          activity.date.month == currentActivity.date.month &&
-          activity.date.day == currentActivity.date.day;
-    }).toList();
-
-    // Find current activity inside today's activities
-    final int currentIndex = remainingActivities.indexWhere(
-      (activity) => activity.activitiesId == currentActivity.activitiesId,
-    );
-
-    if (currentIndex == -1) {
-      return false;
-    }
-
-    double targetAllocatedBudget = 0.0;
-
-    final bool isLastActivityOfDay =
-        currentIndex == remainingActivities.length - 1;
-
-    if (!isLastActivityOfDay) {
-      // Sum the allocated budgets of activities after
-      // the current activity on the same day.
-      final upcomingTodayActivities = remainingActivities.sublist(
-        currentIndex + 1,
-      );
-
-      targetAllocatedBudget = upcomingTodayActivities.fold(
-        0.0,
-        (sum, item) => sum + item.allocatedBudget,
-      );
-    } else {
-      // Current activity is the last activity of the day.
-      // Fetch the next day's activities from the already-fetched list.
-      final DateTime currentDate = currentActivity.date;
-
-      final DateTime nextDay = DateTime(
-        currentDate.year,
-        currentDate.month,
-        currentDate.day + 1,
-      );
-
-      final nextDayActivities = allRemainingActivities.where((activity) {
-        return activity.date.year == nextDay.year &&
-            activity.date.month == nextDay.month &&
-            activity.date.day == nextDay.day;
-      }).toList();
-
-      targetAllocatedBudget = nextDayActivities.fold(
-        0.0,
-        (sum, item) => sum + item.allocatedBudget,
-      );
-    }
-
-    // Determine overspend threshold
     double overspendThresholdPercentage;
 
-    if (targetAllocatedBudget <= 100.0) {
-      overspendThresholdPercentage = 0.15; // 15%
-    } else if (targetAllocatedBudget <= 500.0) {
-      overspendThresholdPercentage = 0.10; // 10%
+    if (allocatedBudget <= 100.0) {
+      overspendThresholdPercentage = 0.15;
+    } else if (allocatedBudget <= 500.0) {
+      overspendThresholdPercentage = 0.10;
     } else {
-      overspendThresholdPercentage = 0.05; // 5%
+      overspendThresholdPercentage = 0.05;
     }
 
     final double allowedOverspendLimit =
-        targetAllocatedBudget * overspendThresholdPercentage;
+        allocatedBudget * overspendThresholdPercentage;
 
     return overspentAmount > allowedOverspendLimit;
   }

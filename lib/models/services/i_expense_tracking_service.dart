@@ -41,7 +41,6 @@ abstract interface class IExpenseTrackingService {
   Future<ExpenseProcessingResult> processExpense({
     required String tripId,
     required String currentActivityId,
-    required double expense,
   });
 
   Future<bool> detectOverspend(
@@ -62,7 +61,6 @@ abstract interface class IExpenseTrackingService {
   );
 
   Future<bool> calculateOverspendPercentage(
-    String tripId,
     Activity currentActivity,
     double overspentAmount,
   );
