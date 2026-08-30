@@ -665,8 +665,12 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     Activity currentActivity,
     double overspentAmount,
   ) async {
-    final double allocatedBudget = currentActivity.allocatedBudget;
-
+    // final double allocatedBudget = currentActivity.allocatedBudget;
+    final double allocatedBudget =
+    currentActivity.allocatedBudget <= 0
+        ? 10.0
+        : currentActivity.allocatedBudget;
+    
     double overspendThresholdPercentage;
 
     if (allocatedBudget <= 100.0) {
