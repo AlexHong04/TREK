@@ -3,6 +3,8 @@ export '../../models/entities/activity.dart';
 import '../../models/entities/expense.dart';
 import '../../models/entities/expense_item.dart';
 
+import 'package:flutter/foundation.dart';
+
 class ActivityUiState {
   final bool isLoading;
   final String tripId;
@@ -37,8 +39,6 @@ class ActivityUiState {
   final double spentBudget;
   final double overspentBudget;
   final int sufficientDays;
-  final String usedPercentageString;
-  final double usedPercentageValue;
   final double shortageAmount;
   final double exceededAmount;
 
@@ -73,16 +73,18 @@ class ActivityUiState {
     this.spentBudget = 0.0,
     this.overspentBudget = 0.0,
     this.sufficientDays = 0,
-    this.usedPercentageString = '0% Used',
-    this.usedPercentageValue = 0.00,
     this.shortageAmount = 0.00,
     this.exceededAmount = 0.00,
     this.popupAction = '',
   });
 
-  double get remainingBudget => totalBudget - spentBudget;
+  double get usedPercentageValue => totalBudget <= 0 ? 0.0 : (spentBudget / totalBudget).clamp(0.0, 1.0);
 
-  double get usedPercentageValues => totalBudget <= 0 ? 0.0 : (spentBudget / totalBudget).clamp(0.0, 1.0);
+  String get usedPercentageString => totalBudget <= 0
+      ? '0% Used'
+      : '${((spentBudget / totalBudget).clamp(0.0, 1.0) * 100).toStringAsFixed(0)}% Used';
+
+  double get remainingBudget => totalBudget - spentBudget;
 
   // Computed Getter automatically filters activities
   List<Activity> get displayActivities {
@@ -175,8 +177,6 @@ class ActivityUiState {
       spentBudget: spentBudget ?? this.spentBudget,
       overspentBudget: overspentBudget ?? this.overspentBudget,
       sufficientDays: sufficientDays ?? this.sufficientDays,
-      usedPercentageString: usedPercentageString ?? this.usedPercentageString,
-      usedPercentageValue: usedPercentageValue ?? this.usedPercentageValue,
       shortageAmount: shortageAmount ?? this.shortageAmount,
       exceededAmount: exceededAmount ?? this.exceededAmount,
       popupAction: popupAction ?? this.popupAction,
