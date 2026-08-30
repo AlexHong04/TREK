@@ -1,20 +1,20 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 
+// Base
 class BaseBudgetDialog extends StatelessWidget {
   final String title;
-  final Widget summaryCard;
-  final String warningText;
+  final Widget? summaryCard;
+  final String? warningText;
   final Widget? contentCard;
   final Widget actions;
 
   const BaseBudgetDialog({
     super.key,
     required this.title,
-    required this.summaryCard,
-    required this.warningText,
+    this.summaryCard,
+    this.warningText,
     this.contentCard,
     required this.actions,
   });
@@ -26,12 +26,11 @@ class BaseBudgetDialog extends StatelessWidget {
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       child: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.all(20.0),
+          padding: const EdgeInsets.all(20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header Title
               Text(
                 title,
                 style: TextStyle(
@@ -41,25 +40,24 @@ class BaseBudgetDialog extends StatelessWidget {
                   color: appTheme.warningPopupHeader,
                 ),
               ),
-              const SizedBox(height: 16),
 
-              // Summary Section
-              summaryCard,
-              const SizedBox(height: 16),
-
-              // Warning Message
-              _buildWarningRow(warningText),
-              const SizedBox(height: 16),
-
-              // Optional Content Widget (Item details card or Top-Up input)
-              if (contentCard != null) ...[
-                contentCard!,
+              if (summaryCard != null) ...[
                 const SizedBox(height: 16),
+                summaryCard!,
               ],
 
-              const SizedBox(height: 8),
+              if (warningText != null && warningText!.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                _buildWarningRow(warningText!),
+              ],
 
-              // Action Buttons
+              if (contentCard != null) ...[
+                const SizedBox(height: 16),
+                contentCard!,
+              ],
+
+              const SizedBox(height: 24),
+
               actions,
             ],
           ),
@@ -68,7 +66,6 @@ class BaseBudgetDialog extends StatelessWidget {
     );
   }
 
-  // Shared Warning Row Builder
   static Widget _buildWarningRow(String text) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -94,7 +91,6 @@ class BaseBudgetDialog extends StatelessWidget {
     );
   }
 
-  // Shared Tag Chip Builder
   static Widget buildTagChip({
     required String label,
     required Color bgColor,
@@ -119,7 +115,212 @@ class BaseBudgetDialog extends StatelessWidget {
   }
 }
 
-// Budget Exceeded Within 20% Popup
+Widget _buildSummaryRow(String label, String value, {Color? valueColor}) {
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Expanded(
+        child: Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: appTheme.popupBrownBudget,
+          ),
+        ),
+      ),
+      const SizedBox(width: 12),
+      Text(
+        value,
+        style: TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          color: valueColor ?? appTheme.black,
+        ),
+      ),
+    ],
+  );
+}
+
+Widget _buildSummaryCard({
+  required String primaryLabel,
+  required String primaryValue,
+  String? secondaryLabel,
+  String? secondaryValue,
+  String? thirdLabel,
+  String? thirdValue,
+  Color? primaryValueColor,
+  Color? thirdValueColor,
+}) {
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: appTheme.popupCreamBg,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: appTheme.popupCreamStroke),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          primaryLabel,
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: appTheme.popupBrownBudget,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          primaryValue,
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: primaryValueColor ?? appTheme.errorRed,
+          ),
+        ),
+
+        if (secondaryLabel != null && secondaryValue != null) ...[
+          const SizedBox(height: 12),
+          Divider(color: appTheme.popupCreamStroke, height: 1),
+          const SizedBox(height: 12),
+          _buildSummaryRow(secondaryLabel, secondaryValue),
+        ],
+
+        if (thirdLabel != null && thirdValue != null) ...[
+          const SizedBox(height: 12),
+          _buildSummaryRow(thirdLabel, thirdValue, valueColor: thirdValueColor),
+        ],
+      ],
+    ),
+  );
+}
+
+Widget _buildActionButton({
+  required String text,
+  required VoidCallback? onPressed,
+  Color? backgroundColor,
+}) {
+  return SizedBox(
+    width: double.infinity,
+    height: 48,
+    child: ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: backgroundColor ?? appTheme.teal_A700,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        elevation: 0,
+      ),
+      onPressed: onPressed,
+      child: Text(
+        text,
+        style: TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          color: appTheme.white_A700,
+        ),
+      ),
+    ),
+  );
+}
+
+Widget _buildTwoActionButtons({
+  required String primaryText,
+  required VoidCallback? onPrimaryPressed,
+  required String secondaryText,
+  required VoidCallback? onSecondaryPressed,
+}) {
+  return Row(
+    children: [
+      Expanded(
+        child: _buildActionButton(
+          text: secondaryText,
+          backgroundColor: appTheme.redButton,
+          onPressed: onSecondaryPressed,
+        ),
+      ),
+      const SizedBox(width: 12),
+      Expanded(
+        child: _buildActionButton(
+          text: primaryText,
+          onPressed: onPrimaryPressed,
+        ),
+      ),
+    ],
+  );
+}
+
+Widget _buildTopUpCard(TextEditingController controller) {
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: Colors.grey.shade200),
+      boxShadow: [
+        BoxShadow(
+          color: appTheme.black.withAlpha(8),
+          blurRadius: 8,
+          offset: const Offset(0, 2),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'TOP-UP AMOUNT',
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: appTheme.blue_gray_300,
+            letterSpacing: 0.8,
+          ),
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: controller,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: appTheme.black,
+          ),
+          decoration: InputDecoration(
+            prefixIcon: const Icon(
+              Icons.account_balance_wallet_outlined,
+              color: Colors.grey,
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
+            filled: true,
+            fillColor: appTheme.white_A700,
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: appTheme.blue_gray_300),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: appTheme.teal_A700, width: 1.5),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+// Budget Exceeded - within threshold
 Future<void> showBudgetExceededDialog({
   required BuildContext context,
   required String allocatedBudget,
@@ -131,134 +332,38 @@ Future<void> showBudgetExceededDialog({
 }) {
   return showDialog(
     context: context,
-    builder: (context) {
+    builder: (dialogContext) {
       return BaseBudgetDialog(
         title: 'Budget Exceeded',
-        summaryCard: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: appTheme.popupCreamBg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: appTheme.popupCreamStroke),
-          ),
-          child: Column(
-            children: [
-              _buildSummaryRow('Allocated Budget:', allocatedBudget),
-              const SizedBox(height: 12),
-              _buildSummaryRow('Remaining Budget:', remainingBudget),
-              const SizedBox(height: 12),
-              _buildSummaryRow(
-                'Exceeded Amount',
-                exceededAmount,
-                valueColor: appTheme.warningPopupHeader,
-              ),
-            ],
-          ),
+
+        summaryCard: _buildSummaryCard(
+          primaryLabel: 'Allocated Budget:',
+          primaryValue: allocatedBudget,
+          secondaryLabel: 'Remaining Budget:',
+          secondaryValue: remainingBudget,
+          thirdLabel: 'Exceeded Amount',
+          thirdValue: exceededAmount,
+          thirdValueColor: appTheme.errorRed,
         ),
+
         warningText: warningText1,
-        contentCard: Column(
-          children: [
-            // Center(
-            //   child: Container(
-            //     decoration: BoxDecoration(
-            //       color: appTheme.white_A700,
-            //       borderRadius: BorderRadius.circular(12),
-            //       border: Border.all(color: appTheme.blue_gray_50),
-            //       boxShadow: [
-            //         BoxShadow(
-            //           color: appTheme.black.withAlpha(10),
-            //           offset: const Offset(0, 2),
-            //           blurRadius: 10,
-            //         ),
-            //       ],
-            //     ),
-            //     child: Column(
-            //       crossAxisAlignment: CrossAxisAlignment.start,
-            //       children: [
-            //         ClipRRect(
-            //           borderRadius: const BorderRadius.vertical(
-            //             top: Radius.circular(12),
-            //           ),
-            //           child: Image.network(
-            //             imageUrl,
-            //             height: 160,
-            //             width: double.infinity,
-            //             fit: BoxFit.cover,
-            //             errorBuilder: (_, __, ___) => Container(
-            //               height: 160,
-            //               color: Colors.grey.shade300,
-            //               child: const Icon(Icons.restaurant, size: 48),
-            //             ),
-            //           ),
-            //         ),
-            //         Padding(
-            //           padding: const EdgeInsets.all(12.0),
-            //           child: Column(
-            //             crossAxisAlignment: CrossAxisAlignment.start,
-            //             children: [
-            //               Text(
-            //                 itemTitle,
-            //                 style: TextStyle(
-            //                   fontSize: 18,
-            //                   fontWeight: FontWeight.bold,
-            //                   color: appTheme.black,
-            //                 ),
-            //               ),
-            //               const SizedBox(height: 10),
-            //               BaseBudgetDialog.buildTagChip(
-            //                 label: originalBudgetChipText,
-            //                 bgColor: appTheme.lime_900,
-            //                 textColor: appTheme.amber_200,
-            //               ),
-            //               const SizedBox(height: 6),
-            //               BaseBudgetDialog.buildTagChip(
-            //                 label: modifiedBudgetChipText,
-            //                 bgColor: appTheme.expenseOverspendBg,
-            //                 textColor: appTheme.expenseOverspendText,
-            //               ),
-            //             ],
-            //           ),
-            //         ),
-            //       ],
-            //     ),
-            //   ),
-            // ),
-            // const SizedBox(height: 16),
-            BaseBudgetDialog._buildWarningRow(warningText2),
-          ],
-        ),
-        actions: SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: appTheme.teal_A700,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
-              elevation: 0,
-            ),
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            child: Text(
-              'Continue',
-              style: TextStyle(
-                fontSize: 16,
-                fontFamily: 'Inter',
-                fontWeight: FontWeight.bold,
-                color: appTheme.white_A700,
-              ),
-            ),
-          ),
+
+        contentCard: BaseBudgetDialog._buildWarningRow(warningText2),
+
+        actions: _buildActionButton(
+          text: 'Continue',
+          onPressed: () {
+            Navigator.of(dialogContext).pop();
+            onContinue?.call();
+          },
         ),
       );
     },
   );
 }
 
-// Budget Exceeded Above 20% Popup
-Future<void> showBudgetExceeded20Dialog({
+// Budget Exceeded - above threshold
+Future<void> showBudgetExceededThresholdDialog({
   required BuildContext context,
   required String allocatedBudget,
   required String remainingBudget,
@@ -270,55 +375,24 @@ Future<void> showBudgetExceeded20Dialog({
 }) {
   return showDialog(
     context: context,
-    builder: (context) {
+    builder: (dialogContext) {
       return BaseBudgetDialog(
         title: 'Budget Exceeded',
-        summaryCard: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: appTheme.popupCreamBg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: appTheme.popupCreamStroke),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Allocated Budget:',
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: appTheme.warningPopupHeader,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                allocatedBudget,
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: appTheme.black,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Divider(color: appTheme.popupCreamStroke, height: 1),
-              const SizedBox(height: 12),
-              _buildSummaryRow('Remaining Budget:', remainingBudget),
-              const SizedBox(height: 12),
-              _buildSummaryRow(
-                'Exceeded Amount',
-                exceededAmount,
-                valueColor: appTheme.warningPopupHeader,
-              ),
-            ],
-          ),
+
+        summaryCard: _buildSummaryCard(
+          primaryLabel: 'Allocated Budget:',
+          primaryValue: allocatedBudget,
+          secondaryLabel: 'Remaining Budget:',
+          secondaryValue: remainingBudget,
+          thirdLabel: 'Exceeded Amount',
+          thirdValue: exceededAmount,
+          thirdValueColor: appTheme.warningPopupHeader,
         ),
+
         warningText: warningText1,
+
         contentCard: Column(
           children: [
-            // Second Warning Message with bold days text
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -340,13 +414,14 @@ Future<void> showBudgetExceeded20Dialog({
                       children: [
                         const TextSpan(
                           text:
-                              'Based on your current spending rate, your remaining budget is estimated to last ',
+                              'Based on your current spending rate, '
+                              'your remaining budget is estimated to last ',
                         ),
                         TextSpan(
                           text: '$estimatedDays more day(s)',
                           style: const TextStyle(
-                            fontWeight: FontWeight.bold,
                             fontFamily: 'Inter',
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
@@ -355,45 +430,26 @@ Future<void> showBudgetExceeded20Dialog({
                 ),
               ],
             ),
+
             const SizedBox(height: 16),
-            // Third Warning Message
+
             BaseBudgetDialog._buildWarningRow(warningText3),
           ],
         ),
-        actions: SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: appTheme.teal_700,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
-              elevation: 0,
-            ),
-            onPressed: () {
-              Navigator.of(context).pop();
-              if (onContinue != null) {
-                onContinue();
-              }
-            },
-            child: Text(
-              'Continue',
-              style: TextStyle(
-                fontSize: 16,
-                fontFamily: 'Inter',
-                fontWeight: FontWeight.bold,
-                color: appTheme.white_A700,
-              ),
-            ),
-          ),
+
+        actions: _buildActionButton(
+          text: 'Continue',
+          onPressed: () {
+            Navigator.of(dialogContext).pop();
+            onContinue?.call();
+          },
         ),
       );
     },
   );
 }
 
-// Budget Recovery Popup
+// Budget Recovery
 Future<void> showBudgetRecoveryDialog({
   required BuildContext context,
   required String shortageAmount,
@@ -402,380 +458,205 @@ Future<void> showBudgetRecoveryDialog({
   VoidCallback? onEndTrip,
   required Future<bool> Function(double amount) onTopUpBudget,
 }) {
-  final TextEditingController topUpController = TextEditingController();
+  final controller = TextEditingController();
 
   return showDialog(
     context: context,
-    builder: (context) {
-      return BaseBudgetDialog(
-        title: 'Budget Recovery',
-        summaryCard: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: appTheme.popupCreamBg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: appTheme.popupCreamStroke),
+    barrierDismissible: false,
+    builder: (dialogContext) {
+      return PopScope(
+        canPop: false,
+        child: BaseBudgetDialog(
+          title: 'Budget Recovery',
+
+          summaryCard: _buildSummaryCard(
+            primaryLabel: 'Budget Shortage Amount:',
+            primaryValue: shortageAmount,
+            secondaryLabel: 'Remaining Budget:',
+            secondaryValue: remainingBudget,
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+
+          warningText: warningText,
+
+          contentCard: _buildTopUpCard(controller),
+
+          actions: Row(
             children: [
-              Text(
-                'Budget Shortage Amount:',
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: appTheme.popupBrownBudget,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                shortageAmount,
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: appTheme.black,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Divider(color: appTheme.popupCreamStroke, height: 1),
-              const SizedBox(height: 12),
-              _buildSummaryRow('Remaining Budget:', remainingBudget),
-            ],
-          ),
-        ),
-        warningText: warningText,
-        contentCard: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey.shade200),
-            boxShadow: [
-              BoxShadow(
-                color: appTheme.black.withAlpha(8),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'TOP-UP AMOUNT',
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: appTheme.blue_gray_300,
-                  letterSpacing: 0.8,
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: topUpController,
-                keyboardType: TextInputType.number,
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: appTheme.black,
-                ),
-                decoration: InputDecoration(
-                  prefixIcon: const Icon(
-                    Icons.account_balance_wallet_outlined,
-                    color: Colors.grey,
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  filled: true,
-                  fillColor: appTheme.white_A700,
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: appTheme.blue_gray_300),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: appTheme.teal_A700,
-                      width: 1.5,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: Row(
-          children: [
-            Expanded(
-              child: SizedBox(
-                height: 48,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: appTheme.redButton,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    elevation: 0,
-                  ),
+              Expanded(
+                child: _buildActionButton(
+                  text: 'End Trip',
+                  backgroundColor: appTheme.redButton,
                   onPressed: () {
-                    Navigator.of(context).pop();
-                    if (onEndTrip != null) {
-                      onEndTrip();
-                    }
+                    Navigator.of(dialogContext).pop();
+                    onEndTrip?.call();
                   },
-                  child: Text(
-                    'End Trip',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: appTheme.white_A700,
-                    ),
-                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: SizedBox(
-                height: 48,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: appTheme.teal_A700,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    elevation: 0,
-                  ),
-                  onPressed: () async {
-                    final amountText = topUpController.text.trim();
-                    final amount = double.tryParse(amountText);
 
-                    if (amount == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Please enter a valid top-up amount.'),
-                        ),
-                      );
-                      return;
-                    }
+              const SizedBox(width: 12),
 
-                    final success = await onTopUpBudget(amount);
+              Expanded(
+                child: ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: controller,
+                  builder: (context, value, child) {
+                    final amount = double.tryParse(value.text.trim());
 
-                    if (success && context.mounted) {
-                      Navigator.of(context).pop();
-                    }
+                    final isValid = amount != null && amount > 0;
+
+                    return _buildActionButton(
+                      text: 'Top-up Budget',
+                      onPressed: isValid
+                          ? () async {
+                              final amount = double.parse(value.text.trim());
+
+                              final success = await onTopUpBudget(amount);
+
+                              if (success && dialogContext.mounted) {
+                                Navigator.of(dialogContext).pop();
+                              }
+                            }
+                          : null,
+                    );
                   },
-                  child: Text(
-                    'Top-up Budget',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: appTheme.white_A700,
-                    ),
-                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     },
   );
 }
 
-Future<void> showInitialTotalBudgetInsufficient({
+// Budget Recovery Top-up Insufficient
+Future<void> showInsufficientTopUpBudgetRecoveryDialog({
+  required BuildContext context,
+  required VoidCallback onContinue,
+}) {
+  return _showSimpleBudgetDialog(
+    context: context,
+    title: 'Insufficient Top-up',
+    messages: const [
+      'You did not top-up a sufficient amount.',
+      'Failed to reallocate the budget to cover the '
+          'overspent amount. The plan will be modified automatically.',
+    ],
+    onContinue: onContinue,
+  );
+}
+
+// Budget Reallocation Failure
+Future<void> showBudgetReallocationFailureDialog({
+  required BuildContext context,
+  VoidCallback? onContinue,
+}) {
+  return _showSimpleBudgetDialog(
+    context: context,
+    title: 'Budget Reallocation Failure',
+    messages: const [
+      'Failed to reallocate the budget to cover the '
+          'overspent amount. The plan will be modified automatically.',
+    ],
+    onContinue: onContinue,
+  );
+}
+
+// Cancel Top-up Initial Total Budget
+Future<void> showCancelTopUpDialog({
+  required BuildContext context,
+  VoidCallback? onContinue,
+}) {
+  return _showSimpleBudgetDialog(
+    context: context,
+    title: 'Cancel Top-up',
+    messages: const [
+      'Your wishlist item could not be fully covered based on '
+          'the limited budget. The system will proceed with '
+          'removing those wishlist items.',
+    ],
+    onContinue: onContinue,
+  );
+}
+
+// Initial Total Budget Insufficient
+Future<void> showInitialTotalBudgetInsufficientDialog({
   required BuildContext context,
   required String shortageAmount,
-  required String warningText,
-  VoidCallback? onCancel,
+  VoidCallback? onEndTrip,
   required Future<bool> Function(double amount) onTopUpBudget,
 }) {
-  final TextEditingController topUpController = TextEditingController();
+  final controller = TextEditingController();
 
   return showDialog(
     context: context,
-    builder: (context) {
+    barrierDismissible: false,
+    builder: (dialogContext) {
       return BaseBudgetDialog(
-        title: 'Budget Recovery',
-        summaryCard: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: appTheme.popupCreamBg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: appTheme.popupCreamStroke),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Budget Shortage Amount:',
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: appTheme.popupBrownBudget,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                shortageAmount,
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: appTheme.black,
-                ),
-              ),
-            ],
-          ),
+        title: 'Budget Insufficient',
+
+        summaryCard: _buildSummaryCard(
+          primaryLabel: 'Estimated Budget Shortage Amount',
+          primaryValue: shortageAmount,
         ),
-        warningText: warningText,
-        contentCard: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey.shade200),
-            boxShadow: [
-              BoxShadow(
-                color: appTheme.black.withAlpha(8),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'TOP-UP AMOUNT',
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: appTheme.blue_gray_300,
-                  letterSpacing: 0.8,
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: topUpController,
-                keyboardType: TextInputType.number,
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: appTheme.black,
-                ),
-                decoration: InputDecoration(
-                  prefixIcon: const Icon(
-                    Icons.account_balance_wallet_outlined,
-                    color: Colors.grey,
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  filled: true,
-                  fillColor: appTheme.white_A700,
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: appTheme.blue_gray_300),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: appTheme.teal_A700,
-                      width: 1.5,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+
+        // First warning
+        warningText:
+            'Your budget is not sufficient to cover all wishlist items. '
+            'Do you want to add more budget?',
+
+        // Top-up field + second warning
+        contentCard: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildTopUpCard(controller),
+
+            const SizedBox(height: 16),
+
+            BaseBudgetDialog._buildWarningRow(
+              'Insufficient top-up amount will trigger alternative '
+              'recommendation directly.',
+            ),
+          ],
         ),
+
         actions: Row(
           children: [
             Expanded(
-              child: SizedBox(
-                height: 48,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: appTheme.redButton,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    elevation: 0,
-                  ),
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    if (onCancel != null) {
-                      onCancel();
-                    }
-                  },
-                  child: Text(
-                    'Cancel',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: appTheme.white_A700,
-                    ),
-                  ),
-                ),
+              child: _buildActionButton(
+                text: 'End Trip',
+                backgroundColor: appTheme.redButton,
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
+                  onEndTrip?.call();
+                },
               ),
             ),
+
             const SizedBox(width: 12),
+
             Expanded(
-              child: SizedBox(
-                height: 48,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: appTheme.teal_A700,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    elevation: 0,
-                  ),
-                  onPressed: () async {
-                    final amountText = topUpController.text.trim();
-                    final amount = double.tryParse(amountText);
+              child: ValueListenableBuilder<TextEditingValue>(
+                valueListenable: controller,
+                builder: (context, value, child) {
+                  final amount = double.tryParse(value.text.trim());
 
-                    if (amount == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Please enter a valid top-up amount.'),
-                        ),
-                      );
-                      return;
-                    }
+                  final isValid = amount != null && amount > 0;
 
-                    final success = await onTopUpBudget(amount);
+                  return _buildActionButton(
+                    text: 'Top-up Budget',
+                    onPressed: isValid
+                        ? () async {
+                            final amount = double.parse(value.text.trim());
 
-                    if (success && context.mounted) {
-                      Navigator.of(context).pop();
-                    }
-                  },
-                  child: Text(
-                    'Top-up Budget',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: appTheme.white_A700,
-                    ),
-                  ),
-                ),
+                            final success = await onTopUpBudget(amount);
+
+                            if (success && dialogContext.mounted) {
+                              Navigator.of(dialogContext).pop();
+                            }
+                          }
+                        : null,
+                  );
+                },
               ),
             ),
           ],
@@ -785,28 +666,54 @@ Future<void> showInitialTotalBudgetInsufficient({
   );
 }
 
-Widget _buildSummaryRow(String label, String value, {Color? valueColor}) {
-  return Row(
-    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-    children: [
-      Text(
-        label,
-        style: TextStyle(
-          fontFamily: 'Inter',
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: appTheme.popupBrownBudget,
-        ),
-      ),
-      Text(
-        value,
-        style: TextStyle(
-          fontFamily: 'Inter',
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-          color: valueColor ?? appTheme.black,
-        ),
-      ),
+// Initial Total Budget Top-up Insufficient
+Future<void> showInsufficientTopUpTotalBudgetDialog({
+  required BuildContext context,
+  VoidCallback? onContinue,
+}) {
+  return _showSimpleBudgetDialog(
+    context: context,
+    title: 'Insufficient Top-up',
+    messages: const [
+      'Your top-up amount is still not sufficient to cover '
+          'all wishlist items. The system will adjust the plan '
+          'based on the latest amount.',
     ],
+    onContinue: onContinue,
+  );
+}
+
+Future<void> _showSimpleBudgetDialog({
+  required BuildContext context,
+  required String title,
+  required List<String> messages,
+  VoidCallback? onContinue,
+}) {
+  return showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) {
+      return BaseBudgetDialog(
+        title: title,
+
+        contentCard: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (int i = 0; i < messages.length; i++) ...[
+              if (i > 0) const SizedBox(height: 16),
+              BaseBudgetDialog._buildWarningRow(messages[i]),
+            ],
+          ],
+        ),
+
+        actions: _buildActionButton(
+          text: 'Continue',
+          onPressed: () {
+            Navigator.of(dialogContext).pop();
+            onContinue?.call();
+          },
+        ),
+      );
+    },
   );
 }
