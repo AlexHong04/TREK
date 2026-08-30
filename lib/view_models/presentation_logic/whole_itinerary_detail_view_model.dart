@@ -92,6 +92,30 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<bool> topUpBudget(double amount) async {
+    if (amount <= 0) {
+      return false;
+    }
+
+    final budget = double.tryParse(_uiState.budgetText) ?? 0.0;
+    final newBudget = budget + amount;
+
+    final remainingShortage =
+    (_uiState.estimatedExtraBudgetNeeded - amount).clamp(0.0, double.infinity);
+
+    final isSufficient = remainingShortage <= 0.0;
+
+    _uiState = _uiState.copyWith(
+      budgetText: newBudget.toStringAsFixed(2),
+      estimatedExtraBudgetNeeded: remainingShortage,
+      showWishlistWarning: false,
+    );
+
+    notifyListeners();
+
+    return isSufficient;
+  }
+
   void dismissWishlistWarning() {
     _uiState = _uiState.copyWith(showWishlistWarning: false);
     notifyListeners();

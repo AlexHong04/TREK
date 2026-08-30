@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../view_models/presentation_logic/whole_itinerary_detail_view_model.dart';
 import '../main.dart';
 import '../widgets/custom_app_bar.dart';
+import 'budget_popup.dart';
 
 class WholeItineraryDetailScreen extends StatefulWidget {
   const WholeItineraryDetailScreen({super.key});
@@ -39,9 +40,65 @@ class WholeItineraryDetailScreen extends StatefulWidget {
 
 class _WholeItineraryDetailScreenState
     extends State<WholeItineraryDetailScreen> {
+  bool _wishlistWarningShowing = false;
+
+  void _checkWishlistWarning(WholeItineraryDetailViewModel viewModel) {
+    if (!viewModel.uiState.showWishlistWarning || _wishlistWarningShowing) {
+      return;
+    }
+
+    _wishlistWarningShowing = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      _showWishlistWarningDialog(viewModel);
+    });
+  }
+
+  Future<void> _showWishlistWarningDialog(
+    WholeItineraryDetailViewModel viewModel,
+  ) async {
+    await showInitialTotalBudgetInsufficientDialog(
+      context: context,
+      shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded
+          .toStringAsFixed(2),
+
+      onCancel: () async {
+        await showCancelTopUpDialog(context: context, onContinue: () {});
+      },
+
+      onTopUpBudget: (double amount) async {
+        final isSufficient = await viewModel.topUpBudget(amount);
+
+        if (!isSufficient) {
+          // Wait until the first dialog is completely removed.
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+
+            showInsufficientTopUpTotalBudgetDialog(
+              context: context,
+              onContinue: () {
+                // Trigger alternative recommendation
+              },
+            );
+          });
+        }
+
+        return true;
+      },
+    );
+
+    if (mounted) {
+      _wishlistWarningShowing = false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final viewModel = context.watch<WholeItineraryDetailViewModel>();
+    _checkWishlistWarning(viewModel);
+
     return Scaffold(
       backgroundColor: appTheme.gray_50_03,
       appBar: const CustomAppBar(title: 'Itinerary Plan'),
