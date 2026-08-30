@@ -765,7 +765,7 @@ class ActivityViewModel extends ChangeNotifier {
         _uiState = _uiState.copyWith(
           isLoading: false,
           totalBudget: updatedTrip.totalBudget,
-          overspentBudget: (_uiState.overspentBudget - additionalAmount).clamp(
+          shortageAmount: (_uiState.shortageAmount - additionalAmount).clamp(
             0.0,
             double.infinity,
           ),
@@ -834,10 +834,13 @@ class ActivityViewModel extends ChangeNotifier {
         _uiState.currentActivityId,
       );
 
+      final exceededAmount = await _expenseTrackingService.getExceededAmount(_uiState.tripId, _uiState.currentActivityId);
+
       _uiState = _uiState.copyWith(
         overspentBudget: overspend,
         shortageAmount: shortageAmount,
         sufficientDays: sufficientDays,
+        exceededAmount: exceededAmount
       );
 
       switch (response) {

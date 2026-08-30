@@ -160,7 +160,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
       allocatedBudget:
       'RM ${state.selectedActivity?.allocatedBudget.toStringAsFixed(2)}',
       remainingBudget: state.remainingBudget.toStringAsFixed(2),
-      exceededAmount: state.shortageAmount.toStringAsFixed(2),
+      exceededAmount: state.exceededAmount.toStringAsFixed(2),
       warningText1:
       'You have overspent ${state.overspentBudget} so far on this trip.',
       estimatedDays: state.sufficientDays.toString(),

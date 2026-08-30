@@ -40,6 +40,7 @@ class ActivityUiState {
   final String usedPercentageString;
   final double usedPercentageValue;
   final double shortageAmount;
+  final double exceededAmount;
 
   final String popupAction;
 
@@ -73,8 +74,9 @@ class ActivityUiState {
     this.overspentBudget = 0.0,
     this.sufficientDays = 0,
     this.usedPercentageString = '0% Used',
-    this.usedPercentageValue = 0.0,
-    this.shortageAmount = 0.0,
+    this.usedPercentageValue = 0.00,
+    this.shortageAmount = 0.00,
+    this.exceededAmount = 0.00,
     this.popupAction = '',
   });
 
@@ -132,6 +134,7 @@ class ActivityUiState {
     String? usedPercentageString,
     double? usedPercentageValue,
     double? shortageAmount,
+    double? exceededAmount,
     String? popupAction,
   }) {
     return ActivityUiState(
@@ -175,6 +178,7 @@ class ActivityUiState {
       usedPercentageString: usedPercentageString ?? this.usedPercentageString,
       usedPercentageValue: usedPercentageValue ?? this.usedPercentageValue,
       shortageAmount: shortageAmount ?? this.shortageAmount,
+      exceededAmount: exceededAmount ?? this.exceededAmount,
       popupAction: popupAction ?? this.popupAction,
     );
   }
