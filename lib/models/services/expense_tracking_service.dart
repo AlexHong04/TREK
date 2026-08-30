@@ -535,7 +535,11 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     debugPrint("Is critical: $isCritical");
 
     if (isCritical) {
-      return ExpenseProcessingResult.critical;
+      final success = await _itineraryRepository.updateCriticalDetails(tripId);
+      if (success) {
+        return ExpenseProcessingResult.critical;
+      }
+      throw Exception('Update critical details failed: $success');
     }
 
     // Check overspend threshold
