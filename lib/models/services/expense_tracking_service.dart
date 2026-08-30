@@ -422,6 +422,52 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     }
   }
 
+  Future<List<Activity>> getRemainingActivities(
+      String tripId,
+      DateTime currentDateTime,
+      ) async {
+    try {
+      final activities =
+      await _itineraryRepository.fetchAllActivitiesByTrip(
+        tripId,
+      );
+
+      activities.sort((a, b) {
+        final aDateTime = _getActivityStartDateTime(a);
+        final bDateTime = _getActivityStartDateTime(b);
+
+        return aDateTime.compareTo(bDateTime);
+      });
+
+      return activities.where((activity) {
+        final activityStart =
+        _getActivityStartDateTime(activity);
+
+        return activityStart.isAfter(currentDateTime);
+      }).toList();
+    } catch (e) {
+      print('Calculating Remaining Activities Error: $e');
+      rethrow;
+    }
+  }
+
+  DateTime _getActivityStartDateTime(Activity activity) {
+    final date = activity.date;
+
+    final timeParts = activity.startTime?.split(':');
+
+    final hour = int.parse(timeParts![0]);
+    final minute = int.parse(timeParts[1]);
+
+    return DateTime(
+      date.year,
+      date.month,
+      date.day,
+      hour,
+      minute,
+    );
+  }
+
   // zhiqin
   Future<ExpenseProcessingResult> processExpense({
     required String tripId,
@@ -433,9 +479,7 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     final currentTrip = await _itineraryRepository.getTrip(tripId);
 
     // get remaining activities
-    final activities = await _itineraryRepository.fetchAllActivitiesByTrip(
-      tripId,
-    );
+    final activities = await getRemainingActivities(tripId, DateTime.now());
 
     // Get ALL confirmed expenses for this activity
     final expenses = await _expenseRepository.getExpensesByActivityId(
