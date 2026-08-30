@@ -58,7 +58,36 @@ class ItineraryRepository implements IItineraryRepository {
       String? lastTripId = lastTripRes?['trip_id'] as String?;
       String newTripId = IdGenerator.generateNextFormattedId('WI', lastTripId);
 
-      final String? currentUserId = SupabaseConfig.client.auth.currentUser?.id;
+      final String? currentAuthId = SupabaseConfig.client.auth.currentUser?.id;
+      String customUserId = 'US0001';
+
+      if (currentAuthId != null) {
+        try {
+          // Attempt to fetch custom user_id based on auth_id
+          final userRes = await SupabaseConfig.client
+              .from('user')
+              .select('user_id')
+              .eq('auth_id', currentAuthId)
+              .maybeSingle();
+          if (userRes != null && userRes['user_id'] != null) {
+            customUserId = userRes['user_id'];
+          }
+        } catch (e) {
+          try {
+            // Fallback to 'users' table if the alias is different
+            final userRes = await SupabaseConfig.client
+                .from('users')
+                .select('user_id')
+                .eq('auth_id', currentAuthId)
+                .maybeSingle();
+            if (userRes != null && userRes['user_id'] != null) {
+              customUserId = userRes['user_id'];
+            }
+          } catch (e2) {
+            print('Error fetching custom user_id: $e2');
+          }
+        }
+      }
 
       // Extract an image from the first activity to represent the whole trip
       String? tripImageUrl;
@@ -72,7 +101,7 @@ class ItineraryRepository implements IItineraryRepository {
       // Create WholeTrip Entity and Insert
       final wholeTrip = WholeTrip(
         tripId: newTripId,
-        userId: currentUserId ?? 'US0001',
+        userId: customUserId,
         destination: destination,
         startDate: DateTime.now(),
         endDate: DateTime.now().add(const Duration(days: 3)),
@@ -471,30 +500,35 @@ class ItineraryRepository implements IItineraryRepository {
       await SupabaseConfig.client
           .from('activities')
           .delete()
-          .inFilter('activities_id', newActivityIds); // Use your column name: 'activities_id' or 'activitiesId'
+          .inFilter(
+            'activities_id',
+            newActivityIds,
+          ); // Use your column name: 'activities_id' or 'activitiesId'
 
       // 3. Prepare payload mapped to Supabase database columns
-      final records = newActivities.map((activity) => {
-        'activities_id': activity.activitiesId,
-        'day_trip_id': activity.dayTripId,
-        'destination': activity.destination,
-        'description': activity.description,
-        'activity_img_url': activity.activityImgUrl,
-        'date': activity.date.toIso8601String(),
-        'allocated_budget': activity.allocatedBudget,
-        'overspend_amount': activity.overspendAmount,
-        'status': activity.status,
-        'start_time': activity.startTime,
-        'end_time': activity.endTime,
-        'duration': activity.duration,
-        'activity_category': activity.activityCategory,
-        'is_overspend': activity.isOverspend,
-      }).toList();
+      final records = newActivities
+          .map(
+            (activity) => {
+              'activities_id': activity.activitiesId,
+              'day_trip_id': activity.dayTripId,
+              'destination': activity.destination,
+              'description': activity.description,
+              'activity_img_url': activity.activityImgUrl,
+              'date': activity.date.toIso8601String(),
+              'allocated_budget': activity.allocatedBudget,
+              'overspend_amount': activity.overspendAmount,
+              'status': activity.status,
+              'start_time': activity.startTime,
+              'end_time': activity.endTime,
+              'duration': activity.duration,
+              'activity_category': activity.activityCategory,
+              'is_overspend': activity.isOverspend,
+            },
+          )
+          .toList();
 
       // 4. Batch insert the replacement activities into Supabase
-      await SupabaseConfig.client
-          .from('activities')
-          .insert(records);
+      await SupabaseConfig.client.from('activities').insert(records);
     } catch (e) {
       debugPrint('Error in replaceTripActivities: $e');
       throw Exception('DB Error: $e');
