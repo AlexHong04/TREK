@@ -312,6 +312,20 @@ class ItineraryRepository implements IItineraryRepository {
     }
   }
 
+  Future<bool> updateCriticalDetails(String tripId) async {
+    try {
+      await SupabaseConfig.client
+          .from('whole_trips')
+          .update({'is_critical_budget': true})
+          .eq('trip_id', tripId);
+      return true;
+    } on Exception catch (e) {
+      debugPrint('Error updating critical details: $e');
+
+      throw Exception('DB Error during updating critical details: $e');
+    }
+  }
+
   // zhiqin
   Future<bool> updateActivities(List<Activity> activities) async {
     if (activities.isEmpty) return false;
