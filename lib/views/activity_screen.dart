@@ -129,6 +129,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
         );
         break;
     }
+
+    viewModel.clearPopupAction();
   }
 
   void _showUnderThresholdDialog(ActivityUiState state) {
