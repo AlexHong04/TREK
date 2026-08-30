@@ -397,7 +397,7 @@ class ActivityViewModel extends ChangeNotifier {
       await loadRecordedExpensesForSelectedActivity();
 
       // detect overspend
-      await handleExpenseSubmission(expenseAmount);
+      await handleExpenseSubmission();
     } catch (error) {
       _uiState = _uiState.copyWith(
         isSavingExpense: false,
@@ -745,7 +745,7 @@ class ActivityViewModel extends ChangeNotifier {
 
       if (updatedTrip != null) {
         final days = await _budgetService.calculateSufficientDays(
-          updatedTrip,
+          updatedTrip.tripId!,
           activityId,
         );
 
@@ -756,7 +756,7 @@ class ActivityViewModel extends ChangeNotifier {
             0.0,
             double.infinity,
           ),
-          sufficientDays: days.toInt(),
+          sufficientDays: days,
           errorMessage: '',
         );
 
@@ -784,7 +784,7 @@ class ActivityViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> handleExpenseSubmission(double expense) async {
+  Future<void> handleExpenseSubmission() async {
     debugPrint("zq handleExpenseSubmission");
 
     _uiState = _uiState.copyWith(isLoading: true);
@@ -794,7 +794,6 @@ class ActivityViewModel extends ChangeNotifier {
       final response = await _expenseTrackingService.processExpense(
         tripId: _uiState.tripId,
         currentActivityId: _uiState.currentActivityId,
-        expense: expense,
       );
 
       debugPrint("result: ${response}");
@@ -807,9 +806,19 @@ class ActivityViewModel extends ChangeNotifier {
         overspend += day.overspendAmount!;
       }
 
+      final activities = await _itineraryService.getRemainingActivities(_uiState.tripId, _uiState.currentActivityId);
+
+      var shortageAmount = 0.0;
+      for (var ad in activities) {
+        shortageAmount += ad.allocatedBudget;
+      }
+
+      final sufficientDays = await _budgetService.calculateSufficientDays(_uiState.tripId, _uiState.currentActivityId);
+
       _uiState = _uiState.copyWith(
         overspentBudget: overspend,
-        shortageAmount: overspend
+        shortageAmount: shortageAmount,
+        sufficientDays: sufficientDays
       );
 
       switch (response) {
