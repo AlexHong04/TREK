@@ -43,6 +43,8 @@ abstract interface class IExpenseTrackingService {
     required String currentActivityId,
   });
 
+  Future<double> getExceededAmount(String tripId, String currentActivityId);
+
   Future<bool> detectOverspend(
     String tripId,
     Activity currentActivity,

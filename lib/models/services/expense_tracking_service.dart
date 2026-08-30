@@ -483,7 +483,8 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     }
 
     // Calculate overspent amount
-    final double overspentAmount = totalActivityExpense - currentActivity.allocatedBudget;
+    final double overspentAmount =
+        totalActivityExpense - currentActivity.allocatedBudget;
 
     debugPrint("Overspent amount: $overspentAmount");
 
@@ -636,5 +637,21 @@ class ExpenseTrackingService implements IExpenseTrackingService {
         allocatedBudget * overspendThresholdPercentage;
 
     return overspentAmount > allowedOverspendLimit;
+  }
+
+  // zhiqin
+  Future<double> getExceededAmount(
+    String tripId,
+    String currentActivityId,
+  ) async {
+    final activity = await _itineraryRepository.getCurrentActivity(currentActivityId);
+    final expenses = await _expenseRepository.getExpensesByActivityId(
+      currentActivityId,
+    );
+    double totalAmount = 0.0;
+    for (final expense in expenses) {
+      totalAmount += expense.totalAmount;
+    }
+    return totalAmount - activity.allocatedBudget;
   }
 }
