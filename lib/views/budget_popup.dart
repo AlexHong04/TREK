@@ -582,7 +582,7 @@ Future<void> showCancelTopUpDialog({
 Future<void> showInitialTotalBudgetInsufficientDialog({
   required BuildContext context,
   required String shortageAmount,
-  VoidCallback? onEndTrip,
+  VoidCallback? onCancel,
   required Future<bool> Function(double amount) onTopUpBudget,
 }) {
   final controller = TextEditingController();
@@ -623,11 +623,11 @@ Future<void> showInitialTotalBudgetInsufficientDialog({
           children: [
             Expanded(
               child: _buildActionButton(
-                text: 'End Trip',
+                text: 'Cancel',
                 backgroundColor: appTheme.redButton,
                 onPressed: () {
                   Navigator.of(dialogContext).pop();
-                  onEndTrip?.call();
+                  onCancel?.call();
                 },
               ),
             ),
