@@ -79,7 +79,7 @@ class _WholeItineraryDetailScreenState
             showInsufficientTopUpTotalBudgetDialog(
               context: context,
               onContinue: () {
-                // Trigger alternative recommendation
+                // Trigger re-recommendation with the latest total budget
               },
             );
           });
