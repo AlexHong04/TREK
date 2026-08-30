@@ -83,89 +83,233 @@ class BudgetService implements IBudgetService {
   }
 
   Future<List<Activity>> reallocateBudget(
-    String tripId,
-    Activity currentActivity,
-    double overspendAmount,
-  ) async {
-    // Fetch remaining activities occurring after currentActivity
-    final List<Activity> remainingActivities = await _itineraryRepository
-        .fetchRemainingActivity(tripId, currentActivity.activitiesId);
+      String tripId,
+      Activity currentActivity,
+      double overspentAmount,
+      ) async {
+    debugPrint('========== START BUDGET REALLOCATION ==========');
+    debugPrint('Trip ID: $tripId');
+    debugPrint('Current Activity ID: ${currentActivity.activitiesId}');
+    debugPrint('Current Activity: ${currentActivity.destination}');
+    debugPrint('Overspent Amount: RM ${overspentAmount.toStringAsFixed(2)}');
 
-    debugPrint("current activity: $currentActivity");
-    debugPrint("trip id: $tripId");
-    debugPrint("remaining activities: $remainingActivities");
-    debugPrint("remaining overspend: $overspendAmount");
+    final allRemainingActivities =
+    await _itineraryRepository.fetchRemainingActivity(
+      tripId,
+      currentActivity.activitiesId,
+    );
 
-    // Get remaining restaurant activities
-    final restaurantActivities = remainingActivities
-        .where(
-          (activity) => activity.activityCategory.toLowerCase() == 'restaurant',
-        )
-        .toList();
+    debugPrint(
+      'Total remaining activities: ${allRemainingActivities.length}',
+    );
 
-    debugPrint("restaurant activities: $restaurantActivities");
+    for (final activity in allRemainingActivities) {
+      debugPrint(
+        'Remaining Activity: '
+            '${activity.activitiesId} | '
+            '${activity.destination} | '
+            'Category: ${activity.activityCategory} | '
+            'Date: ${activity.date} | '
+            'Start: ${activity.startTime} | '
+            'Budget: RM ${activity.allocatedBudget.toStringAsFixed(2)}',
+      );
+    }
 
-    // No restaurants available for reallocation
-    if (restaurantActivities.isEmpty) {
+    final DateTime currentDateTime = DateTime.now();
+
+    debugPrint('Current DateTime: $currentDateTime');
+
+    // Find restaurants that have not started yet.
+    final remainingRestaurantActivities =
+    allRemainingActivities.where((activity) {
+      final timeParts = activity.startTime?.split(':');
+
+      if (timeParts == null || timeParts.length < 2) {
+        debugPrint(
+          '[SKIP] ${activity.activitiesId} - '
+              'Invalid start time: ${activity.startTime}',
+        );
+        return false;
+      }
+
+      final int? hour = int.tryParse(timeParts[0]);
+      final int? minute = int.tryParse(timeParts[1]);
+
+      if (hour == null || minute == null) {
+        debugPrint(
+          '[SKIP] ${activity.activitiesId} - '
+              'Cannot parse start time: ${activity.startTime}',
+        );
+        return false;
+      }
+
+      // Combine activity date + start time
+      final DateTime activityStartDateTime = DateTime(
+        activity.date.year,
+        activity.date.month,
+        activity.date.day,
+        hour,
+        minute,
+      );
+
+      final bool isRestaurant =
+          activity.activityCategory.toLowerCase() == 'restaurant';
+
+      final bool hasNotStarted =
+      activityStartDateTime.isAfter(currentDateTime);
+
+      debugPrint(
+        '[CHECK] ${activity.activitiesId} | '
+            '${activity.destination} | '
+            'Restaurant: $isRestaurant | '
+            'Start: $activityStartDateTime | '
+            'Future: $hasNotStarted',
+      );
+
+      return isRestaurant && hasNotStarted;
+    }).toList();
+
+    // Sort restaurants according to start time.
+    remainingRestaurantActivities.sort((a, b) {
+      final aParts = a.startTime!.split(':');
+      final bParts = b.startTime!.split(':');
+
+      final DateTime aDateTime = DateTime(
+        a.date.year,
+        a.date.month,
+        a.date.day,
+        int.parse(aParts[0]),
+        int.parse(aParts[1]),
+      );
+
+      final DateTime bDateTime = DateTime(
+        b.date.year,
+        b.date.month,
+        b.date.day,
+        int.parse(bParts[0]),
+        int.parse(bParts[1]),
+      );
+
+      return aDateTime.compareTo(bDateTime);
+    });
+
+    debugPrint(
+      'Remaining restaurants: '
+          '${remainingRestaurantActivities.length}',
+    );
+
+    if (remainingRestaurantActivities.isEmpty) {
+      debugPrint(
+        '[REALLOCATION FAILED] No remaining restaurant activities.',
+      );
+      debugPrint('========== END BUDGET REALLOCATION ==========');
       return [];
     }
 
-    // Divide overspend equally among remaining restaurants
+    // Divide the overspent amount equally
+    // among the remaining restaurants.
+    final int numberOfRemainingRestaurants =
+        remainingRestaurantActivities.length;
+
     final double deductionPerRestaurant =
-        overspendAmount / restaurantActivities.length;
+        overspentAmount / numberOfRemainingRestaurants;
 
-    debugPrint("deduction per restaurant: $deductionPerRestaurant");
+    debugPrint(
+      'Number of restaurants: $numberOfRemainingRestaurants',
+    );
 
-    // Check all restaurants before making any changes
-    for (final activity in restaurantActivities) {
-      final double newBudget =
-          activity.allocatedBudget - deductionPerRestaurant;
+    debugPrint(
+      'Total overspent: RM ${overspentAmount.toStringAsFixed(2)}',
+    );
 
-      debugPrint(
-        "${activity.activitiesId}: "
-        "current=${activity.allocatedBudget}, "
-        "min=${activity.minAllocatedBudget}, "
-        "new=$newBudget",
+    debugPrint(
+      'Deduction per restaurant: '
+          'RM ${deductionPerRestaurant.toStringAsFixed(2)}',
+    );
+
+    final List<Activity> modifiedActivities = [];
+
+    for (final restaurant in remainingRestaurantActivities) {
+      final double oldBudget = restaurant.allocatedBudget;
+
+      final double newAllocatedBudget =
+          oldBudget - deductionPerRestaurant;
+
+      final double finalAllocatedBudget =
+      newAllocatedBudget < 0 ? 0.0 : newAllocatedBudget;
+
+      final updatedRestaurant = restaurant.copyWith(
+        allocatedBudget: finalAllocatedBudget,
       );
 
-      if (activity.minAllocatedBudget != null &&
-          newBudget < activity.minAllocatedBudget!) {
-        debugPrint(
-          "Cannot reallocate: activity "
-          "${activity.activitiesId} would fall below minimum allocated budget.",
-        );
+      modifiedActivities.add(updatedRestaurant);
 
-        return [];
-      }
+      debugPrint(
+        '[REALLOCATE] ${restaurant.activitiesId} | '
+            '${restaurant.destination}',
+      );
+
+      debugPrint(
+        '    Old Budget: RM ${oldBudget.toStringAsFixed(2)}',
+      );
+
+      debugPrint(
+        '    Deduction: RM ${deductionPerRestaurant.toStringAsFixed(2)}',
+      );
+
+      debugPrint(
+        '    New Budget: RM ${finalAllocatedBudget.toStringAsFixed(2)}',
+      );
     }
 
-    // All restaurants can accept the deduction
-    final List<Activity> updatedRemainingActivities = remainingActivities.map((
-      activity,
-    ) {
-      if (activity.activityCategory.toLowerCase() == 'restaurant') {
-        final double newBudget =
-            activity.allocatedBudget - deductionPerRestaurant;
+    debugPrint('========== REALLOCATION RESULT ==========');
 
-        return activity.copyWith(allocatedBudget: newBudget);
-      }
+    for (final activity in modifiedActivities) {
+      debugPrint(
+        '${activity.activitiesId} | '
+            '${activity.destination} | '
+            'New Budget: RM ${activity.allocatedBudget.toStringAsFixed(2)}',
+      );
+    }
 
-      return activity;
-    }).toList();
+    debugPrint('========== END BUDGET REALLOCATION ==========');
 
-    return updatedRemainingActivities;
+    return modifiedActivities;
   }
 
-  Future<double> calculateSufficientDays(
-    WholeTrip trip,
-    String currentActivityId,
-  ) async {
-    List<Activity> remainingActivities = await _itineraryRepository
-        .fetchRemainingActivity(trip.tripId!, currentActivityId);
-    double remainingCost = 0.00;
-    for (var activity in remainingActivities) {
+  Future<int> calculateSufficientDays(
+      String tripId,
+      String currentActivityId,
+      ) async {
+    final trip = await _itineraryRepository.getTrip(tripId);
+
+    final List<Activity> remainingActivities =
+    await _itineraryRepository.fetchRemainingActivity(
+      tripId,
+      currentActivityId,
+    );
+
+    double remainingCost = 0.0;
+
+    for (final activity in remainingActivities) {
       remainingCost += activity.allocatedBudget;
     }
-    return remainingCost / trip.remainingBalance!;
+
+    final double remainingBalance = trip.remainingBalance ?? 0.0;
+
+    if (remainingBalance <= 0) {
+      debugPrint('Remaining balance is RM0 or below.');
+      return 0;
+    }
+
+    final double sufficientDays =
+        remainingCost / remainingBalance;
+
+    debugPrint('Remaining cost: RM $remainingCost');
+    debugPrint('Remaining balance: RM $remainingBalance');
+    debugPrint('Sufficient days: $sufficientDays');
+    debugPrint('Returned days: ${sufficientDays.floor()}');
+
+    return sufficientDays.floor();
   }
 }

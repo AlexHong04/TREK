@@ -25,8 +25,8 @@ abstract interface class IBudgetService {
     double overspendAmount,
   );
 
-  Future<double> calculateSufficientDays(
-    WholeTrip trip,
+  Future<int> calculateSufficientDays(
+    String tripId,
     String currentActivityId,
   );
 }
