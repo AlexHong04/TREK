@@ -477,7 +477,20 @@ class ActivityViewModel extends ChangeNotifier {
   }
 
   Future<void> loadTripItinerary(String tripId, {DateTime? filterDate}) async {
-    _uiState = _uiState.copyWith(isLoading: true);
+
+    final now = DateTime.now();
+    final targetDate = filterDate ?? DateTime(now.year, now.month, now.day);
+    _uiState = _uiState.copyWith(
+      isLoading: true,
+      tripId: tripId,
+      filterDate: targetDate,
+      activities: const [],
+      spentBudget: 0.0,
+      totalBudget: 0.0,
+      overspentBudget: 0.0,
+      sufficientDays: 0,
+      errorMessage: '',
+    );
     notifyListeners();
 
     try {
@@ -505,9 +518,6 @@ class ActivityViewModel extends ChangeNotifier {
       if(allActivities.isNotEmpty) {
         initialSufficientDays = await _budgetService.calculateSufficientDays(tripId, allActivities.first.activitiesId);
       }
-
-      final now = DateTime.now();
-      final targetDate = filterDate ?? DateTime(now.year, now.month, now.day);
 
       _uiState = _uiState.copyWith(
         isLoading: false,
