@@ -32,12 +32,11 @@ class ActivityViewModel extends ChangeNotifier {
     IBudgetService? budgetService,
     IExpenseTrackingService? expenseTrackingService,
     IExpenseRepository? expenseRepository,
-  })
-      : _itineraryService = itineraryService ?? ItineraryService(),
-        _budgetService = budgetService ?? BudgetService(),
-        _expenseTrackingService =
-            expenseTrackingService ?? ExpenseTrackingService(),
-        _expenseRepository = expenseRepository ?? ExpenseRepository() {
+  }) : _itineraryService = itineraryService ?? ItineraryService(),
+       _budgetService = budgetService ?? BudgetService(),
+       _expenseTrackingService =
+           expenseTrackingService ?? ExpenseTrackingService(),
+       _expenseRepository = expenseRepository ?? ExpenseRepository() {
     initialize();
   }
 
@@ -314,7 +313,7 @@ class ActivityViewModel extends ChangeNotifier {
           _expenseTrackingService.validateTotalAmount(extractedTotal);
         } on ArgumentError {
           extractedTotalError =
-          'The extracted amount is invalid. Please correct it.';
+              'The extracted amount is invalid. Please correct it.';
         }
       }
 
@@ -322,7 +321,7 @@ class ActivityViewModel extends ChangeNotifier {
         isScanningReceipt: false,
         ocrRawText: receiptText,
         ocrMerchantName:
-        _expenseTrackingService.extractMerchantName(receiptText) ?? '',
+            _expenseTrackingService.extractMerchantName(receiptText) ?? '',
         ocrTransactionDateTime: extractedDateTime,
         clearOcrTransactionDateTime: extractedDateTime == null,
         ocrExtractedTotal: extractedTotal,
@@ -410,14 +409,13 @@ class ActivityViewModel extends ChangeNotifier {
   void _updateDraftExpenseItems(List<ExpenseItem> items) {
     final itemsWithCalculatedSubtotals = items
         .map(
-          (item) =>
-          item.copyWith(
+          (item) => item.copyWith(
             subtotal: _expenseTrackingService.calculateItemSubtotal(
               item.quantity,
               item.unitPrice,
             ),
           ),
-    )
+        )
         .toList();
 
     _uiState = _uiState.copyWith(
@@ -455,11 +453,17 @@ class ActivityViewModel extends ChangeNotifier {
       final result = await _itineraryService.fetchLatestTrip();
 
       if (result != null) {
+        final days = await _budgetService.calculateSufficientDays(
+          result.trip.tripId!,
+          result.activities.first.activitiesId,
+        );
+
         _uiState = _uiState.copyWith(
           isLoading: false,
           tripId: result.trip.tripId,
           activities: result.activities,
           totalBudget: result.trip.totalBudget,
+          sufficientDays: days,
         );
         unawaited(_prepareExpenseReminders(result.activities));
       } else {
@@ -504,21 +508,23 @@ class ActivityViewModel extends ChangeNotifier {
 
   /// Requests notification and exact-alarm permission, then prepares the
   /// activity-end and evening expense-review reminders.
-  Future<void> _prepareExpenseReminders(
-    List<Activity> activities,
-  ) async {
+  Future<void> _prepareExpenseReminders(List<Activity> activities) async {
     try {
-      final hasNotificationPermission =
-          await _notificationSource.requestPermission();
+      final hasNotificationPermission = await _notificationSource
+          .requestPermission();
       if (!hasNotificationPermission) {
-        debugPrint('[Expense reminder] Notification permission was not granted.');
+        debugPrint(
+          '[Expense reminder] Notification permission was not granted.',
+        );
         return;
       }
 
-      final hasExactAlarmPermission =
-          await _notificationSource.requestExactAlarmPermission();
+      final hasExactAlarmPermission = await _notificationSource
+          .requestExactAlarmPermission();
       if (!hasExactAlarmPermission) {
-        debugPrint('[Expense reminder] Exact-alarm permission was not granted.');
+        debugPrint(
+          '[Expense reminder] Exact-alarm permission was not granted.',
+        );
         return;
       }
 
@@ -555,7 +561,8 @@ class ActivityViewModel extends ChangeNotifier {
           id: reminderId,
           scheduledAt: reminderTime,
           title: 'Expense reminder',
-          body: 'Did you spend at ${activity.destination}? '
+          body:
+              'Did you spend at ${activity.destination}? '
               'Record your expense now.',
           payload: activity.activitiesId,
         );
@@ -616,13 +623,15 @@ class ActivityViewModel extends ChangeNotifier {
         return;
       }
 
-      final activityLabel =
-          activitiesWithoutExpenses == 1 ? 'activity' : 'activities';
+      final activityLabel = activitiesWithoutExpenses == 1
+          ? 'activity'
+          : 'activities';
       await _notificationSource.scheduleExpenseReminder(
         id: _eveningExpenseReviewReminderId,
         scheduledAt: reviewTime,
         title: 'Expense review reminder',
-        body: 'You have $activitiesWithoutExpenses $activityLabel without '
+        body:
+            'You have $activitiesWithoutExpenses $activityLabel without '
             'recorded expenses today. Today ends in 4 hours. '
             'Review your expenses.',
         payload: 'evening_expense_review',
@@ -661,8 +670,12 @@ class ActivityViewModel extends ChangeNotifier {
 
     final hour = int.tryParse(timeParts[0]);
     final minute = int.tryParse(timeParts[1]);
-    if (hour == null || minute == null || hour < 0 || hour > 23 ||
-        minute < 0 || minute > 59) {
+    if (hour == null ||
+        minute == null ||
+        hour < 0 ||
+        hour > 23 ||
+        minute < 0 ||
+        minute > 59) {
       return null;
     }
 
@@ -806,19 +819,25 @@ class ActivityViewModel extends ChangeNotifier {
         overspend += day.overspendAmount!;
       }
 
-      final activities = await _itineraryService.getRemainingActivities(_uiState.tripId, _uiState.currentActivityId);
+      final activities = await _itineraryService.getRemainingActivities(
+        _uiState.tripId,
+        _uiState.currentActivityId,
+      );
 
       var shortageAmount = 0.0;
       for (var ad in activities) {
         shortageAmount += ad.allocatedBudget;
       }
 
-      final sufficientDays = await _budgetService.calculateSufficientDays(_uiState.tripId, _uiState.currentActivityId);
+      final sufficientDays = await _budgetService.calculateSufficientDays(
+        _uiState.tripId,
+        _uiState.currentActivityId,
+      );
 
       _uiState = _uiState.copyWith(
         overspentBudget: overspend,
         shortageAmount: shortageAmount,
-        sufficientDays: sufficientDays
+        sufficientDays: sufficientDays,
       );
 
       switch (response) {
