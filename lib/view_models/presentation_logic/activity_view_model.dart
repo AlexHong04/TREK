@@ -458,6 +458,8 @@ class ActivityViewModel extends ChangeNotifier {
           result.activities.first.activitiesId,
         );
 
+        debugPrint("days ${days}");
+
         _uiState = _uiState.copyWith(
           isLoading: false,
           tripId: result.trip.tripId,
@@ -767,6 +769,7 @@ class ActivityViewModel extends ChangeNotifier {
   }
 
   Future<bool> topUpBudget(double additionalAmount) async {
+    debugPrint("Top up Budget");
     if (additionalAmount <= 0) {
       _uiState = _uiState.copyWith(
         isLoading: false,
@@ -776,35 +779,68 @@ class ActivityViewModel extends ChangeNotifier {
       return false;
     }
 
-    final id = _uiState.tripId;
+    final tripId = _uiState.tripId;
     final activityId = _uiState.currentActivityId;
 
-    _uiState = _uiState.copyWith(isLoading: true, errorMessage: '');
+    _uiState = _uiState.copyWith(
+      isLoading: true,
+      errorMessage: '',
+    );
     notifyListeners();
 
     try {
       final updatedTrip = await _budgetService.topUpBudget(
-        tripId: id,
+        tripId: tripId,
         currentActivityId: activityId,
         topupAmount: additionalAmount,
       );
 
+      debugPrint('updated trip ${updatedTrip}');
+
       if (updatedTrip != null) {
+        // Recalculate sufficient days after top-up.
         final days = await _budgetService.calculateSufficientDays(
           updatedTrip.tripId!,
           activityId,
         );
 
+        // Calculate the NEW shortage.
+        final double newShortageAmount =
+        (_uiState.shortageAmount - additionalAmount)
+            .clamp(0.0, double.infinity);
+
+        debugPrint('========== TOP UP ==========');
+        debugPrint('Previous shortage: ${_uiState.shortageAmount}');
+        debugPrint('Top-up amount: $additionalAmount');
+        debugPrint('New shortage: $newShortageAmount');
+        debugPrint('Sufficient days: $days');
+        debugPrint('============================');
+
         _uiState = _uiState.copyWith(
           isLoading: false,
           totalBudget: updatedTrip.totalBudget,
-          shortageAmount: (_uiState.shortageAmount - additionalAmount).clamp(
-            0.0,
-            double.infinity,
-          ),
+          shortageAmount: newShortageAmount,
           sufficientDays: days,
           errorMessage: '',
         );
+
+        // Top-up is still insufficient.
+        if (newShortageAmount > 0.00) {
+          _uiState = _uiState.copyWith(
+            popupAction: 'insufficientTopUp',
+          );
+
+          debugPrint(
+            'Top-up insufficient. Remaining shortage: $newShortageAmount',
+          );
+        } else {
+          // Shortage has been fully covered.
+          _uiState = _uiState.copyWith(
+            popupAction: '',
+          );
+
+          debugPrint('Shortage fully covered.');
+        }
 
         notifyListeners();
         return true;
@@ -854,7 +890,7 @@ class ActivityViewModel extends ChangeNotifier {
 
       final activities = await _itineraryService.getRemainingActivities(
         _uiState.tripId,
-        _uiState.currentActivityId,
+        DateTime.now(),
       );
 
       var shortageAmount = 0.0;
