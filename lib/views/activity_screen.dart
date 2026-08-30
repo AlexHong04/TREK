@@ -33,7 +33,10 @@ class _ActivityScreenState extends State<ActivityScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_isInit) {
-      final args = ModalRoute.of(context)?.settings.arguments;
+      final args = ModalRoute
+          .of(context)
+          ?.settings
+          .arguments;
       String? extractedTripId;
 
       if (args is Map<String, dynamic>) {
@@ -103,12 +106,13 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
     final viewModel = context.read<ActivityViewModel>();
     final state = viewModel.uiState;
+    final action = state.popupAction;
 
-    if (state.popupAction.isEmpty) {
-      return;
-    }
+    if (action.isEmpty) return;
 
-    switch (state.popupAction) {
+    viewModel.clearPopupAction();
+
+    switch (action) {
       case 'successful':
         _showUnderThresholdDialog(state);
         break;
@@ -125,12 +129,11 @@ class _ActivityScreenState extends State<ActivityScreen> {
         _showBudgetRecoveryDialog(
           state,
           onEndTrip: viewModel.endTrip,
-          onTopUpBudget: (amount) => viewModel.topUpBudget(amount),
+          onTopUpBudget: (amount) =>
+              viewModel.topUpBudget(amount),
         );
         break;
     }
-
-    viewModel.clearPopupAction();
   }
 
   void _showUnderThresholdDialog(ActivityUiState state) {
@@ -144,18 +147,20 @@ class _ActivityScreenState extends State<ActivityScreen> {
       'You have overspent ${state.overspentBudget} so far on this trip.',
       warningText2:
       'The budget allocated for remaining restaurants have been modified.',
-      onContinue: () {
-        Navigator.pop(context);
-      },
     );
   }
 
   void _showFailedDialog(ActivityUiState state) {
-    // show your failed dialog
+    showBudgetReallocationFailureDialog(
+      context: context,
+      onContinue: () {
+        // trigger recommendation
+      }
+    );
   }
 
   void _showExceedsThresholdDialog(ActivityUiState state) {
-    showBudgetExceeded20Dialog(
+    showBudgetExceededThresholdDialog(
       context: context,
       allocatedBudget:
       'RM ${state.selectedActivity?.allocatedBudget.toStringAsFixed(2)}',
@@ -166,16 +171,15 @@ class _ActivityScreenState extends State<ActivityScreen> {
       estimatedDays: state.sufficientDays.toString(),
       warningText3: 'Plan will be modified automatically.',
       onContinue: () {
-        // Handle action
+        // Trigger recommendation
       },
     );
   }
 
-  void _showBudgetRecoveryDialog(
-      ActivityUiState uiState, {
-        required VoidCallback onEndTrip,
-        required Future<bool> Function(double amount) onTopUpBudget,
-      }) {
+  void _showBudgetRecoveryDialog(ActivityUiState uiState, {
+    required VoidCallback onEndTrip,
+    required Future<bool> Function(double amount) onTopUpBudget,
+  }) {
     showBudgetRecoveryDialog(
       context: context,
       shortageAmount: uiState.shortageAmount.toString(),
@@ -190,11 +194,39 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
         if (!success) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to top up budget.')),
+            const SnackBar(
+              content: Text('Failed to top up budget.'),
+            ),
           );
+
+          return false;
         }
 
-        return success;
+        // Get the latest state AFTER topUpBudget()
+        final viewModel = context.read<ActivityViewModel>();
+        final latestState = viewModel.uiState;
+
+        // Top-up succeeded, but shortage still remains.
+        if (latestState.shortageAmount > 0) {
+
+          // Wait until the first dialog is completely removed.
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+
+            _showInsufficientTopUpDialog(latestState);
+          });
+        }
+
+        return true;
+      },
+    );
+  }
+
+  void _showInsufficientTopUpDialog(ActivityUiState state) {
+    showInsufficientTopUpBudgetRecoveryDialog(
+      context: context,
+      onContinue: () {
+        // trigger recommendation
       },
     );
   }
@@ -327,7 +359,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
                 ),
               ),
               Text(
-                'RM ${uiState.spentBudget.toStringAsFixed(2)} / RM ${uiState.totalBudget.toStringAsFixed(2)}',
+                'RM ${uiState.spentBudget.toStringAsFixed(2)} / RM ${uiState
+                    .totalBudget.toStringAsFixed(2)}',
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w800,
@@ -556,8 +589,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
     );
   }
 
-  Widget _buildActivityCard(
-      Activity activity,
+  Widget _buildActivityCard(Activity activity,
       ActivityUiState uiState, {
         VoidCallback? onTap,
       }) {

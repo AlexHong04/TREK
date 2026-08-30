@@ -824,23 +824,23 @@ class ActivityViewModel extends ChangeNotifier {
           errorMessage: '',
         );
 
-        // Top-up is still insufficient.
-        if (newShortageAmount > 0.00) {
-          _uiState = _uiState.copyWith(
-            popupAction: 'insufficientTopUp',
-          );
-
-          debugPrint(
-            'Top-up insufficient. Remaining shortage: $newShortageAmount',
-          );
-        } else {
-          // Shortage has been fully covered.
-          _uiState = _uiState.copyWith(
-            popupAction: '',
-          );
-
-          debugPrint('Shortage fully covered.');
-        }
+        // // Top-up is still insufficient.
+        // if (newShortageAmount > 0.00) {
+        //   _uiState = _uiState.copyWith(
+        //     popupAction: 'insufficientTopUp',
+        //   );
+        //
+        //   debugPrint(
+        //     'Top-up insufficient. Remaining shortage: $newShortageAmount',
+        //   );
+        // } else {
+        //   // Shortage has been fully covered.
+        //   _uiState = _uiState.copyWith(
+        //     popupAction: '',
+        //   );
+        //
+        //   debugPrint('Shortage fully covered.');
+        // }
 
         notifyListeners();
         return true;
