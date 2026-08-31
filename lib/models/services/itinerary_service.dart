@@ -485,12 +485,11 @@ class ItineraryService implements IItineraryService {
   }
 
   Future<List<Activity>> getRemainingActivities(
-      String tripId,
-      DateTime currentDateTime,
-      ) async {
+    String tripId,
+    DateTime currentDateTime,
+  ) async {
     try {
-      final activities =
-      await _itineraryRepository.fetchAllActivitiesByTrip(
+      final activities = await _itineraryRepository.fetchAllActivitiesByTrip(
         tripId,
       );
 
@@ -502,8 +501,7 @@ class ItineraryService implements IItineraryService {
       });
 
       return activities.where((activity) {
-        final activityStart =
-        _getActivityStartDateTime(activity);
+        final activityStart = _getActivityStartDateTime(activity);
 
         return activityStart.isAfter(currentDateTime);
       }).toList();
@@ -521,15 +519,8 @@ class ItineraryService implements IItineraryService {
     final hour = int.parse(timeParts![0]);
     final minute = int.parse(timeParts[1]);
 
-    return DateTime(
-      date.year,
-      date.month,
-      date.day,
-      hour,
-      minute,
-    );
+    return DateTime(date.year, date.month, date.day, hour, minute);
   }
-
 
   Future<void> updateTripStatus(String tripId, String newStatus) async {
     final allowedStatus = ['Pending', 'Ongoing', 'Completed'];
@@ -562,28 +553,32 @@ class ItineraryService implements IItineraryService {
       for (final act in remainingActivities) act.activitiesId: act,
     };
 
-    final rawActivitiesPayload = remainingActivities.map((act) => {
-      'activitiesId': act.activitiesId,
-      'dayTripId': act.dayTripId,
-      'destination': act.destination,
-      'description': act.description,
-      'date': act.date.toIso8601String(),
-      'startTime': act.startTime,
-      'endTime': act.endTime,
-      'allocatedBudget': act.allocatedBudget,
-      'activityCategory': act.activityCategory,
-    }).toList();
+    final rawActivitiesPayload = remainingActivities
+        .map(
+          (act) => {
+            'activitiesId': act.activitiesId,
+            'dayTripId': act.dayTripId,
+            'destination': act.destination,
+            'description': act.description,
+            'date': act.date.toIso8601String(),
+            'startTime': act.startTime,
+            'endTime': act.endTime,
+            'allocatedBudget': act.allocatedBudget,
+            'activityCategory': act.activityCategory,
+          },
+        )
+        .toList();
 
     // 2. Call Gemini API
     final List<Map<String, dynamic>> rawResponseList =
-    await GeminiApiConfig.generateRecoveryItinerary(
-      newTotalBudget: newTotalBudget,
-      currentSpentBudget: currentSpentBudget,
-      topUpAmount: topUpAmount,
-      remainingActivities: rawActivitiesPayload,
-      tripDestination: tripDestination,
-      currentDate: currentDate,
-    );
+        await GeminiApiConfig.generateRecoveryItinerary(
+          newTotalBudget: newTotalBudget,
+          currentSpentBudget: currentSpentBudget,
+          topUpAmount: topUpAmount,
+          remainingActivities: rawActivitiesPayload,
+          tripDestination: tripDestination,
+          currentDate: currentDate,
+        );
 
     // Default fallback dayTripId if replacing/creating items
     final defaultDayTripId = remainingActivities.isNotEmpty
@@ -602,7 +597,8 @@ class ItineraryService implements IItineraryService {
         activitiesId: actId.isNotEmpty
             ? actId
             : IdGenerator.generateNextFormattedId('AC', null),
-        dayTripId: item['dayTripId']?.toString() ??
+        dayTripId:
+            item['dayTripId']?.toString() ??
             originalActivity?.dayTripId ??
             defaultDayTripId,
         destination: item['destination']?.toString() ?? '',
@@ -612,7 +608,7 @@ class ItineraryService implements IItineraryService {
             : (originalActivity?.activityImgUrl ?? 'assets/logo.png'),
         date: item['date'] != null
             ? DateTime.tryParse(item['date'].toString()) ??
-            (originalActivity?.date ?? DateTime.now())
+                  (originalActivity?.date ?? DateTime.now())
             : (originalActivity?.date ?? DateTime.now()),
         allocatedBudget: allocatedBudget,
         overspendAmount: allocatedBudget > 0 ? 0 : null,
@@ -620,7 +616,8 @@ class ItineraryService implements IItineraryService {
         startTime: item['startTime']?.toString() ?? '09:00',
         endTime: item['endTime']?.toString() ?? '10:00',
         duration: item['duration']?.toString() ?? '60 min',
-        activityCategory: item['activityCategory']?.toString() ??
+        activityCategory:
+            item['activityCategory']?.toString() ??
             (originalActivity?.activityCategory ?? 'General'),
         isOverspend: false,
       );
