@@ -1,5 +1,7 @@
 import '../../models/entities/activity.dart';
+import '../../models/entities/whole_trip.dart';
 export '../../models/entities/activity.dart';
+export '../../models/entities/whole_trip.dart';
 
 class WholeItineraryUiState {
   final bool isLoading;
@@ -14,6 +16,8 @@ class WholeItineraryUiState {
   final int wishlistItemsCoveredCount;
   final double estimatedExtraBudgetNeeded;
   final bool showWishlistWarning;
+  final List<WholeTrip> allTrips;
+  final String selectedStatusFilter; // 'All Plans', 'Pending', 'Completed'
 
   const WholeItineraryUiState({
     this.isLoading = false,
@@ -28,7 +32,19 @@ class WholeItineraryUiState {
     this.wishlistItemsCoveredCount = 0,
     this.estimatedExtraBudgetNeeded = 0.0,
     this.showWishlistWarning = false,
+    this.allTrips = const [],
+    this.selectedStatusFilter = 'All Plans',
   });
+
+  List<WholeTrip> get filteredTrips {
+    if (selectedStatusFilter == 'All Plans') {
+      return allTrips;
+    }
+    return allTrips.where((trip) {
+      final tripStatus = trip.computedStatus;
+      return tripStatus.toLowerCase() == selectedStatusFilter.toLowerCase();
+    }).toList();
+  }
 
   WholeItineraryUiState copyWith({
     bool? isLoading,
@@ -44,6 +60,8 @@ class WholeItineraryUiState {
     int? wishlistItemsCoveredCount,
     double? estimatedExtraBudgetNeeded,
     bool? showWishlistWarning,
+    List<WholeTrip>? allTrips,
+    String? selectedStatusFilter,
   }) {
     return WholeItineraryUiState(
       isLoading: isLoading ?? this.isLoading,
@@ -62,6 +80,8 @@ class WholeItineraryUiState {
       estimatedExtraBudgetNeeded:
           estimatedExtraBudgetNeeded ?? this.estimatedExtraBudgetNeeded,
       showWishlistWarning: showWishlistWarning ?? this.showWishlistWarning,
+      allTrips: allTrips ?? this.allTrips,
+      selectedStatusFilter: selectedStatusFilter ?? this.selectedStatusFilter,
     );
   }
 }

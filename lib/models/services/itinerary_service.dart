@@ -645,4 +645,9 @@ class ItineraryService implements IItineraryService {
       rethrow;
     }
   }
+
+  @override
+  Future<List<WholeTrip>> fetchAllTrip() {
+    return _itineraryRepository.fetchAllTrip();
+  }
 }
