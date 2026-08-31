@@ -143,6 +143,7 @@ class NotificationSource {
         _channelId,
         _channelName,
         channelDescription: 'Reminders to record travel expenses.',
+        icon: '@mipmap/ic_launcher',
         importance: Importance.high,
         priority: Priority.high,
         playSound: true,
