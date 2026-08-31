@@ -23,6 +23,12 @@ abstract interface class IExpenseTrackingService {
 
   List<String> extractReceiptItemLines(String receiptText);
 
+  List<ExpenseItem> buildDraftExpenseItemsFromReceipt({
+    required String receiptText,
+    String? merchantName,
+    DateTime? transactionDateTime,
+  });
+
   Future<Expense> recordExpense({
     required String activitiesId,
     required List<ExpenseItem> expenseItems,

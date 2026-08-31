@@ -280,6 +280,26 @@ class ActivityViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Replaces the current unsaved items with all item rows detected by OCR.
+  /// These remain editable drafts until the tourist confirms the Expense.
+  int applyOcrItemsToDraft() {
+    if (_uiState.ocrRawText.isEmpty) {
+      return 0;
+    }
+
+    final expenseItems = _expenseTrackingService.buildDraftExpenseItemsFromReceipt(
+      receiptText: _uiState.ocrRawText,
+      merchantName: _uiState.ocrMerchantName,
+      transactionDateTime: _uiState.ocrTransactionDateTime,
+    );
+    if (expenseItems.isEmpty) {
+      return 0;
+    }
+
+    _updateDraftExpenseItems(expenseItems);
+    return expenseItems.length;
+  }
+
   /// Scans the selected receipt and keeps the extracted values temporary until
   /// the tourist has reviewed and confirmed the whole expense.
   Future<void> scanReceipt() async {
@@ -343,6 +363,19 @@ class ActivityViewModel extends ChangeNotifier {
   void clearExpenseMessage() {
     _uiState = _uiState.copyWith(errorMessage: '', successMessage: '');
     notifyListeners();
+  }
+
+  /// Validates the current draft before the View displays the final
+  /// confirmation dialog. Invalid drafts must not ask the tourist to confirm.
+  bool validateExpenseDraftBeforeConfirmation() {
+    try {
+      _expenseTrackingService.validateExpenseItems(_uiState.draftExpenseItems);
+      _expenseTrackingService.validateTotalAmount(_uiState.draftTotalAmount);
+      return true;
+    } catch (error) {
+      _setExpenseError(_readableError(error));
+      return false;
+    }
   }
 
   Future<void> confirmExpense() async {

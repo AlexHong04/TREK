@@ -15,6 +15,18 @@ import 'budget_service.dart';
 import 'i_budget_service.dart';
 import 'i_expense_tracking_service.dart';
 
+class _ExtractedReceiptItem {
+  final String name;
+  final int quantity;
+  final double unitPrice;
+
+  const _ExtractedReceiptItem({
+    required this.name,
+    required this.quantity,
+    required this.unitPrice,
+  });
+}
+
 class ExpenseTrackingService implements IExpenseTrackingService {
   final IItineraryRepository _itineraryRepository = ItineraryRepository();
   final IBudgetService _budgetService = BudgetService();
@@ -212,39 +224,102 @@ class ExpenseTrackingService implements IExpenseTrackingService {
   /// rows and column-style receipts where an item name, quantity, and price are
   /// returned by OCR as separate lines.
   List<String> extractReceiptItemLines(String receiptText) {
+    return _extractReceiptItems(receiptText)
+        .map(
+          (item) => '${item.name} RM${item.unitPrice.toStringAsFixed(2)}',
+        )
+        .toList();
+  }
+
+  /// Creates temporary expense items from OCR output. The caller still lets
+  /// the tourist review or edit them before the parent Expense is confirmed.
+  @override
+  List<ExpenseItem> buildDraftExpenseItemsFromReceipt({
+    required String receiptText,
+    String? merchantName,
+    DateTime? transactionDateTime,
+  }) {
+    final itemDateTime = transactionDateTime ?? DateTime.now();
+    final normalizedMerchantName = merchantName?.trim();
+
+    return _extractReceiptItems(receiptText)
+        .map(
+          (item) => ExpenseItem(
+            itemName: item.name,
+            merchantName: normalizedMerchantName?.isEmpty ?? true
+                ? null
+                : normalizedMerchantName,
+            expenseDateTime: itemDateTime,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            subtotal: calculateItemSubtotal(item.quantity, item.unitPrice),
+          ),
+        )
+        .toList();
+  }
+
+  List<_ExtractedReceiptItem> _extractReceiptItems(String receiptText) {
     final lines = _receiptLines(receiptText);
     final itemHeaderIndex = lines.indexWhere(
       (line) => line.toLowerCase().trim() == 'item',
+    );
+    final quantityHeaderIndex = lines.indexWhere(
+      (line) {
+        final normalizedLine = line.toLowerCase().trim();
+        return normalizedLine == 'qty' || normalizedLine == 'quantity';
+      },
     );
     final priceHeaderIndex = lines.indexWhere(
       (line) => line.toLowerCase().trim() == 'price',
     );
 
     if (itemHeaderIndex >= 0 && priceHeaderIndex >= 0) {
-      final itemName = lines
-          .skip(itemHeaderIndex + 1)
-          .firstWhere(
+      final itemSectionEnd = [quantityHeaderIndex, priceHeaderIndex]
+          .where((index) => index > itemHeaderIndex)
+          .fold(lines.length, (end, index) => index < end ? index : end);
+      final itemNames = lines
+          .sublist(itemHeaderIndex + 1, itemSectionEnd)
+          .where(
             (line) =>
                 RegExp(r'[a-zA-Z]').hasMatch(line) &&
                 !_isReceiptLabel(line) &&
                 !_looksLikeAddress(line),
-            orElse: () => '',
-          );
-      double? price;
+          )
+          .toList();
+      final quantitySectionEnd = priceHeaderIndex > quantityHeaderIndex
+          ? priceHeaderIndex
+          : quantityHeaderIndex;
+      final quantities = quantityHeaderIndex >= 0 &&
+              priceHeaderIndex > quantityHeaderIndex
+          ? lines
+              .sublist(quantityHeaderIndex + 1, quantitySectionEnd)
+              .map((line) => int.tryParse(line.trim()))
+              .whereType<int>()
+              .where((quantity) => quantity > 0)
+              .toList()
+          : const <int>[];
+      final prices = <double>[];
       for (final priceLine in lines.skip(priceHeaderIndex + 1)) {
-        final amounts = _amountsFromLine(priceLine);
-        if (amounts.isNotEmpty) {
-          price = amounts.first;
-          break;
-        }
+        if (_isReceiptLabel(priceLine)) break;
+        prices.addAll(_amountsFromLine(priceLine));
       }
 
-      if (itemName.isNotEmpty && price != null) {
-        return ['$itemName RM${price.toStringAsFixed(2)}'];
+      final itemCount = itemNames.length < prices.length
+          ? itemNames.length
+          : prices.length;
+      if (itemCount > 0) {
+        return List.generate(
+          itemCount,
+          (index) => _ExtractedReceiptItem(
+            name: itemNames[index],
+            quantity: index < quantities.length ? quantities[index] : 1,
+            unitPrice: prices[index],
+          ),
+        );
       }
     }
 
-    final itemLines = <String>[];
+    final itemLines = <_ExtractedReceiptItem>[];
 
     for (var index = 0; index < lines.length; index++) {
       final line = lines[index];
@@ -253,7 +328,13 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       }
 
       if (_amountPattern.hasMatch(line)) {
-        itemLines.add(line);
+        final amount = _amountsFromLine(line).first;
+        final itemName = line.replaceFirst(_amountPattern, '').trim();
+        if (itemName.isNotEmpty) {
+          itemLines.add(
+            _ExtractedReceiptItem(name: itemName, quantity: 1, unitPrice: amount),
+          );
+        }
         continue;
       }
 
@@ -266,11 +347,17 @@ class ExpenseTrackingService implements IExpenseTrackingService {
         }
       }
       if (price != null && !_looksLikeAddress(line)) {
-        itemLines.add('$line RM${price.toStringAsFixed(2)}');
+        itemLines.add(
+          _ExtractedReceiptItem(name: line, quantity: 1, unitPrice: price),
+        );
       }
     }
 
-    return itemLines.toSet().toList();
+    final uniqueItems = <String, _ExtractedReceiptItem>{};
+    for (final item in itemLines) {
+      uniqueItems['${item.name}|${item.unitPrice}'] = item;
+    }
+    return uniqueItems.values.toList();
   }
 
   static final RegExp _amountPattern = RegExp(

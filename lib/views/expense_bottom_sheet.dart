@@ -1074,7 +1074,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
           SizedBox(height: 10),
           if (_hasAppliedOcrValues)
             Text(
-              'OCR values were filled into the editable item form below.',
+              'OCR values created editable expense items below.',
               style: TextStyle(color: appTheme.teal_A700, fontSize: 12),
             ),
         ],
@@ -1260,61 +1260,6 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         _unitPriceController.text.trim().isNotEmpty;
   }
 
-  void _fillItemFormFromOcr() {
-    final uiState = context.read<ActivityViewModel>().uiState;
-    if (uiState.ocrRawText.isEmpty) {
-      return;
-    }
-
-    final extractedItemLine = uiState.ocrItemLines.isEmpty
-        ? ''
-        : uiState.ocrItemLines.first;
-    final extractedTotal = uiState.ocrExtractedTotal;
-    final isValidExtractedTotal =
-        extractedTotal != null &&
-        extractedTotal > 0 &&
-        extractedTotal <= 999999;
-    final canUseTotalAsUnitPrice =
-        isValidExtractedTotal && uiState.ocrItemLines.length <= 1;
-
-    setState(() {
-      _editingItemIndex = null;
-      _isEditingItem = true;
-      _showItemForm = true;
-      _hasAppliedOcrValues = true;
-      _itemNameController.text = _itemNameFromOcrLine(extractedItemLine);
-      _descriptionController.clear();
-      _merchantController.text = uiState.ocrMerchantName;
-      _quantityController.text = '1';
-
-      if (canUseTotalAsUnitPrice) {
-        _unitPriceController.text = extractedTotal.toStringAsFixed(2);
-      } else {
-        _unitPriceController.clear();
-      }
-
-      final extractedDateTime = uiState.ocrTransactionDateTime;
-      if (extractedDateTime != null) {
-        _selectedDate = extractedDateTime;
-        _selectedTime = TimeOfDay.fromDateTime(extractedDateTime);
-      }
-    });
-  }
-
-  String _itemNameFromOcrLine(String line) {
-    final nameWithoutAmount = line
-        .replaceFirst(
-          RegExp(
-            r'(?:RM|\$|S)?\s*\d{1,3}(?:,\d{3})*(?:\.\d{2})?\s*$',
-            caseSensitive: false,
-          ),
-          '',
-        )
-        .trim();
-
-    return nameWithoutAmount.isEmpty ? 'Receipt item' : nameWithoutAmount;
-  }
-
   Future<void> _scanReceipt() async {
     final viewModel = context.read<ActivityViewModel>();
     final hasUnsavedManualItems =
@@ -1347,7 +1292,24 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     }
 
     if (uiState.ocrRawText.isNotEmpty) {
-      _fillItemFormFromOcr();
+      final itemCount = viewModel.applyOcrItemsToDraft();
+      if (itemCount > 0) {
+        setState(() {
+          _editingItemIndex = null;
+          _isEditingItem = false;
+          _showItemForm = false;
+          _hasAppliedOcrValues = true;
+          _itemNameController.clear();
+          _descriptionController.clear();
+          _merchantController.clear();
+          _quantityController.clear();
+          _unitPriceController.clear();
+        });
+      } else {
+        _showValidationMessage(
+          'No item details were detected. Please add the expense item manually.',
+        );
+      }
     }
   }
 
@@ -1461,10 +1423,13 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   }
 
   Future<void> _showConfirmExpenseDialog() async {
-    final totalAmount = context
-        .read<ActivityViewModel>()
-        .uiState
-        .draftTotalAmount;
+    final viewModel = context.read<ActivityViewModel>();
+    if (!viewModel.validateExpenseDraftBeforeConfirmation()) {
+      _showValidationMessage(viewModel.uiState.errorMessage);
+      return;
+    }
+
+    final totalAmount = viewModel.uiState.draftTotalAmount;
     final isConfirmed = await _showConfirmationDialog(
       title: 'Confirm Expense',
       message:
