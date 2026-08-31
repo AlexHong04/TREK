@@ -39,10 +39,10 @@ class GooglePlacesApiConfig {
       'X-Goog-FieldMask': 'places.displayName,places.photos',
     };
 
-    if (!kIsWeb) {
-      headers['X-Android-Package'] = 'com.example.trek';
-      headers['X-Android-Cert'] = '817279A922D846277D95205DE133CEB38DBA0D65';
-    }
+    // if (!kIsWeb) {
+    //   headers['X-Android-Package'] = 'com.example.trek';
+    //   headers['X-Android-Cert'] = '817279A922D846277D95205DE133CEB38DBA0D65';
+    // }
 
     final String body = jsonEncode({"textQuery": query});
 
@@ -77,6 +77,12 @@ class GooglePlacesApiConfig {
           debugPrint(
             'Google Places API (Web proxy) Error: ${response.statusCode} - ${response.body}',
           );
+          if (response.statusCode == 403) {
+            throw PlacesApiDeniedException(
+              response.statusCode.toString(),
+              response.body,
+            );
+          }
         }
       } else {
         // Direct request for mobile
@@ -100,17 +106,32 @@ class GooglePlacesApiConfig {
         } else {
           try {
             final err = jsonDecode(response.body);
+            final status = err["error"]?["status"]?.toString() ?? '';
+            final msg = err["error"]?["message"]?.toString() ?? '';
             debugPrint(
-              'Google Places API Error: ${response.statusCode} - ${err["error"]["status"]} - ${err["error"]["message"]}',
+              'Google Places API Error: ${response.statusCode} - $status - $msg',
             );
-          } catch (_) {
+            if (response.statusCode == 403 ||
+                status == 'PERMISSION_DENIED' ||
+                status == 'REQUEST_DENIED') {
+              throw PlacesApiDeniedException(status, msg);
+            }
+          } catch (e) {
+            if (e is PlacesApiDeniedException) rethrow;
             debugPrint(
               'Google Places API Error: ${response.statusCode} - ${response.body}',
             );
+            if (response.statusCode == 403) {
+              throw PlacesApiDeniedException(
+                response.statusCode.toString(),
+                response.body,
+              );
+            }
           }
         }
       }
     } catch (e) {
+      if (e is PlacesApiDeniedException) rethrow;
       debugPrint('Google Places API Exception: $e');
     }
     return null;
@@ -127,10 +148,10 @@ class GooglePlacesApiConfig {
       'Content-Type': 'application/json',
       'X-Goog-Api-Key': _apiKey,
     };
-    if (!kIsWeb) {
-      headers['X-Android-Package'] = 'com.example.trek';
-      headers['X-Android-Cert'] = '817279A922D846277D95205DE133CEB38DBA0D65';
-    }
+    // if (!kIsWeb) {
+    //   headers['X-Android-Package'] = 'com.example.trek';
+    //   headers['X-Android-Cert'] = '817279A922D846277D95205DE133CEB38DBA0D65';
+    // }
 
     final String body = jsonEncode({"input": query});
 
@@ -219,10 +240,10 @@ class GooglePlacesApiConfig {
     final directUrl =
         'https://places.googleapis.com/v1/$photoReference/media?maxHeightPx=$maxWidth&maxWidthPx=$maxWidth&key=$_apiKey';
 
-    if (kIsWeb) {
-      // Use CORS proxy for images on web to avoid Canvas/CORS paint exceptions.
-      return 'https://corsproxy.io/?${Uri.encodeComponent(directUrl)}';
-    }
+    // if (kIsWeb) {
+    //   // Use CORS proxy for images on web to avoid Canvas/CORS paint exceptions.
+    //   return 'https://corsproxy.io/?${Uri.encodeComponent(directUrl)}';
+    // }
     return directUrl;
   }
 
