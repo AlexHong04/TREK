@@ -948,4 +948,93 @@ class ActivityViewModel extends ChangeNotifier {
     _uiState = _uiState.copyWith(popupAction: '');
     notifyListeners();
   }
+
+  Future<bool> generateBudgetRecoveryPlan({
+    String? dayTripId,
+    double? availableBudget,
+  }) async {
+    final tripId = _uiState.tripId;
+    if (tripId.isEmpty) {
+      _uiState = _uiState.copyWith(
+        errorMessage: 'Cannot generate recovery plan without an active trip.',
+      );
+      notifyListeners();
+      return false;
+    }
+
+    _uiState = _uiState.copyWith(
+      isLoading: true,
+      errorMessage: '',
+      popupAction: '',
+    );
+    notifyListeners();
+
+    try {
+      // 1. Filter remaining activities for today and future days
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final remainingActivities = _uiState.activities.where((act) {
+        final actDate = DateTime(act.date.year, act.date.month, act.date.day);
+        return actDate.isAtSameMomentAs(today) || actDate.isAfter(today);
+      }).toList();
+
+      // 2. Call itinerary service to generate budget recovery plan
+      final recoveryActivities =
+      await _itineraryService.generateBudgetRecoveryItinerary(
+        tripId: tripId,
+        newTotalBudget: availableBudget ?? _uiState.totalBudget,
+        currentSpentBudget: _uiState.spentBudget,
+        topUpAmount: _uiState.exceededAmount ?? 0.0,
+        remainingActivities: remainingActivities,
+        tripDestination: _uiState.selectedActivity?.destination ?? '',
+        currentDate: _uiState.filterDate ?? today,
+      );
+
+      // 3. Recalculate trip status & budget indicators
+      final allActivities =
+      await _itineraryService.fetchAllActivitiesByTrip(tripId);
+      final days = await _itineraryService.getDaysByTripId(tripId);
+
+      double totalOverspend = 0.0;
+      for (final day in days) {
+        totalOverspend += (day.overspendAmount ?? 0.0);
+      }
+
+      int recalculatedSufficientDays = 0;
+      final activeList =
+      allActivities.isNotEmpty ? allActivities : recoveryActivities;
+      if (activeList.isNotEmpty) {
+        recalculatedSufficientDays = await _budgetService.calculateSufficientDays(
+          tripId,
+          activeList.first.activitiesId,
+        );
+      }
+
+      // 4. Update ActivityUiState using only its valid fields
+      _uiState = _uiState.copyWith(
+        isLoading: false,
+        activities: activeList,
+        totalBudget: availableBudget ?? _uiState.totalBudget,
+        overspentBudget: totalOverspend,
+        shortageAmount: 0.0,
+        sufficientDays: recalculatedSufficientDays,
+        popupAction: '',
+        errorMessage: '',
+      );
+
+      // 5. Reschedule local reminders for newly adjusted activities
+      unawaited(_prepareExpenseReminders(_uiState.activities));
+
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('Error in generateBudgetRecoveryPlan: $e');
+      _uiState = _uiState.copyWith(
+        isLoading: false,
+        errorMessage: 'Failed to generate recovery plan: ${_readableError(e)}',
+      );
+      notifyListeners();
+      return false;
+    }
+  }
 }
