@@ -153,9 +153,29 @@ class _ActivityScreenState extends State<ActivityScreen> {
   void _showFailedDialog(ActivityUiState state) {
     showBudgetReallocationFailureDialog(
       context: context,
-      onContinue: () {
-        // trigger recommendation
-      }
+      onContinue: () async {
+        // 1. Dismiss the dialog
+        Navigator.of(context, rootNavigator: true).pop();
+
+        // 2. Trigger the budget recovery plan generation
+        final viewModel = context.read<ActivityViewModel>();
+        final success = await viewModel.generateBudgetRecoveryPlan(
+          dayTripId: state.selectedActivity?.dayTripId,
+          availableBudget: state.totalBudget - state.spentBudget,
+        );
+
+        // 3. Optional: Provide UI feedback if recovery fails
+        if (!success && mounted) {
+          final error = viewModel.uiState.errorMessage;
+          if (error.isNotEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(error),
+              ),
+            );
+          }
+        }
+      },
     );
   }
 
@@ -170,8 +190,28 @@ class _ActivityScreenState extends State<ActivityScreen> {
       'You have overspent ${state.overspentBudget.toStringAsFixed(2)} so far on this trip.',
       estimatedDays: state.sufficientDays.toString(),
       warningText3: 'Plan will be modified automatically.',
-      onContinue: () {
-        // Trigger recommendation
+      onContinue: () async {
+        // 1. Dismiss the dialog
+        Navigator.of(context, rootNavigator: true).pop();
+
+        // 2. Trigger the budget recovery plan generation
+        final viewModel = context.read<ActivityViewModel>();
+        final success = await viewModel.generateBudgetRecoveryPlan(
+          dayTripId: state.selectedActivity?.dayTripId,
+          availableBudget: state.totalBudget - state.spentBudget,
+        );
+
+        // 3. Optional: Provide UI feedback if recovery fails
+        if (!success && mounted) {
+          final error = viewModel.uiState.errorMessage;
+          if (error.isNotEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(error),
+              ),
+            );
+          }
+        }
       },
     );
   }
@@ -225,8 +265,24 @@ class _ActivityScreenState extends State<ActivityScreen> {
   void _showInsufficientTopUpDialog(ActivityUiState state) {
     showInsufficientTopUpBudgetRecoveryDialog(
       context: context,
-      onContinue: () {
-        // trigger recommendation
+      onContinue: () async {
+        Navigator.of(context, rootNavigator: true).pop();
+        final viewModel = context.read<ActivityViewModel>();
+        final success = await viewModel.generateBudgetRecoveryPlan(
+          dayTripId: state.selectedActivity?.dayTripId,
+          availableBudget: state.totalBudget - state.spentBudget,
+        );
+
+        if(!success && mounted) {
+          final error = viewModel.uiState.errorMessage;
+          if(error.isNotEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(error),
+              ),
+            );
+          }
+        }
       },
     );
   }
