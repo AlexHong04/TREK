@@ -80,6 +80,7 @@ class _WholeItineraryDetailScreenState
               context: context,
               onContinue: () {
                 // Trigger re-recommendation with the latest total budget
+                viewModel.confirmItinerary();
               },
             );
           });
@@ -700,21 +701,12 @@ class _WholeItineraryDetailScreenState
                     backgroundColor: appTheme.teal_A200,
                     textColor: appTheme.teal_700,
                   ),
-                if (activity.minAllocatedBudget != null &&
-                    activity.minAllocatedBudget! < activity.allocatedBudget)
-                  _buildChip(
-                    label:
-                        'RM${activity.minAllocatedBudget!.toStringAsFixed(0)} - RM${activity.allocatedBudget.toStringAsFixed(0)}${activity.activityCategory.toLowerCase() == 'restaurant' ? ' / pax' : ''}',
-                    backgroundColor: appTheme.amber_200,
-
-                    textColor: appTheme.lime_900,
-                  )
-                else
-                  _buildChip(
-                    label: 'RM${activity.allocatedBudget.toStringAsFixed(0)}',
-                    backgroundColor: appTheme.amber_200,
-                    textColor: appTheme.lime_900,
-                  ),
+                _buildChip(
+                  label:
+                      'RM${activity.allocatedBudget.toStringAsFixed(0)}${activity.activityCategory.toLowerCase() == 'restaurant' ? ' / pax' : ''}',
+                  backgroundColor: appTheme.amber_200,
+                  textColor: appTheme.lime_900,
+                ),
                 if (activity.isOverspend == true &&
                     activity.overspendAmount != null)
                   _buildChip(
