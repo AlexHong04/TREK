@@ -260,6 +260,72 @@ class ExpenseTrackingService implements IExpenseTrackingService {
 
   List<_ExtractedReceiptItem> _extractReceiptItems(String receiptText) {
     final lines = _receiptLines(receiptText);
+    final descriptionHeaderIndex = lines.indexWhere(
+      (line) => line.toLowerCase().contains('description'),
+    );
+    final unitPriceHeaderIndex = lines.indexWhere(
+      (line) => line.toLowerCase().trim().contains('unit price'),
+    );
+    final amountHeaderIndex = lines.indexWhere(
+      (line) => line.toLowerCase().trim() == 'amount',
+    );
+
+    // ML Kit often reads receipt tables by column. For example, it returns all
+    // "QTY Description" rows first, then the "Unit Price" values, then the
+    // "Amount" values. Pair the quantity/name rows with their unit prices.
+    if (descriptionHeaderIndex >= 0 && unitPriceHeaderIndex >= 0) {
+      final descriptionRows = <_ExtractedReceiptItem>[];
+      for (var index = descriptionHeaderIndex + 1;
+          index < lines.length;
+          index++) {
+        final line = lines[index];
+        final normalizedLine = line.toLowerCase().trim();
+        if (normalizedLine == 'notes' ||
+            normalizedLine.contains('subtotal') ||
+            normalizedLine.contains('sales tax') ||
+            normalizedLine.startsWith('total')) {
+          break;
+        }
+
+        final match = RegExp(r'^(\d+)\s+(.+)$').firstMatch(line.trim());
+        if (match == null) continue;
+
+        final quantity = int.tryParse(match.group(1)!);
+        final name = match.group(2)!.trim();
+        if (quantity == null || quantity <= 0 || name.isEmpty) continue;
+        descriptionRows.add(
+          _ExtractedReceiptItem(name: name, quantity: quantity, unitPrice: 0),
+        );
+      }
+
+      final unitPrices = <double>[];
+      final unitPriceEnd = amountHeaderIndex > unitPriceHeaderIndex
+          ? amountHeaderIndex
+          : lines.length;
+      for (var index = unitPriceHeaderIndex + 1;
+          index < unitPriceEnd;
+          index++) {
+        final amounts = _amountsFromLine(lines[index]);
+        if (amounts.isNotEmpty) {
+          unitPrices.add(amounts.first);
+        }
+      }
+
+      final itemCount = descriptionRows.length < unitPrices.length
+          ? descriptionRows.length
+          : unitPrices.length;
+      if (itemCount > 0) {
+        return List.generate(
+          itemCount,
+          (index) => _ExtractedReceiptItem(
+            name: descriptionRows[index].name,
+            quantity: descriptionRows[index].quantity,
+            unitPrice: unitPrices[index],
+          ),
+        );
+      }
+    }
+
     final itemHeaderIndex = lines.indexWhere(
       (line) => line.toLowerCase().trim() == 'item',
     );

@@ -320,6 +320,7 @@ class ActivityViewModel extends ChangeNotifier {
       final receiptText = await _expenseTrackingService.readReceiptText(
         receiptLocalPath,
       );
+      debugPrint('Receipt OCR raw text:\n$receiptText');
       final extractedTotal = _expenseTrackingService.extractReceiptTotal(
         receiptText,
       );
