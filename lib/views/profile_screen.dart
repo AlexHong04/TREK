@@ -1,3 +1,4 @@
+import 'package:Trek/main.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -5,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../view_models/presentation_logic/profile_view_model.dart';
 import '../widgets/custom_app_bar.dart';
+import '../views/all_plans_screen.dart';
 import 'change_password_screen.dart';
 import 'edit_profile_screen.dart';
 import 'personal_constraint_management_screen.dart';
@@ -179,7 +181,7 @@ class ProfileScreen extends StatelessWidget {
                       if (onViewAllPlans != null) {
                         onViewAllPlans!();
                       } else {
-                        Navigator.pushNamed(context, '/viewAllPlans');
+                        Navigator.pushNamed(context, AppRoutes.allPlansScreen);
                       }
                     },
                   ),

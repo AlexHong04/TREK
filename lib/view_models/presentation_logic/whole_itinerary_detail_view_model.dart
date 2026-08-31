@@ -245,4 +245,28 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
       return e.toString();
     }
   }
+
+  Future<void> loadAllTrips() async {
+    _uiState = _uiState.copyWith(isLoading: true, errorMessage: null);
+    notifyListeners();
+
+    try {
+      final trips = await _itineraryService.fetchAllTrip();
+      _uiState = _uiState.copyWith(
+        isLoading: false,
+        allTrips: trips,
+      );
+    } catch (e) {
+      _uiState = _uiState.copyWith(
+        isLoading: false,
+        errorMessage: e.toString(),
+      );
+    }
+    notifyListeners();
+  }
+
+  void setStatusFilter(String filter) {
+    _uiState = _uiState.copyWith(selectedStatusFilter: filter);
+    notifyListeners();
+  }
 }

@@ -61,4 +61,6 @@ abstract interface class IItineraryService {
   });
 
   Future<void> saveRevisedItineraryActivities(List<Activity> activities);
+
+  Future<List<WholeTrip>> fetchAllTrip();
 }

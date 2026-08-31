@@ -534,4 +534,46 @@ class ItineraryRepository implements IItineraryRepository {
       throw Exception('DB Error: $e');
     }
   }
+
+  // for all plans screen
+  @override
+  Future<List<WholeTrip>> fetchAllTrip() async {
+    try {
+      final authUser = SupabaseConfig.client.auth.currentUser;
+      if (authUser == null) {
+        debugPrint('fetchAllTrips: No authenticated user session found.');
+        return [];
+      }
+
+      // 1. Resolve custom user_id from public.user using the auth email
+      final userRecord = await SupabaseConfig.client
+          .from('user')
+          .select('user_id')
+          .eq('email', authUser.email ?? '')
+          .maybeSingle();
+
+      final String? customUserId = userRecord?['user_id'] as String?;
+
+      if (customUserId == null || customUserId.isEmpty) {
+        debugPrint('fetchAllTrips: User profile record not found for email ${authUser.email}');
+        return [];
+      }
+
+      debugPrint('fetchAllTrips: Fetching trips for user_id = $customUserId');
+
+      // 2. Query Supabase strictly for this user_id
+      final response = await SupabaseConfig.client
+          .from('whole_trips')
+          .select()
+          .eq('user_id', customUserId)
+          .order('created_at', ascending: false);
+
+      return (response as List)
+          .map((row) => WholeTrip.fromJson(row as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching user trips: $e');
+      throw Exception('DB Error: $e');
+    }
+  }
 }

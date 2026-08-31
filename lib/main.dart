@@ -33,6 +33,7 @@ import 'views/home_screen.dart';
 import 'views/travel_information_input_screen.dart';
 import 'views/activity_screen.dart';
 import 'views/financial_dashboard_screen.dart';
+import 'views/all_plans_screen.dart';
 
 class AppRoutes {
   static const String loginScreen = '/login';
@@ -48,6 +49,7 @@ class AppRoutes {
   static const String activityScreen = '/activityScreen';
   static const String financialDashboardScreen = '/financialDashboardScreen';
   static const String tripSummaryScreen = '/tripSummaryScreen';
+  static const String allPlansScreen = '/allPlansScreen';
   static const String initialRoute = loginScreen;
 }
 
@@ -213,6 +215,7 @@ class _MyAppState extends State<MyApp> {
         AppRoutes.activityScreen: (context) => ActivityScreen.builder(context),
         AppRoutes.financialDashboardScreen: (context) =>
             FinancialDashboardScreen.builder(context),
+        AppRoutes.allPlansScreen: (context) => AllPlansScreen.builder(context),
       },
     );
   }
