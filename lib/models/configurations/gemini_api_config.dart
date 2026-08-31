@@ -55,30 +55,58 @@ class GeminiApiConfig {
     - Do NOT jump across the city on the same day. Every single activity on a given "dayNumber" MUST be found within that day's designated area to minimize travel time.
     - Consecutive activities MUST be close to each other in real life to make routing practical.
 
+    CRITICAL RULE FOR TIME SCHEDULING:
+    - EVERY single day of the itinerary MUST strictly start at exactly 09:00 and the FINAL activity MUST end at exactly 21:00.
+    - You MUST provide between 6 to 8 activities per day to completely fill the 12-hour span from 09:00 to 21:00.
+    - Do not schedule any activities before 09:00 or after 21:00. 
+    - The first activity of EACH day MUST have a startTime of "09:00". 
+    - The absolute last activity of EACH day MUST have an endTime of "21:00". THIS IS MANDATORY. Do NOT end the day at 18:00, 19:00, or 20:00. If your last activity ends before 21:00, YOU TRIPLE CHECK AND ADD A NEW SUPPER/NIGHT MARKET ACTIVITY TO REACH EXACTLY 21:00.
+
+    CRITICAL RULE FOR COMPOSITION:
+    - EVERY day MUST include at least THREE "Restaurant" category activities (strictly representing Breakfast, Lunch, and Dinner).
+    - EVERY day MUST include at least ONE "Transportation" category activity representing the journey/commute. For "Transportation", the "destination" MUST be the exact name of the physical station or arrival landmark (e.g. "KL Sentral", "Bukit Bintang MRT Stage", NOT vague terms like "Grab", "Taxi" or "Walking").
+
     CRITICAL RULE FOR DESTINATIONS/RESTAURANTS:
     - Every destination, restaurant, cafe, or eatery MUST be specified using its full, real-world, specific business or place name.
     - Do NOT generate generic dish or food names (such as "Nasi Lemak", "Teh Tarik", "Roti Canai", "Satay") as the destination. You must specify the actual restaurant name where it can be eaten (e.g., "Village Park Restaurant", "Nasi Lemak Antarabangsa").
-    - Every "destination" value MUST be an actual, currently operating business or landmark that returns results when searched on Google Places API / Google Maps. Do NOT invent fictional place names.
-    - We will programmatically verify each destination against Google Places API. If a destination is NOT found on Google Places, the itinerary is invalid.
+    - Every "destination" value MUST be an actual, currently operating, highly popular business or landmark that is guaranteed to have a listing and photos on Google Maps. Do NOT invent fictional place names.
+    - We will programmatically verify each destination against Google Places API to fetch its image. If a destination is obscure or NOT found on Google Places, the itinerary is invalid.
     ${(avoidPlaces != null && avoidPlaces.isNotEmpty) ? '\nCRITICAL REJECTION LIST FOR RETRY:\nThe following places were previously generated in a prior attempt but COULD NOT be found on Google Places API. You MUST NOT include any of these in your response. Instead, suggest different, verified, operating real-world venues/landmarks that are definitely searchable on Google Places:\n' + avoidPlaces.map((e) => '- "$e"').join('\n') : ''}
     
-    Format your response as a valid JSON object with the following fields:
-    - "totalAllocatedBudget": (double) The sum of the allocatedBudget of all activities in the itinerary.
-    - "wishlistItemsCoveredCount": (int) The number of user-provided wishlist items that you were actually able to include/cover in this generated itinerary.
-    - "estimatedExtraBudgetNeeded": (double) If some of the user-provided wishlist items could NOT be covered due to the budget limit, estimate how much extra budget (in RM) would be needed in total to cover the remaining/uncovered wishlist items. If all wishlist items are covered, return 0.0.
-    - "activities": (Array of Objects) A day-by-day itinerary where each activity object has the following fields:
-      - "dayNumber": (int) Based on the requested dates ("$dates"), distribute the itinerary across multiple days. Return 1 for Day 1, 2 for Day 2, etc. (e.g., if it's a 3-day trip, activities should have dayNumber 1, 2, or 3). The exact geographical neighborhood or area name for this day (e.g., "KLCC", "Bukit Bintang", "Batu Caves"). Do NOT invent catchy titles or add extra words.
-      - "destination": (String) The EXACT, FULL official business name or landmark name as it appears on Google Maps. Examples of CORRECT values: "Village Park Restaurant", "Madam Kwan's KLCC", "Petronas Twin Towers", "Jalan Alor", "Lot 10 Hutong", "Din Tai Fung Pavilion KL". Examples of WRONG values: "Nasi Lemak Breakfast", "Local Coffee Shop", "Relaxation Spa", "Street Food Tour".
-      - "imageKeyword": (String) IF it's a famous landmark, use its exact name (e.g. "Petronas Towers"). IF it's a specific restaurant/cafe, DO NOT use its name; instead, use the generic famous food/drink type (e.g. "Nasi Lemak", "Latte Art", "Seafood") so the generated image matches the activity context perfectly.
-      - "description": (String) Short description
-      - "allocatedBudget": (double) The maximum estimated cost or upper bound of the price range (e.g., if price is RM 15-35, allocatedBudget is 35.0). For free activities, set to 0.0.
-      - "duration": (String) e.g., "60-90 min"
-      - "activityCategory": (String) You MUST classify the activity into exactly one of these THREE categories ONLY: "Transportation", "Attraction", or "Restaurant". Do NOT use any other categories (e.g., NO "Food", NO "Culture").
-      - "startTime": (String) e.g., "09:00"
-      - "endTime": (String) e.g., "11:00"
-      - "minPrice": (double, optional) The minimum estimated cost or lower bound of the price range (e.g., if price is RM 15-35, minPrice is 15.0). For free activities or fixed price activities, do not include or set to null.
+    Format your response STRICTLY as the following JSON object structure. Do NOT include markdown fences (no ```json ... ```), and do NOT include any extra text:
+    
+    {
+      "totalAllocatedBudget": 200.0,
+      "wishlistItemsCoveredCount": 1,
+      "estimatedExtraBudgetNeeded": 0.0,
+      "activities": [
+        {
+          "dayNumber": 1,
+          "destination": "Actual Google Maps Business/Landmark Name",
+          "imageKeyword": "Petronas Towers",
+          "description": "Short description of the activity",
+          "allocatedBudget": 50.0,
+          "duration": "60-90 min",
+          "activityCategory": "Attraction",
+          "startTime": "09:00",
+          "endTime": "11:00",
+          "minPrice": 20.0 
+        }
+      ]
+    }
 
-    Return ONLY the JSON object, with no markdown formatting and no extra text.
+    Field definitions:
+    - totalAllocatedBudget (double): The sum of all allocatedBudget.
+    - wishlistItemsCoveredCount (int): Number of user-provided wishlist items covered.
+    - estimatedExtraBudgetNeeded (double): Extra budget needed for remaining wishlist items (return 0.0 if all covered).
+    - dayNumber (int): Sequential day (1 for Day 1, 2 for Day 2...).
+    - destination (String): EXACT, FULL official business name or landmark on Google Maps. No generic names.
+    - imageKeyword (String): Landmark name or generic food type (e.g. "Nasi Lemak" instead of restaurant name).
+    - allocatedBudget (double): Max estimated cost or fixed price. 0.0 for free.
+    - duration (String): e.g., "60-90 min".
+    - activityCategory (String): MUST be "Transportation", "Attraction", or "Restaurant".
+    - startTime/endTime (String): 24-hour format "HH:mm".
+    - minPrice (double): Min estimated cost. Set to 0.0 or null if free/fixed.
     ''';
 
     int retries = 3;
@@ -425,7 +453,8 @@ class GeminiApiConfig {
     final effectiveRemainingBudget =
         (newTotalBudget + topUpAmount) - currentSpentBudget;
 
-    final prompt = '''
+    final prompt =
+        '''
     You are an AI travel itinerary and budget optimizer.
     A tourist has hit a critical budget threshold and needs a revised schedule for their remaining trip.
 
