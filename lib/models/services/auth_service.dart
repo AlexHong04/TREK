@@ -33,6 +33,9 @@ class AuthService extends IAuthService {
   User? get currentUser => _currentUser;
 
   @override
+  String get preferredCurrency => _currentUser?.currency ?? 'MYR';
+
+  @override
   bool get isPasswordRecovery => _isPasswordRecovery;
 
   @override

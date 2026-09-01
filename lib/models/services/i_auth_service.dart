@@ -32,6 +32,8 @@ abstract class IAuthService extends ChangeNotifier {
 
   User? get currentUser;
 
+  String get preferredCurrency;
+
   bool get isPasswordRecovery;
 
   Future<void> restoreSession();
