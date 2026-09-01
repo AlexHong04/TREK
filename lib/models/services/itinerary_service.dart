@@ -22,7 +22,6 @@ class ItineraryService implements IItineraryService {
     required String dates,
     required String budget,
     String? preference,
-    String? emergencyFund,
     List<String>? wishlist,
   }) async {
     try {
@@ -41,7 +40,6 @@ class ItineraryService implements IItineraryService {
           dates: dates,
           budget: budget,
           preference: preference,
-          emergencyFund: emergencyFund,
           avoidPlaces: failedDestinations,
           wishlist: wishlist,
         );

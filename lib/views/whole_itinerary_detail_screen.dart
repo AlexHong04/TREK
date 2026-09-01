@@ -22,7 +22,6 @@ class WholeItineraryDetailScreen extends StatefulWidget {
           dates: args?['dates'] as String? ?? '',
           budget: args?['budget'] as String? ?? '0',
           preference: args?['preference'] as String?,
-          emergencyFund: args?['emergencyFund'] as String?,
           wishlist: (args?['wishlist'] as List?)
               ?.map((e) => e.toString())
               .toList(),
@@ -80,10 +79,12 @@ class _WholeItineraryDetailScreenState
               context: context,
               onContinue: () {
                 // Trigger re-recommendation with the latest total budget
-                viewModel.confirmItinerary();
+                viewModel.generateItinerary();
               },
             );
           });
+        } else {
+          viewModel.generateItinerary();
         }
 
         return true;

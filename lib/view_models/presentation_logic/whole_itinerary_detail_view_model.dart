@@ -52,7 +52,6 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     required String dates,
     required String budget,
     String? preference,
-    String? emergencyFund,
     List<String>? wishlist,
   }) async {
     _uiState = _uiState.copyWith(
@@ -60,6 +59,8 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
       destinationTitle: destination,
       datesText: dates,
       budgetText: budget,
+      preference: preference,
+      wishlist: wishlist,
       errorMessage: null,
     );
     notifyListeners();
@@ -70,7 +71,6 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         dates: dates,
         budget: budget,
         preference: preference,
-        emergencyFund: emergencyFund,
         wishlist: wishlist,
       );
 
@@ -92,6 +92,16 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> generateItinerary() async {
+    await initialize(
+      destination: _uiState.destinationTitle,
+      dates: _uiState.datesText,
+      budget: _uiState.budgetText,
+      preference: _uiState.preference,
+      wishlist: _uiState.wishlist,
+    );
+  }
+
   Future<bool> topUpBudget(double amount) async {
     if (amount <= 0) {
       return false;
@@ -100,8 +110,8 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     final budget = double.tryParse(_uiState.budgetText) ?? 0.0;
     final newBudget = budget + amount;
 
-    final remainingShortage =
-    (_uiState.estimatedExtraBudgetNeeded - amount).clamp(0.0, double.infinity);
+    final remainingShortage = (_uiState.estimatedExtraBudgetNeeded - amount)
+        .clamp(0.0, double.infinity);
 
     final isSufficient = remainingShortage <= 0.0;
 
@@ -252,10 +262,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
 
     try {
       final trips = await _itineraryService.fetchAllTrip();
-      _uiState = _uiState.copyWith(
-        isLoading: false,
-        allTrips: trips,
-      );
+      _uiState = _uiState.copyWith(isLoading: false, allTrips: trips);
     } catch (e) {
       _uiState = _uiState.copyWith(
         isLoading: false,

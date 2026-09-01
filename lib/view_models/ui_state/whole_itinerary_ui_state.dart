@@ -18,6 +18,8 @@ class WholeItineraryUiState {
   final bool showWishlistWarning;
   final List<WholeTrip> allTrips;
   final String selectedStatusFilter; // 'All Plans', 'Pending', 'Completed'
+  final String? preference;
+  final List<String>? wishlist;
 
   const WholeItineraryUiState({
     this.isLoading = false,
@@ -34,6 +36,8 @@ class WholeItineraryUiState {
     this.showWishlistWarning = false,
     this.allTrips = const [],
     this.selectedStatusFilter = 'All Plans',
+    this.preference,
+    this.wishlist,
   });
 
   List<WholeTrip> get filteredTrips {
@@ -62,6 +66,8 @@ class WholeItineraryUiState {
     bool? showWishlistWarning,
     List<WholeTrip>? allTrips,
     String? selectedStatusFilter,
+    String? preference,
+    List<String>? wishlist,
   }) {
     return WholeItineraryUiState(
       isLoading: isLoading ?? this.isLoading,
@@ -82,6 +88,8 @@ class WholeItineraryUiState {
       showWishlistWarning: showWishlistWarning ?? this.showWishlistWarning,
       allTrips: allTrips ?? this.allTrips,
       selectedStatusFilter: selectedStatusFilter ?? this.selectedStatusFilter,
+      preference: preference ?? this.preference,
+      wishlist: wishlist ?? this.wishlist,
     );
   }
 }
