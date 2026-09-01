@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../theme/app_theme.dart';
 import '../view_models/presentation_logic/trip_summary_view_model.dart';
+import 'budget_popup.dart';
 
 class TripSummaryScreen extends StatelessWidget {
   final String tripId;
@@ -553,22 +554,17 @@ class TripSummaryScreen extends StatelessWidget {
     if (result == FutureRecommendationAcceptResult.invalidTotal) {
       await showDialog<void>(
         context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('Invalid Percentage Total'),
-          content: Text(
-            'The three categories currently total '
-            '${viewModel.futureRecommendationTotal.round()}%. '
-            'Please adjust them so the total is exactly 100%.',
+        barrierDismissible: false,
+        builder: (dialogContext) => BaseBudgetDialog(
+          title: 'Invalid Percentage Total',
+          warningText:
+              'The three categories currently total '
+              '${viewModel.futureRecommendationTotal.round()}%. '
+              'Please adjust them so the total is exactly 100%.',
+          actions: _buildRecommendationDialogButton(
+            text: 'Adjust Again',
+            onPressed: () => Navigator.pop(dialogContext),
           ),
-          actions: [
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              style: FilledButton.styleFrom(
-                backgroundColor: appTheme.teal_A700,
-              ),
-              child: const Text('Adjust Again'),
-            ),
-          ],
         ),
       );
       return;
@@ -577,29 +573,59 @@ class TripSummaryScreen extends StatelessWidget {
     if (result == FutureRecommendationAcceptResult.saved) {
       await showDialog<void>(
         context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: Row(
+        barrierDismissible: false,
+        builder: (dialogContext) => BaseBudgetDialog(
+          title: 'Saved Successfully',
+          titleColor: appTheme.teal_800,
+          contentCard: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.check_circle, color: appTheme.teal_A700),
-              const SizedBox(width: 10),
-              const Text('Saved Successfully'),
+              Icon(Icons.check_circle_outline, color: appTheme.teal_800),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Your future budget recommendations have been saved.',
+                  style: TextStyle(
+                    color: appTheme.teal_800,
+                    fontSize: 14,
+                    height: 1.4,
+                  ),
+                ),
+              ),
             ],
           ),
-          content: const Text(
-            'Your future budget recommendations have been saved.',
+          actions: _buildRecommendationDialogButton(
+            text: 'Continue',
+            onPressed: () => Navigator.pop(dialogContext),
           ),
-          actions: [
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              style: FilledButton.styleFrom(
-                backgroundColor: appTheme.teal_A700,
-              ),
-              child: const Text('OK'),
-            ),
-          ],
         ),
       );
     }
+  }
+
+  Widget _buildRecommendationDialogButton({
+    required String text,
+    required VoidCallback onPressed,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      height: 48,
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: appTheme.teal_A700,
+          foregroundColor: appTheme.white_A700,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+        ),
+        child: Text(
+          text,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
+      ),
+    );
   }
 
   String _formatDateRange(DateTime startDate, DateTime endDate) {

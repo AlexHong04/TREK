@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 // Base
 class BaseBudgetDialog extends StatelessWidget {
   final String title;
+  final Color? titleColor;
   final Widget? summaryCard;
   final String? warningText;
   final Widget? contentCard;
@@ -13,6 +14,7 @@ class BaseBudgetDialog extends StatelessWidget {
   const BaseBudgetDialog({
     super.key,
     required this.title,
+    this.titleColor,
     this.summaryCard,
     this.warningText,
     this.contentCard,
@@ -37,7 +39,7 @@ class BaseBudgetDialog extends StatelessWidget {
                   fontFamily: 'Inter',
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: appTheme.warningPopupHeader,
+                  color: titleColor ?? appTheme.warningPopupHeader,
                 ),
               ),
 
