@@ -113,6 +113,7 @@ class _WholeItineraryDetailScreenState
       shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded
           .toStringAsFixed(2),
       minTopUp: minTopUp,
+      wishlistCovered: viewModel.uiState.wishlistItemsCoveredCount,
       onCancel: () async {
         await showCancelTopUpDialog(context: context, onContinue: () {});
       },
