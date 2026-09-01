@@ -345,6 +345,22 @@ class ItineraryRepository implements IItineraryRepository {
   }
 
   // zhiqin
+  Future<void> updateDayTopUpBudget(DayTrip day) async {
+    if (day.dayTripId == null) {
+      throw Exception('Cannot update daily topup budget: dayTripId is null.');
+    }
+    try {
+      await SupabaseConfig.client
+          .from('day_trips')
+          .update({'topup_budget': day.topUpBudget})
+          .eq('day_trip_id', day.dayTripId!);
+    } on Exception catch (e) {
+      print('Budget Recovery Update Balance Error: $e');
+      throw Exception('DB Error: $e');
+    }
+  }
+
+  // zhiqin
   @override
   Future<bool> updateCriticalDetails(String tripId) async {
     try {

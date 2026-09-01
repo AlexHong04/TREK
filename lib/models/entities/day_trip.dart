@@ -7,6 +7,7 @@ class DayTrip {
   final double? overspendAmount;
   final String? overspendCategory;
   final DateTime? createdAt;
+  final double? topUpBudget;
 
   DayTrip({
     this.dayTripId,
@@ -17,6 +18,7 @@ class DayTrip {
     this.overspendAmount,
     this.overspendCategory,
     this.createdAt,
+    this.topUpBudget,
   });
 
   DayTrip copyWith({
@@ -27,7 +29,8 @@ class DayTrip {
     bool? isOverspend,
     double? overspendAmount,
     String? overspendCategory,
-    DateTime? createdAt
+    DateTime? createdAt,
+    double? topUpBudget,
 }) {
     return DayTrip(
       dayTripId: dayTripId ?? this.dayTripId,
@@ -38,6 +41,7 @@ class DayTrip {
       overspendAmount: overspendAmount ?? this.overspendAmount,
       overspendCategory: overspendCategory ?? this.overspendCategory,
       createdAt: createdAt ?? this.createdAt,
+      topUpBudget: topUpBudget ?? this.topUpBudget,
     );
   }
 
@@ -53,6 +57,7 @@ class DayTrip {
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
           : null,
+      topUpBudget: (json['topup_budget'] as num?)?.toDouble(),
     );
   }
 
@@ -66,6 +71,7 @@ class DayTrip {
       if (overspendAmount != null) 'overspend_amount': overspendAmount,
       if (overspendCategory != null) 'overspend_category': overspendCategory,
       if (createdAt != null) 'created_at': createdAt?.toIso8601String(),
+      if (topUpBudget != null) 'topup_budget': topUpBudget,
     };
   }
 }
