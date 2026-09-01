@@ -279,6 +279,7 @@ class ItineraryRepository implements IItineraryRepository {
   }
 
   //zhiqin
+  @override
   Future<Activity> getCurrentActivity(String id) async {
     try {
       final response = await SupabaseConfig.client
@@ -295,6 +296,7 @@ class ItineraryRepository implements IItineraryRepository {
   }
 
   //zhiqin
+  @override
   Future<DayTrip> getCurrentDay(String dayId) async {
     debugPrint("get current day $dayId");
     try {
@@ -312,6 +314,7 @@ class ItineraryRepository implements IItineraryRepository {
   }
 
   //zhiqin
+  @override
   Future<bool> updateOverspendDetails(DayTrip day, Activity activity) async {
     try {
       // Update day_trips
@@ -341,6 +344,8 @@ class ItineraryRepository implements IItineraryRepository {
     }
   }
 
+  // zhiqin
+  @override
   Future<bool> updateCriticalDetails(String tripId) async {
     try {
       await SupabaseConfig.client
@@ -356,6 +361,7 @@ class ItineraryRepository implements IItineraryRepository {
   }
 
   // zhiqin
+  @override
   Future<bool> updateActivities(List<Activity> activities) async {
     if (activities.isEmpty) return false;
 
@@ -376,6 +382,7 @@ class ItineraryRepository implements IItineraryRepository {
   }
 
   //zhiqin
+  @override
   Future<WholeTrip> getTrip(String tripId) async {
     try {
       final res = await SupabaseConfig.client
@@ -392,6 +399,7 @@ class ItineraryRepository implements IItineraryRepository {
   }
 
   //zhiqin
+  @override
   Future<List<DayTrip>> fetchDaysByTripId(String tripId) async {
     try {
       final res = await SupabaseConfig.client
@@ -407,6 +415,7 @@ class ItineraryRepository implements IItineraryRepository {
   }
 
   // zhiqin
+  @override
   Future<WholeTrip> getTripByActivityId(String activityId) async {
     try {
       final activity = await getCurrentActivity(activityId);
@@ -424,6 +433,7 @@ class ItineraryRepository implements IItineraryRepository {
   }
 
   // kokhong
+  @override
   Future<WholeTrip?> getLatestTrip() async {
     try {
       final res = await SupabaseConfig.client
@@ -445,6 +455,7 @@ class ItineraryRepository implements IItineraryRepository {
   }
 
   // weisong
+  @override
   Future<List<Activity>> fetchAllActivitiesByTrip(String tripId) async {
     try {
       final response = await SupabaseConfig.client
@@ -472,6 +483,7 @@ class ItineraryRepository implements IItineraryRepository {
   }
 
   // weisong
+  @override
   Future<void> updateTripStatus(String tripId, String newStatus) async {
     try {
       await SupabaseConfig.client
@@ -535,6 +547,7 @@ class ItineraryRepository implements IItineraryRepository {
     }
   }
 
+  // weisong
   // for all plans screen
   @override
   Future<List<WholeTrip>> fetchAllTrip() async {
@@ -574,6 +587,42 @@ class ItineraryRepository implements IItineraryRepository {
     } catch (e) {
       debugPrint('Error fetching user trips: $e');
       throw Exception('DB Error: $e');
+    }
+  }
+
+  // weisong
+  // the trip and activities that filtered by user id
+  @override
+  Future<WholeTrip?> fetchLatestTrip() async {
+    try{
+      final user = SupabaseConfig.client.auth.currentUser;
+      if(user == null) return null;
+
+      final userRecord = await SupabaseConfig.client
+          .from('user')
+          .select('user_id')
+          .eq('email', user.email ?? '')
+          .maybeSingle();
+
+      final String targetUserId =
+          userRecord?['user_id'] as String? ?? user.id;
+
+      final tripResponse = await SupabaseConfig.client
+          .from('whole_trips')
+          .select()
+          .eq('user_id', targetUserId)
+          .order('created_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      if (tripResponse == null) {
+        return null;
+      }
+
+      return WholeTrip.fromJson(tripResponse);
+    } catch (e) {
+      debugPrint('Error in fetchLatestTrip: $e');
+      return null;
     }
   }
 }

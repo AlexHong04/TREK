@@ -447,6 +447,7 @@ class ItineraryService implements IItineraryService {
   }
 
   // weisong
+  @override
   Future<({WholeTrip trip, List<Activity> activities})?>
   fetchLatestTrip() async {
     final latestTrip = await _itineraryRepository.getLatestTrip();
@@ -459,6 +460,7 @@ class ItineraryService implements IItineraryService {
     return (trip: latestTrip, activities: activities);
   }
 
+  @override
   Future<List<Activity>> fetchAllActivitiesByTrip(String tripId) async {
     return await _itineraryRepository.fetchAllActivitiesByTrip(tripId);
   }
@@ -644,5 +646,10 @@ class ItineraryService implements IItineraryService {
   @override
   Future<List<WholeTrip>> fetchAllTrip() {
     return _itineraryRepository.fetchAllTrip();
+  }
+
+  @override
+  Future<WholeTrip?> fetchLatestTripWithCurrentUserId() {
+    return _itineraryRepository.fetchLatestTrip();
   }
 }
