@@ -45,4 +45,6 @@ abstract interface class IItineraryRepository {
   Future<void> replaceTripActivities({required String tripId, required List<Activity> newActivities});
 
   Future<List<WholeTrip>> fetchAllTrip();
+
+  Future<WholeTrip?> fetchLatestTrip();
 }

@@ -12,7 +12,7 @@ class HomeScreen extends StatefulWidget {
 
   static Widget builder(BuildContext context) {
     return const HomeViewModelScope(
-      child: const HomeScreen(),
+      child: HomeScreen(),
     );
   }
 
@@ -53,20 +53,26 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             _buildTopBar(context),
             Expanded(
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 24.0),
-                      _buildPageIndicator(),
-                      const SizedBox(height: 20.0),
-                      _buildGreeting(context),
-                      const SizedBox(height: 32.0),
-                      _buildPlanCard(context),
-                      const SizedBox(height: 24.0),
-                    ],
+              child: RefreshIndicator(
+                onRefresh: () => context
+                    .read<HomeViewModel>()
+                    .fetchLatestTripWithCurrentUserId(),
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 24.0),
+                        _buildPageIndicator(),
+                        const SizedBox(height: 20.0),
+                        _buildGreeting(context),
+                        const SizedBox(height: 32.0),
+                        _buildPlanCard(context),
+                        const SizedBox(height: 24.0),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -130,7 +136,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          // Profile avatar
           Semantics(
             button: true,
             label: 'Open profile',
@@ -251,7 +256,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildPlanCard(BuildContext context) {
     final viewModel = context.watch<HomeViewModel>();
-    if (viewModel.uiState.isLoading) {
+    final state = viewModel.uiState;
+
+    if (state.isLoading) {
       return Container(
         width: double.infinity,
         height: 260,
@@ -263,7 +270,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    if (!viewModel.uiState.hasPlan || viewModel.uiState.latestTrip == null) {
+    if (!state.hasPlan || state.latestTrip == null) {
       return Container(
         width: double.infinity,
         height: 260,
@@ -292,7 +299,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    final trip = viewModel.uiState.latestTrip!;
+    final trip = state.latestTrip!;
     final startDateStr = DateFormat('MMM dd').format(trip.startDate);
     final endDateStr = DateFormat('MMM dd, yyyy').format(trip.endDate);
 
@@ -300,10 +307,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final bool isOngoing = status == 'ongoing';
     final bool isCompleted = status == 'completed';
 
-    final String? activeImageUrl =
-        (trip.imgUrl != null && trip.imgUrl!.trim().isNotEmpty)
-        ? trip.imgUrl!.trim()
-        : null;
+    // Prioritize resolved banner from state, falling back to trip.imgUrl
+    final String? activeImageUrl = (state.bannerImgUrl?.trim().isNotEmpty == true)
+        ? state.bannerImgUrl!.trim()
+        : (trip.imgUrl?.trim().isNotEmpty == true ? trip.imgUrl!.trim() : null);
 
     return Container(
       width: double.infinity,
@@ -376,7 +383,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             Text(
                               status.isNotEmpty
                                   ? status[0].toUpperCase() +
-                                        status.substring(1)
+                                  status.substring(1)
                                   : 'Pending',
                               style: TextStyle(
                                 fontSize: 12,
@@ -482,7 +489,6 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       child: Column(
         children: [
-          // Start Plan button
           SizedBox(
             width: double.infinity,
             child: Container(
@@ -491,12 +497,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 borderRadius: BorderRadius.circular(14),
                 boxShadow: isStartEnabled
                     ? [
-                        BoxShadow(
-                          color: appTheme.teal_50,
-                          offset: const Offset(0, 4),
-                          blurRadius: 8,
-                        ),
-                      ]
+                  BoxShadow(
+                    color: appTheme.teal_50,
+                    offset: const Offset(0, 4),
+                    blurRadius: 8,
+                  ),
+                ]
                     : [],
               ),
               child: Material(
@@ -505,22 +511,24 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: InkWell(
                   onTap: isStartEnabled
                       ? () async {
-                          final now = DateTime.now();
-                          final deviceDate = DateTime(
-                            now.year,
-                            now.month,
-                            now.day,
-                          );
-                          await Navigator.of(context).pushNamed(
-                            '/activityScreen',
-                            arguments: {
-                              'trip': trip,
-                              'isReadOnly': false,
-                              'filterDate': deviceDate,
-                            },
-                          );
-                          viewModel.fetchLatestTrip();
-                        }
+                    final now = DateTime.now();
+                    final deviceDate = DateTime(
+                      now.year,
+                      now.month,
+                      now.day,
+                    );
+                    await Navigator.of(context).pushNamed(
+                      '/activityScreen',
+                      arguments: {
+                        'trip': trip,
+                        'isReadOnly': false,
+                        'filterDate': deviceDate,
+                      },
+                    );
+                    if (context.mounted) {
+                      viewModel.fetchLatestTripWithCurrentUserId();
+                    }
+                  }
                       : null,
                   borderRadius: BorderRadius.circular(14),
                   child: Padding(
@@ -528,17 +536,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Center(
                       child: Text(
                         'Start Plan',
-                        style:
-                            const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              fontFamily: 'Inter',
-                            ).copyWith(
-                              color: isStartEnabled
-                                  ? appTheme.white_A700
-                                  : appTheme.blue_gray_300,
-                              height: 22 / 18,
-                            ),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: 'Inter',
+                        ).copyWith(
+                          color: isStartEnabled
+                              ? appTheme.white_A700
+                              : appTheme.blue_gray_300,
+                          height: 22 / 18,
+                        ),
                       ),
                     ),
                   ),
@@ -547,7 +554,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          // Plan New button
           SizedBox(
             width: double.infinity,
             child: Container(
@@ -568,10 +574,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: InkWell(
                   onTap: () async {
                     viewModel.prepareNewPlan();
-                    await Navigator.of(
-                      context,
-                    ).pushNamed('/travelInformationInputScreen');
-                    viewModel.fetchLatestTrip();
+                    await Navigator.of(context).pushNamed(
+                      '/travelInformationInputScreen',
+                    );
+                    if (context.mounted) {
+                      viewModel.fetchLatestTripWithCurrentUserId();
+                    }
                   },
                   borderRadius: BorderRadius.circular(14),
                   child: Padding(
@@ -583,7 +591,10 @@ class _HomeScreenState extends State<HomeScreen> {
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
                           fontFamily: 'Inter',
-                        ).copyWith(color: appTheme.white_A700, height: 22 / 18),
+                        ).copyWith(
+                          color: appTheme.white_A700,
+                          height: 22 / 18,
+                        ),
                       ),
                     ),
                   ),

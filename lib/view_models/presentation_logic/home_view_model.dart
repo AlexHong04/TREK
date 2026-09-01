@@ -18,10 +18,13 @@ class HomeViewModel extends ChangeNotifier {
   HomeViewModel(this._authService) {
     _authService.addListener(_handleAuthUserChanged);
     _syncAuthUser(notify: false);
-    fetchLatestTrip();
+    fetchLatestTripWithCurrentUserId();
   }
 
-  void _handleAuthUserChanged() => _syncAuthUser();
+  void _handleAuthUserChanged() {
+    _syncAuthUser(notify: true);
+    fetchLatestTripWithCurrentUserId();
+  }
 
   Future<void> refreshProfile() async {
     await _authService.refreshCurrentUser();
@@ -32,12 +35,11 @@ class HomeViewModel extends ChangeNotifier {
     _uiState = HomeUiState(
       email: user?.email ?? 'User',
       userName: user?.fullName,
-      isLoading: _uiState.isLoading,
-      hasPlan: _uiState.hasPlan,
-      errorMessage: _uiState.errorMessage,
-      latestTrip: _uiState.latestTrip,
-      bannerImgUrl: _uiState.bannerImgUrl,
       profilePictureUrl: user?.profilePicture,
+      latestTrip: null,
+      hasPlan: false,
+      bannerImgUrl: null,
+      errorMessage: null,
     );
     if (notify) notifyListeners();
   }
@@ -111,6 +113,38 @@ class HomeViewModel extends ChangeNotifier {
   void dispose() {
     _authService.removeListener(_handleAuthUserChanged);
     super.dispose();
+  }
+
+  Future<void> fetchLatestTripWithCurrentUserId() async {
+    _uiState = _uiState.copyWith(isLoading: true);
+    notifyListeners();
+
+    try {
+      // Calls the user-scoped fetch method
+      final result = await _service.fetchLatestTripWithCurrentUserId();
+
+      if (result != null) {
+        final trip = result;
+        final tripImg = result.imgUrl;
+
+        _uiState = _uiState.copyWith(
+          isLoading: false,
+          hasPlan: true,
+          latestTrip: trip.copyWith(imgUrl: tripImg),
+          bannerImgUrl: tripImg,
+        );
+      } else {
+        _uiState = _uiState.copyWith(
+          isLoading: false,
+          hasPlan: false,
+          latestTrip: null,
+          bannerImgUrl: null,
+        );
+      }
+    } catch (e) {
+      _uiState = _uiState.copyWith(isLoading: false, errorMessage: e.toString());
+    }
+    notifyListeners();
   }
 }
 
