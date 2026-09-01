@@ -385,6 +385,48 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       }
     }
 
+    // Handle receipts where items have quantity prefixes (e.g. "1 MUSH NOODLES DRY")
+    // and all price lines follow later in the OCR stream.
+    final qtyPrefixedItems = <_ExtractedReceiptItem>[];
+    for (final line in lines) {
+      if (_isReceiptLabel(line)) continue;
+      final match = RegExp(r'^(\d+)\s+([a-zA-Z].+)$').firstMatch(line.trim());
+      if (match != null) {
+        final quantity = int.tryParse(match.group(1)!);
+        final name = match.group(2)!.trim();
+        if (quantity != null &&
+            quantity > 0 &&
+            name.isNotEmpty &&
+            !_looksLikeAddress(name) &&
+            !_isReceiptLabel(name)) {
+          qtyPrefixedItems.add(
+            _ExtractedReceiptItem(name: name, quantity: quantity, unitPrice: 0),
+          );
+        }
+      }
+    }
+
+    if (qtyPrefixedItems.isNotEmpty) {
+      final allAmounts = <double>[];
+      for (final line in lines) {
+        final amounts = _amountsFromLine(line);
+        if (amounts.isNotEmpty) {
+          allAmounts.addAll(amounts);
+        }
+      }
+
+      if (allAmounts.length >= qtyPrefixedItems.length) {
+        return List.generate(
+          qtyPrefixedItems.length,
+          (index) => _ExtractedReceiptItem(
+            name: qtyPrefixedItems[index].name,
+            quantity: qtyPrefixedItems[index].quantity,
+            unitPrice: allAmounts[index],
+          ),
+        );
+      }
+    }
+
     final itemLines = <_ExtractedReceiptItem>[];
 
     for (var index = 0; index < lines.length; index++) {
@@ -405,7 +447,7 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       }
 
       double? price;
-      for (final possiblePriceLine in lines.skip(index + 1).take(3)) {
+      for (final possiblePriceLine in lines.skip(index + 1).take(8)) {
         final amounts = _amountsFromLine(possiblePriceLine);
         if (amounts.isNotEmpty) {
           price = amounts.first;
