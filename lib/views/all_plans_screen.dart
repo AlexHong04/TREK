@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../view_models/presentation_logic/whole_itinerary_detail_view_model.dart';
 import '../view_models/ui_state/whole_itinerary_ui_state.dart';
+import '../widgets/custom_app_bar.dart';
 
 class AllPlansScreen extends StatefulWidget {
   const AllPlansScreen({super.key});
@@ -36,24 +37,7 @@ class _AllPlansScreenState extends State<AllPlansScreen> {
 
     return Scaffold(
       backgroundColor: appTheme.gray_50_03,
-      appBar: AppBar(
-        backgroundColor: appTheme.white_A700,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: appTheme.teal_800),
-          onPressed: () => Navigator.pop(context),
-        ),
-        centerTitle: true,
-        title: Text(
-          'All Plan',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            fontFamily: 'Inter',
-            color: appTheme.teal_800,
-          ),
-        ),
-      ),
+      appBar: const CustomAppBar(title: 'All Plans'),
       body: uiState.isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
