@@ -153,7 +153,12 @@ class GooglePlacesApiConfig {
     //   headers['X-Android-Cert'] = '817279A922D846277D95205DE133CEB38DBA0D65';
     // }
 
-    final String body = jsonEncode({"input": query});
+    final String body = jsonEncode({
+      "input": query,
+      "includedRegionCodes": [
+        "my",
+      ], // Strictly restrict search results to Malaysia
+    });
 
     try {
       if (kIsWeb) {

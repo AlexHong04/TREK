@@ -29,7 +29,6 @@ class GeminiApiConfig {
     required String dates,
     required String budget,
     String? preference,
-    String? emergencyFund,
     List<String>? avoidPlaces,
     List<String>? wishlist,
   }) async {
@@ -40,14 +39,15 @@ class GeminiApiConfig {
     - Destination: $destination
     - Dates: $dates
     - Budget: \$$budget
-    ${preference != null ? '- Preference: $preference' : ''}
-    ${emergencyFund != null ? '- Emergency Fund: $emergencyFund' : ''}
-    ${(wishlist != null && wishlist.isNotEmpty) ? '- Wishlist Items to try to cover: ' + wishlist.join(', ') : ''}
+    ${preference != null ? '- Preference: $preference (You MUST heavily prioritize planning activities that strictly match this theme!)' : ''}
+    ${(wishlist != null && wishlist.isNotEmpty) ? '- Wishlist Items: ' + wishlist.join(', ') + ' (You MUST include ALL of these places in the itinerary if the budget allows!)' : ''}
 
     Please provide a structured day-by-day itinerary with estimated costs and durations for each activity.
     CRITICAL RULE FOR BUDGET: 
+    - You MUST try your absolute best to MAXIMIZE the budget utilization. Spend as close to \$$budget as rationally possible. If there is leftover budget, recommend more expensive restaurants, premium transportation (e.g. Grab instead of walking), or higher-quality attractions!
     - Assign realistic cost for "allocatedBudget". 
     - Public parks, sightseeing of landmarks, walking tours, and free attractions MUST have an allocatedBudget of 0.
+    - "Transportation" activities MUST ALWAYS have a realistic allocatedBudget greater than 0 (e.g., Grab fare, MRT tickets). Do NEVER assign 0 to Transportation!
     - Only assign costs to food/dining, transportation, and places that explicitly require entrance tickets.
     
     CRITICAL RULE FOR ROUTING:
@@ -71,6 +71,10 @@ class GeminiApiConfig {
     - Do NOT generate generic dish or food names (such as "Nasi Lemak", "Teh Tarik", "Roti Canai", "Satay") as the destination. You must specify the actual restaurant name where it can be eaten (e.g., "Village Park Restaurant", "Nasi Lemak Antarabangsa").
     - Every "destination" value MUST be an actual, currently operating, highly popular business or landmark that is guaranteed to have a listing and photos on Google Maps. Do NOT invent fictional place names.
     - We will programmatically verify each destination against Google Places API to fetch its image. If a destination is obscure or NOT found on Google Places, the itinerary is invalid.
+    
+    CRITICAL RULE FOR UNIQUENESS (NO DUPLICATES):
+    - EVERY destination across the entire itinerary MUST be strictly UNIQUE. 
+    - Do NOT propose the same restaurant, attraction, or landmark more than once across all the days.
     ${(avoidPlaces != null && avoidPlaces.isNotEmpty) ? '\nCRITICAL REJECTION LIST FOR RETRY:\nThe following places were previously generated in a prior attempt but COULD NOT be found on Google Places API. You MUST NOT include any of these in your response. Instead, suggest different, verified, operating real-world venues/landmarks that are definitely searchable on Google Places:\n' + avoidPlaces.map((e) => '- "$e"').join('\n') : ''}
     
     Format your response STRICTLY as the following JSON object structure. Do NOT include markdown fences (no ```json ... ```), and do NOT include any extra text:
@@ -379,6 +383,7 @@ class GeminiApiConfig {
     CRITICAL RULES FOR DESTINATION & BUDGET:
     - The destination MUST be an EXACT, FULL official business name or landmark on Google Maps (e.g., "Museum of Illusions Kuala Lumpur", "Limapulo: Baba Can Cook"). Do NOT use generic names (e.g., "Local Cafe", "Museum Visit").
     - Public parks, sightseeing of landmarks, walking tours, and free attractions MUST have an "allocatedBudget" of 0.
+    - "Transportation" activities MUST ALWAYS have a realistic allocatedBudget greater than 0. Do NEVER assign 0 to Transportation.
     - Only assign costs to food/dining, transportation, and places that explicitly require entrance tickets.
     - "activityCategory" MUST strictly be one of: "Transportation", "Attraction", or "Restaurant".
 

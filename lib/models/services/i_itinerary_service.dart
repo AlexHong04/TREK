@@ -9,7 +9,6 @@ abstract interface class IItineraryService {
     required String dates,
     required String budget,
     String? preference,
-    String? emergencyFund,
     List<String>? wishlist,
   });
 
