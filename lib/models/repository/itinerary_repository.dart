@@ -33,6 +33,8 @@ class ItineraryRepository implements IItineraryRepository {
             .from('itinerary_images')
             .getPublicUrl(path);
       }
+
+
     } catch (e) {
       print('Failed to upload image $externalUrl: $e');
     }

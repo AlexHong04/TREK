@@ -1,3 +1,5 @@
+import 'package:Trek/models/entities/whole_trip.dart';
+
 import '../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -14,18 +16,31 @@ class WholeItineraryDetailScreen extends StatefulWidget {
   static Widget builder(BuildContext context) {
     final args =
         ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
+
+    // For all plan screen
+    final isReadOnly = args?['isReadOnly'] as bool? ?? false;
+    final tripId = (args?['tripId'] ?? args?['tripID']) as String?;
+    final trip = args?['trip'] as WholeTrip?;
+
     return ChangeNotifierProvider<WholeItineraryDetailViewModel>(
       create: (context) {
         final vm = WholeItineraryDetailViewModel();
-        vm.initialize(
-          destination: args?['destination'] as String? ?? 'Unknown',
-          dates: args?['dates'] as String? ?? '',
-          budget: args?['budget'] as String? ?? '0',
-          preference: args?['preference'] as String?,
-          wishlist: (args?['wishlist'] as List?)
-              ?.map((e) => e.toString())
-              .toList(),
-        );
+        final resolvedTripId = tripId ?? trip?.tripId ?? '';
+
+        if(isReadOnly && (tripId != null || trip != null)) {
+          vm.loadSavedTrip(tripId:resolvedTripId, trip:trip);
+        } else {
+          vm.initialize(
+            destination: args?['destination'] as String? ?? 'Unknown',
+            dates: args?['dates'] as String? ?? '',
+            budget: args?['budget'] as String? ?? '0',
+            preference: args?['preference'] as String?,
+            wishlist: (args?['wishlist'] as List?)
+                ?.map((e) => e.toString())
+                .toList(),
+          );
+        }
+
         return vm;
       },
       child: const WholeItineraryDetailScreen(),
@@ -99,7 +114,13 @@ class _WholeItineraryDetailScreenState
   @override
   Widget build(BuildContext context) {
     final viewModel = context.watch<WholeItineraryDetailViewModel>();
-    _checkWishlistWarning(viewModel);
+    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    final isReadOnly = args?['isReadOnly'] as bool? ?? false;
+
+    // hide the confirm button when it only read the generated itinerary plan
+    if(!isReadOnly) {
+      _checkWishlistWarning(viewModel);
+    }
 
     return Scaffold(
       backgroundColor: appTheme.gray_50_03,
@@ -117,7 +138,7 @@ class _WholeItineraryDetailScreenState
                     SizedBox(height: 24.0),
                     _buildLocationHeader(viewModel),
                     SizedBox(height: 16.0),
-                    _buildTimeline(context, viewModel),
+                    _buildTimeline(context, viewModel, isReadOnly: isReadOnly),
                     SizedBox(height: 10.0),
                   ],
                 ),
@@ -338,9 +359,10 @@ class _WholeItineraryDetailScreenState
   }
 
   Widget _buildTimeline(
-    BuildContext context,
-    WholeItineraryDetailViewModel viewModel,
-  ) {
+      BuildContext context,
+      WholeItineraryDetailViewModel viewModel, {
+        required bool isReadOnly,
+      }) {
     if (viewModel.uiState.isLoading) {
       return Center(
         child: CircularProgressIndicator(color: appTheme.teal_A700),
@@ -355,7 +377,6 @@ class _WholeItineraryDetailScreenState
     for (int i = 0; i < activities.length; i++) {
       final activity = activities[i];
 
-      // Detect day change
       if (lastDate == null ||
           lastDate.year != activity.date.year ||
           lastDate.month != activity.date.month ||
@@ -382,14 +403,15 @@ class _WholeItineraryDetailScreenState
 
       final bool isLast =
           i == activities.length - 1 ||
-          (i + 1 < activities.length &&
-              (activities[i + 1].date.day != activity.date.day));
+              (i + 1 < activities.length &&
+                  (activities[i + 1].date.day != activity.date.day));
 
       children.add(
         _buildTimelineItem(
           context: context,
           activity: activity,
           isLast: isLast,
+          isReadOnly: isReadOnly,
           onRemove: () => viewModel.removeActivity(activity.activitiesId),
         ),
       );
@@ -406,6 +428,7 @@ class _WholeItineraryDetailScreenState
     required dynamic activity,
     required bool isLast,
     required VoidCallback onRemove,
+    required bool isReadOnly,
   }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -428,6 +451,7 @@ class _WholeItineraryDetailScreenState
                       color: appTheme.gray_800,
                     ).copyWith(height: 1.2),
                   ),
+                  if(!isReadOnly)
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: onRemove,
