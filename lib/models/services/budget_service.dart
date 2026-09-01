@@ -41,17 +41,30 @@ class BudgetService implements IBudgetService {
     final currentTrip = await _itineraryRepository.getTrip(tripId);
     debugPrint('current trip ${currentTrip}');
 
+    final currentActivity = await _itineraryRepository.getCurrentActivity(currentActivityId);
+    debugPrint('current activity ${currentActivity}');
+
+    final currentDay = await _itineraryRepository.getCurrentDay(currentActivity.dayTripId);
+
     final oldRemaining = currentTrip.remainingBalance ?? 0.0;
     final oldTotal = currentTrip.totalBudget;
+
+    final oldTopup = currentDay.topUpBudget ?? 0.00;
 
     final updatedTrip = currentTrip.copyWith(
       remainingBalance: oldRemaining + topupAmount,
       totalBudget: oldTotal + topupAmount,
     );
 
+    final updatedDay = currentDay.copyWith(
+      topUpBudget: oldTopup + topupAmount,
+    );
+
     debugPrint('updatedTrip ${updatedTrip}');
+    debugPrint('updatedDay ${updatedDay}');
 
     await _itineraryRepository.updateTripBudget(updatedTrip);
+    await _itineraryRepository.updateDayTopUpBudget(updatedDay);
 
     return updatedTrip;
   }
@@ -185,6 +198,7 @@ class BudgetService implements IBudgetService {
           activity.activityCategory.toLowerCase() == 'restaurant';
 
       final bool hasNotStarted = activityStartDateTime.isAfter(currentDateTime);
+      // remove those comparing date
 
       debugPrint(
         '[CHECK] ${activity.activitiesId} | '
@@ -263,6 +277,8 @@ class BudgetService implements IBudgetService {
       final updatedRestaurant = restaurant.copyWith(
         allocatedBudget: finalAllocatedBudget,
       );
+
+      // add if newAllocatedBudget < 0 or newAllocatedBudget < min price, skip the reallocation
 
       modifiedActivities.add(updatedRestaurant);
 

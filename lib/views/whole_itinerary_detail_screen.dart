@@ -27,8 +27,8 @@ class WholeItineraryDetailScreen extends StatefulWidget {
         final vm = WholeItineraryDetailViewModel();
         final resolvedTripId = tripId ?? trip?.tripId ?? '';
 
-        if(isReadOnly && (tripId != null || trip != null)) {
-          vm.loadSavedTrip(tripId:resolvedTripId, trip:trip);
+        if (isReadOnly && (tripId != null || trip != null)) {
+          vm.loadSavedTrip(tripId: resolvedTripId, trip: trip);
         } else {
           vm.initialize(
             destination: args?['destination'] as String? ?? 'Unknown',
@@ -73,11 +73,46 @@ class _WholeItineraryDetailScreenState
   Future<void> _showWishlistWarningDialog(
     WholeItineraryDetailViewModel viewModel,
   ) async {
+    double minTopUp = viewModel.uiState.estimatedExtraBudgetNeeded * 0.50;
+    if (viewModel.uiState.wishlistItemsCoveredCount == 0) {
+      await showInitialTotalBudgetTotallyInsufficientDialog(
+        context: context,
+        shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded
+            .toStringAsFixed(2),
+        minTopUp: minTopUp,
+        wishlistCovered: viewModel.uiState.wishlistItemsCoveredCount,
+        onTopUpBudget: (double amount) async {
+          final isSufficient = await viewModel.topUpBudget(amount);
+
+          if (!isSufficient) {
+            // Wait until the first dialog is completely removed.
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+
+              showInsufficientTopUpTotalBudgetDialog(
+                context: context,
+                onContinue: () {
+                  // Trigger re-recommendation with the latest total budget
+                  viewModel.generateItinerary();
+                },
+              );
+            });
+          } else {
+            Navigator.of(context).pop();
+          }
+
+          return true;
+        },
+      );
+      if (mounted) {
+        _wishlistWarningShowing = false;
+      }
+    }
     await showInitialTotalBudgetInsufficientDialog(
       context: context,
       shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded
           .toStringAsFixed(2),
-
+      minTopUp: minTopUp,
       onCancel: () async {
         await showCancelTopUpDialog(context: context, onContinue: () {});
       },
@@ -114,11 +149,12 @@ class _WholeItineraryDetailScreenState
   @override
   Widget build(BuildContext context) {
     final viewModel = context.watch<WholeItineraryDetailViewModel>();
-    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    final args =
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     final isReadOnly = args?['isReadOnly'] as bool? ?? false;
 
     // hide the confirm button when it only read the generated itinerary plan
-    if(!isReadOnly) {
+    if (!isReadOnly) {
       _checkWishlistWarning(viewModel);
     }
 
@@ -359,10 +395,10 @@ class _WholeItineraryDetailScreenState
   }
 
   Widget _buildTimeline(
-      BuildContext context,
-      WholeItineraryDetailViewModel viewModel, {
-        required bool isReadOnly,
-      }) {
+    BuildContext context,
+    WholeItineraryDetailViewModel viewModel, {
+    required bool isReadOnly,
+  }) {
     if (viewModel.uiState.isLoading) {
       return Center(
         child: CircularProgressIndicator(color: appTheme.teal_A700),
@@ -403,8 +439,8 @@ class _WholeItineraryDetailScreenState
 
       final bool isLast =
           i == activities.length - 1 ||
-              (i + 1 < activities.length &&
-                  (activities[i + 1].date.day != activity.date.day));
+          (i + 1 < activities.length &&
+              (activities[i + 1].date.day != activity.date.day));
 
       children.add(
         _buildTimelineItem(
@@ -451,16 +487,16 @@ class _WholeItineraryDetailScreenState
                       color: appTheme.gray_800,
                     ).copyWith(height: 1.2),
                   ),
-                  if(!isReadOnly)
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: onRemove,
-                    child: Icon(
-                      Icons.delete_outline,
-                      color: appTheme.errorRed,
-                      size: 24,
+                  if (!isReadOnly)
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: onRemove,
+                      child: Icon(
+                        Icons.delete_outline,
+                        color: appTheme.errorRed,
+                        size: 24,
+                      ),
                     ),
-                  ),
                 ],
               ),
               SizedBox(height: 12.0),

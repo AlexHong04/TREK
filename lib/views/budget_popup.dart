@@ -580,10 +580,11 @@ Future<void> showCancelTopUpDialog({
   );
 }
 
-// Initial Total Budget Insufficient
+// Initial Total Budget Insufficient (Limited Wishlist Coverage)
 Future<void> showInitialTotalBudgetInsufficientDialog({
   required BuildContext context,
   required String shortageAmount,
+  required double minTopUp,
   VoidCallback? onCancel,
   required Future<bool> Function(double amount) onTopUpBudget,
 }) {
@@ -615,7 +616,7 @@ Future<void> showInitialTotalBudgetInsufficientDialog({
             const SizedBox(height: 16),
 
             BaseBudgetDialog._buildWarningRow(
-              'Insufficient top-up amount will trigger alternative '
+              'Top-up amount should at least ${minTopUp.toStringAsFixed(2)}, insufficient top-up amount will trigger alternative '
               'recommendation directly.',
             ),
           ],
@@ -642,7 +643,7 @@ Future<void> showInitialTotalBudgetInsufficientDialog({
                 builder: (context, value, child) {
                   final amount = double.tryParse(value.text.trim());
 
-                  final isValid = amount != null && amount > 0;
+                  final isValid = amount != null && amount >= minTopUp;
 
                   return _buildActionButton(
                     text: 'Top-up Budget',
@@ -656,6 +657,98 @@ Future<void> showInitialTotalBudgetInsufficientDialog({
                               Navigator.of(dialogContext).pop();
                             }
                           }
+                        : null,
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+// Initial Total Budget Insufficient (Zero Wishlist Coverage)
+Future<void> showInitialTotalBudgetTotallyInsufficientDialog({
+  required BuildContext context,
+  required String shortageAmount,
+  required double minTopUp,
+  required int wishlistCovered,
+  VoidCallback? onCancel,
+  required Future<bool> Function(double amount) onTopUpBudget,
+}) {
+  final controller = TextEditingController();
+
+  return showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) {
+      return BaseBudgetDialog(
+        title: 'Budget Insufficient',
+
+        summaryCard: _buildSummaryCard(
+          primaryLabel: 'Estimated Budget Shortage Amount',
+          primaryValue: shortageAmount,
+          secondaryLabel: 'Wishlist Covered',
+          secondaryValue: wishlistCovered.toString()
+        ),
+
+        // First warning
+        warningText:
+        'Your budget is not sufficient to cover any wishlist items. '
+            'Do you want to add more budget?',
+
+        // Top-up field + second warning
+        contentCard: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildTopUpCard(controller),
+
+            const SizedBox(height: 16),
+
+            BaseBudgetDialog._buildWarningRow(
+              'Top-up amount should be at least ${minTopUp.toStringAsFixed(2)}, insufficient top-up amount will trigger alternative '
+                  'recommendation directly.',
+            ),
+          ],
+        ),
+
+        actions: Row(
+          children: [
+            Expanded(
+              child: _buildActionButton(
+                text: 'Cancel',
+                backgroundColor: appTheme.redButton,
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
+                  onCancel?.call();
+                },
+              ),
+            ),
+
+            const SizedBox(width: 12),
+
+            Expanded(
+              child: ValueListenableBuilder<TextEditingValue>(
+                valueListenable: controller,
+                builder: (context, value, child) {
+                  final amount = double.tryParse(value.text.trim());
+
+                  final isValid = amount != null && amount >= minTopUp;
+
+                  return _buildActionButton(
+                    text: 'Top-up Budget',
+                    onPressed: isValid
+                        ? () async {
+                      final amount = double.parse(value.text.trim());
+
+                      final success = await onTopUpBudget(amount);
+
+                      if (success && dialogContext.mounted) {
+                        Navigator.of(dialogContext).pop();
+                      }
+                    }
                         : null,
                   );
                 },
