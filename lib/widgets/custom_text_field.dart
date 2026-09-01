@@ -1,4 +1,6 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
 import '../theme/app_theme.dart';
 
 class CustomTextField extends StatelessWidget {
@@ -6,14 +8,27 @@ class CustomTextField extends StatelessWidget {
   final String hintText;
   final IconData prefixIcon;
   final TextEditingController? controller;
+  final String? initialValue;
   final String? Function(String?)? validator;
   final VoidCallback? onTap;
-  final Function(String)? onFieldSubmitted;
-  final Function(String)? onChanged;
+  final ValueChanged<String>? onFieldSubmitted;
+  final ValueChanged<String>? onChanged;
   final bool readOnly;
+  final bool enabled;
+  final bool obscureText;
+  final bool autocorrect;
+  final bool enableSuggestions;
   final TextInputType? keyboardType;
+  final TextInputAction? textInputAction;
+  final TextCapitalization textCapitalization;
+  final Iterable<String>? autofillHints;
+  final List<TextInputFormatter>? inputFormatters;
+  final FocusNode? focusNode;
+  final String? errorText;
+  final int errorMaxLines;
   final Widget? bottomWidget;
   final Widget? suffixIcon;
+  final EdgeInsetsGeometry margin;
 
   const CustomTextField({
     super.key,
@@ -21,20 +36,36 @@ class CustomTextField extends StatelessWidget {
     required this.hintText,
     required this.prefixIcon,
     this.controller,
+    this.initialValue,
     this.validator,
     this.onTap,
     this.onFieldSubmitted,
     this.onChanged,
     this.readOnly = false,
+    this.enabled = true,
+    this.obscureText = false,
+    this.autocorrect = true,
+    this.enableSuggestions = true,
     this.keyboardType,
+    this.textInputAction,
+    this.textCapitalization = TextCapitalization.none,
+    this.autofillHints,
+    this.inputFormatters,
+    this.focusNode,
+    this.errorText,
+    this.errorMaxLines = 3,
     this.bottomWidget,
     this.suffixIcon,
-  });
+    this.margin = const EdgeInsets.symmetric(horizontal: 24.0),
+  }) : assert(
+  controller == null || initialValue == null,
+  'controller and initialValue cannot both be provided.',
+  );
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24.0),
+      margin: margin,
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
       decoration: BoxDecoration(
         color: appTheme.white_A700,
@@ -58,16 +89,29 @@ class CustomTextField extends StatelessWidget {
               fontWeight: FontWeight.w800,
               fontFamily: 'Inter',
               color: appTheme.blue_gray_300,
-            ).copyWith(letterSpacing: 1, height: 1.2),
+              letterSpacing: 1,
+              height: 1.2,
+            ),
           ),
+          const SizedBox(height: 6.0),
           TextFormField(
             controller: controller,
+            initialValue: initialValue,
+            focusNode: focusNode,
+            enabled: enabled,
             autovalidateMode: AutovalidateMode.onUserInteraction,
             readOnly: readOnly,
+            obscureText: obscureText,
+            autocorrect: autocorrect,
+            enableSuggestions: enableSuggestions,
             onTap: onTap,
             onFieldSubmitted: onFieldSubmitted,
             onChanged: onChanged,
             keyboardType: keyboardType,
+            textInputAction: textInputAction,
+            textCapitalization: textCapitalization,
+            autofillHints: autofillHints,
+            inputFormatters: inputFormatters,
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w400,
@@ -80,8 +124,10 @@ class CustomTextField extends StatelessWidget {
                 fontSize: 16,
                 fontWeight: FontWeight.w400,
                 fontFamily: 'Inter',
-                color: appTheme.gray_800,
-              ).copyWith(color: appTheme.blue_gray_300),
+                color: appTheme.blue_gray_300,
+              ),
+              errorText: errorText,
+              errorMaxLines: errorMaxLines,
               prefixIcon: Icon(prefixIcon),
               prefixIconConstraints: const BoxConstraints(
                 minWidth: 44.0,
@@ -93,7 +139,7 @@ class CustomTextField extends StatelessWidget {
                 horizontal: 12.0,
               ),
               filled: true,
-              fillColor: appTheme.white_A700,
+              fillColor: enabled ? appTheme.white_A700 : appTheme.gray_200,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12.0),
                 borderSide: BorderSide(color: appTheme.gray_200, width: 1.0),
@@ -105,6 +151,10 @@ class CustomTextField extends StatelessWidget {
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12.0),
                 borderSide: BorderSide(color: appTheme.teal_A700, width: 1.0),
+              ),
+              disabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12.0),
+                borderSide: BorderSide(color: appTheme.gray_200, width: 1.0),
               ),
               errorBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12.0),

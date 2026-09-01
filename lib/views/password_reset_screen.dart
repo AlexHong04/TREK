@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../view_models/presentation_logic/password_reset_view_model.dart';
 import '../widgets/auth_form_widgets.dart';
+import '../widgets/custom_text_field.dart';
 
 class PasswordResetScreen extends StatefulWidget {
   const PasswordResetScreen({super.key});
@@ -56,7 +57,6 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const AuthFieldLabel('NEW PASSWORD'),
                     Focus(
                       onFocusChange: (hasFocus) {
                         if (_isNewPasswordFocused != hasFocus) {
@@ -64,35 +64,38 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
                         }
                         if (!hasFocus) viewModel.onNewPasswordFocusLost();
                       },
-                      child: TextFormField(
+                      child: CustomTextField(
+                        sectionTitle: 'NEW PASSWORD',
+                        hintText: 'Enter your new password',
+                        prefixIcon: Icons.lock_reset_outlined,
+                        margin: EdgeInsets.zero,
                         enabled: !state.isLoading,
                         obscureText: state.obscurePassword,
+                        autocorrect: false,
+                        enableSuggestions: false,
                         textInputAction: TextInputAction.done,
                         autofillHints: const [AutofillHints.newPassword],
                         onChanged: viewModel.onNewPasswordChanged,
                         onFieldSubmitted: (_) => viewModel.onResetPressed(),
-                        decoration: authFieldDecoration(
-                          hint: 'Enter your new password',
-                          errorText: state.passwordError,
-                          suffixIcon: IconButton(
-                            tooltip: state.obscurePassword
-                                ? 'Show password'
-                                : 'Hide password',
-                            onPressed: state.isLoading
-                                ? null
-                                : viewModel.togglePasswordVisibility,
-                            icon: Icon(
-                              state.obscurePassword
-                                  ? Icons.visibility_off_outlined
-                                  : Icons.visibility_outlined,
-                            ),
+                        errorText: state.passwordError,
+                        suffixIcon: IconButton(
+                          tooltip: state.obscurePassword
+                              ? 'Show password'
+                              : 'Hide password',
+                          onPressed: state.isLoading
+                              ? null
+                              : viewModel.togglePasswordVisibility,
+                          icon: Icon(
+                            state.obscurePassword
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
                           ),
                         ),
+                        bottomWidget: PasswordPolicyChecklist(
+                          password: state.newPassword,
+                          isVisible: _isNewPasswordFocused,
+                        ),
                       ),
-                    ),
-                    PasswordPolicyChecklist(
-                      password: state.newPassword,
-                      isVisible: _isNewPasswordFocused,
                     ),
                     const SizedBox(height: 32),
                     AuthPrimaryButton(

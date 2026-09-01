@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 import '../view_models/presentation_logic/change_password_view_model.dart';
 import '../widgets/auth_form_widgets.dart';
 import '../widgets/custom_app_bar.dart';
+import '../widgets/custom_text_field.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -88,10 +89,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     onToggleVisibility: viewModel.toggleNewPasswordVisibility,
                     textInputAction: TextInputAction.done,
                     onSubmitted: (_) => viewModel.changePassword(),
-                  ),
-                  PasswordPolicyChecklist(
-                    password: state.newPassword,
-                    isVisible: _isNewPasswordFocused,
+                    bottomWidget: PasswordPolicyChecklist(
+                      password: state.newPassword,
+                      isVisible: _isNewPasswordFocused,
+                    ),
                   ),
                   const SizedBox(height: 32),
                   FilledButton(
@@ -142,6 +143,7 @@ class _PasswordField extends StatelessWidget {
   final VoidCallback onToggleVisibility;
   final TextInputAction textInputAction;
   final ValueChanged<String>? onSubmitted;
+  final Widget? bottomWidget;
 
   const _PasswordField({
     required this.label,
@@ -155,73 +157,45 @@ class _PasswordField extends StatelessWidget {
     required this.onToggleVisibility,
     this.textInputAction = TextInputAction.next,
     this.onSubmitted,
+    this.bottomWidget,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 12, bottom: 6),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: appTheme.teal_A700,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.7,
-            ),
+    return Focus(
+      onFocusChange: (hasFocus) {
+        onFocusChanged?.call(hasFocus);
+        if (!hasFocus) onFocusLost();
+      },
+      child: CustomTextField(
+        sectionTitle: label,
+        hintText: hint,
+        prefixIcon: Icons.lock_outline,
+        margin: EdgeInsets.zero,
+        enabled: enabled,
+        obscureText: obscure,
+        autocorrect: false,
+        enableSuggestions: false,
+        textInputAction: textInputAction,
+        autofillHints: [
+          label.startsWith('CURRENT')
+              ? AutofillHints.password
+              : AutofillHints.newPassword,
+        ],
+        onChanged: onChanged,
+        onFieldSubmitted: onSubmitted,
+        errorText: errorText,
+        bottomWidget: bottomWidget,
+        suffixIcon: IconButton(
+          tooltip: obscure ? 'Show password' : 'Hide password',
+          onPressed: enabled ? onToggleVisibility : null,
+          icon: Icon(
+            obscure
+                ? Icons.visibility_off_outlined
+                : Icons.visibility_outlined,
           ),
         ),
-        Focus(
-          onFocusChange: (hasFocus) {
-            onFocusChanged?.call(hasFocus);
-            if (!hasFocus) onFocusLost();
-          },
-          child: TextFormField(
-            enabled: enabled,
-            obscureText: obscure,
-            textInputAction: textInputAction,
-            autofillHints: [
-              label.startsWith('CURRENT')
-                  ? AutofillHints.password
-                  : AutofillHints.newPassword,
-            ],
-            onChanged: onChanged,
-            onFieldSubmitted: onSubmitted,
-            decoration: InputDecoration(
-              hintText: hint,
-              errorText: errorText,
-              errorMaxLines: 3,
-              suffixIcon: IconButton(
-                tooltip: obscure ? 'Show password' : 'Hide password',
-                onPressed: enabled ? onToggleVisibility : null,
-                icon: Icon(
-                  obscure
-                      ? Icons.visibility_off_outlined
-                      : Icons.visibility_outlined,
-                ),
-              ),
-              filled: true,
-              fillColor: appTheme.white_A700,
-              contentPadding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(13),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(13),
-                borderSide: BorderSide(color: appTheme.blue_gray_300),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(13),
-                borderSide: BorderSide(color: appTheme.teal_A700, width: 1.5),
-              ),
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }

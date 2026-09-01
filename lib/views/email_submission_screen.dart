@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../view_models/presentation_logic/email_submission_view_model.dart';
 import '../widgets/auth_form_widgets.dart';
+import '../widgets/custom_text_field.dart';
 
 class EmailSubmissionScreen extends StatelessWidget {
   const EmailSubmissionScreen({super.key});
@@ -74,23 +75,24 @@ class EmailSubmissionScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const AuthFieldLabel('EMAIL ADDRESS'),
                       Focus(
                         onFocusChange: (hasFocus) {
                           if (!hasFocus) viewModel.onEmailFocusLost();
                         },
-                        child: TextFormField(
+                        child: CustomTextField(
+                          sectionTitle: 'EMAIL ADDRESS',
+                          hintText: 'Enter your email address',
+                          prefixIcon: Icons.email_outlined,
+                          margin: EdgeInsets.zero,
                           enabled: !state.isLoading,
                           keyboardType: TextInputType.emailAddress,
                           textInputAction: TextInputAction.done,
                           autofillHints: const [AutofillHints.email],
                           autocorrect: false,
+                          enableSuggestions: false,
                           onChanged: viewModel.onEmailChanged,
                           onFieldSubmitted: (_) => viewModel.onSendPressed(),
-                          decoration: authFieldDecoration(
-                            hint: 'Enter your email address',
-                            errorText: state.emailError,
-                          ),
+                          errorText: state.emailError,
                         ),
                       ),
                       const SizedBox(height: 42),

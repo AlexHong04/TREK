@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../view_models/presentation_logic/edit_profile_view_model.dart';
 import '../widgets/custom_app_bar.dart';
+import '../widgets/custom_text_field.dart';
 import '../widgets/currency_picker_field.dart';
 
 class EditProfileScreen extends StatelessWidget {
@@ -51,32 +52,27 @@ class EditProfileScreen extends StatelessWidget {
                 keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: const EdgeInsets.fromLTRB(20, 22, 20, 32),
                 children: [
-                  _FieldCard(
-                    label: 'FULL NAME (OPTIONAL)',
-                    child: TextFormField(
-                      initialValue: state.fullName,
-                      enabled: !state.isSaving,
-                      textCapitalization: TextCapitalization.words,
-                      textInputAction: TextInputAction.next,
-                      onChanged: viewModel.onFullNameChanged,
-                      decoration: _fieldDecoration(
-                        hint: 'Enter your full name',
-                        icon: Icons.badge_outlined,
-                      ),
-                    ),
+                  CustomTextField(
+                    sectionTitle: 'FULL NAME (OPTIONAL)',
+                    hintText: 'Enter your full name',
+                    prefixIcon: Icons.badge_outlined,
+                    margin: EdgeInsets.zero,
+                    initialValue: state.fullName,
+                    enabled: !state.isSaving,
+                    textCapitalization: TextCapitalization.words,
+                    textInputAction: TextInputAction.next,
+                    autofillHints: const [AutofillHints.name],
+                    onChanged: viewModel.onFullNameChanged,
                   ),
                   const SizedBox(height: 12),
-                  _FieldCard(
-                    label: 'EMAIL ADDRESS',
-                    child: TextFormField(
-                      initialValue: state.email,
-                      enabled: false,
-                      decoration: _fieldDecoration(
-                        hint: '',
-                        icon: Icons.mark_email_read_outlined,
-                        disabled: true,
-                      ),
-                    ),
+                  CustomTextField(
+                    sectionTitle: 'EMAIL ADDRESS',
+                    hintText: '',
+                    prefixIcon: Icons.mark_email_read_outlined,
+                    margin: EdgeInsets.zero,
+                    initialValue: state.email,
+                    enabled: false,
+                    keyboardType: TextInputType.emailAddress,
                   ),
                   const SizedBox(height: 12),
                   _FieldCard(
@@ -125,34 +121,6 @@ class EditProfileScreen extends StatelessWidget {
     );
   }
 
-  static InputDecoration _fieldDecoration({
-    required String hint,
-    required IconData icon,
-    String? errorText,
-    bool disabled = false,
-  }) {
-    return InputDecoration(
-      hintText: hint,
-      prefixIcon: Icon(icon, size: 19),
-      errorText: errorText,
-      filled: true,
-      fillColor: disabled ? appTheme.gray_200 : appTheme.white_A700,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: appTheme.gray_200),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: appTheme.teal_A700, width: 1.5),
-      ),
-      disabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: appTheme.gray_200),
-      ),
-    );
-  }
 }
 
 class _FieldCard extends StatelessWidget {
