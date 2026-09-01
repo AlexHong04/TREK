@@ -220,9 +220,11 @@ class _ActivityScreenState extends State<ActivityScreen> {
     required VoidCallback onEndTrip,
     required Future<bool> Function(double amount) onTopUpBudget,
   }) {
+    final minTopUp = uiState.shortageAmount * 0.50;
     showBudgetRecoveryDialog(
       context: context,
       shortageAmount: uiState.shortageAmount.toStringAsFixed(2),
+      minTopUp: minTopUp.toStringAsFixed(2),
       remainingBudget: uiState.remainingBudget.toStringAsFixed(2),
       warningText:
       'Insufficient top-up amount will trigger alternative recommendation directly.',

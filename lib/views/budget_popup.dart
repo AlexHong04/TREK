@@ -455,6 +455,7 @@ Future<void> showBudgetExceededThresholdDialog({
 Future<void> showBudgetRecoveryDialog({
   required BuildContext context,
   required String shortageAmount,
+  required String minTopUp,
   required String remainingBudget,
   required String warningText,
   VoidCallback? onEndTrip,
@@ -502,8 +503,9 @@ Future<void> showBudgetRecoveryDialog({
                   valueListenable: controller,
                   builder: (context, value, child) {
                     final amount = double.tryParse(value.text.trim());
+                    final min = double.tryParse(minTopUp.trim()) ?? 0.00;
 
-                    final isValid = amount != null && amount > 0;
+                    final isValid = amount != null && amount > min;
 
                     return _buildActionButton(
                       text: 'Top-up Budget',
@@ -585,6 +587,7 @@ Future<void> showInitialTotalBudgetInsufficientDialog({
   required BuildContext context,
   required String shortageAmount,
   required double minTopUp,
+  required int wishlistCovered,
   VoidCallback? onCancel,
   required Future<bool> Function(double amount) onTopUpBudget,
 }) {
@@ -600,6 +603,8 @@ Future<void> showInitialTotalBudgetInsufficientDialog({
         summaryCard: _buildSummaryCard(
           primaryLabel: 'Estimated Budget Shortage Amount',
           primaryValue: shortageAmount,
+          secondaryLabel: 'Wishlist Covered',
+          secondaryValue: wishlistCovered.toString(),
         ),
 
         // First warning
@@ -691,12 +696,12 @@ Future<void> showInitialTotalBudgetTotallyInsufficientDialog({
           primaryLabel: 'Estimated Budget Shortage Amount',
           primaryValue: shortageAmount,
           secondaryLabel: 'Wishlist Covered',
-          secondaryValue: wishlistCovered.toString()
+          secondaryValue: wishlistCovered.toString(),
         ),
 
         // First warning
         warningText:
-        'Your budget is not sufficient to cover any wishlist items. '
+            'Your budget is not sufficient to cover any wishlist items. '
             'Do you want to add more budget?',
 
         // Top-up field + second warning
@@ -709,7 +714,7 @@ Future<void> showInitialTotalBudgetTotallyInsufficientDialog({
 
             BaseBudgetDialog._buildWarningRow(
               'Top-up amount should be at least ${minTopUp.toStringAsFixed(2)}, insufficient top-up amount will trigger alternative '
-                  'recommendation directly.',
+              'recommendation directly.',
             ),
           ],
         ),
@@ -741,14 +746,14 @@ Future<void> showInitialTotalBudgetTotallyInsufficientDialog({
                     text: 'Top-up Budget',
                     onPressed: isValid
                         ? () async {
-                      final amount = double.parse(value.text.trim());
+                            final amount = double.parse(value.text.trim());
 
-                      final success = await onTopUpBudget(amount);
+                            final success = await onTopUpBudget(amount);
 
-                      if (success && dialogContext.mounted) {
-                        Navigator.of(dialogContext).pop();
-                      }
-                    }
+                            if (success && dialogContext.mounted) {
+                              Navigator.of(dialogContext).pop();
+                            }
+                          }
                         : null,
                   );
                 },
