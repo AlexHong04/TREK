@@ -1,10 +1,7 @@
-// lib/views/all_plans_screen.dart
-
 import 'package:Trek/main.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import '../models/entities/whole_trip.dart';
 import '../theme/app_theme.dart';
 import '../view_models/presentation_logic/whole_itinerary_detail_view_model.dart';
 import '../view_models/ui_state/whole_itinerary_ui_state.dart';
@@ -207,7 +204,7 @@ class _AllPlansScreenState extends State<AllPlansScreen> {
           onTap: () {
             Navigator.of(context).pushNamed(
               AppRoutes.wholeItineraryDetailScreen,
-              arguments: {'tripID': trip.tripId, 'trip': trip, 'isReadOnly': false},
+              arguments: {'tripID': trip.tripId, 'trip': trip, 'isReadOnly': true},
             );
           },
           child: Column(

@@ -4,6 +4,7 @@ import '../../models/entities/activity.dart';
 import '../../models/services/i_itinerary_service.dart';
 import '../../models/services/itinerary_service.dart';
 import '../ui_state/whole_itinerary_ui_state.dart';
+import 'package:intl/intl.dart';
 
 class WholeItineraryDetailViewModel extends ChangeNotifier {
   final IItineraryService _itineraryService;
@@ -274,6 +275,45 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
 
   void setStatusFilter(String filter) {
     _uiState = _uiState.copyWith(selectedStatusFilter: filter);
+    notifyListeners();
+  }
+
+  Future<void> loadSavedTrip({required String tripId, WholeTrip? trip}) async {
+
+    final startDateStr = trip?.startDate != null
+        ? DateFormat('MMM dd').format(trip!.startDate)
+        : '';
+    final endDateStr = trip?.endDate != null
+        ? DateFormat('MMM dd, yyyy').format(trip!.endDate)
+        : '';
+    final dateRangeText = (startDateStr.isNotEmpty && endDateStr.isNotEmpty)
+        ? '$startDateStr - $endDateStr'
+        : '';
+
+    _uiState = _uiState.copyWith(
+      isLoading: true,
+      destinationTitle: trip?.destination ?? '',
+      datesText: dateRangeText,
+      budgetText: trip?.totalBudget.toStringAsFixed(2) ?? '0',
+      errorMessage: null,
+    );
+    notifyListeners();
+
+    try{
+      final activities = await _itineraryService.fetchAllActivitiesByTrip(tripId);
+
+      _uiState = _uiState.copyWith(
+        isLoading: false,
+        activities: activities,
+        totalAllocatedBudget: trip?.totalBudget ?? 0.0,
+        showWishlistWarning: false,
+      );
+    } catch (e) {
+      _uiState = _uiState.copyWith(
+        isLoading: false,
+        errorMessage: e.toString(),
+      );
+    }
     notifyListeners();
   }
 }
