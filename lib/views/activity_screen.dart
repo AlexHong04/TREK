@@ -227,7 +227,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
       minTopUp: minTopUp.toStringAsFixed(2),
       remainingBudget: uiState.remainingBudget.toStringAsFixed(2),
       warningText:
-      'Insufficient top-up amount will trigger alternative recommendation directly.',
+      'Top-up amount should at least ${minTopUp.toStringAsFixed(2)}, insufficient top-up amount will trigger alternative recommendation directly.',
       onEndTrip: onEndTrip,
       onTopUpBudget: (amount) async {
         final success = await onTopUpBudget(amount);
