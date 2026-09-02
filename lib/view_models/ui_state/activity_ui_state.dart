@@ -14,6 +14,7 @@ class ActivityUiState {
   // Temporary Add Expense form data.
   final Activity? selectedActivity;
   final List<ExpenseItem> draftExpenseItems;
+  final double draftTaxAmount;
   final double draftTotalAmount;
   final String paymentMethod;
   final String receiptLocalPath;
@@ -24,6 +25,7 @@ class ActivityUiState {
   final String ocrMerchantName;
   final DateTime? ocrTransactionDateTime;
   final double? ocrExtractedTotal;
+  final double? ocrExtractedTax;
   final List<String> ocrItemLines;
   final String errorMessage;
   final String successMessage;
@@ -51,6 +53,7 @@ class ActivityUiState {
     this.filterDate,
     this.selectedActivity,
     this.draftExpenseItems = const [],
+    this.draftTaxAmount = 0.0,
     this.draftTotalAmount = 0.0,
     this.paymentMethod = '',
     this.receiptLocalPath = '',
@@ -61,6 +64,7 @@ class ActivityUiState {
     this.ocrMerchantName = '',
     this.ocrTransactionDateTime,
     this.ocrExtractedTotal,
+    this.ocrExtractedTax,
     this.ocrItemLines = const [],
     this.errorMessage = '',
     this.successMessage = '',
@@ -76,6 +80,9 @@ class ActivityUiState {
     this.exceededAmount = 0.00,
     this.popupAction = '',
   });
+
+  double get itemsSubtotal =>
+      draftExpenseItems.fold(0.0, (total, item) => total + item.subtotal);
 
   double get usedPercentageValue => totalBudget <= 0 ? 0.0 : (spentBudget / totalBudget).clamp(0.0, 1.0);
 
@@ -109,6 +116,7 @@ class ActivityUiState {
     bool clearFilterDate = false,
     Activity? selectedActivity,
     List<ExpenseItem>? draftExpenseItems,
+    double? draftTaxAmount,
     double? draftTotalAmount,
     String? paymentMethod,
     String? receiptLocalPath,
@@ -119,10 +127,12 @@ class ActivityUiState {
     String? ocrMerchantName,
     DateTime? ocrTransactionDateTime,
     double? ocrExtractedTotal,
+    double? ocrExtractedTax,
     List<String>? ocrItemLines,
     bool clearOcrData = false,
     bool clearOcrTransactionDateTime = false,
     bool clearOcrExtractedTotal = false,
+    bool clearOcrExtractedTax = false,
     String? errorMessage,
     String? successMessage,
     List<Expense>? recordedExpenses,
@@ -147,6 +157,7 @@ class ActivityUiState {
       filterDate: clearFilterDate ? null : (filterDate ?? this.filterDate),
       selectedActivity: selectedActivity ?? this.selectedActivity,
       draftExpenseItems: draftExpenseItems ?? this.draftExpenseItems,
+      draftTaxAmount: draftTaxAmount ?? this.draftTaxAmount,
       draftTotalAmount: draftTotalAmount ?? this.draftTotalAmount,
       paymentMethod: paymentMethod ?? this.paymentMethod,
       receiptLocalPath: receiptLocalPath ?? this.receiptLocalPath,
@@ -163,6 +174,9 @@ class ActivityUiState {
       ocrExtractedTotal: clearOcrData || clearOcrExtractedTotal
           ? null
           : ocrExtractedTotal ?? this.ocrExtractedTotal,
+      ocrExtractedTax: clearOcrData || clearOcrExtractedTax
+          ? null
+          : ocrExtractedTax ?? this.ocrExtractedTax,
       ocrItemLines: clearOcrData ? const [] : ocrItemLines ?? this.ocrItemLines,
       errorMessage: errorMessage ?? this.errorMessage,
       successMessage: successMessage ?? this.successMessage,
