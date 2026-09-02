@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 
-import '../../models/entities/activity.dart';
 import '../../models/services/i_itinerary_service.dart';
 import '../../models/services/itinerary_service.dart';
 import '../../models/entities/future_suggestion.dart';
@@ -78,7 +77,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         final userId = SupabaseConfig.client.auth.currentUser?.id;
         if (userId != null) {
           final dashboardRepository = DashboardRepository();
-          final trips = await dashboardRepository.getTripsForUser(userId);
+          final trips = await dashboardRepository.getTripsForCurrentUser();
           final completedTrips = trips
               .where((t) => t.status.toLowerCase() == 'completed')
               .toList();
