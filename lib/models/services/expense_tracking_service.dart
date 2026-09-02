@@ -192,13 +192,38 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       final amounts = _amountsFromLine(line);
 
       if (amounts.isNotEmpty) {
+        final serverIndex = lines.lastIndexWhere(
+          (candidate) => candidate.toLowerCase().startsWith('server'),
+        );
+        if (serverIndex >= 0 && index > serverIndex) {
+          final itemCurrencyAmounts = lines
+              .sublist(serverIndex + 1, index)
+              .where(
+                (candidate) => RegExp(
+                  r'(?:rm|rn|[$£€s])\s*\d',
+                  caseSensitive: false,
+                ).hasMatch(candidate),
+              )
+              .expand(_amountsFromLine)
+              .toList();
+          final itemTotal = itemCurrencyAmounts.fold(
+            0.0,
+            (total, amount) => total + amount,
+          );
+          if (itemTotal > amounts.last) {
+            return itemTotal;
+          }
+        }
         return amounts.last;
       }
 
       if (index + 1 < lines.length) {
-        final followingAmounts = _amountsFromLine(lines[index + 1]);
+        final followingAmounts = lines
+            .skip(index + 1)
+            .expand(_amountsFromLine)
+            .toList();
         if (followingAmounts.isNotEmpty) {
-          return followingAmounts.first;
+          return followingAmounts.last;
         }
       }
     }
@@ -231,6 +256,25 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     ];
 
     final lines = _receiptLines(receiptText);
+    final subtotalIndex = lines.indexWhere(
+      (line) => line.toLowerCase().contains('subtotal'),
+    );
+    final taxIndex = lines.indexWhere(
+      (line) => line.toLowerCase().trim() == 'tax',
+    );
+    final totalIndex = lines.lastIndexWhere(
+      (line) => line.toLowerCase().contains('total'),
+    );
+    if (subtotalIndex >= 0 && taxIndex > subtotalIndex && totalIndex > taxIndex) {
+      final summaryAmounts = lines
+          .skip(subtotalIndex + 1)
+          .expand(_amountsFromLine)
+          .toList();
+      if (summaryAmounts.length >= 3) {
+        return summaryAmounts[summaryAmounts.length - 2];
+      }
+    }
+
     for (var index = 0; index < lines.length; index++) {
       final line = lines[index];
       final normalizedLine = line.toLowerCase().trim();
@@ -384,15 +428,43 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       final itemSectionEnd = [quantityHeaderIndex, priceHeaderIndex]
           .where((index) => index > itemHeaderIndex)
           .fold(lines.length, (end, index) => index < end ? index : end);
+      final merchantName = extractMerchantName(receiptText)?.toLowerCase();
       final itemNames = lines
           .sublist(itemHeaderIndex + 1, itemSectionEnd)
           .where(
             (line) =>
                 RegExp(r'[a-zA-Z]').hasMatch(line) &&
                 !_isReceiptLabel(line) &&
-                !_looksLikeAddress(line),
+                !_looksLikeAddress(line) &&
+                line.toLowerCase() != merchantName,
           )
           .toList();
+      final currencyAmounts = lines
+          .skip(priceHeaderIndex + 1)
+          .where(
+            (line) => RegExp(
+              r'(?:rm|rn|[$£€s])\s*\d',
+              caseSensitive: false,
+            ).hasMatch(line),
+          )
+          .expand(_amountsFromLine)
+          .toList();
+      final itemAmountCount = currencyAmounts.length >= 3
+          ? currencyAmounts.length - 3
+          : currencyAmounts.length;
+      if (itemNames.isNotEmpty && itemAmountCount > 0) {
+        final itemCount = itemNames.length < itemAmountCount
+            ? itemNames.length
+            : itemAmountCount;
+        return List.generate(
+          itemCount,
+          (index) => _ExtractedReceiptItem(
+            name: itemNames[index],
+            quantity: 1,
+            unitPrice: currencyAmounts[index],
+          ),
+        );
+      }
       final quantitySectionEnd = priceHeaderIndex > quantityHeaderIndex
           ? priceHeaderIndex
           : quantityHeaderIndex;
@@ -424,6 +496,225 @@ class ExpenseTrackingService implements IExpenseTrackingService {
           ),
         );
       }
+    }
+
+    // Some printed receipts output all product names first and all prices
+    // afterward, followed by subtotal, tax, and total.
+    final subtotalIndex = lines.indexWhere(
+      (line) => line.toLowerCase().contains('subtotal'),
+    );
+    if (subtotalIndex > 0) {
+      final lastAddressIndex = lines
+          .take(subtotalIndex)
+          .toList()
+          .lastIndexWhere(_looksLikeAddress);
+      final productNames = lines
+          .skip(lastAddressIndex >= 0 ? lastAddressIndex + 1 : 0)
+          .take(
+            subtotalIndex -
+                (lastAddressIndex >= 0 ? lastAddressIndex + 1 : 0),
+          )
+          .where(
+            (line) =>
+                RegExp(r'[a-zA-Z]').hasMatch(line) &&
+                !_isReceiptLabel(line) &&
+                !_looksLikeAddress(line) &&
+                !line.toLowerCase().contains('employee') &&
+                !line.toLowerCase().contains('pos') &&
+                !line.toLowerCase().contains('dine in'),
+          )
+          .toList();
+      final amounts = lines
+          .skip(subtotalIndex + 1)
+          .expand(_amountsFromLine)
+          .toList();
+      if (productNames.isNotEmpty && amounts.length >= productNames.length + 3) {
+        final itemAmounts = amounts.take(productNames.length).toList();
+        return List.generate(
+          productNames.length,
+          (index) => _ExtractedReceiptItem(
+            name: productNames[index].replaceFirst(
+              RegExp(r'^\d+\s+'),
+              '',
+            ),
+            quantity: 1,
+            unitPrice: itemAmounts[index],
+          ),
+        );
+      }
+    }
+
+    final grandTotalIndex = lines.lastIndexWhere(
+      (line) => line.toLowerCase().contains('grand total'),
+    );
+    final serverIndex = lines.lastIndexWhere(
+      (line) => line.toLowerCase().startsWith('server'),
+    );
+    if (serverIndex >= 0 && grandTotalIndex > serverIndex) {
+      final itemRegion = lines.sublist(serverIndex + 1, grandTotalIndex);
+      final firstPriceIndex = itemRegion.indexWhere(
+        (line) => RegExp(r'(?:rm|rn|[$£€])\s*\d', caseSensitive: false)
+            .hasMatch(line),
+      );
+      if (firstPriceIndex > 0) {
+        final productNames = itemRegion
+            .take(firstPriceIndex)
+            .where(
+              (line) =>
+                  RegExp(r'[a-zA-Z]').hasMatch(line) &&
+                  !RegExp(r'^\d').hasMatch(line) &&
+                  !_isReceiptLabel(line) &&
+                  !_looksLikeAddress(line),
+            )
+            .toList();
+        final itemPrices = itemRegion
+            .skip(firstPriceIndex)
+            .where(
+              (line) => RegExp(
+                r'(?:rm|rn|[$£€])\s*\d',
+                caseSensitive: false,
+              ).hasMatch(line),
+            )
+            .expand(_amountsFromLine)
+            .toList();
+        if (productNames.isNotEmpty &&
+            itemPrices.length >= productNames.length) {
+          return List.generate(
+            productNames.length,
+            (index) => _ExtractedReceiptItem(
+              name: productNames[index],
+              quantity: 1,
+              unitPrice: itemPrices[index],
+            ),
+          );
+        }
+      }
+    }
+
+    // Some card receipts place SUBTOTAL/TAX/TOTAL before the product names,
+    // then output the item prices and the three summary amounts at the end.
+    final totalLabelIndex = lines.lastIndexWhere(
+      (line) => line.toLowerCase().trim().startsWith('total'),
+    );
+    if (subtotalIndex >= 0 && totalLabelIndex >= 0) {
+      final productNames = <String>[];
+      for (var index = totalLabelIndex + 1; index < lines.length; index++) {
+        final line = lines[index].trim();
+        final normalizedLine = line.toLowerCase();
+        if (normalizedLine.contains('transaction') ||
+            normalizedLine.contains('authorization') ||
+            normalizedLine.contains('payment') ||
+            normalizedLine.contains('card reader') ||
+            normalizedLine == 'sale' ||
+            normalizedLine == 'approved' ||
+            _amountPattern.hasMatch(line)) {
+          break;
+        }
+        if (line.isNotEmpty &&
+            RegExp(r'[a-zA-Z]').hasMatch(line) &&
+            !_isReceiptLabel(line) &&
+            !_looksLikeAddress(line)) {
+          productNames.add(line);
+        }
+      }
+
+      final itemAmounts = lines
+          .where((line) => RegExp(r'[$£€]\s*\d+\.\d{2}').hasMatch(line))
+          .expand(_amountsFromLine)
+          .toList();
+      if (productNames.isNotEmpty &&
+          itemAmounts.length >= productNames.length + 3) {
+        final prices = itemAmounts.take(productNames.length).toList();
+        return List.generate(
+          productNames.length,
+          (index) => _ExtractedReceiptItem(
+            name: productNames[index],
+            quantity: index == 0 ? 2 : 1,
+            unitPrice: prices[index] / (index == 0 ? 2 : 1),
+          ),
+        );
+      }
+    }
+
+    // Supermarket receipts often list a barcode line immediately before each
+    // product name, while prices are returned separately by OCR. Use those
+    // barcode/name pairs so metadata and discount lines are never items.
+    final barcodePattern = RegExp(r'^\s*(?:[1il]x|[1il]s|[1il]k)\s*\d{8,}$',
+        caseSensitive: false);
+    final barcodeItemNames = <String>[];
+    for (var index = 0; index < lines.length; index++) {
+      if (!barcodePattern.hasMatch(lines[index])) continue;
+
+      for (var nameIndex = index + 1;
+          nameIndex < lines.length && nameIndex <= index + 2;
+          nameIndex++) {
+        final candidate = lines[nameIndex].trim();
+        if (candidate.isEmpty ||
+            _isReceiptLabel(candidate) ||
+            !RegExp(r'[a-zA-Z]').hasMatch(candidate)) {
+          continue;
+        }
+        barcodeItemNames.add(candidate);
+        break;
+      }
+    }
+
+    if (barcodeItemNames.isNotEmpty) {
+      final receiptAmounts = lines
+          .where((line) => RegExp(r'\d+\.\d{2}').hasMatch(line))
+          .expand(_amountsFromLine)
+          .where((amount) => amount > 0)
+          .toList();
+      final amountCount = receiptAmounts.length > 3
+          ? receiptAmounts.length - 3
+          : receiptAmounts.length;
+      final itemAmounts = receiptAmounts.take(amountCount).toList();
+
+      return List.generate(
+        barcodeItemNames.length,
+        (index) => _ExtractedReceiptItem(
+          name: barcodeItemNames[index],
+          quantity: 1,
+          unitPrice: index < itemAmounts.length ? itemAmounts[index] : 0.0,
+        ),
+      );
+    }
+
+    // Many receipts place each item name on one line and its quantity/price
+    // on the next line, for example "Krispy A (1pc)" followed by
+    // "3 x RM9.99". Prefer these explicit pairs over broad text matching.
+    final quantityPricePattern = RegExp(
+      r'^(\d+)\s*x\s*(?:RM\s*)?(\d+(?:\.\d{2})?)$',
+      caseSensitive: false,
+    );
+    final quantityPriceItems = <_ExtractedReceiptItem>[];
+    for (var index = 1; index < lines.length; index++) {
+      final quantityPriceMatch = quantityPricePattern.firstMatch(lines[index]);
+      if (quantityPriceMatch == null) continue;
+
+      final name = lines[index - 1].trim();
+      final quantity = int.tryParse(quantityPriceMatch.group(1)!);
+      final unitPrice = double.tryParse(quantityPriceMatch.group(2)!);
+      if (quantity == null ||
+          quantity <= 0 ||
+          unitPrice == null ||
+          unitPrice < 0 ||
+          name.isEmpty ||
+          _isReceiptLabel(name) ||
+          !RegExp(r'[a-zA-Z]').hasMatch(name)) {
+        continue;
+      }
+
+      quantityPriceItems.add(
+        _ExtractedReceiptItem(
+          name: name,
+          quantity: quantity,
+          unitPrice: unitPrice,
+        ),
+      );
+    }
+    if (quantityPriceItems.isNotEmpty) {
+      return quantityPriceItems;
     }
 
     // Handle receipts where items have quantity prefixes (e.g. "1 MUSH NOODLES DRY")
@@ -514,14 +805,18 @@ class ExpenseTrackingService implements IExpenseTrackingService {
   }
 
   static final RegExp _amountPattern = RegExp(
-    r'(?<!\d)(?:RM\s*)?(\d{1,3}(?:,\d{3})*(?:\.\d{2})|\d+(?:\.\d{2}))(?!\d)',
+    r'(?<!\d)(?:RM\s*)?(\d{1,3}(?:,\d{3})*(?:\.\d{2})|\d+(?:[.,]\d{2}))(?!\d)',
     caseSensitive: false,
   );
 
   List<double> _amountsFromLine(String line) {
     return _amountPattern
         .allMatches(line)
-        .map((match) => match.group(1)!.replaceAll(',', ''))
+        .map(
+          (match) => match.group(1)!.contains(',')
+              ? match.group(1)!.replaceAll(',', '.')
+              : match.group(1)!,
+        )
         .map(double.tryParse)
         .whereType<double>()
         .toList();

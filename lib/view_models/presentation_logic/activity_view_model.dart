@@ -319,6 +319,20 @@ class ActivityViewModel extends ChangeNotifier {
   }
 
   double _inferTaxFromReceiptTotal(List<ExpenseItem> expenseItems) {
+    final hasTaxLabel = _uiState.ocrRawText
+        .split(RegExp(r'\r?\n'))
+        .map((line) => line.trim().toLowerCase())
+        .any(
+          (line) =>
+              RegExp(r'\b(?:sales tax|service tax|govt tax|sst|gst)\b')
+                  .hasMatch(line) &&
+              !line.contains(' id') &&
+              !line.contains(' no'),
+        );
+    if (!hasTaxLabel) {
+      return 0.0;
+    }
+
     final receiptTotal = _uiState.ocrExtractedTotal;
     if (receiptTotal == null) {
       return 0.0;

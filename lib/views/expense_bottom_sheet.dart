@@ -179,13 +179,13 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   Widget _buildNewExpenseForm(ActivityUiState uiState) {
     return Column(
       children: [
-        _buildPaymentMethodSection(uiState),
-        SizedBox(height: 10),
         _buildExpenseItemsSection(uiState),
         SizedBox(height: 10),
         _buildTaxSection(uiState),
         SizedBox(height: 10),
         _buildTotalAmountSection(uiState),
+        SizedBox(height: 10),
+        _buildPaymentMethodSection(uiState),
         SizedBox(height: 10),
         _buildReceiptSection(uiState),
         if (uiState.isScanningReceipt ||
@@ -847,16 +847,6 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                   letterSpacing: 1,
                 ),
               ),
-              if (uiState.draftTaxAmount > 0)
-                Text(
-                  'RM${uiState.draftTaxAmount.toStringAsFixed(2)}',
-                  style: TextStyle(
-                    color: appTheme.gray_900,
-                    fontFamily: 'Inter',
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
             ],
           ),
           SizedBox(height: 8),
@@ -1369,6 +1359,10 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
 
     if (uiState.ocrRawText.isNotEmpty) {
       final itemCount = viewModel.applyOcrItemsToDraft();
+      final detectedTax = viewModel.uiState.draftTaxAmount;
+      _taxController.text = detectedTax > 0
+          ? detectedTax.toStringAsFixed(2)
+          : '';
       if (itemCount > 0) {
         setState(() {
           _editingItemIndex = null;
