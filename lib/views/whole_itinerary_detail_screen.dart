@@ -81,6 +81,19 @@ class _WholeItineraryDetailScreenState
     });
   }
 
+  String _formatDisplayTime(dynamic activity) {
+    final startTime = activity.startTime as String?;
+    if (startTime != null && startTime.trim().isNotEmpty) {
+      try {
+        final parsed = DateFormat('HH:mm').parse(startTime.trim());
+        return DateFormat('hh:mm a').format(parsed);
+      } catch (_) {
+        return startTime;
+      }
+    }
+    return DateFormat('hh:mm a').format(activity.date);
+  }
+
   Future<void> _showWishlistWarningDialog(
     WholeItineraryDetailViewModel viewModel,
   ) async {
@@ -192,7 +205,8 @@ class _WholeItineraryDetailScreenState
               ),
             ),
           ),
-          _buildBottomSection(context, viewModel),
+          if(!isReadOnly) _buildBottomSection(context, viewModel),
+
         ],
       ),
     );
@@ -456,6 +470,7 @@ class _WholeItineraryDetailScreenState
       children.add(
         _buildTimelineItem(
           context: context,
+          viewModel: viewModel,
           activity: activity,
           isLast: isLast,
           isReadOnly: isReadOnly,
@@ -472,6 +487,7 @@ class _WholeItineraryDetailScreenState
 
   Widget _buildTimelineItem({
     required BuildContext context,
+    required WholeItineraryDetailViewModel viewModel,
     required dynamic activity,
     required bool isLast,
     required VoidCallback onRemove,
@@ -490,7 +506,7 @@ class _WholeItineraryDetailScreenState
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    DateFormat('hh:mm a').format(activity.date),
+                    _formatDisplayTime(activity),
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -511,7 +527,7 @@ class _WholeItineraryDetailScreenState
                 ],
               ),
               SizedBox(height: 12.0),
-              _buildActivityCard(activity),
+              _buildActivityCard(context, viewModel, activity),
               if (!isLast) SizedBox(height: 24.0),
             ],
           ),
@@ -644,7 +660,9 @@ class _WholeItineraryDetailScreenState
     );
   }
 
-  Widget _buildActivityCard(dynamic activity) {
+  Widget _buildActivityCard(BuildContext context,
+    WholeItineraryDetailViewModel viewModel,
+      dynamic activity) {
     // Check if the activity has been cleared (empty slot state)
     if (activity.status == 'empty' ||
         (activity.destination.isEmpty && activity.description.isEmpty)) {
@@ -668,8 +686,25 @@ class _WholeItineraryDetailScreenState
                   size: 32,
                   color: appTheme.blue_gray_300,
                 ),
-                onPressed: () {
-                  // Handle tap on empty activity slot
+                onPressed: () async {
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (_) => Center(child: CircularProgressIndicator()),
+                  );
+
+                  try {
+                    await viewModel.generateAlternativeActivity(
+                      slotActivityId: activity.activitiesId,
+                      destination: activity.destination,
+                    );
+                  } catch (e) {
+                    debugPrint('Error generating alternative activity: $e');
+                  } finally {
+                    if (context.mounted) {
+                      Navigator.of(context, rootNavigator: true).pop();
+                    }
+                  }
                 },
               ),
               const SizedBox(height: 8),

@@ -216,7 +216,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     );
     if (slotIndex == -1) return;
 
-    final targetSlot = _uiState.activities[slotIndex];
+      final targetSlot = _uiState.activities[slotIndex];
 
     // Set slot-specific loading state instead of screen-wide loading
     _uiState = _uiState.copyWith(
@@ -264,11 +264,13 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
       _uiState = _uiState.copyWith(
         activities: updatedList,
         clearRegeneratingSlot: true,
+        isLoading: false,
       );
     } catch (e) {
       _uiState = _uiState.copyWith(
         clearRegeneratingSlot: true,
         errorMessage: e.toString(),
+        isLoading: false,
       );
     }
     notifyListeners();
