@@ -40,12 +40,13 @@ class GeminiApiConfig {
     - Dates: $dates
     - Budget: \$$budget
     ${preference != null ? '- Preference: $preference (You MUST heavily prioritize planning activities that strictly match this theme!)' : ''}
-    ${(wishlist != null && wishlist.isNotEmpty) ? '- Wishlist Items: ' + wishlist.join(', ') + ' (You MUST include ALL of these places in the itinerary if the budget allows!)' : ''}
+    ${(wishlist != null && wishlist.isNotEmpty) ? '- Wishlist Items: ' + wishlist.join(', ') + '\n    CRITICAL RULE FOR WISHLIST & BUDGET:\n    - If the provided Budget (\$$budget) is too low to realistically cover these wishlist items along with basic daily meals and transport, DO NOT assign fake \$0.0 costs just to force them into the budget.\n    - Instead, you MUST assign their true, realistic costs.\n    - If the total realistic cost exceeds the provided Budget, calculate the shortfall (Total Realistic Cost - Budget) and securely return it in "estimatedExtraBudgetNeeded".\n    - If you are forced to exclude any wishlist items due to extreme budget constraints, add their realistic costs to "estimatedExtraBudgetNeeded" as well.' : ''}
 
     Please provide a structured day-by-day itinerary with estimated costs and durations for each activity.
     CRITICAL RULE FOR BUDGET: 
     - You MUST try your absolute best to MAXIMIZE the budget utilization. Spend as close to \$$budget as rationally possible. If there is leftover budget, recommend more expensive restaurants, premium transportation (e.g. Grab instead of walking), or higher-quality attractions!
     - Assign realistic cost for "allocatedBudget". 
+    - DO NOT fake \$0 costs for expensive attractions or restaurants just to meet a small budget.
     - Public parks, sightseeing of landmarks, walking tours, and free attractions MUST have an allocatedBudget of 0.
     - "Transportation" activities MUST ALWAYS have a realistic allocatedBudget greater than 0 (e.g., Grab fare, MRT tickets). Do NEVER assign 0 to Transportation!
     - Only assign costs to food/dining, transportation, and places that explicitly require entrance tickets.
@@ -102,7 +103,7 @@ class GeminiApiConfig {
     Field definitions:
     - totalAllocatedBudget (double): The sum of all allocatedBudget.
     - wishlistItemsCoveredCount (int): Number of user-provided wishlist items covered.
-    - estimatedExtraBudgetNeeded (double): Extra budget needed for remaining wishlist items (return 0.0 if all covered).
+    - estimatedExtraBudgetNeeded (double): If the true realistic cost of the itinerary + wishlist items exceeds the \$$budget, return the shortfall amount here. Return 0.0 ONLY if \$$budget is genuinely sufficient.
     - dayNumber (int): Sequential day (1 for Day 1, 2 for Day 2...).
     - destination (String): EXACT, FULL official business name or landmark on Google Maps. No generic names.
     - imageKeyword (String): Landmark name or generic food type (e.g. "Nasi Lemak" instead of restaurant name).
