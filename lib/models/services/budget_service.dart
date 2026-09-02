@@ -127,10 +127,10 @@ class BudgetService implements IBudgetService {
   }
 
   Future<List<Activity>> reallocateBudget(
-    String tripId,
-    Activity currentActivity,
-    double overspentAmount,
-  ) async {
+      String tripId,
+      Activity currentActivity,
+      double overspentAmount,
+      ) async {
     debugPrint('========== START BUDGET REALLOCATION ==========');
     debugPrint('Trip ID: $tripId');
     debugPrint('Current Activity ID: ${currentActivity.activitiesId}');
@@ -147,68 +147,28 @@ class BudgetService implements IBudgetService {
     for (final activity in allRemainingActivities) {
       debugPrint(
         'Remaining Activity: '
-        '${activity.activitiesId} | '
-        '${activity.destination} | '
-        'Category: ${activity.activityCategory} | '
-        'Date: ${activity.date} | '
-        'Start: ${activity.startTime} | '
-        'Budget: RM ${activity.allocatedBudget.toStringAsFixed(2)}',
+            '${activity.activitiesId} | '
+            '${activity.destination} | '
+            'Category: ${activity.activityCategory} | '
+            'Date: ${activity.date} | '
+            'Start: ${activity.startTime} | '
+            'Budget: RM ${activity.allocatedBudget.toStringAsFixed(2)}',
       );
     }
 
-    final DateTime currentDateTime = DateTime.now();
-
-    debugPrint('Current DateTime: $currentDateTime');
-
-    // Find restaurants that have not started yet.
-    final remainingRestaurantActivities = allRemainingActivities.where((
-      activity,
-    ) {
-      final timeParts = activity.startTime?.split(':');
-
-      if (timeParts == null || timeParts.length < 2) {
-        debugPrint(
-          '[SKIP] ${activity.activitiesId} - '
-          'Invalid start time: ${activity.startTime}',
-        );
-        return false;
-      }
-
-      final int? hour = int.tryParse(timeParts[0]);
-      final int? minute = int.tryParse(timeParts[1]);
-
-      if (hour == null || minute == null) {
-        debugPrint(
-          '[SKIP] ${activity.activitiesId} - '
-          'Cannot parse start time: ${activity.startTime}',
-        );
-        return false;
-      }
-
-      // Combine activity date + start time
-      final DateTime activityStartDateTime = DateTime(
-        activity.date.year,
-        activity.date.month,
-        activity.date.day,
-        hour,
-        minute,
-      );
-
+    // Find restaurant activities here.
+    final List<Activity> remainingRestaurantActivities =
+    allRemainingActivities.where((activity) {
       final bool isRestaurant =
           activity.activityCategory.toLowerCase() == 'restaurant';
 
-      final bool hasNotStarted = activityStartDateTime.isAfter(currentDateTime);
-      // remove those comparing date
-
       debugPrint(
         '[CHECK] ${activity.activitiesId} | '
-        '${activity.destination} | '
-        'Restaurant: $isRestaurant | '
-        'Start: $activityStartDateTime | '
-        'Future: $hasNotStarted',
+            '${activity.destination} | '
+            'Restaurant: $isRestaurant',
       );
 
-      return isRestaurant && hasNotStarted;
+      return isRestaurant;
     }).toList();
 
     // Sort restaurants according to start time.
@@ -237,17 +197,19 @@ class BudgetService implements IBudgetService {
 
     debugPrint(
       'Remaining restaurants: '
-      '${remainingRestaurantActivities.length}',
+          '${remainingRestaurantActivities.length}',
     );
 
     if (remainingRestaurantActivities.isEmpty) {
-      debugPrint('[REALLOCATION FAILED] No remaining restaurant activities.');
+      debugPrint(
+        '[REALLOCATION FAILED] '
+            'No remaining restaurant activities.',
+      );
       debugPrint('========== END BUDGET REALLOCATION ==========');
       return [];
     }
 
-    // Divide the overspent amount equally
-    // among the remaining restaurants.
+    // Divide the overspent amount equally among the remaining restaurants.
     final int numberOfRemainingRestaurants =
         remainingRestaurantActivities.length;
 
@@ -256,45 +218,101 @@ class BudgetService implements IBudgetService {
 
     debugPrint('Number of restaurants: $numberOfRemainingRestaurants');
 
-    debugPrint('Total overspent: RM ${overspentAmount.toStringAsFixed(2)}');
+    debugPrint(
+      'Total overspent: RM ${overspentAmount.toStringAsFixed(2)}',
+    );
 
     debugPrint(
       'Deduction per restaurant: '
-      'RM ${deductionPerRestaurant.toStringAsFixed(2)}',
+          'RM ${deductionPerRestaurant.toStringAsFixed(2)}',
     );
+
+    // Check whether all restaurants can absorb the deduction
+    for (final restaurant in remainingRestaurantActivities) {
+      final double oldBudget = restaurant.allocatedBudget;
+
+      final double newAllocatedBudget =
+          oldBudget - deductionPerRestaurant;
+
+      final double minPrice = restaurant.minAllocatedBudget ?? 0.00;
+
+      debugPrint(
+        '[MIN PRICE CHECK] ${restaurant.activitiesId} | '
+            '${restaurant.destination}',
+      );
+
+      debugPrint(
+        'Old Budget: RM ${oldBudget.toStringAsFixed(2)}',
+      );
+
+      debugPrint(
+        'Deduction: RM ${deductionPerRestaurant.toStringAsFixed(2)}',
+      );
+
+      debugPrint(
+        'New Budget: RM ${newAllocatedBudget.toStringAsFixed(2)}',
+      );
+
+      debugPrint(
+        'Min Price: RM ${minPrice.toStringAsFixed(2)}',
+      );
+
+      // If the new budget is <= minimum price, skip the reallocation
+      if (newAllocatedBudget <= minPrice) {
+        debugPrint(
+          '[REALLOCATION FAILED] ${restaurant.destination} '
+              'would fall to or below minimum price.',
+        );
+
+        debugPrint(
+          'New Budget: RM '
+              '${newAllocatedBudget.toStringAsFixed(2)}',
+        );
+
+        debugPrint(
+          'Min Price: RM '
+              '${minPrice.toStringAsFixed(2)}',
+        );
+
+        debugPrint('========== END BUDGET REALLOCATION ==========');
+
+        return [];
+      }
+    }
+
+    // ----------------------------------------------------------
+    // PERFORM REALLOCATION
+    // ----------------------------------------------------------
 
     final List<Activity> modifiedActivities = [];
 
     for (final restaurant in remainingRestaurantActivities) {
       final double oldBudget = restaurant.allocatedBudget;
 
-      final double newAllocatedBudget = oldBudget - deductionPerRestaurant;
-
-      final double finalAllocatedBudget = newAllocatedBudget < 0
-          ? 0.0
-          : newAllocatedBudget;
+      final double newAllocatedBudget =
+          oldBudget - deductionPerRestaurant;
 
       final updatedRestaurant = restaurant.copyWith(
-        allocatedBudget: finalAllocatedBudget,
+        allocatedBudget: newAllocatedBudget,
       );
-
-      // add if newAllocatedBudget < 0 or newAllocatedBudget < min price, skip the reallocation
 
       modifiedActivities.add(updatedRestaurant);
 
       debugPrint(
         '[REALLOCATE] ${restaurant.activitiesId} | '
-        '${restaurant.destination}',
-      );
-
-      debugPrint('    Old Budget: RM ${oldBudget.toStringAsFixed(2)}');
-
-      debugPrint(
-        '    Deduction: RM ${deductionPerRestaurant.toStringAsFixed(2)}',
+            '${restaurant.destination}',
       );
 
       debugPrint(
-        '    New Budget: RM ${finalAllocatedBudget.toStringAsFixed(2)}',
+        'Old Budget: RM ${oldBudget.toStringAsFixed(2)}',
+      );
+
+      debugPrint(
+        'Deduction: RM ${deductionPerRestaurant.toStringAsFixed(2)}',
+      );
+
+      debugPrint(
+        'New Budget: RM ${newAllocatedBudget.toStringAsFixed(2)}',
       );
     }
 
@@ -303,8 +321,8 @@ class BudgetService implements IBudgetService {
     for (final activity in modifiedActivities) {
       debugPrint(
         '${activity.activitiesId} | '
-        '${activity.destination} | '
-        'New Budget: RM ${activity.allocatedBudget.toStringAsFixed(2)}',
+            '${activity.destination} | '
+            'New Budget: RM ${activity.allocatedBudget.toStringAsFixed(2)}',
       );
     }
 
@@ -313,11 +331,199 @@ class BudgetService implements IBudgetService {
     return modifiedActivities;
   }
 
+  // Future<List<Activity>> reallocateBudget(
+  //   String tripId,
+  //   Activity currentActivity,
+  //   double overspentAmount,
+  // ) async {
+  //   debugPrint('========== START BUDGET REALLOCATION ==========');
+  //   debugPrint('Trip ID: $tripId');
+  //   debugPrint('Current Activity ID: ${currentActivity.activitiesId}');
+  //   debugPrint('Current Activity: ${currentActivity.destination}');
+  //   debugPrint('Overspent Amount: RM ${overspentAmount.toStringAsFixed(2)}');
+  //
+  //   final allRemainingActivities = await getRemainingActivities(
+  //     tripId,
+  //     DateTime.now(),
+  //   );
+  //
+  //   debugPrint('Total remaining activities: ${allRemainingActivities.length}');
+  //
+  //   for (final activity in allRemainingActivities) {
+  //     debugPrint(
+  //       'Remaining Activity: '
+  //       '${activity.activitiesId} | '
+  //       '${activity.destination} | '
+  //       'Category: ${activity.activityCategory} | '
+  //       'Date: ${activity.date} | '
+  //       'Start: ${activity.startTime} | '
+  //       'Budget: RM ${activity.allocatedBudget.toStringAsFixed(2)}',
+  //     );
+  //   }
+  //
+  //   final DateTime currentDateTime = DateTime.now();
+  //
+  //   debugPrint('Current DateTime: $currentDateTime');
+  //
+  //   // Find restaurants that have not started yet.
+  //   final remainingRestaurantActivities = allRemainingActivities.where((
+  //     activity,
+  //   ) {
+  //     final timeParts = activity.startTime?.split(':');
+  //
+  //     if (timeParts == null || timeParts.length < 2) {
+  //       debugPrint(
+  //         '[SKIP] ${activity.activitiesId} - '
+  //         'Invalid start time: ${activity.startTime}',
+  //       );
+  //       return false;
+  //     }
+  //
+  //     final int? hour = int.tryParse(timeParts[0]);
+  //     final int? minute = int.tryParse(timeParts[1]);
+  //
+  //     if (hour == null || minute == null) {
+  //       debugPrint(
+  //         '[SKIP] ${activity.activitiesId} - '
+  //         'Cannot parse start time: ${activity.startTime}',
+  //       );
+  //       return false;
+  //     }
+  //
+  //     // Combine activity date + start time
+  //     final DateTime activityStartDateTime = DateTime(
+  //       activity.date.year,
+  //       activity.date.month,
+  //       activity.date.day,
+  //       hour,
+  //       minute,
+  //     );
+  //
+  //     final bool isRestaurant =
+  //         activity.activityCategory.toLowerCase() == 'restaurant';
+  //
+  //     final bool hasNotStarted = activityStartDateTime.isAfter(currentDateTime);
+  //     // remove those comparing date
+  //
+  //     debugPrint(
+  //       '[CHECK] ${activity.activitiesId} | '
+  //       '${activity.destination} | '
+  //       'Restaurant: $isRestaurant | '
+  //       'Start: $activityStartDateTime | '
+  //       'Future: $hasNotStarted',
+  //     );
+  //
+  //     return isRestaurant && hasNotStarted;
+  //   }).toList();
+  //
+  //   // Sort restaurants according to start time.
+  //   remainingRestaurantActivities.sort((a, b) {
+  //     final aParts = a.startTime!.split(':');
+  //     final bParts = b.startTime!.split(':');
+  //
+  //     final DateTime aDateTime = DateTime(
+  //       a.date.year,
+  //       a.date.month,
+  //       a.date.day,
+  //       int.parse(aParts[0]),
+  //       int.parse(aParts[1]),
+  //     );
+  //
+  //     final DateTime bDateTime = DateTime(
+  //       b.date.year,
+  //       b.date.month,
+  //       b.date.day,
+  //       int.parse(bParts[0]),
+  //       int.parse(bParts[1]),
+  //     );
+  //
+  //     return aDateTime.compareTo(bDateTime);
+  //   });
+  //
+  //   debugPrint(
+  //     'Remaining restaurants: '
+  //     '${remainingRestaurantActivities.length}',
+  //   );
+  //
+  //   if (remainingRestaurantActivities.isEmpty) {
+  //     debugPrint('[REALLOCATION FAILED] No remaining restaurant activities.');
+  //     debugPrint('========== END BUDGET REALLOCATION ==========');
+  //     return [];
+  //   }
+  //
+  //   // Divide the overspent amount equally
+  //   // among the remaining restaurants.
+  //   final int numberOfRemainingRestaurants =
+  //       remainingRestaurantActivities.length;
+  //
+  //   final double deductionPerRestaurant =
+  //       overspentAmount / numberOfRemainingRestaurants;
+  //
+  //   debugPrint('Number of restaurants: $numberOfRemainingRestaurants');
+  //
+  //   debugPrint('Total overspent: RM ${overspentAmount.toStringAsFixed(2)}');
+  //
+  //   debugPrint(
+  //     'Deduction per restaurant: '
+  //     'RM ${deductionPerRestaurant.toStringAsFixed(2)}',
+  //   );
+  //
+  //   final List<Activity> modifiedActivities = [];
+  //
+  //   for (final restaurant in remainingRestaurantActivities) {
+  //     final double oldBudget = restaurant.allocatedBudget;
+  //
+  //     final double newAllocatedBudget = oldBudget - deductionPerRestaurant;
+  //
+  //     final double finalAllocatedBudget = newAllocatedBudget < 0
+  //         ? 0.0
+  //         : newAllocatedBudget;
+  //
+  //     final updatedRestaurant = restaurant.copyWith(
+  //       allocatedBudget: finalAllocatedBudget,
+  //     );
+  //
+  //     // add if newAllocatedBudget < 0 or newAllocatedBudget < min price, skip the reallocation
+  //
+  //     modifiedActivities.add(updatedRestaurant);
+  //
+  //     debugPrint(
+  //       '[REALLOCATE] ${restaurant.activitiesId} | '
+  //       '${restaurant.destination}',
+  //     );
+  //
+  //     debugPrint('    Old Budget: RM ${oldBudget.toStringAsFixed(2)}');
+  //
+  //     debugPrint(
+  //       '    Deduction: RM ${deductionPerRestaurant.toStringAsFixed(2)}',
+  //     );
+  //
+  //     debugPrint(
+  //       '    New Budget: RM ${finalAllocatedBudget.toStringAsFixed(2)}',
+  //     );
+  //   }
+  //
+  //   debugPrint('========== REALLOCATION RESULT ==========');
+  //
+  //   for (final activity in modifiedActivities) {
+  //     debugPrint(
+  //       '${activity.activitiesId} | '
+  //       '${activity.destination} | '
+  //       'New Budget: RM ${activity.allocatedBudget.toStringAsFixed(2)}',
+  //     );
+  //   }
+  //
+  //   debugPrint('========== END BUDGET REALLOCATION ==========');
+  //
+  //   return modifiedActivities;
+  // }
+
   Future<int> calculateSufficientDays(
     String tripId,
     String currentActivityId,
   ) async {
     final trip = await _itineraryRepository.getTrip(tripId);
+    debugPrint("trip ${trip.tripId}, ${trip.remainingBalance}, ${trip.totalBudget}");
 
     final List<Activity> remainingActivities = await getRemainingActivities(
       tripId,
