@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter/foundation.dart';
+import '../entities/future_suggestion.dart';
 
 class GeminiApiRequestException implements Exception {
   final int statusCode;
@@ -31,6 +32,8 @@ class GeminiApiConfig {
     String? preference,
     List<String>? avoidPlaces,
     List<String>? wishlist,
+    List<String>? constraints,
+    List<FutureSuggestion>? futureSuggestions,
   }) async {
     final prompt =
         '''
@@ -40,6 +43,8 @@ class GeminiApiConfig {
     - Dates: $dates
     - Budget: \$$budget
     ${preference != null ? '- Preference: $preference (You MUST heavily prioritize planning activities that strictly match this theme!)' : ''}
+    ${(constraints != null && constraints.isNotEmpty) ? '- Personal Constraints: ' + constraints.join(', ') + ' (You MUST strictly follow these constraints when suggesting places, e.g., food restrictions or accessibility!)' : ''}
+    ${(futureSuggestions != null && futureSuggestions.isNotEmpty) ? '- Budget Distribution: ' + futureSuggestions.map((e) => '${e.activityCategory}: ${e.suggestedAmount}%').join(', ') + ' (You MUST strictly allocate the provided Budget according to these category percentages!)' : ''}
     ${(wishlist != null && wishlist.isNotEmpty) ? '- Wishlist Items: ' + wishlist.join(', ') + '\n    CRITICAL RULE FOR WISHLIST & BUDGET:\n    - If the provided Budget (\$$budget) is too low to realistically cover these wishlist items along with basic daily meals and transport, DO NOT assign fake \$0.0 costs just to force them into the budget.\n    - Instead, you MUST assign their true, realistic costs.\n    - If the total realistic cost exceeds the provided Budget, calculate the shortfall (Total Realistic Cost - Budget) and securely return it in "estimatedExtraBudgetNeeded".\n    - If you are forced to exclude any wishlist items due to extreme budget constraints, add their realistic costs to "estimatedExtraBudgetNeeded" as well.' : ''}
 
     Please provide a structured day-by-day itinerary with estimated costs and durations for each activity.
