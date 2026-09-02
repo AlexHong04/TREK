@@ -10,6 +10,7 @@ class ActivityUiState {
   final String currentActivityId;
   final List<Activity> activities;
   final DateTime? filterDate;
+  final String tripDestination;
 
   // Temporary Add Expense form data.
   final Activity? selectedActivity;
@@ -51,6 +52,7 @@ class ActivityUiState {
     this.currentActivityId = '',
     this.activities = const [],
     this.filterDate,
+    this.tripDestination = '',
     this.selectedActivity,
     this.draftExpenseItems = const [],
     this.draftTaxAmount = 0.0,
@@ -94,16 +96,27 @@ class ActivityUiState {
 
   // Computed Getter automatically filters activities
   List<Activity> get displayActivities {
-    if (filterDate == null) {
-      return activities;
-    }
-
-    return activities.where((activity) {
-      final actDate = activity.date;
-      return actDate.year == filterDate!.year &&
-          actDate.month == filterDate!.month &&
-          actDate.day == filterDate!.day;
+    final filtered = filterDate == null
+        ? List<Activity>.from(activities)
+        : activities.where((a) {
+      return a.date.year == filterDate!.year &&
+          a.date.month == filterDate!.month &&
+          a.date.day == filterDate!.day;
     }).toList();
+
+    // Sort chronologically by date and startTime
+    filtered.sort((a, b) {
+      // 1. Primary sort: Date
+      final dateCompare = a.date.compareTo(b.date);
+      if (dateCompare != 0) return dateCompare;
+
+      // 2. Secondary sort: startTime (e.g. "09:00", "10:30", "17:00")
+      final aTime = a.startTime ?? '00:00';
+      final bTime = b.startTime ?? '00:00';
+      return aTime.compareTo(bTime);
+    });
+
+    return filtered;
   }
 
 
@@ -113,6 +126,7 @@ class ActivityUiState {
     String? currentActivityId,
     List<Activity>? activities,
     DateTime? filterDate,
+    String? tripDestination,
     bool clearFilterDate = false,
     Activity? selectedActivity,
     List<ExpenseItem>? draftExpenseItems,
@@ -155,6 +169,7 @@ class ActivityUiState {
       currentActivityId: currentActivityId ?? this.currentActivityId,
       activities: activities ?? this.activities,
       filterDate: clearFilterDate ? null : (filterDate ?? this.filterDate),
+      tripDestination: tripDestination ?? this.tripDestination,
       selectedActivity: selectedActivity ?? this.selectedActivity,
       draftExpenseItems: draftExpenseItems ?? this.draftExpenseItems,
       draftTaxAmount: draftTaxAmount ?? this.draftTaxAmount,

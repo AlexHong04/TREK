@@ -37,7 +37,6 @@ class ActivityViewModel extends ChangeNotifier {
        _expenseTrackingService =
            expenseTrackingService ?? ExpenseTrackingService(),
        _expenseRepository = expenseRepository ?? ExpenseRepository() {
-    initialize();
   }
 
   ActivityUiState _uiState = const ActivityUiState();
@@ -580,7 +579,9 @@ class ActivityViewModel extends ChangeNotifier {
   Future<void> loadTripItinerary(String tripId, {DateTime? filterDate}) async {
 
     final now = DateTime.now();
-    final targetDate = filterDate ?? DateTime(now.year, now.month, now.day);
+    final targetDate = filterDate != null
+        ? DateTime(filterDate.year, filterDate.month, filterDate.day)
+        : DateTime(now.year, now.month, now.day);
     _uiState = _uiState.copyWith(
       isLoading: true,
       tripId: tripId,
@@ -620,9 +621,13 @@ class ActivityViewModel extends ChangeNotifier {
         initialSufficientDays = await _budgetService.calculateSufficientDays(tripId, allActivities.first.activitiesId);
       }
 
+      final currentDateActivities = allActivities.where((act) {
+        return _isSameDate(act.date, targetDate);
+      }).toList();
+
       _uiState = _uiState.copyWith(
         isLoading: false,
-        activities: allActivities,
+        activities: currentDateActivities,
         totalBudget: tripResult?.trip.totalBudget ?? _uiState.totalBudget,
         spentBudget: totalSpent,
         overspentBudget: totalOverspend,
@@ -638,6 +643,13 @@ class ActivityViewModel extends ChangeNotifier {
       );
     }
     notifyListeners();
+  }
+
+  List<Activity> get currentFilteredActivities {
+    final filterDate = _uiState.filterDate ?? DateTime.now();
+    return _uiState.activities.where((act) {
+      return _isSameDate(act.date, filterDate);
+    }).toList();
   }
 
   /// Requests notification and exact-alarm permission, then prepares the
@@ -1049,88 +1061,61 @@ class ActivityViewModel extends ChangeNotifier {
   }
 
   Future<bool> generateBudgetRecoveryPlan({
-    String? dayTripId,
-    double? availableBudget,
+    required String? dayTripId,
+    required double availableBudget,
+    double topUpAmount = 0.0,
   }) async {
-    final tripId = _uiState.tripId;
-    if (tripId.isEmpty) {
-      _uiState = _uiState.copyWith(
-        errorMessage: 'Cannot generate recovery plan without an active trip.',
-      );
-      notifyListeners();
-      return false;
-    }
+    if (dayTripId == null) return false;
 
-    _uiState = _uiState.copyWith(
-      isLoading: true,
-      errorMessage: '',
-      popupAction: '',
-    );
+    _uiState = _uiState.copyWith(isLoading: true, errorMessage: '');
     notifyListeners();
 
     try {
-      // 1. Filter remaining activities for today and future days
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-      final remainingActivities = _uiState.activities.where((act) {
-        final actDate = DateTime(act.date.year, act.date.month, act.date.day);
-        return actDate.isAtSameMomentAs(today) || actDate.isAfter(today);
+      // 1. Extract remaining activities that require optimization
+      final remainingActivities = _uiState.activities
+          .where((a) => a.dayTripId == dayTripId && a.status != 'completed')
+          .toList();
+
+      if (remainingActivities.isEmpty) {
+        _uiState = _uiState.copyWith(
+          isLoading: false,
+          errorMessage: 'No remaining activities to optimize.',
+        );
+        notifyListeners();
+        return false;
+      }
+
+      // 2. Delegate generation and Supabase updates completely to Service
+      final revisedActivities =
+      await _itineraryService.generateBudgetRecoveryItinerary(
+        tripId: _uiState.tripId ?? '',
+        newTotalBudget: _uiState.totalBudget,
+        currentSpentBudget: _uiState.spentBudget,
+        topUpAmount: topUpAmount,
+        remainingActivities: remainingActivities,
+        tripDestination: _uiState.tripDestination,
+        currentDate: DateTime.now(),
+      );
+
+      // 3. Merge returned domain activities into the state
+      final revisedMap = {
+        for (final item in revisedActivities) item.activitiesId: item,
+      };
+
+      final updatedActivities = _uiState.activities.map((a) {
+        return revisedMap[a.activitiesId] ?? a;
       }).toList();
 
-      // 2. Call itinerary service to generate budget recovery plan
-      final recoveryActivities =
-      await _itineraryService.generateBudgetRecoveryItinerary(
-        tripId: tripId,
-        newTotalBudget: availableBudget ?? _uiState.totalBudget,
-        currentSpentBudget: _uiState.spentBudget,
-        topUpAmount: _uiState.exceededAmount ?? 0.0,
-        remainingActivities: remainingActivities,
-        tripDestination: _uiState.selectedActivity?.destination ?? '',
-        currentDate: _uiState.filterDate ?? today,
-      );
-
-      // 3. Recalculate trip status & budget indicators
-      final allActivities =
-      await _itineraryService.fetchAllActivitiesByTrip(tripId);
-      final days = await _itineraryService.getDaysByTripId(tripId);
-
-      double totalOverspend = 0.0;
-      for (final day in days) {
-        totalOverspend += (day.overspendAmount ?? 0.0);
-      }
-
-      int recalculatedSufficientDays = 0;
-      final activeList =
-      allActivities.isNotEmpty ? allActivities : recoveryActivities;
-      if (activeList.isNotEmpty) {
-        recalculatedSufficientDays = await _budgetService.calculateSufficientDays(
-          tripId,
-          activeList.first.activitiesId,
-        );
-      }
-
-      // 4. Update ActivityUiState using only its valid fields
       _uiState = _uiState.copyWith(
         isLoading: false,
-        activities: activeList,
-        totalBudget: availableBudget ?? _uiState.totalBudget,
-        overspentBudget: totalOverspend,
-        shortageAmount: 0.0,
-        sufficientDays: recalculatedSufficientDays,
-        popupAction: '',
-        errorMessage: '',
+        activities: updatedActivities,
       );
-
-      // 5. Reschedule local reminders for newly adjusted activities
-      unawaited(_prepareExpenseReminders(_uiState.activities));
-
       notifyListeners();
       return true;
     } catch (e) {
-      debugPrint('Error in generateBudgetRecoveryPlan: $e');
       _uiState = _uiState.copyWith(
         isLoading: false,
-        errorMessage: 'Failed to generate recovery plan: ${_readableError(e)}',
+        errorMessage: e.toString(),
       );
       notifyListeners();
       return false;

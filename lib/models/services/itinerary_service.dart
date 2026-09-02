@@ -462,7 +462,7 @@ class ItineraryService implements IItineraryService {
   @override
   Future<({WholeTrip trip, List<Activity> activities})?>
   fetchLatestTrip() async {
-    final latestTrip = await _itineraryRepository.getLatestTrip();
+    final latestTrip = await _itineraryRepository.fetchLatestTrip();
     if (latestTrip == null || latestTrip.tripId == null) {
       return null;
     }
@@ -560,7 +560,7 @@ class ItineraryService implements IItineraryService {
     required String tripDestination,
     DateTime? currentDate,
   }) async {
-    // 1. Map existing activities and create a lookup map for fallback metadata (e.g., dayTripId)
+    // 1. Create lookup map for preserving IDs and metadata
     final Map<String, Activity> activityLookup = {
       for (final act in remainingActivities) act.activitiesId: act,
     };
@@ -568,40 +568,38 @@ class ItineraryService implements IItineraryService {
     final rawActivitiesPayload = remainingActivities
         .map(
           (act) => {
-            'activitiesId': act.activitiesId,
-            'dayTripId': act.dayTripId,
-            'destination': act.destination,
-            'description': act.description,
-            'date': act.date.toIso8601String(),
-            'startTime': act.startTime,
-            'endTime': act.endTime,
-            'allocatedBudget': act.allocatedBudget,
-            'activityCategory': act.activityCategory,
-          },
-        )
+        'activitiesId': act.activitiesId,
+        'dayTripId': act.dayTripId,
+        'destination': act.destination,
+        'description': act.description,
+        'date': act.date.toIso8601String(),
+        'startTime': act.startTime,
+        'endTime': act.endTime,
+        'allocatedBudget': act.allocatedBudget,
+        'activityCategory': act.activityCategory,
+      },
+    )
         .toList();
 
-    // 2. Call Gemini API
+    // 2. Call Gemini API endpoint
     final List<Map<String, dynamic>> rawResponseList =
-        await GeminiApiConfig.generateRecoveryItinerary(
-          newTotalBudget: newTotalBudget,
-          currentSpentBudget: currentSpentBudget,
-          topUpAmount: topUpAmount,
-          remainingActivities: rawActivitiesPayload,
-          tripDestination: tripDestination,
-          currentDate: currentDate,
-        );
+    await GeminiApiConfig.generateRecoveryItinerary(
+      newTotalBudget: newTotalBudget,
+      currentSpentBudget: currentSpentBudget,
+      topUpAmount: topUpAmount,
+      remainingActivities: rawActivitiesPayload,
+      tripDestination: tripDestination,
+      currentDate: currentDate,
+    );
 
-    // Default fallback dayTripId if replacing/creating items
     final defaultDayTripId = remainingActivities.isNotEmpty
         ? remainingActivities.first.dayTripId
         : '';
 
-    // 3. Convert JSON response back to domain Activity entities
+    // 3. Map returned JSON array back to domain entities
     final revisedActivities = rawResponseList.map((item) {
       final actId = item['activitiesId']?.toString() ?? '';
       final originalActivity = activityLookup[actId];
-
       final allocatedBudget =
           (item['allocatedBudget'] as num?)?.toDouble() ?? 0.0;
 
@@ -609,8 +607,7 @@ class ItineraryService implements IItineraryService {
         activitiesId: actId.isNotEmpty
             ? actId
             : IdGenerator.generateNextFormattedId('AC', null),
-        dayTripId:
-            item['dayTripId']?.toString() ??
+        dayTripId: item['dayTripId']?.toString() ??
             originalActivity?.dayTripId ??
             defaultDayTripId,
         destination: item['destination']?.toString() ?? '',
@@ -620,7 +617,7 @@ class ItineraryService implements IItineraryService {
             : (originalActivity?.activityImgUrl ?? 'assets/logo.png'),
         date: item['date'] != null
             ? DateTime.tryParse(item['date'].toString()) ??
-                  (originalActivity?.date ?? DateTime.now())
+            (originalActivity?.date ?? DateTime.now())
             : (originalActivity?.date ?? DateTime.now()),
         allocatedBudget: allocatedBudget,
         overspendAmount: allocatedBudget > 0 ? 0 : null,
@@ -628,12 +625,19 @@ class ItineraryService implements IItineraryService {
         startTime: item['startTime']?.toString() ?? '09:00',
         endTime: item['endTime']?.toString() ?? '10:00',
         duration: item['duration']?.toString() ?? '60 min',
-        activityCategory:
-            item['activityCategory']?.toString() ??
+        activityCategory: item['activityCategory']?.toString() ??
             (originalActivity?.activityCategory ?? 'General'),
         isOverspend: false,
       );
     }).toList();
+
+    // 4. Update the database through the repository
+    if (revisedActivities.isNotEmpty) {
+      await _itineraryRepository.replaceTripActivities(
+        tripId: tripId,
+        newActivities: revisedActivities,
+      );
+    }
 
     return revisedActivities;
   }
