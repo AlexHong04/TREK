@@ -58,6 +58,8 @@ class TripSummaryViewModel extends ChangeNotifier {
           endDate: summary.trip.endDate,
           allocatedBudget: budget,
           allocatedBudgetText: _formatMoney(budget),
+          topUpBudget: summary.totalTopUpBudget,
+          topUpBudgetText: _formatMoney(summary.totalTopUpBudget),
           totalExpense: expense,
           totalExpenseText: _formatMoney(expense),
           remainingBudget: budget - expense,

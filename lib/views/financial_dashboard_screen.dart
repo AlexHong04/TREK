@@ -5,7 +5,9 @@ import 'package:intl/intl.dart' as intl;
 import 'package:provider/provider.dart';
 
 import '../theme/app_theme.dart';
+import '../models/services/i_auth_service.dart';
 import '../view_models/presentation_logic/financial_dashboard_view_model.dart';
+import 'profile_screen.dart';
 import 'trip_summary_screen.dart';
 
 class FinancialDashboardScreen extends StatelessWidget {
@@ -15,7 +17,9 @@ class FinancialDashboardScreen extends StatelessWidget {
 
   static Widget builder(BuildContext context, {VoidCallback? onHomeSelected}) {
     return ChangeNotifierProvider<FinancialDashboardViewModel>(
-      create: (_) => FinancialDashboardViewModel()..loadCurrentDay(),
+      create: (providerContext) => FinancialDashboardViewModel(
+        authService: providerContext.read<IAuthService>(),
+      )..loadCurrentDay(),
       child: FinancialDashboardScreen(onHomeSelected: onHomeSelected),
     );
   }
@@ -30,7 +34,7 @@ class FinancialDashboardScreen extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
-            _buildTopBar(),
+            _buildTopBar(context, viewModel),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(18, 22, 18, 30),
@@ -58,8 +62,6 @@ class FinancialDashboardScreen extends StatelessWidget {
                         viewModel,
                         uiState.errorMessage!,
                       )
-                    else if (!uiState.hasCurrentTrip)
-                      _buildEmptyState()
                     else ...[
                       _buildSummaryCard(uiState),
                       const SizedBox(height: 18),
@@ -81,7 +83,27 @@ class FinancialDashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTopBar() {
+  Widget _buildTopBar(
+    BuildContext context,
+    FinancialDashboardViewModel viewModel,
+  ) {
+    final profilePictureUrl = viewModel.uiState.profilePictureUrl;
+    final trimmedName = viewModel.uiState.profileName.trim();
+    final initial = trimmedName.isEmpty ? 'T' : trimmedName[0].toUpperCase();
+
+    Widget initialAvatar() {
+      return Center(
+        child: Text(
+          initial,
+          style: TextStyle(
+            color: appTheme.teal_800,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Row(
@@ -112,19 +134,50 @@ class FinancialDashboardScreen extends StatelessWidget {
               ),
             ],
           ),
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: appTheme.gray_200,
-              border: Border.all(color: appTheme.gray_100),
+          Semantics(
+            button: true,
+            label: 'Open profile',
+            child: Material(
+              color: appTheme.teal_50,
+              shape: CircleBorder(
+                side: BorderSide(color: appTheme.gray_100, width: 1),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: () => _openProfile(context, viewModel),
+                child: SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: profilePictureUrl?.isNotEmpty == true
+                      ? Image.network(
+                          profilePictureUrl!,
+                          fit: BoxFit.cover,
+                          loadingBuilder: (_, child, loadingProgress) =>
+                              loadingProgress == null ? child : initialAvatar(),
+                          errorBuilder: (_, _, _) => initialAvatar(),
+                        )
+                      : initialAvatar(),
+                ),
+              ),
             ),
-            child: Icon(Icons.person, color: appTheme.blue_gray_300, size: 24),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _openProfile(
+    BuildContext context,
+    FinancialDashboardViewModel viewModel,
+  ) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (routeContext) => ProfileScreen.builder(routeContext),
+      ),
+    );
+    if (context.mounted) {
+      await viewModel.refreshProfile();
+    }
   }
 
   Widget _buildPageIndicator(BuildContext context) {
@@ -175,6 +228,17 @@ class FinancialDashboardScreen extends StatelessWidget {
             color: appTheme.white_A700.withValues(alpha: 0.33),
             height: 1,
           ),
+          if (uiState.topUpBudget > 0) ...[
+            _SummaryRow(
+              icon: Icons.add_card_outlined,
+              label: 'Top-up Budget',
+              amount: uiState.topUpBudget,
+            ),
+            Divider(
+              color: appTheme.white_A700.withValues(alpha: 0.33),
+              height: 1,
+            ),
+          ],
           _SummaryRow(
             icon: Icons.south_west,
             label: 'Total Expense',
@@ -496,10 +560,6 @@ class FinancialDashboardScreen extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  Widget _buildEmptyState() {
-    return const Center(child: Text('No trip or expenses found for today.'));
   }
 
   void _handleDonutTap(
@@ -1132,7 +1192,7 @@ class _BreakdownRow extends StatelessWidget {
           children: [
             _MoneyCell(
               amount: category.budget,
-              percentage: 100,
+              percentage: category.budget == 0 ? 0 : 100,
               color: appTheme.gray_400,
             ),
             _MoneyCell(

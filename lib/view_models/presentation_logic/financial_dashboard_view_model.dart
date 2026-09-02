@@ -6,24 +6,55 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../models/services/financial_dashboard_service.dart';
+import '../../models/services/i_auth_service.dart';
 import '../../theme/app_theme.dart';
 import '../ui_state/financial_dashboard_ui_state.dart';
 export '../ui_state/financial_dashboard_ui_state.dart';
 
 class FinancialDashboardViewModel extends ChangeNotifier {
   final IFinancialDashboardService _service;
+  final IAuthService? _authService;
 
   FinancialDashboardUiState _uiState = FinancialDashboardUiState(
     selectedDate: DateTime.now(),
     displayedCalendarMonth: DateTime(DateTime.now().year, DateTime.now().month),
   );
 
-  FinancialDashboardViewModel({IFinancialDashboardService? service})
-    : _service = service ?? FinancialDashboardService();
+  FinancialDashboardViewModel({
+    IFinancialDashboardService? service,
+    IAuthService? authService,
+  }) : _service = service ?? FinancialDashboardService(),
+       _authService = authService {
+    _authService?.addListener(_handleAuthUserChanged);
+    _syncAuthUser(notify: false);
+  }
 
   FinancialDashboardUiState get uiState => _uiState;
 
+  void _handleAuthUserChanged() => _syncAuthUser();
+
+  void _syncAuthUser({bool notify = true}) {
+    final user = _authService?.currentUser;
+    final pictureUrl = user?.profilePicture?.trim();
+    _uiState = _uiState.copyWith(
+      profileName: user?.fullName ?? '',
+      profilePictureUrl: pictureUrl,
+      clearProfilePictureUrl: pictureUrl == null || pictureUrl.isEmpty,
+    );
+    if (notify) notifyListeners();
+  }
+
+  Future<void> refreshProfile() async {
+    await _authService?.refreshCurrentUser();
+  }
+
   Future<void> loadCurrentDay() => loadDate(DateTime.now());
+
+  @override
+  void dispose() {
+    _authService?.removeListener(_handleAuthUserChanged);
+    super.dispose();
+  }
 
   Future<void> loadDate(DateTime date) async {
     _uiState = _uiState.copyWith(
@@ -43,7 +74,8 @@ class FinancialDashboardViewModel extends ChangeNotifier {
           tripId: '',
           userId: '',
           destination: '',
-          categories: const [],
+          topUpBudget: 0,
+          categories: FinancialDashboardUiState.defaultCategories,
         );
       } else {
         _uiState = _uiState.copyWith(
@@ -52,6 +84,7 @@ class FinancialDashboardViewModel extends ChangeNotifier {
           tripId: summary.trip.tripId ?? '',
           userId: summary.trip.userId ?? '',
           destination: summary.trip.destination,
+          topUpBudget: summary.dayTrip.topUpBudget ?? 0,
           categories: summary.categories
               .map(
                 (category) => DashboardCategoryUiState(
@@ -92,14 +125,6 @@ class FinancialDashboardViewModel extends ChangeNotifier {
   }
 
   Future<void> loadAvailableDates() async {
-    if (_uiState.userId.isEmpty) {
-      _uiState = _uiState.copyWith(
-        availableDatesErrorMessage: 'No user trip data is available.',
-      );
-      notifyListeners();
-      return;
-    }
-
     _uiState = _uiState.copyWith(
       isLoadingAvailableDates: true,
       displayedCalendarMonth: DateTime(
@@ -111,7 +136,7 @@ class FinancialDashboardViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final dates = await _service.getAvailableDates(_uiState.userId);
+      final dates = await _service.getAvailableDates();
       _uiState = _uiState.copyWith(
         isLoadingAvailableDates: false,
         availableDates: dates,
@@ -152,14 +177,6 @@ class FinancialDashboardViewModel extends ChangeNotifier {
   }
 
   Future<void> loadCompletedTrips() async {
-    if (_uiState.userId.isEmpty) {
-      _uiState = _uiState.copyWith(
-        completedTripsErrorMessage: 'No user trip data is available.',
-      );
-      notifyListeners();
-      return;
-    }
-
     _uiState = _uiState.copyWith(
       isLoadingCompletedTrips: true,
       clearCompletedTripsError: true,
@@ -167,7 +184,7 @@ class FinancialDashboardViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final trips = await _service.getCompletedTrips(_uiState.userId);
+      final trips = await _service.getCompletedTrips();
       _uiState = _uiState.copyWith(
         isLoadingCompletedTrips: false,
         completedTrips: trips

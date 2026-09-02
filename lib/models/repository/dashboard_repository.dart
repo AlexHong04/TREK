@@ -28,9 +28,9 @@ abstract class IDashboardRepository {
 
   Future<List<Expense>> getExpenses(List<String> activityIds);
 
-  Future<List<DateTime>> getAvailableDates(String userId);
+  Future<List<DateTime>> getAvailableDates();
 
-  Future<List<WholeTrip>> getTripsForUser(String userId);
+  Future<List<WholeTrip>> getTripsForCurrentUser();
 
   Future<String> requestGeminiCostSavingTips({
     required String destination,
@@ -54,38 +54,28 @@ abstract class IDashboardRepository {
 
 class DashboardRepository implements IDashboardRepository {
   static const _futureSuggestionsTable = 'future_suggestions';
+  static const _futureSuggestionIdPrefix = 'FS';
   static const _databaseTimeout = Duration(seconds: 10);
   static const _geminiTimeout = Duration(seconds: 30);
 
   @override
   Future<WholeTrip?> getCurrentTrip(DateTime date) async {
     final dateText = _dateOnly(date);
-    final userId = SupabaseConfig.client.auth.currentUser?.id;
 
     try {
-      final Map<String, dynamic>? response;
-      if (userId == null) {
-        response = await SupabaseConfig.client
-            .from('whole_trips')
-            .select()
-            .lte('start_date', dateText)
-            .gte('end_date', dateText)
-            .order('created_at', ascending: false)
-            .limit(1)
-            .maybeSingle()
-            .timeout(_databaseTimeout);
-      } else {
-        response = await SupabaseConfig.client
-            .from('whole_trips')
-            .select()
-            .eq('user_id', userId)
-            .lte('start_date', dateText)
-            .gte('end_date', dateText)
-            .order('created_at', ascending: false)
-            .limit(1)
-            .maybeSingle()
-            .timeout(_databaseTimeout);
-      }
+      final userId = await _getCurrentAppUserId();
+      if (userId == null) return null;
+
+      final response = await SupabaseConfig.client
+          .from('whole_trips')
+          .select()
+          .eq('user_id', userId)
+          .lte('start_date', dateText)
+          .gte('end_date', dateText)
+          .order('created_at', ascending: false)
+          .limit(1)
+          .maybeSingle()
+          .timeout(_databaseTimeout);
 
       return response == null ? null : WholeTrip.fromJson(response);
     } on TimeoutException {
@@ -221,8 +211,11 @@ class DashboardRepository implements IDashboardRepository {
   }
 
   @override
-  Future<List<DateTime>> getAvailableDates(String userId) async {
+  Future<List<DateTime>> getAvailableDates() async {
     try {
+      final userId = await _getCurrentAppUserId();
+      if (userId == null) return const [];
+
       final tripRows = await SupabaseConfig.client
           .from('whole_trips')
           .select('trip_id')
@@ -258,8 +251,11 @@ class DashboardRepository implements IDashboardRepository {
   }
 
   @override
-  Future<List<WholeTrip>> getTripsForUser(String userId) async {
+  Future<List<WholeTrip>> getTripsForCurrentUser() async {
     try {
+      final userId = await _getCurrentAppUserId();
+      if (userId == null) return const [];
+
       final response = await SupabaseConfig.client
           .from('whole_trips')
           .select()
@@ -375,6 +371,7 @@ class DashboardRepository implements IDashboardRepository {
       final latestRow = await SupabaseConfig.client
           .from(_futureSuggestionsTable)
           .select('suggestion_id')
+          .like('suggestion_id', '$_futureSuggestionIdPrefix%')
           .order('suggestion_id', ascending: false)
           .limit(1)
           .maybeSingle()
@@ -388,9 +385,13 @@ class DashboardRepository implements IDashboardRepository {
             existingByCategory[suggestion.activityCategory
                 .trim()
                 .toLowerCase()];
-        final suggestionId =
-            existing?.suggestionId ??
-            (latestId = IdGenerator.generateNextFormattedId('FS', latestId));
+        final existingId = existing?.suggestionId?.trim();
+        final suggestionId = existingId != null && existingId.isNotEmpty
+            ? existingId
+            : (latestId = IdGenerator.generateNextFormattedId(
+                _futureSuggestionIdPrefix,
+                latestId,
+              ));
         rows.add(
           suggestion
               .copyWith(suggestionId: suggestionId, createdAt: now)
@@ -413,5 +414,20 @@ class DashboardRepository implements IDashboardRepository {
     final month = date.month.toString().padLeft(2, '0');
     final day = date.day.toString().padLeft(2, '0');
     return '${date.year}-$month-$day';
+  }
+
+  Future<String?> _getCurrentAppUserId() async {
+    final authId = SupabaseConfig.client.auth.currentUser?.id;
+    if (authId == null) return null;
+
+    final response = await SupabaseConfig.client
+        .from('user')
+        .select('user_id')
+        .eq('auth_id', authId)
+        .limit(1)
+        .maybeSingle()
+        .timeout(_databaseTimeout);
+    final userId = response?['user_id']?.toString().trim();
+    return userId == null || userId.isEmpty ? null : userId;
   }
 }

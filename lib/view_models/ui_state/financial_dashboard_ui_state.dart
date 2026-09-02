@@ -54,6 +54,12 @@ class DashboardTripUiState {
 }
 
 class FinancialDashboardUiState {
+  static const defaultCategories = <DashboardCategoryUiState>[
+    DashboardCategoryUiState(name: 'Restaurant', budget: 0, expense: 0),
+    DashboardCategoryUiState(name: 'Transport', budget: 0, expense: 0),
+    DashboardCategoryUiState(name: 'Attraction', budget: 0, expense: 0),
+  ];
+
   final bool isLoading;
   final bool isLoadingAvailableDates;
   final bool isLoadingCompletedTrips;
@@ -66,6 +72,9 @@ class FinancialDashboardUiState {
   final String tripId;
   final String userId;
   final String destination;
+  final double topUpBudget;
+  final String profileName;
+  final String? profilePictureUrl;
   final List<DateTime> availableDates;
   final List<DashboardTripUiState> completedTrips;
   final List<DashboardCategoryUiState> categories;
@@ -83,9 +92,12 @@ class FinancialDashboardUiState {
     this.tripId = '',
     this.userId = '',
     this.destination = '',
+    this.topUpBudget = 0,
+    this.profileName = '',
+    this.profilePictureUrl,
     this.availableDates = const [],
     this.completedTrips = const [],
-    this.categories = const [],
+    this.categories = defaultCategories,
   });
 
   double get totalAllocatedBudget =>
@@ -94,7 +106,8 @@ class FinancialDashboardUiState {
   double get totalExpense =>
       categories.fold(0, (sum, category) => sum + category.expense);
 
-  double get remainingBudget => totalAllocatedBudget - totalExpense;
+  double get remainingBudget =>
+      totalAllocatedBudget + topUpBudget - totalExpense;
 
   FinancialDashboardUiState copyWith({
     bool? isLoading,
@@ -112,6 +125,10 @@ class FinancialDashboardUiState {
     String? tripId,
     String? userId,
     String? destination,
+    double? topUpBudget,
+    String? profileName,
+    String? profilePictureUrl,
+    bool clearProfilePictureUrl = false,
     List<DateTime>? availableDates,
     List<DashboardTripUiState>? completedTrips,
     List<DashboardCategoryUiState>? categories,
@@ -136,6 +153,11 @@ class FinancialDashboardUiState {
       tripId: tripId ?? this.tripId,
       userId: userId ?? this.userId,
       destination: destination ?? this.destination,
+      topUpBudget: topUpBudget ?? this.topUpBudget,
+      profileName: profileName ?? this.profileName,
+      profilePictureUrl: clearProfilePictureUrl
+          ? null
+          : (profilePictureUrl ?? this.profilePictureUrl),
       availableDates: availableDates ?? this.availableDates,
       completedTrips: completedTrips ?? this.completedTrips,
       categories: categories ?? this.categories,

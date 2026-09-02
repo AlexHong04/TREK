@@ -31,7 +31,7 @@ class DayTrip {
     String? overspendCategory,
     DateTime? createdAt,
     double? topUpBudget,
-}) {
+  }) {
     return DayTrip(
       dayTripId: dayTripId ?? this.dayTripId,
       tripId: tripId ?? this.tripId,

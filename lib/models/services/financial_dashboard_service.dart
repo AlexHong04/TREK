@@ -58,11 +58,13 @@ class TripCategorySummary {
 class WholeTripFinancialSummary {
   final WholeTrip trip;
   final double totalExpense;
+  final double totalTopUpBudget;
   final List<TripCategorySummary> categories;
 
   const WholeTripFinancialSummary({
     required this.trip,
     required this.totalExpense,
+    required this.totalTopUpBudget,
     required this.categories,
   });
 }
@@ -128,9 +130,9 @@ abstract class IFinancialDashboardService {
     required Map<String, double> percentages,
   });
 
-  Future<List<DateTime>> getAvailableDates(String userId);
+  Future<List<DateTime>> getAvailableDates();
 
-  Future<List<WholeTrip>> getCompletedTrips(String userId);
+  Future<List<WholeTrip>> getCompletedTrips();
 }
 
 class FinancialDashboardService implements IFinancialDashboardService {
@@ -265,6 +267,10 @@ class FinancialDashboardService implements IFinancialDashboardService {
       totalExpense: expenses.fold(
         0,
         (total, expense) => total + expense.totalAmount,
+      ),
+      totalTopUpBudget: dayTrips.fold(
+        0,
+        (total, dayTrip) => total + (dayTrip.topUpBudget ?? 0),
       ),
       categories: _tripSummaryCategories
           .map(
@@ -465,8 +471,8 @@ class FinancialDashboardService implements IFinancialDashboardService {
   }
 
   @override
-  Future<List<DateTime>> getAvailableDates(String userId) async {
-    final dates = await _repository.getAvailableDates(userId);
+  Future<List<DateTime>> getAvailableDates() async {
+    final dates = await _repository.getAvailableDates();
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
@@ -477,8 +483,8 @@ class FinancialDashboardService implements IFinancialDashboardService {
   }
 
   @override
-  Future<List<WholeTrip>> getCompletedTrips(String userId) async {
-    final trips = await _repository.getTripsForUser(userId);
+  Future<List<WholeTrip>> getCompletedTrips() async {
+    final trips = await _repository.getTripsForCurrentUser();
     return trips.where((trip) {
       return trip.status.toLowerCase() != 'terminated' &&
           trip.computedStatus == 'completed';

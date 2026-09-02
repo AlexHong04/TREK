@@ -6,7 +6,6 @@ import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart
 import '../entities/activity.dart';
 import '../entities/expense.dart';
 import '../entities/expense_item.dart';
-import '../entities/whole_trip.dart';
 import '../repository/expense_repository.dart';
 import '../repository/i_expense_repository.dart';
 import '../repository/itinerary_repository.dart';
@@ -225,9 +224,7 @@ class ExpenseTrackingService implements IExpenseTrackingService {
   /// returned by OCR as separate lines.
   List<String> extractReceiptItemLines(String receiptText) {
     return _extractReceiptItems(receiptText)
-        .map(
-          (item) => '${item.name} RM${item.unitPrice.toStringAsFixed(2)}',
-        )
+        .map((item) => '${item.name} RM${item.unitPrice.toStringAsFixed(2)}')
         .toList();
   }
 
@@ -275,9 +272,11 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     // "Amount" values. Pair the quantity/name rows with their unit prices.
     if (descriptionHeaderIndex >= 0 && unitPriceHeaderIndex >= 0) {
       final descriptionRows = <_ExtractedReceiptItem>[];
-      for (var index = descriptionHeaderIndex + 1;
-          index < lines.length;
-          index++) {
+      for (
+        var index = descriptionHeaderIndex + 1;
+        index < lines.length;
+        index++
+      ) {
         final line = lines[index];
         final normalizedLine = line.toLowerCase().trim();
         if (normalizedLine == 'notes' ||
@@ -302,9 +301,11 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       final unitPriceEnd = amountHeaderIndex > unitPriceHeaderIndex
           ? amountHeaderIndex
           : lines.length;
-      for (var index = unitPriceHeaderIndex + 1;
-          index < unitPriceEnd;
-          index++) {
+      for (
+        var index = unitPriceHeaderIndex + 1;
+        index < unitPriceEnd;
+        index++
+      ) {
         final amounts = _amountsFromLine(lines[index]);
         if (amounts.isNotEmpty) {
           unitPrices.add(amounts.first);
@@ -329,12 +330,10 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     final itemHeaderIndex = lines.indexWhere(
       (line) => line.toLowerCase().trim() == 'item',
     );
-    final quantityHeaderIndex = lines.indexWhere(
-      (line) {
-        final normalizedLine = line.toLowerCase().trim();
-        return normalizedLine == 'qty' || normalizedLine == 'quantity';
-      },
-    );
+    final quantityHeaderIndex = lines.indexWhere((line) {
+      final normalizedLine = line.toLowerCase().trim();
+      return normalizedLine == 'qty' || normalizedLine == 'quantity';
+    });
     final priceHeaderIndex = lines.indexWhere(
       (line) => line.toLowerCase().trim() == 'price',
     );
@@ -355,14 +354,14 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       final quantitySectionEnd = priceHeaderIndex > quantityHeaderIndex
           ? priceHeaderIndex
           : quantityHeaderIndex;
-      final quantities = quantityHeaderIndex >= 0 &&
-              priceHeaderIndex > quantityHeaderIndex
+      final quantities =
+          quantityHeaderIndex >= 0 && priceHeaderIndex > quantityHeaderIndex
           ? lines
-              .sublist(quantityHeaderIndex + 1, quantitySectionEnd)
-              .map((line) => int.tryParse(line.trim()))
-              .whereType<int>()
-              .where((quantity) => quantity > 0)
-              .toList()
+                .sublist(quantityHeaderIndex + 1, quantitySectionEnd)
+                .map((line) => int.tryParse(line.trim()))
+                .whereType<int>()
+                .where((quantity) => quantity > 0)
+                .toList()
           : const <int>[];
       final prices = <double>[];
       for (final priceLine in lines.skip(priceHeaderIndex + 1)) {
@@ -440,7 +439,11 @@ class ExpenseTrackingService implements IExpenseTrackingService {
         final itemName = line.replaceFirst(_amountPattern, '').trim();
         if (itemName.isNotEmpty) {
           itemLines.add(
-            _ExtractedReceiptItem(name: itemName, quantity: 1, unitPrice: amount),
+            _ExtractedReceiptItem(
+              name: itemName,
+              quantity: 1,
+              unitPrice: amount,
+            ),
           );
         }
         continue;
@@ -618,12 +621,11 @@ class ExpenseTrackingService implements IExpenseTrackingService {
   }
 
   Future<List<Activity>> getRemainingActivities(
-      String tripId,
-      DateTime currentDateTime,
-      ) async {
+    String tripId,
+    DateTime currentDateTime,
+  ) async {
     try {
-      final activities =
-      await _itineraryRepository.fetchAllActivitiesByTrip(
+      final activities = await _itineraryRepository.fetchAllActivitiesByTrip(
         tripId,
       );
 
@@ -635,8 +637,7 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       });
 
       return activities.where((activity) {
-        final activityStart =
-        _getActivityStartDateTime(activity);
+        final activityStart = _getActivityStartDateTime(activity);
 
         return activityStart.isAfter(currentDateTime);
       }).toList();
@@ -654,13 +655,7 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     final hour = int.parse(timeParts![0]);
     final minute = int.parse(timeParts[1]);
 
-    return DateTime(
-      date.year,
-      date.month,
-      date.day,
-      hour,
-      minute,
-    );
+    return DateTime(date.year, date.month, date.day, hour, minute);
   }
 
   // zhiqin
@@ -724,6 +719,10 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     // Calculate overspent amount
     final double overspentAmount =
         totalActivityExpense - currentActivity.allocatedBudget;
+    final double previousActivityOverspend =
+        currentActivity.overspendAmount ?? 0.0;
+    final double overspendIncrease =
+        overspentAmount - previousActivityOverspend;
 
     debugPrint("Overspent amount: $overspentAmount");
 
@@ -749,7 +748,9 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     }
 
     final updatedDay = currentDay.copyWith(
-      overspendAmount: (currentDay.overspendAmount ?? 0.00) + overspentAmount,
+      overspendAmount: ((currentDay.overspendAmount ?? 0.0) + overspendIncrease)
+          .clamp(0.0, double.infinity)
+          .toDouble(),
       overspendCategory: existingCategories.join(', '),
       isOverspend: true,
     );
@@ -861,11 +862,10 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     double overspentAmount,
   ) async {
     // final double allocatedBudget = currentActivity.allocatedBudget;
-    final double allocatedBudget =
-    currentActivity.allocatedBudget <= 0
+    final double allocatedBudget = currentActivity.allocatedBudget <= 0
         ? 10.0
         : currentActivity.allocatedBudget;
-    
+
     double overspendThresholdPercentage;
 
     if (allocatedBudget <= 100.0) {
@@ -887,7 +887,9 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     String tripId,
     String currentActivityId,
   ) async {
-    final activity = await _itineraryRepository.getCurrentActivity(currentActivityId);
+    final activity = await _itineraryRepository.getCurrentActivity(
+      currentActivityId,
+    );
     final expenses = await _expenseRepository.getExpensesByActivityId(
       currentActivityId,
     );

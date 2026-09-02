@@ -672,6 +672,14 @@ class _BudgetMetricsCard extends StatelessWidget {
             ],
           ),
           Divider(color: appTheme.gray_200, height: 1),
+          if (uiState.topUpBudget > 0) ...[
+            _BudgetMetric(
+              amount: uiState.topUpBudgetText,
+              label: 'Total Top-up Budget',
+              amountColor: appTheme.teal_A700,
+            ),
+            Divider(color: appTheme.gray_200, height: 1),
+          ],
           _BudgetMetric(
             amount: uiState.remainingBudgetText,
             label: 'Remain',

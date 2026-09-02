@@ -83,8 +83,8 @@ class Activity {
       endTime: json['end_time'],
       duration: json['duration'],
       activityCategory: json['activity_category'],
-      isOverspend: null,
-      overspendAmount: null,
+      isOverspend: json['is_overspend'] as bool?,
+      overspendAmount: (json['overspend_amount'] as num?)?.toDouble(),
       dayTripId: json['day_trip_id'],
       minAllocatedBudget: json['min_allocated_budget'] != null
           ? (json['min_allocated_budget'] as num).toDouble()
@@ -107,6 +107,8 @@ class Activity {
       'end_time': endTime,
       'duration': duration,
       'activity_category': activityCategory,
+      if (isOverspend != null) 'is_overspend': isOverspend,
+      if (overspendAmount != null) 'overspend_amount': overspendAmount,
       'day_trip_id': dayTripId,
       'min_allocated_budget': minAllocatedBudget,
     };
