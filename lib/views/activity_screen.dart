@@ -42,6 +42,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
       if (args is Map<String, dynamic>) {
         if (args['filterDate'] is DateTime) {
           _filterDate = args['filterDate'] as DateTime;
+        } else {
+          final now = DateTime.now();
+          _filterDate = DateTime(now.year, now.month, now.day);
         }
 
         if (args['trip'] != null) {
@@ -80,6 +83,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
         } catch (_) {
           extractedTripId = null;
         }
+      } else {
+        final now = DateTime.now();
+        _filterDate = DateTime(now.year, now.month, now.day);
       }
 
       if (extractedTripId != null && extractedTripId.isNotEmpty) {
@@ -268,22 +274,81 @@ class _ActivityScreenState extends State<ActivityScreen> {
     showInsufficientTopUpBudgetRecoveryDialog(
       context: context,
       onContinue: () async {
-        Navigator.of(context, rootNavigator: true).pop();
-        final viewModel = context.read<ActivityViewModel>();
-        final success = await viewModel.generateBudgetRecoveryPlan(
-          dayTripId: state.selectedActivity?.dayTripId,
-          availableBudget: state.totalBudget - state.spentBudget,
+        // 1. Close the confirmation prompt
+        Navigator.of(context).pop();
+
+        // 2. Display uncancelable loading dialog
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => PopScope(
+            canPop: false,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 28.0, vertical: 24.0),
+                decoration: BoxDecoration(
+                  color: appTheme.white_A700,
+                  borderRadius: BorderRadius.circular(16.0),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(color: appTheme.teal_A700),
+                    const SizedBox(height: 16.0),
+                    Text(
+                      'Re-optimizing your itinerary...',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Inter',
+                        color: appTheme.gray_900,
+                      ),
+                    ),
+                    const SizedBox(height: 4.0),
+                    Text(
+                      'Balancing activities with your remaining budget',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontFamily: 'Inter',
+                        color: appTheme.gray_800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         );
 
-        if(!success && mounted) {
-          final error = viewModel.uiState.errorMessage;
-          if(error.isNotEmpty) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(error),
-              ),
-            );
+        final viewModel = context.read<ActivityViewModel>();
+
+        bool success = false;
+        try {
+          success = await viewModel.generateBudgetRecoveryPlan(
+            dayTripId: state.selectedActivity?.dayTripId,
+            availableBudget: state.totalBudget - state.spentBudget,
+          );
+        } finally {
+          // 3. Guarantee dismissal of the loading dialog
+          if (context.mounted) {
+            Navigator.of(context, rootNavigator: true).pop();
           }
+        }
+
+        if (!mounted) return;
+
+        if (!success) {
+          final error = viewModel.uiState.errorMessage;
+          showThreeSecondMessage(
+            context,
+            error.isNotEmpty ? error : 'Failed to re-optimize itinerary.',
+            isError: true,
+          );
+        } else {
+          showThreeSecondMessage(
+            context,
+            'Itinerary successfully updated to fit your budget!',
+          );
         }
       },
     );
