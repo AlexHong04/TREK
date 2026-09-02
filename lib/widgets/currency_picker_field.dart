@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'custom_text_field.dart';
 import '../theme/app_theme.dart';
 
 class CurrencyPickerField extends StatelessWidget {
@@ -119,19 +119,12 @@ class _CurrencyPickerSheetState extends State<_CurrencyPickerSheet> {
               ),
             ),
             const SizedBox(height: 16),
-            TextField(
-              autofocus: false,
+            CustomTextField(
+              sectionTitle: 'SEARCH CURRENCY',
+              hintText: 'Search USD, MYR, EUR…',
+              prefixIcon: Icons.search,
+              margin: EdgeInsets.zero,
               onChanged: (value) => setState(() => query = value),
-              decoration: InputDecoration(
-                hintText: 'Search USD, MYR, EUR…',
-                prefixIcon: const Icon(Icons.search),
-                filled: true,
-                fillColor: appTheme.gray_50_02,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
             ),
             const SizedBox(height: 10),
             Expanded(

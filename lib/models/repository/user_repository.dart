@@ -90,6 +90,41 @@ class UserRepository implements IUserRepository {
   }
 
   @override
+  Future<double?> convertCurrency({
+    required double amount,
+    required String fromCurrency,
+    required String toCurrency,
+  }) async {
+    if (!amount.isFinite) {
+      throw ArgumentError.value(
+        amount,
+        'amount',
+        'Amount must be a finite number.',
+      );
+    }
+
+    final normalizedFrom = fromCurrency.trim().toUpperCase();
+    final normalizedTo = toCurrency.trim().toUpperCase();
+
+    if (normalizedFrom.isEmpty || normalizedTo.isEmpty) {
+      throw ArgumentError(
+        'The source and destination currencies are required.',
+      );
+    }
+
+    if (normalizedFrom == normalizedTo) {
+      return amount;
+    }
+
+    final rate = await FrankfurterApiConfig.getRate(
+      fromCurrency: normalizedFrom,
+      toCurrency: normalizedTo,
+    );
+
+    return rate == null ? null : amount * rate;
+  }
+
+  @override
   Future<LoginLockStatus> getLoginLockStatus(String email) async {
     final result = await _client.rpc(
       'get_login_lock_status',

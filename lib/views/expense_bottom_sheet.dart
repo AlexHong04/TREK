@@ -48,6 +48,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   final TextEditingController _merchantController = TextEditingController();
   final TextEditingController _quantityController = TextEditingController();
   final TextEditingController _unitPriceController = TextEditingController();
+  final TextEditingController _taxController = TextEditingController();
   DateTime _selectedDate = DateTime.now();
   TimeOfDay _selectedTime = TimeOfDay.now();
   int? _editingItemIndex;
@@ -66,6 +67,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     _merchantController.dispose();
     _quantityController.dispose();
     _unitPriceController.dispose();
+    _taxController.dispose();
     super.dispose();
   }
 
@@ -177,11 +179,13 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   Widget _buildNewExpenseForm(ActivityUiState uiState) {
     return Column(
       children: [
+        _buildPaymentMethodSection(uiState),
+        SizedBox(height: 10),
         _buildExpenseItemsSection(uiState),
         SizedBox(height: 10),
-        _buildTotalAmountSection(uiState),
+        _buildTaxSection(uiState),
         SizedBox(height: 10),
-        _buildPaymentMethodSection(uiState),
+        _buildTotalAmountSection(uiState),
         SizedBox(height: 10),
         _buildReceiptSection(uiState),
         if (uiState.isScanningReceipt ||
@@ -642,9 +646,13 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                 SizedBox(height: 14),
                 Row(
                   children: [
-                    Expanded(child: _buildDatePicker()),
+                    Expanded(
+                      child: _buildDatePicker(),
+                    ),
                     SizedBox(width: 12),
-                    Expanded(child: _buildTimePicker()),
+                    Expanded(
+                      child: _buildTimePicker(),
+                    ),
                   ],
                 ),
                 SizedBox(height: 14),
@@ -654,29 +662,27 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                       child: _buildTextField(
                         'Quantity',
                         _quantityController,
-                        '',
+                        '1',
                         TextInputType.number,
                       ),
                     ),
                     SizedBox(width: 12),
                     Expanded(
                       child: _buildTextField(
-                        'Unit Price',
+                        'Unit Price (RM)',
                         _unitPriceController,
-                        '',
+                        '0.00',
                         TextInputType.numberWithOptions(decimal: true),
                       ),
                     ),
                   ],
                 ),
-                SizedBox(height: 14),
+                SizedBox(height: 16),
                 Container(
-                  width: double.infinity,
                   padding: EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: appTheme.gray_100,
-                    border: Border.all(color: appTheme.gray_200),
-                    borderRadius: BorderRadius.circular(12),
+                    color: appTheme.teal_50,
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -813,6 +819,70 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     );
   }
 
+  Widget _buildTaxSection(ActivityUiState uiState) {
+    if (_taxController.text.isEmpty && uiState.draftTaxAmount > 0) {
+      _taxController.text = uiState.draftTaxAmount.toStringAsFixed(2);
+    }
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: appTheme.white_A700,
+        border: Border.all(color: appTheme.gray_200),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'TAX (OPTIONAL)',
+                style: TextStyle(
+                  color: appTheme.blue_gray_300,
+                  fontFamily: 'Inter',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1,
+                ),
+              ),
+              if (uiState.draftTaxAmount > 0)
+                Text(
+                  'RM${uiState.draftTaxAmount.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    color: appTheme.gray_900,
+                    fontFamily: 'Inter',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+            ],
+          ),
+          SizedBox(height: 8),
+          TextField(
+            controller: _taxController,
+            keyboardType: TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*[.,]?\d{0,2}')),
+            ],
+            onChanged: (value) {
+              final parsedTax = _parsePrice(value) ?? 0.0;
+              context.read<ActivityViewModel>().setDraftTaxAmount(parsedTax);
+            },
+            decoration: _fieldDecoration('0.00').copyWith(
+              prefixText: 'RM ',
+              prefixStyle: TextStyle(
+                color: appTheme.gray_900,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTotalAmountSection(ActivityUiState uiState) {
     return Container(
       width: double.infinity,
@@ -826,7 +896,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'TOTAL AMOUNT',
+            'TOTAL (INCLUDING TAX)',
             style: TextStyle(
               color: appTheme.blue_gray_300,
               fontFamily: 'Inter',
@@ -853,11 +923,11 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   Widget _buildPaymentMethodSection(ActivityUiState uiState) {
     final methods = ['Debit/Credit Card', 'Cash', 'E-wallet', 'Bank Transfer'];
     return _ExpenseSectionCard(
-      title: 'PAYMENT METHOD',
+      title: 'PAYMENT METHOD (REQUIRED)',
       child: DropdownButtonFormField<String>(
         value: uiState.paymentMethod.isEmpty ? null : uiState.paymentMethod,
         decoration: _fieldDecoration(
-          'Optional',
+          'Select Payment Method',
         ).copyWith(prefixIcon: Icon(Icons.credit_card_outlined)),
         items: methods
             .map(
@@ -1050,6 +1120,12 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                 : 'Not detected',
           ),
           _buildOcrValue(
+            'Extracted tax',
+            uiState.ocrExtractedTax != null
+                ? 'RM${uiState.ocrExtractedTax!.toStringAsFixed(2)}'
+                : 'RM0.00 (Not detected)',
+          ),
+          _buildOcrValue(
             'Extracted total',
             hasOcrTotal
                 ? 'RM${uiState.ocrExtractedTotal!.toStringAsFixed(2)}'
@@ -1082,6 +1158,18 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     );
   }
 
+  Widget _buildMessage(String message, bool isError) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isError ? Color(0xFFFFE4E6) : appTheme.teal_50,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(message),
+    );
+  }
+
   Widget _buildOcrValue(String label, String value) {
     return Padding(
       padding: EdgeInsets.only(bottom: 6),
@@ -1094,18 +1182,6 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildMessage(String message, bool isError) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isError ? Color(0xFFFFE4E6) : appTheme.teal_50,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(message),
     );
   }
 

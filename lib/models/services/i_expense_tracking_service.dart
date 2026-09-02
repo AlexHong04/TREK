@@ -21,6 +21,8 @@ abstract interface class IExpenseTrackingService {
 
   double? extractReceiptTotal(String receiptText);
 
+  double? extractReceiptTax(String receiptText);
+
   List<String> extractReceiptItemLines(String receiptText);
 
   List<ExpenseItem> buildDraftExpenseItemsFromReceipt({
@@ -32,13 +34,17 @@ abstract interface class IExpenseTrackingService {
   Future<Expense> recordExpense({
     required String activitiesId,
     required List<ExpenseItem> expenseItems,
-    String? paymentMethod,
+    required String paymentMethod,
+    double taxAmount = 0.0,
     String? receiptLocalPath,
   });
 
   double calculateItemSubtotal(int quantity, double unitPrice);
 
-  double calculateTotalExpense(List<ExpenseItem> expenseItems);
+  double calculateTotalExpense(
+    List<ExpenseItem> expenseItems, [
+    double taxAmount = 0.0,
+  ]);
 
   void validateExpenseItems(List<ExpenseItem> expenseItems);
 

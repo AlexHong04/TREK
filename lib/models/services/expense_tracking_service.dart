@@ -219,6 +219,48 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     return null;
   }
 
+  /// Finds the amount on a labelled tax line such as "GST", "SST", "Sales Tax", "Tax", etc.
+  double? extractReceiptTax(String receiptText) {
+    const taxLabels = [
+      'sales tax',
+      'service tax',
+      'govt tax',
+      'gst',
+      'sst',
+      'tax',
+    ];
+
+    final lines = _receiptLines(receiptText);
+    for (var index = 0; index < lines.length; index++) {
+      final line = lines[index];
+      final normalizedLine = line.toLowerCase().trim();
+      // Avoid matching GST NO or tax registration numbers
+      if (normalizedLine.contains('gst no') ||
+          normalizedLine.contains('tax no') ||
+          normalizedLine.contains('tax id')) {
+        continue;
+      }
+
+      if (!taxLabels.any((label) => normalizedLine.contains(label))) {
+        continue;
+      }
+
+      final amounts = _amountsFromLine(line);
+      if (amounts.isNotEmpty) {
+        return amounts.last;
+      }
+
+      if (index + 1 < lines.length) {
+        final followingAmounts = _amountsFromLine(lines[index + 1]);
+        if (followingAmounts.isNotEmpty) {
+          return followingAmounts.first;
+        }
+      }
+    }
+
+    return null;
+  }
+
   /// Returns likely purchase lines for review. It supports both one-line item
   /// rows and column-style receipts where an item name, quantity, and price are
   /// returned by OCR as separate lines.
@@ -528,11 +570,16 @@ class ExpenseTrackingService implements IExpenseTrackingService {
   Future<Expense> recordExpense({
     required String activitiesId,
     required List<ExpenseItem> expenseItems,
-    String? paymentMethod,
+    required String paymentMethod,
+    double taxAmount = 0.0,
     String? receiptLocalPath,
   }) async {
     if (activitiesId.trim().isEmpty) {
       throw ArgumentError('An expense must be linked to a selected activity.');
+    }
+
+    if (paymentMethod.trim().isEmpty) {
+      throw ArgumentError('Please select a payment method.');
     }
 
     validateExpenseItems(expenseItems);
@@ -545,14 +592,17 @@ class ExpenseTrackingService implements IExpenseTrackingService {
         )
         .toList();
 
-    final totalAmount = calculateTotalExpense(itemsWithCalculatedSubtotals);
+    final totalAmount = calculateTotalExpense(
+      itemsWithCalculatedSubtotals,
+      taxAmount,
+    );
     validateTotalAmount(totalAmount);
 
     final savedExpense = await _expenseRepository.insertExpense(
       Expense(
         activitiesId: activitiesId,
         totalAmount: totalAmount,
-        paymentMethod: paymentMethod,
+        paymentMethod: paymentMethod.trim(),
       ),
     );
 
@@ -588,8 +638,16 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     return quantity * unitPrice;
   }
 
-  double calculateTotalExpense(List<ExpenseItem> expenseItems) {
-    return expenseItems.fold(0.0, (total, item) => total + item.subtotal);
+  double calculateTotalExpense(
+    List<ExpenseItem> expenseItems, [
+    double taxAmount = 0.0,
+  ]) {
+    final itemsSubtotal = expenseItems.fold(
+      0.0,
+      (total, item) => total + item.subtotal,
+    );
+    final normalizedTax = taxAmount < 0 ? 0.0 : taxAmount;
+    return itemsSubtotal + normalizedTax;
   }
 
   void validateExpenseItems(List<ExpenseItem> expenseItems) {

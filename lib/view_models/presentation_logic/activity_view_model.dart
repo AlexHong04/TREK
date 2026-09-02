@@ -160,7 +160,23 @@ class ActivityViewModel extends ChangeNotifier {
   void clearDraftExpenseItemsForOcr() {
     _uiState = _uiState.copyWith(
       draftExpenseItems: const [],
+      draftTaxAmount: 0.0,
       draftTotalAmount: 0.0,
+      errorMessage: '',
+      successMessage: '',
+    );
+    notifyListeners();
+  }
+
+  void setDraftTaxAmount(double taxAmount) {
+    final normalizedTax = taxAmount < 0 ? 0.0 : taxAmount;
+    final total = _expenseTrackingService.calculateTotalExpense(
+      _uiState.draftExpenseItems,
+      normalizedTax,
+    );
+    _uiState = _uiState.copyWith(
+      draftTaxAmount: normalizedTax,
+      draftTotalAmount: total,
       errorMessage: '',
       successMessage: '',
     );
@@ -296,7 +312,8 @@ class ActivityViewModel extends ChangeNotifier {
       return 0;
     }
 
-    _updateDraftExpenseItems(expenseItems);
+    final detectedTax = _uiState.ocrExtractedTax ?? 0.0;
+    _updateDraftExpenseItems(expenseItems, detectedTax);
     return expenseItems.length;
   }
 
@@ -324,6 +341,9 @@ class ActivityViewModel extends ChangeNotifier {
       final extractedTotal = _expenseTrackingService.extractReceiptTotal(
         receiptText,
       );
+      final extractedTax = _expenseTrackingService.extractReceiptTax(
+        receiptText,
+      );
       final extractedDateTime = _expenseTrackingService.extractReceiptDateTime(
         receiptText,
       );
@@ -347,6 +367,8 @@ class ActivityViewModel extends ChangeNotifier {
         clearOcrTransactionDateTime: extractedDateTime == null,
         ocrExtractedTotal: extractedTotal,
         clearOcrExtractedTotal: extractedTotal == null,
+        ocrExtractedTax: extractedTax,
+        clearOcrExtractedTax: extractedTax == null,
         ocrItemLines: _expenseTrackingService.extractReceiptItemLines(
           receiptText,
         ),
@@ -370,6 +392,9 @@ class ActivityViewModel extends ChangeNotifier {
   /// confirmation dialog. Invalid drafts must not ask the tourist to confirm.
   bool validateExpenseDraftBeforeConfirmation() {
     try {
+      if (_uiState.paymentMethod.trim().isEmpty) {
+        throw ArgumentError('Please select a payment method.');
+      }
       _expenseTrackingService.validateExpenseItems(_uiState.draftExpenseItems);
       _expenseTrackingService.validateTotalAmount(_uiState.draftTotalAmount);
       return true;
@@ -386,6 +411,11 @@ class ActivityViewModel extends ChangeNotifier {
       return;
     }
 
+    if (_uiState.paymentMethod.trim().isEmpty) {
+      _setExpenseError('Please select a payment method.');
+      return;
+    }
+
     _uiState = _uiState.copyWith(
       isSavingExpense: true,
       errorMessage: '',
@@ -399,9 +429,8 @@ class ActivityViewModel extends ChangeNotifier {
       await _expenseTrackingService.recordExpense(
         activitiesId: selectedActivity.activitiesId,
         expenseItems: _uiState.draftExpenseItems,
-        paymentMethod: _uiState.paymentMethod.isEmpty
-            ? null
-            : _uiState.paymentMethod,
+        paymentMethod: _uiState.paymentMethod.trim(),
+        taxAmount: _uiState.draftTaxAmount,
         receiptLocalPath: _uiState.receiptLocalPath.isEmpty
             ? null
             : _uiState.receiptLocalPath,
@@ -418,6 +447,7 @@ class ActivityViewModel extends ChangeNotifier {
       _uiState = _uiState.copyWith(
         isSavingExpense: false,
         draftExpenseItems: const [],
+        draftTaxAmount: 0.0,
         draftTotalAmount: 0.0,
         paymentMethod: '',
         receiptLocalPath: '',
@@ -440,7 +470,11 @@ class ActivityViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _updateDraftExpenseItems(List<ExpenseItem> items) {
+  void _updateDraftExpenseItems(
+    List<ExpenseItem> items, [
+    double? newTaxAmount,
+  ]) {
+    final tax = newTaxAmount ?? _uiState.draftTaxAmount;
     final itemsWithCalculatedSubtotals = items
         .map(
           (item) => item.copyWith(
@@ -454,8 +488,10 @@ class ActivityViewModel extends ChangeNotifier {
 
     _uiState = _uiState.copyWith(
       draftExpenseItems: itemsWithCalculatedSubtotals,
+      draftTaxAmount: tax,
       draftTotalAmount: _expenseTrackingService.calculateTotalExpense(
         itemsWithCalculatedSubtotals,
+        tax,
       ),
       errorMessage: '',
       successMessage: '',

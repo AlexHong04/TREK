@@ -104,6 +104,12 @@ abstract interface class IUserRepository {
 
   Future<List<String>> getSupportedCurrencies();
 
+  Future<double?> convertCurrency({
+    required double amount,
+    required String fromCurrency,
+    required String toCurrency,
+  });
+
   Future<LoginLockStatus> getLoginLockStatus(String email);
 
   Future<LoginLockStatus> recordFailedLoginAttempt(String email);

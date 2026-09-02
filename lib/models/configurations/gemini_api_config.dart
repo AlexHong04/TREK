@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter/foundation.dart';
+import '../entities/future_suggestion.dart';
 
 class GeminiApiRequestException implements Exception {
   final int statusCode;
@@ -31,22 +32,37 @@ class GeminiApiConfig {
     String? preference,
     List<String>? avoidPlaces,
     List<String>? wishlist,
+    List<String>? constraints,
+    List<FutureSuggestion>? futureSuggestions,
   }) async {
+    int numberOfDays = 1;
+    try {
+      final parts = dates.split(' - ');
+      if (parts.length == 2) {
+        final start = DateTime.parse(parts[0].trim());
+        final end = DateTime.parse(parts[1].trim());
+        numberOfDays = end.difference(start).inDays + 1;
+      }
+    } catch (_) {}
+
     final prompt =
         '''
     You are an expert travel planner. Please help me generate a travel itinerary in Malaysia.
     Details:
     - Destination: $destination
-    - Dates: $dates
+    - Dates: $dates (Total: $numberOfDays days)
     - Budget: \$$budget
     ${preference != null ? '- Preference: $preference (You MUST heavily prioritize planning activities that strictly match this theme!)' : ''}
+    ${(constraints != null && constraints.isNotEmpty) ? '- Personal Constraints: ' + constraints.join(', ') + ' (You MUST strictly follow these constraints when suggesting places, e.g., food restrictions or accessibility!)' : ''}
+    ${(futureSuggestions != null && futureSuggestions.isNotEmpty) ? '- Budget Distribution: ' + futureSuggestions.map((e) => '${e.activityCategory}: ${e.suggestedAmount}%').join(', ') + ' (You MUST strictly allocate the provided Budget according to these category percentages!)' : ''}
     ${(wishlist != null && wishlist.isNotEmpty) ? '- Wishlist Items: ' + wishlist.join(', ') + '\n    CRITICAL RULE FOR WISHLIST & BUDGET:\n    - If the provided Budget (\$$budget) is too low to realistically cover these wishlist items along with basic daily meals and transport, DO NOT assign fake \$0.0 costs just to force them into the budget.\n    - Instead, you MUST assign their true, realistic costs.\n    - If the total realistic cost exceeds the provided Budget, calculate the shortfall (Total Realistic Cost - Budget) and securely return it in "estimatedExtraBudgetNeeded".\n    - If you are forced to exclude any wishlist items due to extreme budget constraints, add their realistic costs to "estimatedExtraBudgetNeeded" as well.' : ''}
 
     Please provide a structured day-by-day itinerary with estimated costs and durations for each activity.
     CRITICAL RULE FOR BUDGET: 
-    - You MUST try your absolute best to MAXIMIZE the budget utilization. Spend as close to \$$budget as rationally possible. If there is leftover budget, recommend more expensive restaurants, premium transportation (e.g. Grab instead of walking), or higher-quality attractions!
-    - Assign realistic cost for "allocatedBudget". 
-    - DO NOT fake \$0 costs for expensive attractions or restaurants just to meet a small budget.
+    - You MUST ensure that the TOTAL sum of all "allocatedBudget" values across every single activity EXACTLY EQUALS the provided Budget (\$$budget)! 
+    - Adjust the "allocatedBudget" (which acts as the maximum price limit for the activity) to completely use up the budget. If there is a shortfall, recommend more expensive restaurants or premium transportation (e.g., Grab instead of walking) to ensure the math perfectly adds up. There MUST NOT be any leftover or unallocated budget in your math.
+    - "totalAllocatedBudget" MUST perfectly match the mathematical sum of all "allocatedBudget" fields in the activities list.
+    - Assign realistic cost for "allocatedBudget". DO NOT fake \$0 costs for expensive attractions or restaurants just to meet the budget.
     - Public parks, sightseeing of landmarks, walking tours, and free attractions MUST have an allocatedBudget of 0.
     - "Transportation" activities MUST ALWAYS have a realistic allocatedBudget greater than 0 (e.g., Grab fare, MRT tickets). Do NEVER assign 0 to Transportation!
     - Only assign costs to food/dining, transportation, and places that explicitly require entrance tickets.
@@ -57,6 +73,7 @@ class GeminiApiConfig {
     - Consecutive activities MUST be close to each other in real life to make routing practical.
 
     CRITICAL RULE FOR TIME SCHEDULING:
+    - You MUST generate an itinerary exactly for $numberOfDays day(s). The "dayNumber" MUST go from 1 up to $numberOfDays. DO NOT generate less or more days!
     - EVERY single day of the itinerary MUST strictly start at exactly 09:00 and the FINAL activity MUST end at exactly 21:00.
     - You MUST provide between 6 to 8 activities per day to completely fill the 12-hour span from 09:00 to 21:00.
     - Do not schedule any activities before 09:00 or after 21:00. 

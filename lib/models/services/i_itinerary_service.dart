@@ -2,6 +2,7 @@ import 'package:Trek/models/entities/day_trip.dart';
 
 import '../entities/activity.dart';
 import '../entities/whole_trip.dart';
+import '../entities/future_suggestion.dart';
 
 abstract interface class IItineraryService {
   Future<ItineraryGenerationResult> generateItinerary({
@@ -10,6 +11,8 @@ abstract interface class IItineraryService {
     required String budget,
     String? preference,
     List<String>? wishlist,
+    List<String>? constraints,
+    List<FutureSuggestion>? futureSuggestions,
   });
 
   Future<Activity> generateAlternativeItinerary({
