@@ -312,9 +312,24 @@ class ActivityViewModel extends ChangeNotifier {
       return 0;
     }
 
-    final detectedTax = _uiState.ocrExtractedTax ?? 0.0;
+    final detectedTax =
+        _uiState.ocrExtractedTax ?? _inferTaxFromReceiptTotal(expenseItems);
     _updateDraftExpenseItems(expenseItems, detectedTax);
     return expenseItems.length;
+  }
+
+  double _inferTaxFromReceiptTotal(List<ExpenseItem> expenseItems) {
+    final receiptTotal = _uiState.ocrExtractedTotal;
+    if (receiptTotal == null) {
+      return 0.0;
+    }
+
+    final itemsSubtotal = expenseItems.fold(
+      0.0,
+      (total, item) => total + item.subtotal,
+    );
+    final inferredTax = receiptTotal - itemsSubtotal;
+    return inferredTax > 0 ? inferredTax : 0.0;
   }
 
   /// Scans the selected receipt and keeps the extracted values temporary until
