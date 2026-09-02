@@ -82,8 +82,8 @@ class _WholeItineraryDetailScreenState
   }
 
   Future<void> _showWishlistWarningDialog(
-      WholeItineraryDetailViewModel viewModel,
-      ) async {
+    WholeItineraryDetailViewModel viewModel,
+  ) async {
     double minTopUp = viewModel.uiState.estimatedExtraBudgetNeeded * 0.50;
     if (viewModel.uiState.wishlistItemsCoveredCount == 0) {
       await showInitialTotalBudgetTotallyInsufficientDialog(
@@ -108,8 +108,6 @@ class _WholeItineraryDetailScreenState
                 },
               );
             });
-          } else {
-            Navigator.of(context).pop();
           }
 
           return true;
@@ -118,8 +116,8 @@ class _WholeItineraryDetailScreenState
       if (mounted) {
         _wishlistWarningShowing = false;
       }
-    }
-    if (viewModel.uiState.wishlistItemsCoveredCount < viewModel.uiState.wishlist!.length) {
+    } else if (viewModel.uiState.wishlistItemsCoveredCount <
+        viewModel.uiState.wishlist!.length) {
       await showInitialTotalBudgetInsufficientDialog(
         context: context,
         shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded
@@ -147,17 +145,15 @@ class _WholeItineraryDetailScreenState
                 },
               );
             });
-          } else {
-            viewModel.generateItinerary();
           }
 
           return true;
         },
       );
-    }
 
-    if (mounted) {
-      _wishlistWarningShowing = false;
+      if (mounted) {
+        _wishlistWarningShowing = false;
+      }
     }
   }
 
@@ -288,7 +284,7 @@ class _WholeItineraryDetailScreenState
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  '${viewModel.uiState.activities.length} Stops Planned',
+                  '${viewModel.plannedStopsCount} Stops Planned',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
