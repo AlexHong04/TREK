@@ -1112,7 +1112,9 @@ class ActivityViewModel extends ChangeNotifier {
       );
       notifyListeners();
       return true;
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('Error in generateBudgetRecoveryPlan: $e');
+      debugPrint('Stack trace: $stackTrace');
       _uiState = _uiState.copyWith(
         isLoading: false,
         errorMessage: e.toString(),

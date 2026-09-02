@@ -274,17 +274,18 @@ class _ActivityScreenState extends State<ActivityScreen> {
     showInsufficientTopUpBudgetRecoveryDialog(
       context: context,
       onContinue: () async {
-        // 1. Close the confirmation prompt
-        // Navigator.of(context).pop();
-        // Wait until the first dialog is completely removed.
-        WidgetsBinding.instance.addPostFrameCallback((_) async {
-          if (!mounted) return;
+        // 1. Close confirmation dialog
+        Navigator.of(context).pop();
 
-          // 2. Display uncancelable loading dialogs
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (_) => PopScope(
+        // 2. Show loading dialog and capture its reference
+        BuildContext? loadingDialogContext;
+
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogCtx) {
+            loadingDialogContext = dialogCtx;
+            return PopScope(
               canPop: false,
               child: Center(
                 child: Container(
@@ -307,53 +308,48 @@ class _ActivityScreenState extends State<ActivityScreen> {
                           color: appTheme.gray_900,
                         ),
                       ),
-                      const SizedBox(height: 4.0),
-                      Text(
-                        'Balancing activities with your remaining budget',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontFamily: 'Inter',
-                          color: appTheme.gray_800,
-                        ),
-                      ),
                     ],
                   ),
                 ),
               ),
-            ),
+            );
+          },
+        );
+
+        final viewModel = context.read<ActivityViewModel>();
+        bool success = false;
+
+        try {
+          success = await viewModel.generateBudgetRecoveryPlan(
+            dayTripId: state.selectedActivity?.dayTripId,
+            availableBudget: state.totalBudget - state.spentBudget,
           );
-
-          final viewModel = context.read<ActivityViewModel>();
-
-          bool success = false;
-          try {
-            success = await viewModel.generateBudgetRecoveryPlan(
-              dayTripId: state.selectedActivity?.dayTripId,
-              availableBudget: state.totalBudget - state.spentBudget,
-            );
-          } finally {
-            // 3. Guarantee dismissal of the loading dialog
-            if (context.mounted) {
-              Navigator.of(context, rootNavigator: true).pop();
-            }
+        } catch (e) {
+          debugPrint('Recovery plan error: $e');
+        } finally {
+          // 3. Pop using the dialog's specific context if it was mounted
+          if (loadingDialogContext != null && loadingDialogContext!.mounted) {
+            Navigator.of(loadingDialogContext!).pop();
+          } else if (mounted) {
+            Navigator.of(context, rootNavigator: true).pop();
           }
+        }
 
-          if (!mounted) return;
+        if (!mounted) return;
 
-          if (!success) {
-            final error = viewModel.uiState.errorMessage;
-            showThreeSecondMessage(
-              context,
-              error.isNotEmpty ? error : 'Failed to re-optimize itinerary.',
-              isError: true,
-            );
-          } else {
-            showThreeSecondMessage(
-              context,
-              'Itinerary successfully updated to fit your budget!',
-            );
-          }
-        });
+        if (!success) {
+          final error = viewModel.uiState.errorMessage;
+          showThreeSecondMessage(
+            context,
+            error.isNotEmpty ? error : 'Failed to re-optimize itinerary.',
+            isError: true,
+          );
+        } else {
+          showThreeSecondMessage(
+            context,
+            'Itinerary successfully updated to fit your budget!',
+          );
+        }
       },
     );
   }

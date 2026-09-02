@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:google_generative_ai/google_generative_ai.dart';
@@ -534,6 +535,11 @@ class GeminiApiConfig {
           ],
           "generationConfig": {"responseMimeType": "application/json"},
         }),
+      ).timeout(
+        const Duration(seconds: 25),
+        onTimeout: () {
+          throw TimeoutException("Gemini API request timed out after 25 seconds. Please Try Again.");
+        }
       );
 
       if (response.statusCode == 200) {
