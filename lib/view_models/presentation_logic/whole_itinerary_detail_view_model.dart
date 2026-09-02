@@ -50,6 +50,9 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
 
   int get sufficientDays => 7;
 
+  int get plannedStopsCount => _uiState.activities
+      .where((a) => a.status != 'empty' && a.destination.isNotEmpty)
+      .length;
   Future<void> initialize({
     required String destination,
     required String dates,
@@ -105,11 +108,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         totalAllocatedBudget: fetchedResult.totalAllocatedBudget,
         wishlistItemsCoveredCount: fetchedResult.wishlistItemsCoveredCount,
         estimatedExtraBudgetNeeded: fetchedResult.estimatedExtraBudgetNeeded,
-        showWishlistWarning:
-            fetchedResult.estimatedExtraBudgetNeeded > 0 &&
-            (wishlist != null &&
-                wishlist.isNotEmpty &&
-                fetchedResult.wishlistItemsCoveredCount < wishlist.length),
+        showWishlistWarning: fetchedResult.estimatedExtraBudgetNeeded > 0,
         errorMessage: null,
       );
     } catch (e) {
@@ -150,6 +149,9 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
       budgetText: newBudget.toStringAsFixed(2),
       estimatedExtraBudgetNeeded: remainingShortage,
       showWishlistWarning: false,
+      wishlistItemsCoveredCount: isSufficient
+          ? (_uiState.wishlist?.length ?? 0)
+          : _uiState.wishlistItemsCoveredCount,
     );
 
     notifyListeners();
