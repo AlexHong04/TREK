@@ -2,6 +2,7 @@ import '../../models/entities/activity.dart';
 import '../../models/entities/whole_trip.dart';
 export '../../models/entities/activity.dart';
 export '../../models/entities/whole_trip.dart';
+import '../../models/entities/future_suggestion.dart';
 
 class WholeItineraryUiState {
   final bool isLoading;
@@ -20,6 +21,8 @@ class WholeItineraryUiState {
   final String selectedStatusFilter; // 'All Plans', 'Pending', 'Completed'
   final String? preference;
   final List<String>? wishlist;
+  final List<String>? constraints;
+  final List<FutureSuggestion>? futureSuggestions;
 
   const WholeItineraryUiState({
     this.isLoading = false,
@@ -38,6 +41,8 @@ class WholeItineraryUiState {
     this.selectedStatusFilter = 'All Plans',
     this.preference,
     this.wishlist,
+    this.constraints,
+    this.futureSuggestions,
   });
 
   List<WholeTrip> get filteredTrips {
@@ -68,6 +73,8 @@ class WholeItineraryUiState {
     String? selectedStatusFilter,
     String? preference,
     List<String>? wishlist,
+    List<String>? constraints,
+    List<FutureSuggestion>? futureSuggestions,
   }) {
     return WholeItineraryUiState(
       isLoading: isLoading ?? this.isLoading,
@@ -90,6 +97,8 @@ class WholeItineraryUiState {
       selectedStatusFilter: selectedStatusFilter ?? this.selectedStatusFilter,
       preference: preference ?? this.preference,
       wishlist: wishlist ?? this.wishlist,
+      constraints: constraints ?? this.constraints,
+      futureSuggestions: futureSuggestions ?? this.futureSuggestions,
     );
   }
 }

@@ -2,9 +2,9 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 import 'package:flutter/foundation.dart';
 import 'package:Trek/models/entities/day_trip.dart';
-
 import '../entities/activity.dart';
 import '../entities/whole_trip.dart';
+import '../entities/future_suggestion.dart';
 import '../configurations/gemini_api_config.dart';
 import '../configurations/google_places_api_config.dart';
 import '../configurations/image_resolver_config.dart';
@@ -23,6 +23,8 @@ class ItineraryService implements IItineraryService {
     required String budget,
     String? preference,
     List<String>? wishlist,
+    List<String>? constraints,
+    List<FutureSuggestion>? futureSuggestions,
   }) async {
     try {
       int retries = 3;
@@ -42,6 +44,8 @@ class ItineraryService implements IItineraryService {
           preference: preference,
           avoidPlaces: failedDestinations,
           wishlist: wishlist,
+          constraints: constraints,
+          futureSuggestions: futureSuggestions,
         );
 
         // Extract JSON object
@@ -219,7 +223,15 @@ class ItineraryService implements IItineraryService {
         int dayNumber = item['dayNumber'] as int? ?? 1;
         String startTimeStr = item['startTime'] as String? ?? '09:00';
 
-        DateTime baseDate = DateTime.now().add(Duration(days: dayNumber - 1));
+        DateTime tripStartDate = DateTime.now();
+        try {
+          final parts = dates.split(' - ');
+          if (parts.isNotEmpty) {
+            tripStartDate = DateTime.parse(parts[0].trim());
+          }
+        } catch (_) {}
+
+        DateTime baseDate = tripStartDate.add(Duration(days: dayNumber - 1));
         DateTime parsedDate = baseDate;
 
         try {
