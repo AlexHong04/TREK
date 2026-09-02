@@ -223,7 +223,15 @@ class ItineraryService implements IItineraryService {
         int dayNumber = item['dayNumber'] as int? ?? 1;
         String startTimeStr = item['startTime'] as String? ?? '09:00';
 
-        DateTime baseDate = DateTime.now().add(Duration(days: dayNumber - 1));
+        DateTime tripStartDate = DateTime.now();
+        try {
+          final parts = dates.split(' - ');
+          if (parts.isNotEmpty) {
+            tripStartDate = DateTime.parse(parts[0].trim());
+          }
+        } catch (_) {}
+
+        DateTime baseDate = tripStartDate.add(Duration(days: dayNumber - 1));
         DateTime parsedDate = baseDate;
 
         try {

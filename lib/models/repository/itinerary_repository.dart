@@ -33,8 +33,6 @@ class ItineraryRepository implements IItineraryRepository {
             .from('itinerary_images')
             .getPublicUrl(path);
       }
-
-
     } catch (e) {
       print('Failed to upload image $externalUrl: $e');
     }
@@ -100,13 +98,30 @@ class ItineraryRepository implements IItineraryRepository {
         );
       }
 
+      DateTime parsedStartDate = DateTime.now();
+      DateTime parsedEndDate = DateTime.now().add(const Duration(days: 3));
+
+      try {
+        final parts = datesText.split(' - ');
+        if (parts.length == 2) {
+          parsedStartDate = DateTime.parse(parts[0].trim());
+          parsedEndDate = DateTime.parse(parts[1].trim());
+        } else {
+          // If only 1 date happens
+          parsedStartDate = DateTime.parse(parts[0].trim());
+          parsedEndDate = parsedStartDate;
+        }
+      } catch (e) {
+        print('Error parsing datesText \'\$datesText\': \$e');
+      }
+
       // Create WholeTrip Entity and Insert
       final wholeTrip = WholeTrip(
         tripId: newTripId,
         userId: customUserId,
         destination: destination,
-        startDate: DateTime.now(),
-        endDate: DateTime.now().add(const Duration(days: 3)),
+        startDate: parsedStartDate,
+        endDate: parsedEndDate,
         totalBudget: totalBudget,
         remainingBalance: totalBudget,
         status: 'pending',
@@ -586,7 +601,9 @@ class ItineraryRepository implements IItineraryRepository {
       final String? customUserId = userRecord?['user_id'] as String?;
 
       if (customUserId == null || customUserId.isEmpty) {
-        debugPrint('fetchAllTrips: User profile record not found for email ${authUser.email}');
+        debugPrint(
+          'fetchAllTrips: User profile record not found for email ${authUser.email}',
+        );
         return [];
       }
 
@@ -612,9 +629,9 @@ class ItineraryRepository implements IItineraryRepository {
   // the trip and activities that filtered by user id
   @override
   Future<WholeTrip?> fetchLatestTrip() async {
-    try{
+    try {
       final user = SupabaseConfig.client.auth.currentUser;
-      if(user == null) return null;
+      if (user == null) return null;
 
       final userRecord = await SupabaseConfig.client
           .from('user')
@@ -622,8 +639,7 @@ class ItineraryRepository implements IItineraryRepository {
           .eq('email', user.email ?? '')
           .maybeSingle();
 
-      final String targetUserId =
-          userRecord?['user_id'] as String? ?? user.id;
+      final String targetUserId = userRecord?['user_id'] as String? ?? user.id;
 
       final tripResponse = await SupabaseConfig.client
           .from('whole_trips')
