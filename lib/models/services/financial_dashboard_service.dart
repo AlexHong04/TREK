@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import '../entities/activity.dart';
 import '../entities/day_trip.dart';
+import '../entities/expense_item.dart';
 import '../entities/future_suggestion.dart';
 import '../entities/whole_trip.dart';
 import '../repository/dashboard_repository.dart';
@@ -21,18 +22,24 @@ class FinancialCategorySummary {
 }
 
 class FinancialExpenseDetail {
+  final String expenseId;
   final String activityName;
   final String activityImageUrl;
   final String? activityStartTime;
   final double amount;
   final String? paymentMethod;
+  final String? receiptImageUrl;
+  final DateTime? recordedAt;
 
   const FinancialExpenseDetail({
+    required this.expenseId,
     required this.activityName,
     required this.activityImageUrl,
     required this.activityStartTime,
     required this.amount,
     required this.paymentMethod,
+    required this.receiptImageUrl,
+    required this.recordedAt,
   });
 }
 
@@ -103,6 +110,8 @@ abstract class IFinancialDashboardService {
   Future<CurrentDayFinancialSummary?> getCurrentDaySummary(DateTime date);
 
   Future<WholeTripFinancialSummary?> getTripSummary(String tripId);
+
+  Future<List<ExpenseItem>> getExpenseItems(String expenseId);
 
   Future<List<CostSavingTip>> getCostSavingTips({
     required String destination,
@@ -184,11 +193,14 @@ class FinancialDashboardService implements IFinancialDashboardService {
       if (category == null) continue;
       detailsByCategory[category]!.add(
         FinancialExpenseDetail(
+          expenseId: expense.expenseId ?? '',
           activityName: activity.destination,
           activityImageUrl: activity.activityImgUrl,
           activityStartTime: activity.startTime,
           amount: expense.totalAmount,
           paymentMethod: expense.paymentMethod,
+          receiptImageUrl: expense.receiptImageUrl,
+          recordedAt: expense.createdAt,
         ),
       );
     }
@@ -226,6 +238,11 @@ class FinancialDashboardService implements IFinancialDashboardService {
       dayTrip: dayTrip,
       categories: categories,
     );
+  }
+
+  @override
+  Future<List<ExpenseItem>> getExpenseItems(String expenseId) {
+    return _repository.getExpenseItems(expenseId);
   }
 
   @override

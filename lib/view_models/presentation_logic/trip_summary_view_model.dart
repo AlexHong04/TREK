@@ -45,9 +45,15 @@ class TripSummaryViewModel extends ChangeNotifier {
           errorMessage: 'This trip could not be found.',
         );
       } else {
-        final budget = summary.trip.totalBudget;
+        final actualBudget = summary.trip.totalBudget;
+        final topUpBudget = summary.totalTopUpBudget;
+        final allocatedBudget = math
+            .max(0.0, actualBudget - topUpBudget)
+            .toDouble();
         final expense = summary.totalExpense;
-        final rawPercentage = budget <= 0 ? 0.0 : expense / budget * 100;
+        final rawPercentage = actualBudget <= 0
+            ? 0.0
+            : expense / actualBudget * 100;
 
         _uiState = _uiState.copyWith(
           isLoading: false,
@@ -56,14 +62,16 @@ class TripSummaryViewModel extends ChangeNotifier {
           destination: summary.trip.destination,
           startDate: summary.trip.startDate,
           endDate: summary.trip.endDate,
-          allocatedBudget: budget,
-          allocatedBudgetText: _formatMoney(budget),
-          topUpBudget: summary.totalTopUpBudget,
-          topUpBudgetText: _formatMoney(summary.totalTopUpBudget),
+          allocatedBudget: allocatedBudget,
+          allocatedBudgetText: _formatMoney(allocatedBudget),
+          topUpBudget: topUpBudget,
+          topUpBudgetText: _formatMoney(topUpBudget),
+          actualBudget: actualBudget,
+          actualBudgetText: _formatMoney(actualBudget),
           totalExpense: expense,
           totalExpenseText: _formatMoney(expense),
-          remainingBudget: budget - expense,
-          remainingBudgetText: _formatMoney(budget - expense),
+          remainingBudget: actualBudget - expense,
+          remainingBudgetText: _formatMoney(actualBudget - expense),
           spentPercentage: rawPercentage,
           financialHealth: _healthLabel(rawPercentage),
           categories: summary.categories
@@ -110,7 +118,7 @@ class TripSummaryViewModel extends ChangeNotifier {
     try {
       final tips = await _service.getCostSavingTips(
         destination: _uiState.destination,
-        allocatedBudget: _uiState.allocatedBudget,
+        allocatedBudget: _uiState.actualBudget,
         totalExpense: _uiState.totalExpense,
         remainingBudget: _uiState.remainingBudget,
         categoryExpenses: {
@@ -193,7 +201,7 @@ class TripSummaryViewModel extends ChangeNotifier {
 
       final recommendations = await _service.getFutureBudgetRecommendations(
         destination: _uiState.destination,
-        allocatedBudget: _uiState.allocatedBudget,
+        allocatedBudget: _uiState.actualBudget,
         totalExpense: _uiState.totalExpense,
         categoryExpenses: {
           for (final category in _uiState.categories)

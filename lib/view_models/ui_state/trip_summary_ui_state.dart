@@ -66,6 +66,8 @@ class TripSummaryUiState {
   final String allocatedBudgetText;
   final double topUpBudget;
   final String topUpBudgetText;
+  final double actualBudget;
+  final String actualBudgetText;
   final double totalExpense;
   final String totalExpenseText;
   final double remainingBudget;
@@ -96,6 +98,8 @@ class TripSummaryUiState {
     this.allocatedBudgetText = 'RM 0.00',
     this.topUpBudget = 0,
     this.topUpBudgetText = 'RM 0.00',
+    this.actualBudget = 0,
+    this.actualBudgetText = 'RM 0.00',
     this.totalExpense = 0,
     this.totalExpenseText = 'RM 0.00',
     this.remainingBudget = 0,
@@ -129,6 +133,8 @@ class TripSummaryUiState {
     String? allocatedBudgetText,
     double? topUpBudget,
     String? topUpBudgetText,
+    double? actualBudget,
+    String? actualBudgetText,
     double? totalExpense,
     String? totalExpenseText,
     double? remainingBudget,
@@ -163,6 +169,8 @@ class TripSummaryUiState {
       allocatedBudgetText: allocatedBudgetText ?? this.allocatedBudgetText,
       topUpBudget: topUpBudget ?? this.topUpBudget,
       topUpBudgetText: topUpBudgetText ?? this.topUpBudgetText,
+      actualBudget: actualBudget ?? this.actualBudget,
+      actualBudgetText: actualBudgetText ?? this.actualBudgetText,
       totalExpense: totalExpense ?? this.totalExpense,
       totalExpenseText: totalExpenseText ?? this.totalExpenseText,
       remainingBudget: remainingBudget ?? this.remainingBudget,

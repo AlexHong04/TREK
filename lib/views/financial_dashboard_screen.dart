@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -233,6 +234,15 @@ class FinancialDashboardScreen extends StatelessWidget {
               icon: Icons.add_card_outlined,
               label: 'Top-up Budget',
               amount: uiState.topUpBudget,
+            ),
+            Divider(
+              color: appTheme.white_A700.withValues(alpha: 0.33),
+              height: 1,
+            ),
+            _SummaryRow(
+              icon: Icons.calculate_outlined,
+              label: 'Actual Budget',
+              amount: uiState.totalAvailableBudget,
             ),
             Divider(
               color: appTheme.white_A700.withValues(alpha: 0.33),
@@ -481,8 +491,8 @@ class FinancialDashboardScreen extends StatelessWidget {
           spacing: 14,
           runSpacing: 8,
           children: [
-            _DotLegend(label: 'Allocated Budget', color: appTheme.teal_800),
-            _DotLegend(label: 'Expenses', color: appTheme.gray_200),
+            _DotLegend(label: 'Allocated Budget', color: appTheme.gray_400),
+            _DotLegend(label: 'Expenses', color: appTheme.teal_800),
             _DotLegend(
               label: 'Overspending',
               color: appTheme.expenseOverspendBg,
@@ -588,12 +598,16 @@ class FinancialDashboardScreen extends StatelessWidget {
       if (chartCategory.expense <= 0) continue;
       final sweep = math.pi * 2 * chartCategory.expense / totalExpense;
       if (tapAngle >= accumulatedAngle && tapAngle < accumulatedAngle + sweep) {
+        final viewModel = context.read<FinancialDashboardViewModel>();
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => _FinancialExpenseDetailView(
-              category: chartCategory,
-              date: uiState.selectedDate,
+            builder: (_) => ChangeNotifierProvider.value(
+              value: viewModel,
+              child: _FinancialExpenseDetailView(
+                category: chartCategory,
+                date: uiState.selectedDate,
+              ),
             ),
           ),
         );
@@ -697,7 +711,10 @@ class _FinancialExpenseDetailView extends StatelessWidget {
                 ...category.expenseDetails.map(
                   (item) => Padding(
                     padding: const EdgeInsets.only(bottom: 14),
-                    child: _DashboardExpenseCard(item: item),
+                    child: _DashboardExpenseCard(
+                      item: item,
+                      onTap: () => _showExpenseItems(context, item),
+                    ),
                   ),
                 ),
             ],
@@ -705,6 +722,29 @@ class _FinancialExpenseDetailView extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _showExpenseItems(
+    BuildContext context,
+    DashboardExpenseDetailUiState expense,
+  ) async {
+    final viewModel = context.read<FinancialDashboardViewModel>();
+    final loadFuture = viewModel.loadExpenseItems(expense.expenseId);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: appTheme.transparentCustom,
+      barrierColor: appTheme.black.withValues(alpha: 0.25),
+      builder: (_) => ChangeNotifierProvider.value(
+        value: viewModel,
+        child: _DashboardExpenseItemsSheet(expense: expense),
+      ),
+    );
+
+    await loadFuture;
+    viewModel.clearExpenseItems();
   }
 }
 
@@ -754,87 +794,455 @@ class _DashboardDetailSummary extends StatelessWidget {
 
 class _DashboardExpenseCard extends StatelessWidget {
   final DashboardExpenseDetailUiState item;
+  final VoidCallback onTap;
 
-  const _DashboardExpenseCard({required this.item});
+  const _DashboardExpenseCard({required this.item, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
+    return Material(
+      color: appTheme.white_A700,
+      borderRadius: BorderRadius.circular(16),
+      elevation: 2,
+      shadowColor: appTheme.black_900_0c,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: _DashboardActivityImage(imageUrl: item.activityImageUrl),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.activityName,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: appTheme.gray_900,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 7),
+                    _DashboardDetailLine(
+                      icon: Icons.schedule,
+                      text: item.timeText,
+                    ),
+                    const SizedBox(height: 6),
+                    _DashboardDetailLine(
+                      icon: Icons.account_balance_wallet_outlined,
+                      text: 'RM ${item.amount.toStringAsFixed(2)}',
+                    ),
+                    const SizedBox(height: 7),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 9,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: appTheme.gray_100,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.credit_card,
+                            size: 13,
+                            color: appTheme.teal_A700,
+                          ),
+                          const SizedBox(width: 5),
+                          Flexible(
+                            child: Text(
+                              item.paymentMethod,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: appTheme.blue_gray_700,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(Icons.chevron_right, color: appTheme.gray_400),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DashboardExpenseItemsSheet extends StatelessWidget {
+  final DashboardExpenseDetailUiState expense;
+
+  const _DashboardExpenseItemsSheet({required this.expense});
+
+  @override
+  Widget build(BuildContext context) {
+    final viewModel = context.watch<FinancialDashboardViewModel>();
+    final uiState = viewModel.uiState;
+    final isSelectedExpense = uiState.selectedExpenseId == expense.expenseId;
+
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.72,
+      minChildSize: 0.45,
+      maxChildSize: 0.92,
+      builder: (context, scrollController) => Material(
+        color: appTheme.white_A700,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        clipBehavior: Clip.antiAlias,
+        child: SingleChildScrollView(
+          controller: scrollController,
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 52,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: appTheme.gray_200,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Expense Details',
+                      style: TextStyle(
+                        color: appTheme.gray_900,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Close',
+                    onPressed: () => Navigator.pop(context),
+                    icon: Icon(Icons.close, color: appTheme.blue_gray_700),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: appTheme.gray_50_02,
+                  border: Border.all(color: appTheme.gray_200),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      expense.activityName,
+                      style: TextStyle(
+                        color: appTheme.gray_900,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _ExpenseSheetInfoLine(
+                      icon: Icons.payments_outlined,
+                      label: 'Total Expense',
+                      value: 'RM ${expense.amount.toStringAsFixed(2)}',
+                    ),
+                    _ExpenseSheetInfoLine(
+                      icon: Icons.credit_card_outlined,
+                      label: 'Payment Method',
+                      value: expense.paymentMethod,
+                    ),
+                    _ExpenseSheetInfoLine(
+                      icon: Icons.event_outlined,
+                      label: 'Recorded On',
+                      value: expense.recordedAtText,
+                    ),
+                    _ExpenseSheetInfoLine(
+                      icon: Icons.receipt_long_outlined,
+                      label: 'Receipt',
+                      value: expense.receiptImageUrl?.trim().isNotEmpty == true
+                          ? 'Attached'
+                          : 'Not attached',
+                      isLast: true,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 22),
+              Text(
+                'EXPENSE ITEMS',
+                style: TextStyle(
+                  color: appTheme.blue_gray_700,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (!isSelectedExpense || uiState.isLoadingExpenseItems)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 40),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (uiState.expenseItemsErrorMessage != null)
+                _ExpenseItemsError(
+                  message: uiState.expenseItemsErrorMessage!,
+                  onRetry: () => viewModel.loadExpenseItems(expense.expenseId),
+                )
+              else if (uiState.selectedExpenseItems.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 32),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: appTheme.gray_50_02,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Text(
+                    'No expense items were recorded.',
+                    style: TextStyle(color: appTheme.blue_gray_300),
+                  ),
+                )
+              else
+                for (
+                  var index = 0;
+                  index < uiState.selectedExpenseItems.length;
+                  index++
+                ) ...[
+                  _DashboardExpenseItemCard(
+                    item: uiState.selectedExpenseItems[index],
+                    itemNumber: index + 1,
+                  ),
+                  if (index != uiState.selectedExpenseItems.length - 1)
+                    const SizedBox(height: 12),
+                ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ExpenseSheetInfoLine extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final bool isLast;
+
+  const _ExpenseSheetInfoLine({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.isLast = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: isLast ? 0 : 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 17, color: appTheme.teal_A700),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(color: appTheme.blue_gray_700, fontSize: 13),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                color: appTheme.gray_900,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DashboardExpenseItemCard extends StatelessWidget {
+  final DashboardExpenseItemUiState item;
+  final int itemNumber;
+
+  const _DashboardExpenseItemCard({
+    required this.item,
+    required this.itemNumber,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final description = item.itemDescription?.trim() ?? '';
+    final merchant = item.merchantName?.trim() ?? '';
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: appTheme.white_A700,
+        border: Border.all(color: appTheme.gray_200),
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: appTheme.black_900_0c,
-            blurRadius: 6,
-            offset: const Offset(0, 3),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: appTheme.teal_50,
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Text(
+                  '$itemNumber',
+                  style: TextStyle(
+                    color: appTheme.teal_800,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Text(
+                  item.itemName,
+                  style: TextStyle(
+                    color: appTheme.gray_900,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'RM ${item.subtotal.toStringAsFixed(2)}',
+                style: TextStyle(
+                  color: appTheme.teal_800,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          if (description.isNotEmpty) ...[
+            const SizedBox(height: 9),
+            Text(
+              description,
+              style: TextStyle(color: appTheme.blue_gray_700, fontSize: 13),
+            ),
+          ],
+          const SizedBox(height: 12),
+          Divider(color: appTheme.gray_200, height: 1),
+          const SizedBox(height: 12),
+          if (merchant.isNotEmpty)
+            _ExpenseItemMetadata(
+              icon: Icons.storefront_outlined,
+              text: merchant,
+            ),
+          _ExpenseItemMetadata(
+            icon: Icons.schedule_outlined,
+            text: item.expenseDateTimeText,
+          ),
+          _ExpenseItemMetadata(
+            icon: Icons.calculate_outlined,
+            text: '${item.quantity} × RM ${item.unitPrice.toStringAsFixed(2)}',
+            isLast: true,
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ExpenseItemMetadata extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final bool isLast;
+
+  const _ExpenseItemMetadata({
+    required this.icon,
+    required this.text,
+    this.isLast = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: isLast ? 0 : 7),
       child: Row(
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: _DashboardActivityImage(imageUrl: item.activityImageUrl),
-          ),
-          const SizedBox(width: 16),
+          Icon(icon, size: 16, color: appTheme.blue_gray_300),
+          const SizedBox(width: 8),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.activityName,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: appTheme.gray_900,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 7),
-                _DashboardDetailLine(icon: Icons.schedule, text: item.timeText),
-                const SizedBox(height: 6),
-                _DashboardDetailLine(
-                  icon: Icons.account_balance_wallet_outlined,
-                  text: 'RM ${item.amount.toStringAsFixed(2)}',
-                ),
-                const SizedBox(height: 7),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 9,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: appTheme.gray_100,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.credit_card,
-                        size: 13,
-                        color: appTheme.teal_A700,
-                      ),
-                      const SizedBox(width: 5),
-                      Flexible(
-                        child: Text(
-                          item.paymentMethod,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: appTheme.blue_gray_700,
-                            fontSize: 10,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+            child: Text(
+              text,
+              style: TextStyle(color: appTheme.blue_gray_700, fontSize: 12),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExpenseItemsError extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _ExpenseItemsError({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: appTheme.gray_50_02,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.error_outline, color: appTheme.errorRed),
+          const SizedBox(height: 8),
+          Text(message, textAlign: TextAlign.center),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh, size: 18),
+            label: const Text('Try Again'),
           ),
         ],
       ),
@@ -1009,7 +1417,7 @@ class _ExpenseBars extends StatelessWidget {
   Widget build(BuildContext context) {
     final expenseColor = category.isOverspent
         ? appTheme.expenseOverspendBg
-        : appTheme.gray_200;
+        : appTheme.teal_800;
     double barHeight(double amount) {
       if (amount <= 0 || maximumAmount <= 0) return 2;
       return math.max(8, 88 * amount / maximumAmount);
@@ -1025,7 +1433,7 @@ class _ExpenseBars extends StatelessWidget {
             _AmountBar(
               amount: category.budget,
               height: barHeight(category.budget),
-              color: appTheme.teal_800,
+              color: appTheme.gray_400,
             ),
             const SizedBox(width: 10),
             _AmountBar(

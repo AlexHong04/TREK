@@ -62,6 +62,10 @@ class FinancialDashboardViewModel extends ChangeNotifier {
       selectedDate: date,
       displayedCalendarMonth: DateTime(date.year, date.month),
       clearError: true,
+      isLoadingExpenseItems: false,
+      selectedExpenseId: '',
+      selectedExpenseItems: const [],
+      clearExpenseItemsError: true,
     );
     notifyListeners();
 
@@ -94,6 +98,7 @@ class FinancialDashboardViewModel extends ChangeNotifier {
                   expenseDetails: category.expenseDetails
                       .map(
                         (detail) => DashboardExpenseDetailUiState(
+                          expenseId: detail.expenseId,
                           activityName: detail.activityName,
                           activityImageUrl: detail.activityImageUrl,
                           timeText: _formatTime(detail.activityStartTime, date),
@@ -102,6 +107,12 @@ class FinancialDashboardViewModel extends ChangeNotifier {
                               detail.paymentMethod?.trim().isNotEmpty == true
                               ? detail.paymentMethod!.trim()
                               : 'Payment method unavailable',
+                          recordedAtText: detail.recordedAt == null
+                              ? 'Recorded date unavailable'
+                              : DateFormat(
+                                  'dd MMM yyyy, hh:mm a',
+                                ).format(detail.recordedAt!),
+                          receiptImageUrl: detail.receiptImageUrl,
                         ),
                       )
                       .toList(),
@@ -121,6 +132,64 @@ class FinancialDashboardViewModel extends ChangeNotifier {
         errorMessage: 'Unable to load expenses. Please try again.',
       );
     }
+    notifyListeners();
+  }
+
+  Future<void> loadExpenseItems(String expenseId) async {
+    _uiState = _uiState.copyWith(
+      isLoadingExpenseItems: true,
+      selectedExpenseId: expenseId,
+      selectedExpenseItems: const [],
+      clearExpenseItemsError: true,
+    );
+    notifyListeners();
+
+    try {
+      final items = await _service.getExpenseItems(expenseId);
+      if (_uiState.selectedExpenseId != expenseId) return;
+
+      _uiState = _uiState.copyWith(
+        isLoadingExpenseItems: false,
+        selectedExpenseItems: items
+            .map(
+              (item) => DashboardExpenseItemUiState(
+                itemName: item.itemName,
+                itemDescription: item.itemDescription,
+                merchantName: item.merchantName,
+                expenseDateTimeText: DateFormat(
+                  'dd MMM yyyy, hh:mm a',
+                ).format(item.expenseDateTime),
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                subtotal: item.subtotal,
+              ),
+            )
+            .toList(),
+      );
+    } on TimeoutException {
+      if (_uiState.selectedExpenseId != expenseId) return;
+      _uiState = _uiState.copyWith(
+        isLoadingExpenseItems: false,
+        expenseItemsErrorMessage: 'Connection timed out. Please try again.',
+      );
+    } catch (_) {
+      if (_uiState.selectedExpenseId != expenseId) return;
+      _uiState = _uiState.copyWith(
+        isLoadingExpenseItems: false,
+        expenseItemsErrorMessage:
+            'Unable to load expense items. Please try again.',
+      );
+    }
+    notifyListeners();
+  }
+
+  void clearExpenseItems() {
+    _uiState = _uiState.copyWith(
+      isLoadingExpenseItems: false,
+      selectedExpenseId: '',
+      selectedExpenseItems: const [],
+      clearExpenseItemsError: true,
+    );
     notifyListeners();
   }
 

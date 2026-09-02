@@ -5,6 +5,7 @@ import '../configurations/supabase_config.dart';
 import '../entities/activity.dart';
 import '../entities/day_trip.dart';
 import '../entities/expense.dart';
+import '../entities/expense_item.dart';
 import '../entities/future_suggestion.dart';
 import '../entities/whole_trip.dart';
 import '../../utils/id_generator.dart';
@@ -27,6 +28,8 @@ abstract class IDashboardRepository {
   Future<List<Activity>> getActivitiesForDayTrips(List<String> dayTripIds);
 
   Future<List<Expense>> getExpenses(List<String> activityIds);
+
+  Future<List<ExpenseItem>> getExpenseItems(String expenseId);
 
   Future<List<DateTime>> getAvailableDates();
 
@@ -207,6 +210,28 @@ class DashboardRepository implements IDashboardRepository {
       rethrow;
     } catch (error) {
       throw Exception("Unable to retrieve today's expenses: $error");
+    }
+  }
+
+  @override
+  Future<List<ExpenseItem>> getExpenseItems(String expenseId) async {
+    if (expenseId.trim().isEmpty) return const [];
+
+    try {
+      final response = await SupabaseConfig.client
+          .from('expense_item')
+          .select()
+          .eq('expense_id', expenseId)
+          .order('expense_datetime')
+          .timeout(_databaseTimeout);
+
+      return response
+          .map((json) => ExpenseItem.fromJson(Map<String, dynamic>.from(json)))
+          .toList();
+    } on TimeoutException {
+      rethrow;
+    } catch (error) {
+      throw Exception('Unable to retrieve expense items: $error');
     }
   }
 

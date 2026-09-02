@@ -679,6 +679,11 @@ class _BudgetMetricsCard extends StatelessWidget {
               amountColor: appTheme.teal_A700,
             ),
             Divider(color: appTheme.gray_200, height: 1),
+            _BudgetMetric(
+              amount: uiState.actualBudgetText,
+              label: 'Actual Budget',
+            ),
+            Divider(color: appTheme.gray_200, height: 1),
           ],
           _BudgetMetric(
             amount: uiState.remainingBudgetText,
