@@ -98,13 +98,66 @@ class _WholeItineraryDetailScreenState
     WholeItineraryDetailViewModel viewModel,
   ) async {
     double minTopUp = viewModel.uiState.estimatedExtraBudgetNeeded * 0.50;
-    if (viewModel.uiState.wishlistItemsCoveredCount == 0) {
+    debugPrint("wishlist: ${viewModel.uiState.wishlist}");
+    debugPrint("estimated extra budget needed: ${viewModel.uiState.estimatedExtraBudgetNeeded}");
+    if (viewModel.uiState.wishlist != null &&
+        viewModel.uiState.estimatedExtraBudgetNeeded > 0) {
+      await showEmptyWishlistInsufficientTotalBudgetDialog(
+        context: context,
+        shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded
+            .toStringAsFixed(2),
+        minTopUp: minTopUp,
+        onCancel: () async {
+          await showCancelTripWithoutWishlistDialog(
+            context: context,
+            onContinue: () {
+              Navigator.of(context).pop();
+            },
+          );
+        },
+
+        onTopUpBudget: (double amount) async {
+          final isSufficient = await viewModel.topUpBudget(amount);
+
+          if (!isSufficient) {
+            // Wait until the first dialog is completely removed.
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+
+              showInsufficientTopUpTotalBudgetWithoutWishlistDialog(
+                context: context,
+                onContinue: () {
+                  // Trigger re-recommendation with the latest total budget
+                  Navigator.of(context).pop();
+                  viewModel.generateItinerary();
+                },
+              );
+            });
+          }
+
+          return true;
+        },
+      );
+
+      if (mounted) {
+        _wishlistWarningShowing = false;
+      }
+    } else if (viewModel.uiState.wishlist != null &&
+        viewModel.uiState.wishlistItemsCoveredCount == 0) {
       await showInitialTotalBudgetTotallyInsufficientDialog(
         context: context,
         shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded
             .toStringAsFixed(2),
         minTopUp: minTopUp,
         wishlistCovered: viewModel.uiState.wishlistItemsCoveredCount,
+        onCancel: () async {
+          await showCancelTripDialog(
+            context: context,
+            onContinue: () {
+              Navigator.of(context).pop();
+            },
+          );
+        },
         onTopUpBudget: (double amount) async {
           final isSufficient = await viewModel.topUpBudget(amount);
 
@@ -129,8 +182,9 @@ class _WholeItineraryDetailScreenState
       if (mounted) {
         _wishlistWarningShowing = false;
       }
-    } else if (viewModel.uiState.wishlistItemsCoveredCount <
-        viewModel.uiState.wishlist!.length) {
+    } else if (viewModel.uiState.wishlist != null &&
+        viewModel.uiState.wishlistItemsCoveredCount <
+            viewModel.uiState.wishlist!.length) {
       await showInitialTotalBudgetInsufficientDialog(
         context: context,
         shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded
@@ -138,7 +192,12 @@ class _WholeItineraryDetailScreenState
         minTopUp: minTopUp,
         wishlistCovered: viewModel.uiState.wishlistItemsCoveredCount,
         onCancel: () async {
-          await showCancelTopUpDialog(context: context, onContinue: () {});
+          await showCancelTopUpDialog(
+            context: context,
+            onContinue: () {
+              Navigator.of(context).pop();
+            },
+          );
         },
 
         onTopUpBudget: (double amount) async {
@@ -205,8 +264,7 @@ class _WholeItineraryDetailScreenState
               ),
             ),
           ),
-          if(!isReadOnly) _buildBottomSection(context, viewModel),
-
+          if (!isReadOnly) _buildBottomSection(context, viewModel),
         ],
       ),
     );
@@ -660,9 +718,11 @@ class _WholeItineraryDetailScreenState
     );
   }
 
-  Widget _buildActivityCard(BuildContext context,
+  Widget _buildActivityCard(
+    BuildContext context,
     WholeItineraryDetailViewModel viewModel,
-      dynamic activity) {
+    dynamic activity,
+  ) {
     // Check if the activity has been cleared (empty slot state)
     if (activity.status == 'empty' ||
         (activity.destination.isEmpty && activity.description.isEmpty)) {

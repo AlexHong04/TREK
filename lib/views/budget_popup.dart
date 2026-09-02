@@ -565,7 +565,7 @@ Future<void> showBudgetReallocationFailureDialog({
   );
 }
 
-// Cancel Top-up Initial Total Budget
+// Cancel Top-up Initial Total Budget (Wishlist Covered > 0)
 Future<void> showCancelTopUpDialog({
   required BuildContext context,
   VoidCallback? onContinue,
@@ -577,6 +577,36 @@ Future<void> showCancelTopUpDialog({
       'Your wishlist item could not be fully covered based on '
           'the limited budget. The system will proceed with '
           'removing those wishlist items.',
+    ],
+    onContinue: onContinue,
+  );
+}
+
+// Cancel Top-up Initial Total Budget (Wishlist Covered == 0)
+Future<void> showCancelTripDialog({
+  required BuildContext context,
+  VoidCallback? onContinue,
+}) {
+  return _showSimpleBudgetDialog(
+    context: context,
+    title: 'Cancel Top-up',
+    messages: const [
+      'Your budget is insufficient to fully cover at least one wishlist item. The system will proceed with cancelling this trip.',
+    ],
+    onContinue: onContinue,
+  );
+}
+
+// Cancel Top-up Initial Total Budget (Wishlist is Empty)
+Future<void> showCancelTripWithoutWishlistDialog({
+  required BuildContext context,
+  VoidCallback? onContinue,
+}) {
+  return _showSimpleBudgetDialog(
+    context: context,
+    title: 'Cancel Top-up',
+    messages: const [
+      'Your budget is insufficient. The system will proceed with cancelling this trip.',
     ],
     onContinue: onContinue,
   );
@@ -766,6 +796,94 @@ Future<void> showInitialTotalBudgetTotallyInsufficientDialog({
   );
 }
 
+// Initial Total Budget Insufficient (Wishlist is Empty)
+Future<void> showEmptyWishlistInsufficientTotalBudgetDialog({
+  required BuildContext context,
+  required String shortageAmount,
+  required double minTopUp,
+  VoidCallback? onCancel,
+  required Future<bool> Function(double amount) onTopUpBudget,
+}) {
+  final controller = TextEditingController();
+
+  return showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) {
+      return BaseBudgetDialog(
+        title: 'Budget Insufficient',
+
+        summaryCard: _buildSummaryCard(
+          primaryLabel: 'Estimated Budget Shortage Amount',
+          primaryValue: shortageAmount,
+        ),
+
+        // First warning
+        warningText:
+        'Your budget is not sufficient for the trip. '
+            'Do you want to add more budget?',
+
+        // Top-up field + second warning
+        contentCard: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildTopUpCard(controller),
+
+            const SizedBox(height: 16),
+
+            BaseBudgetDialog._buildWarningRow(
+              'Top-up amount should be at least ${minTopUp.toStringAsFixed(2)}, insufficient top-up amount will trigger alternative '
+                  'recommendation directly.',
+            ),
+          ],
+        ),
+
+        actions: Row(
+          children: [
+            Expanded(
+              child: _buildActionButton(
+                text: 'Cancel',
+                backgroundColor: appTheme.redButton,
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
+                  onCancel?.call();
+                },
+              ),
+            ),
+
+            const SizedBox(width: 12),
+
+            Expanded(
+              child: ValueListenableBuilder<TextEditingValue>(
+                valueListenable: controller,
+                builder: (context, value, child) {
+                  final amount = double.tryParse(value.text.trim());
+
+                  final isValid = amount != null && amount >= minTopUp;
+
+                  return _buildActionButton(
+                    text: 'Top-up Budget',
+                    onPressed: isValid
+                        ? () async {
+                      final amount = double.parse(value.text.trim());
+
+                      final success = await onTopUpBudget(amount);
+
+                      if (success && dialogContext.mounted) {
+                        Navigator.of(dialogContext).pop();
+                      }
+                    }
+                        : null,
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
 // Initial Total Budget Top-up Insufficient
 Future<void> showInsufficientTopUpTotalBudgetDialog({
   required BuildContext context,
@@ -777,6 +895,23 @@ Future<void> showInsufficientTopUpTotalBudgetDialog({
     messages: const [
       'Your top-up amount is still not sufficient to cover '
           'all wishlist items. The system will adjust the plan '
+          'based on the latest amount.',
+    ],
+    onContinue: onContinue,
+  );
+}
+
+// Initial Total Budget Top-up Insufficient
+Future<void> showInsufficientTopUpTotalBudgetWithoutWishlistDialog({
+  required BuildContext context,
+  VoidCallback? onContinue,
+}) {
+  return _showSimpleBudgetDialog(
+    context: context,
+    title: 'Insufficient Top-up',
+    messages: const [
+      'Your top-up amount is still not sufficient to cover '
+          'all the planned activities. The system will adjust the plan '
           'based on the latest amount.',
     ],
     onContinue: onContinue,
