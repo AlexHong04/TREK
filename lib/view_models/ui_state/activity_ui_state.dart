@@ -3,7 +3,6 @@ export '../../models/entities/activity.dart';
 import '../../models/entities/expense.dart';
 import '../../models/entities/expense_item.dart';
 
-import 'package:flutter/foundation.dart';
 
 class ActivityUiState {
   final bool isLoading;
@@ -99,6 +98,7 @@ class ActivityUiState {
           actDate.day == filterDate!.day;
     }).toList();
   }
+
 
   ActivityUiState copyWith({
     bool? isLoading,
