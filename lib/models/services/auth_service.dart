@@ -33,7 +33,15 @@ class AuthService extends IAuthService {
   User? get currentUser => _currentUser;
 
   @override
-  String get preferredCurrency => _currentUser?.currency ?? 'MYR';
+  String get preferredCurrency {
+    final currency = _currentUser?.currency.trim().toUpperCase();
+
+    if (currency == null || currency.isEmpty) {
+      return 'MYR';
+    }
+
+    return currency;
+  }
 
   @override
   bool get isPasswordRecovery => _isPasswordRecovery;
@@ -176,6 +184,22 @@ class AuthService extends IAuthService {
   @override
   Future<List<String>> getSupportedCurrencies() {
     return _userRepository.getSupportedCurrencies();
+  }
+
+  @override
+  Future<double?> convertToPreferredCurrency({
+    required double amount,
+    required String fromCurrency,
+  }) {
+    if (_currentUser == null) {
+      throw StateError('No signed-in tourist.');
+    }
+
+    return _userRepository.convertCurrency(
+      amount: amount,
+      fromCurrency: fromCurrency,
+      toCurrency: preferredCurrency,
+    );
   }
 
   @override

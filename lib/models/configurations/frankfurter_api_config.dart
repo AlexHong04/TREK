@@ -217,26 +217,6 @@ class FrankfurterApiConfig {
     return toValue / fromValue;
   }
 
-  static Future<double?> convertAmount({
-    required double amount,
-    required String fromCurrency,
-    required String toCurrency,
-  }) async {
-    final normalizedFrom = _normalizeCode(fromCurrency);
-    final normalizedTo = _normalizeCode(toCurrency);
-
-    if (normalizedFrom == normalizedTo) {
-      return amount;
-    }
-
-    final rate = await getRate(
-      fromCurrency: normalizedFrom,
-      toCurrency: normalizedTo,
-    );
-
-    return rate == null ? null : amount * rate;
-  }
-
   static Future<String?> getRateDate({
     String baseCurrency = defaultBaseCurrency,
   }) {

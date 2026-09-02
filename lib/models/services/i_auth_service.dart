@@ -63,6 +63,11 @@ abstract class IAuthService extends ChangeNotifier {
 
   Future<List<String>> getSupportedCurrencies();
 
+  Future<double?> convertToPreferredCurrency({
+    required double amount,
+    required String fromCurrency,
+  });
+
   Future<void> updateCurrentProfile({
     required String fullName,
     required String currency,
