@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
 import '../view_models/presentation_logic/whole_itinerary_detail_view_model.dart';
+import '../models/services/i_auth_service.dart';
 import '../main.dart';
 import '../widgets/custom_app_bar.dart';
 import 'budget_popup.dart';
@@ -21,6 +22,14 @@ class WholeItineraryDetailScreen extends StatefulWidget {
     final isReadOnly = args?['isReadOnly'] as bool? ?? false;
     final tripId = (args?['tripId'] ?? args?['tripID']) as String?;
     final trip = args?['trip'] as WholeTrip?;
+
+    // Retrieve constraints from current user
+    final authService = context.read<IAuthService>();
+    final constraints =
+        authService.currentUser?.personalConstraints
+            .map((c) => '${c.category}: ${c.constraintName}')
+            .toList() ??
+        [];
 
     return ChangeNotifierProvider<WholeItineraryDetailViewModel>(
       create: (context) {
@@ -38,6 +47,7 @@ class WholeItineraryDetailScreen extends StatefulWidget {
             wishlist: (args?['wishlist'] as List?)
                 ?.map((e) => e.toString())
                 .toList(),
+            constraints: constraints,
           );
         }
 

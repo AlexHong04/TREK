@@ -3,6 +3,9 @@ import 'package:flutter/foundation.dart';
 import '../../models/entities/activity.dart';
 import '../../models/services/i_itinerary_service.dart';
 import '../../models/services/itinerary_service.dart';
+import '../../models/entities/future_suggestion.dart';
+import '../../models/repository/dashboard_repository.dart';
+import '../../models/configurations/supabase_config.dart';
 import '../ui_state/whole_itinerary_ui_state.dart';
 import 'package:intl/intl.dart';
 
@@ -54,6 +57,8 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     required String budget,
     String? preference,
     List<String>? wishlist,
+    List<String>? constraints,
+    List<FutureSuggestion>? futureSuggestions,
   }) async {
     _uiState = _uiState.copyWith(
       isLoading: true,
@@ -62,17 +67,37 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
       budgetText: budget,
       preference: preference,
       wishlist: wishlist,
+      constraints: constraints,
       errorMessage: null,
     );
     notifyListeners();
 
     try {
+      List<FutureSuggestion> resolvedSuggestions = futureSuggestions ?? [];
+      if (futureSuggestions == null) {
+        final userId = SupabaseConfig.client.auth.currentUser?.id;
+        if (userId != null) {
+          final dashboardRepository = DashboardRepository();
+          final trips = await dashboardRepository.getTripsForUser(userId);
+          final completedTrips = trips
+              .where((t) => t.status.toLowerCase() == 'completed')
+              .toList();
+          if (completedTrips.isNotEmpty &&
+              completedTrips.first.tripId != null) {
+            resolvedSuggestions = await dashboardRepository
+                .getFutureSuggestions(completedTrips.first.tripId!);
+          }
+        }
+      }
+
       final fetchedResult = await _itineraryService.generateItinerary(
         destination: destination,
         dates: dates,
         budget: budget,
         preference: preference,
         wishlist: wishlist,
+        constraints: constraints,
+        futureSuggestions: resolvedSuggestions,
       );
 
       _uiState = _uiState.copyWith(
@@ -81,7 +106,11 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         totalAllocatedBudget: fetchedResult.totalAllocatedBudget,
         wishlistItemsCoveredCount: fetchedResult.wishlistItemsCoveredCount,
         estimatedExtraBudgetNeeded: fetchedResult.estimatedExtraBudgetNeeded,
-        showWishlistWarning: fetchedResult.estimatedExtraBudgetNeeded > 0,
+        showWishlistWarning:
+            fetchedResult.estimatedExtraBudgetNeeded > 0 &&
+            (wishlist != null &&
+                wishlist.isNotEmpty &&
+                fetchedResult.wishlistItemsCoveredCount < wishlist.length),
         errorMessage: null,
       );
     } catch (e) {
@@ -100,6 +129,8 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
       budget: _uiState.budgetText,
       preference: _uiState.preference,
       wishlist: _uiState.wishlist,
+      constraints: _uiState.constraints,
+      futureSuggestions: _uiState.futureSuggestions,
     );
   }
 
@@ -279,7 +310,6 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
   }
 
   Future<void> loadSavedTrip({required String tripId, WholeTrip? trip}) async {
-
     final startDateStr = trip?.startDate != null
         ? DateFormat('MMM dd').format(trip!.startDate)
         : '';
@@ -299,8 +329,10 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     );
     notifyListeners();
 
-    try{
-      final activities = await _itineraryService.fetchAllActivitiesByTrip(tripId);
+    try {
+      final activities = await _itineraryService.fetchAllActivitiesByTrip(
+        tripId,
+      );
 
       _uiState = _uiState.copyWith(
         isLoading: false,
