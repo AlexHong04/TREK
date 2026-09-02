@@ -352,6 +352,13 @@ class _ActivityScreenState extends State<ActivityScreen> {
   }
 
   Widget _buildBudgetCard(ActivityUiState uiState) {
+    final progressColor = _getBudgetProgressColor(
+      uiState.spentBudget,
+      uiState.totalBudget,
+    );
+
+    final badgeBgColor = progressColor.withValues(alpha: 0.12);
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20.0),
@@ -387,7 +394,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                   vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color: appTheme.teal_50,
+                  color: badgeBgColor,
                   borderRadius: BorderRadius.circular(16.0),
                 ),
                 child: Text(
@@ -396,7 +403,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
                     fontFamily: 'Inter',
-                    color: appTheme.teal_700,
+                    color: progressColor,
                   ),
                 ),
               ),
@@ -417,8 +424,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                 ),
               ),
               Text(
-                'RM ${uiState.spentBudget.toStringAsFixed(2)} / RM ${uiState
-                    .totalBudget.toStringAsFixed(2)}',
+                'RM ${uiState.spentBudget.toStringAsFixed(2)} / RM ${uiState.totalBudget.toStringAsFixed(2)}',
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w800,
@@ -435,7 +441,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
               value: uiState.usedPercentageValue,
               minHeight: 8.0,
               backgroundColor: appTheme.gray_200,
-              valueColor: AlwaysStoppedAnimation<Color>(appTheme.teal_A700),
+              valueColor: AlwaysStoppedAnimation<Color>(progressColor),
             ),
           ),
           const SizedBox(height: 24.0),
@@ -816,5 +822,19 @@ class _ActivityScreenState extends State<ActivityScreen> {
       color: appTheme.gray_200,
       child: Icon(Icons.terrain, size: 40, color: appTheme.blue_gray_300),
     );
+  }
+
+  Color _getBudgetProgressColor(double spentBudget, double totalBudget) {
+    if (totalBudget <= 0) return appTheme.teal_A700;
+
+    final double ratio = spentBudget / totalBudget;
+
+    if (ratio >= 0.90) {
+      return appTheme.errorRed;
+    } else if (ratio >= 0.50) {
+      return Colors.amber.shade800;
+    } else {
+      return appTheme.teal_A700;
+    }
   }
 }
