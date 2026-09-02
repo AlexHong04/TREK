@@ -55,16 +55,19 @@ class GeminiApiConfig {
     ${preference != null ? '- Preference: $preference (You MUST heavily prioritize planning activities that strictly match this theme!)' : ''}
     ${(constraints != null && constraints.isNotEmpty) ? '- Personal Constraints: ' + constraints.join(', ') + ' (You MUST strictly follow these constraints when suggesting places, e.g., food restrictions or accessibility!)' : ''}
     ${(futureSuggestions != null && futureSuggestions.isNotEmpty) ? '- Budget Distribution: ' + futureSuggestions.map((e) => '${e.activityCategory}: ${e.suggestedAmount}%').join(', ') + ' (You MUST strictly allocate the provided Budget according to these category percentages!)' : ''}
-    ${(wishlist != null && wishlist.isNotEmpty) ? '- Wishlist Items: ' + wishlist.join(', ') + '\n    CRITICAL RULE FOR WISHLIST & BUDGET:\n    - If the provided Budget (\$$budget) is too low to realistically cover these wishlist items along with basic daily meals and transport, DO NOT assign fake \$0.0 costs just to force them into the budget.\n    - Instead, you MUST assign their true, realistic costs.\n    - If the total realistic cost exceeds the provided Budget, calculate the shortfall (Total Realistic Cost - Budget) and securely return it in "estimatedExtraBudgetNeeded".\n    - If you are forced to exclude any wishlist items due to extreme budget constraints, add their realistic costs to "estimatedExtraBudgetNeeded" as well.' : ''}
+    ${(wishlist != null && wishlist.isNotEmpty) ? '- Wishlist Items: ' + wishlist.join(', ') + '\n    CRITICAL RULE FOR WISHLIST:\n    - You MUST ALWAYS INCLUDE ALL of these wishlist items in the generated itinerary, NO MATTER how low or insufficient the Budget (\$$budget) is! NEVER exclude them.\n    - Because you forcefully included them with their TRUE realistic prices, the total cost will likely exceed a low budget. You MUST add this excess to "estimatedExtraBudgetNeeded".\n    - IF the realistic total cost exceeds the Budget (\$$budget), you MUST artificially return "wishlistItemsCoveredCount" as 0 (to flag to the system that the user cannot afford them yet). NEVER return the full count if budget is exceeded! \n    - ONLY if the Budget (\$$budget) is fully sufficient to cover everything without shortfall, return the full number of wishlist items mapped in "wishlistItemsCoveredCount".' : ''}
 
     Please provide a structured day-by-day itinerary with estimated costs and durations for each activity.
-    CRITICAL RULE FOR BUDGET: 
-    - You MUST ensure that the TOTAL sum of all "allocatedBudget" values across every single activity EXACTLY EQUALS the provided Budget (\$$budget)! 
-    - Adjust the "allocatedBudget" (which acts as the maximum price limit for the activity) to completely use up the budget. If there is a shortfall, recommend more expensive restaurants or premium transportation (e.g., Grab instead of walking) to ensure the math perfectly adds up. There MUST NOT be any leftover or unallocated budget in your math.
-    - "totalAllocatedBudget" MUST perfectly match the mathematical sum of all "allocatedBudget" fields in the activities list.
-    - Assign realistic cost for "allocatedBudget". DO NOT fake \$0 costs for expensive attractions or restaurants just to meet the budget.
+    CRITICAL RULE FOR BUDGET & PRICING: 
+    - The user provided a target budget of \$$budget. 
+    - You MUST assign TRUE, REALISTIC market-rate costs for EVERY activity's "allocatedBudget" (e.g., meals cost RM15-40, transport RM5-30). 
+    - NEVER invent fake RM0.0, RM0.5, or insanely low prices for restaurants or paid attractions just to blindly fit into an impossibly low budget.
+    - If the \$$budget is extremely low (like RM1 or RM10), YOU MUST STILL USE REALISTIC PRICES. If assigning realistic prices causes the itinerary's total cost to heavily exceed the \$$budget, THAT IS PERFECTLY FINE. 
+    - You MUST calculate the exact shortfall (Sum of ALL realistic allocatedBudgets - \$$budget) and return this positive shortfall amount in "estimatedExtraBudgetNeeded".
+    - If the \$$budget is sufficient, distribute it fairly but DO NOT artificially inflate prices beyond realistic maximums.
+    - "totalAllocatedBudget" MUST ALWAYS perfectly match the mathematical sum of all "allocatedBudget" fields in the activities list. (It is completely fine if this total sum exceeds the \$$budget).
     - Public parks, sightseeing of landmarks, walking tours, and free attractions MUST have an allocatedBudget of 0.
-    - "Transportation" activities MUST ALWAYS have a realistic allocatedBudget greater than 0 (e.g., Grab fare, MRT tickets). Do NEVER assign 0 to Transportation!
+    - "Transportation" activities MUST ALWAYS have a realistic allocatedBudget greater than 0 (e.g., Grab fare, MRT tickets). NEVER assign 0 to Transportation!
     - Only assign costs to food/dining, transportation, and places that explicitly require entrance tickets.
     
     CRITICAL RULE FOR ROUTING:
@@ -73,7 +76,8 @@ class GeminiApiConfig {
     - Consecutive activities MUST be close to each other in real life to make routing practical.
 
     CRITICAL RULE FOR TIME SCHEDULING:
-    - You MUST generate an itinerary exactly for $numberOfDays day(s). The "dayNumber" MUST go from 1 up to $numberOfDays. DO NOT generate less or more days!
+    - THIS IS THE MOST IMPORTANT RULE: You MUST generate an itinerary exactly for $numberOfDays day(s). If $numberOfDays is 3, return exactly 3 days. If $numberOfDays is 4, return exactly 4 days. The number of days returned MUST strictly match $numberOfDays!
+    - The "dayNumber" MUST go sequentially from 1 up to exactly $numberOfDays. DO NOT generate less or more days than $numberOfDays!
     - EVERY single day of the itinerary MUST strictly start at exactly 09:00 and the FINAL activity MUST end at exactly 21:00.
     - You MUST provide between 6 to 8 activities per day to completely fill the 12-hour span from 09:00 to 21:00.
     - Do not schedule any activities before 09:00 or after 21:00. 
@@ -91,8 +95,8 @@ class GeminiApiConfig {
     - We will programmatically verify each destination against Google Places API to fetch its image. If a destination is obscure or NOT found on Google Places, the itinerary is invalid.
     
     CRITICAL RULE FOR UNIQUENESS (NO DUPLICATES):
-    - EVERY destination across the entire itinerary MUST be strictly UNIQUE. 
-    - Do NOT propose the same restaurant, attraction, or landmark more than once across all the days.
+    - EVERY single destination and activity across the ENTIRE itinerary MUST be strictly UNIQUE. 
+    - Do NOT propose the same restaurant, attraction, or landmark more than once across all the days. If a place is visited on Day 1, it CANNOT be visited again on any other day.
     ${(avoidPlaces != null && avoidPlaces.isNotEmpty) ? '\nCRITICAL REJECTION LIST FOR RETRY:\nThe following places were previously generated in a prior attempt but COULD NOT be found on Google Places API. You MUST NOT include any of these in your response. Instead, suggest different, verified, operating real-world venues/landmarks that are definitely searchable on Google Places:\n' + avoidPlaces.map((e) => '- "$e"').join('\n') : ''}
     
     Format your response STRICTLY as the following JSON object structure. Do NOT include markdown fences (no ```json ... ```), and do NOT include any extra text:
