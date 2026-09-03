@@ -35,6 +35,7 @@ class GeminiApiConfig {
     List<String>? wishlist,
     List<String>? constraints,
     List<FutureSuggestion>? futureSuggestions,
+    bool strictBudget = false,
   }) async {
     int numberOfDays = 1;
     try {
@@ -56,9 +57,19 @@ class GeminiApiConfig {
     ${preference != null ? '- Preference: $preference (You MUST heavily prioritize planning activities that strictly match this theme!)' : ''}
     ${(constraints != null && constraints.isNotEmpty) ? '- Personal Constraints: ' + constraints.join(', ') + ' (You MUST strictly follow these constraints when suggesting places, e.g., food restrictions or accessibility!)' : ''}
     ${(futureSuggestions != null && futureSuggestions.isNotEmpty) ? '- Budget Distribution: ' + futureSuggestions.map((e) => '${e.activityCategory}: ${e.suggestedAmount}%').join(', ') + ' (You MUST strictly allocate the provided Budget according to these category percentages!)' : ''}
-    ${(wishlist != null && wishlist.isNotEmpty) ? '- Wishlist Items: ' + wishlist.join(', ') + '\n    CRITICAL RULE FOR WISHLIST:\n    - You MUST ALWAYS INCLUDE ALL of these wishlist items in the generated itinerary, NO MATTER how low or insufficient the Budget (\$$budget) is! NEVER exclude them.\n    - Because you forcefully included them with their TRUE realistic prices, the total cost will likely exceed a low budget. You MUST add this excess to "estimatedExtraBudgetNeeded".\n    - IF the realistic total cost exceeds the Budget (\$$budget), you MUST artificially return "wishlistItemsCoveredCount" as 0 (to flag to the system that the user cannot afford them yet). NEVER return the full count if budget is exceeded! \n    - ONLY if the Budget (\$$budget) is fully sufficient to cover everything without shortfall, return the full number of wishlist items mapped in "wishlistItemsCoveredCount".' : ''}
+    ${(wishlist != null && wishlist.isNotEmpty) ? '- Wishlist Items: ' + wishlist.join(', ') + (strictBudget ? '\n    CRITICAL RULE FOR WISHLIST (BUDGET-CONSTRAINED MODE):\n    - Try to INCLUDE these wishlist items in the itinerary IF they fit within the Budget (\$$budget).\n    - You MUST adjust other activities (use cheaper restaurants, free attractions, walking instead of transport) to make room for wishlist items.\n    - If a wishlist item genuinely cannot fit even after adjustments, you may exclude it.\n    - Return the actual number of wishlist items successfully included in "wishlistItemsCoveredCount".\n    - "estimatedExtraBudgetNeeded" MUST be 0.0 since the plan MUST fit within \$$budget.' : '\n    CRITICAL RULE FOR WISHLIST:\n    - You MUST ALWAYS INCLUDE ALL of these wishlist items in the generated itinerary, NO MATTER how low or insufficient the Budget (\$$budget) is! NEVER exclude them.\n    - Because you forcefully included them with their TRUE realistic prices, the total cost will likely exceed a low budget. You MUST add this excess to "estimatedExtraBudgetNeeded".\n    - IF the realistic total cost exceeds the Budget (\$$budget), you MUST artificially return "wishlistItemsCoveredCount" as 0 (to flag to the system that the user cannot afford them yet). NEVER return the full count if budget is exceeded! \n    - ONLY if the Budget (\$$budget) is fully sufficient to cover everything without shortfall, return the full number of wishlist items mapped in "wishlistItemsCoveredCount".') : ''}
 
     Please provide a structured day-by-day itinerary with estimated costs and durations for each activity.
+    ${strictBudget ? '''
+    CRITICAL RULE FOR BUDGET & PRICING (STRICT BUDGET MODE):
+    - The user has a HARD budget limit of \$$budget. The sum of ALL allocatedBudget values MUST be LESS THAN OR EQUAL TO \$$budget. This is NON-NEGOTIABLE.
+    - You MUST fit the entire itinerary within \$$budget by choosing AFFORDABLE options: hawker centres instead of fine dining, free parks instead of paid attractions, walking or public transit instead of Grab.
+    - "totalAllocatedBudget" MUST be <= \$$budget.
+    - "estimatedExtraBudgetNeeded" MUST be 0.0.
+    - Public parks, sightseeing of landmarks, walking tours, and free attractions MUST have an allocatedBudget of 0.
+    - "Transportation" activities MUST have a realistic but minimal allocatedBudget (e.g., MRT/LRT tickets RM2-5).
+    - Only assign costs to food/dining, transportation, and places that explicitly require entrance tickets.
+    ''' : '''
     CRITICAL RULE FOR BUDGET & PRICING: 
     - The user provided a target budget of \$$budget. 
     - You MUST assign TRUE, REALISTIC market-rate costs for EVERY activity's "allocatedBudget" (e.g., meals cost RM15-40, transport RM5-30). 
@@ -70,6 +81,7 @@ class GeminiApiConfig {
     - Public parks, sightseeing of landmarks, walking tours, and free attractions MUST have an allocatedBudget of 0.
     - "Transportation" activities MUST ALWAYS have a realistic allocatedBudget greater than 0 (e.g., Grab fare, MRT tickets). NEVER assign 0 to Transportation!
     - Only assign costs to food/dining, transportation, and places that explicitly require entrance tickets.
+    '''}
     
     CRITICAL RULE FOR ROUTING:
     - Group activities geographically! Each day of the itinerary MUST focus on ONE specific area or neighborhood (e.g., Day 1 is dedicated entirely to "KLCC", Day 2 entirely to "Bukit Bintang").
@@ -483,8 +495,8 @@ class GeminiApiConfig {
         (newTotalBudget + topUpAmount) - currentSpentBudget;
 
     final locationConstraint = userCoordinates != null
-    ? 'Current GPS Coordinates: $userCoordinates (within $tripDestination)'
-    : 'Destination: $tripDestination';
+        ? 'Current GPS Coordinates: $userCoordinates (within $tripDestination)'
+        : 'Destination: $tripDestination';
     final prompt =
         '''
     You are an AI travel itinerary and budget optimizer.
@@ -540,11 +552,11 @@ class GeminiApiConfig {
           ],
           "generationConfig": {"responseMimeType": "application/json"},
         }),
-      // ).timeout(
-      //   const Duration(seconds: 25),
-      //   onTimeout: () {
-      //     throw TimeoutException("Gemini API request timed out after 25 seconds. Please Try Again.");
-      //   }
+        // ).timeout(
+        //   const Duration(seconds: 25),
+        //   onTimeout: () {
+        //     throw TimeoutException("Gemini API request timed out after 25 seconds. Please Try Again.");
+        //   }
       );
 
       if (response.statusCode == 200) {

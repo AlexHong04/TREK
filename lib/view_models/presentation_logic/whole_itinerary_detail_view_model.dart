@@ -101,6 +101,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         wishlist: wishlist,
         constraints: constraints,
         futureSuggestions: resolvedSuggestions,
+        strictBudget: suppressWarning,
       );
 
       // When suppressWarning is true (post-top-up regeneration), calculate

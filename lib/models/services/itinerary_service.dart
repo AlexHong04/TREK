@@ -25,6 +25,7 @@ class ItineraryService implements IItineraryService {
     List<String>? wishlist,
     List<String>? constraints,
     List<FutureSuggestion>? futureSuggestions,
+    bool strictBudget = false,
   }) async {
     try {
       int retries = 3;
@@ -46,6 +47,7 @@ class ItineraryService implements IItineraryService {
           wishlist: wishlist,
           constraints: constraints,
           futureSuggestions: futureSuggestions,
+          strictBudget: strictBudget,
         );
 
         // Extract JSON object
@@ -570,30 +572,30 @@ class ItineraryService implements IItineraryService {
     final rawActivitiesPayload = remainingActivities
         .map(
           (act) => {
-        'activitiesId': act.activitiesId,
-        'dayTripId': act.dayTripId,
-        'destination': act.destination,
-        'description': act.description,
-        'date': act.date.toIso8601String(),
-        'startTime': act.startTime,
-        'endTime': act.endTime,
-        'allocatedBudget': act.allocatedBudget,
-        'activityCategory': act.activityCategory,
-      },
-    )
+            'activitiesId': act.activitiesId,
+            'dayTripId': act.dayTripId,
+            'destination': act.destination,
+            'description': act.description,
+            'date': act.date.toIso8601String(),
+            'startTime': act.startTime,
+            'endTime': act.endTime,
+            'allocatedBudget': act.allocatedBudget,
+            'activityCategory': act.activityCategory,
+          },
+        )
         .toList();
 
     // 2. Call Gemini API endpoint
     final List<Map<String, dynamic>> rawResponseList =
-    await GeminiApiConfig.generateRecoveryItinerary(
-      newTotalBudget: newTotalBudget,
-      currentSpentBudget: currentSpentBudget,
-      topUpAmount: topUpAmount,
-      remainingActivities: rawActivitiesPayload,
-      tripDestination: tripDestination,
-      userCoordinates: userCoordinates,
-      currentDate: currentDate,
-    );
+        await GeminiApiConfig.generateRecoveryItinerary(
+          newTotalBudget: newTotalBudget,
+          currentSpentBudget: currentSpentBudget,
+          topUpAmount: topUpAmount,
+          remainingActivities: rawActivitiesPayload,
+          tripDestination: tripDestination,
+          userCoordinates: userCoordinates,
+          currentDate: currentDate,
+        );
 
     final defaultDayTripId = remainingActivities.isNotEmpty
         ? remainingActivities.first.dayTripId
@@ -610,7 +612,8 @@ class ItineraryService implements IItineraryService {
         activitiesId: actId.isNotEmpty
             ? actId
             : IdGenerator.generateNextFormattedId('AC', null),
-        dayTripId: item['dayTripId']?.toString() ??
+        dayTripId:
+            item['dayTripId']?.toString() ??
             originalActivity?.dayTripId ??
             defaultDayTripId,
         destination: item['destination']?.toString() ?? '',
@@ -620,7 +623,7 @@ class ItineraryService implements IItineraryService {
             : (originalActivity?.activityImgUrl ?? 'assets/logo.png'),
         date: item['date'] != null
             ? DateTime.tryParse(item['date'].toString()) ??
-            (originalActivity?.date ?? DateTime.now())
+                  (originalActivity?.date ?? DateTime.now())
             : (originalActivity?.date ?? DateTime.now()),
         allocatedBudget: allocatedBudget,
         overspendAmount: allocatedBudget > 0 ? 0 : null,
@@ -628,7 +631,8 @@ class ItineraryService implements IItineraryService {
         startTime: item['startTime']?.toString() ?? '09:00',
         endTime: item['endTime']?.toString() ?? '10:00',
         duration: item['duration']?.toString() ?? '60 min',
-        activityCategory: item['activityCategory']?.toString() ??
+        activityCategory:
+            item['activityCategory']?.toString() ??
             (originalActivity?.activityCategory ?? 'General'),
         isOverspend: false,
       );

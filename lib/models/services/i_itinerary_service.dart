@@ -13,6 +13,7 @@ abstract interface class IItineraryService {
     List<String>? wishlist,
     List<String>? constraints,
     List<FutureSuggestion>? futureSuggestions,
+    bool strictBudget = false,
   });
 
   Future<Activity> generateAlternativeItinerary({
