@@ -264,7 +264,7 @@ Widget _buildTopUpCard(TextEditingController controller) {
     decoration: BoxDecoration(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: Colors.grey.shade200),
+      border: Border.all(color: appTheme.grey200),
       boxShadow: [
         BoxShadow(
           color: appTheme.black.withAlpha(8),
