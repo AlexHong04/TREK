@@ -630,6 +630,7 @@ class ItineraryRepository implements IItineraryRepository {
   @override
   Future<WholeTrip?> fetchLatestTrip() async {
     try {
+      final nowIso = DateTime.now().toUtc().toIso8601String();
       final user = SupabaseConfig.client.auth.currentUser;
       if (user == null) return null;
 
@@ -639,39 +640,51 @@ class ItineraryRepository implements IItineraryRepository {
           .eq('email', user.email ?? '')
           .maybeSingle();
 
-      final String targetUserId = userRecord?['user_id'] as String? ?? user.id;
+      final String userId = userRecord?['user_id'] as String? ?? user.id;
 
-      // 1. Try to fetch an active 'ongoing' trip first
-      final ongoingTripResponse = await SupabaseConfig.client
+      // 1. First priority: Check if a trip is ongoing today by dates
+      final ongoingData = await SupabaseConfig.client
           .from('whole_trips')
           .select()
-          .eq('user_id', targetUserId)
-          .eq('status', 'ongoing')
+          .eq('user_id', userId)
+          .neq('status', 'completed')
+          .lte('start_date', nowIso) // Started on or before today
+          .gte('end_date', nowIso)   // Ends on or after today
           .order('start_date', ascending: true)
           .limit(1)
           .maybeSingle();
 
-      if (ongoingTripResponse != null) {
-        return WholeTrip.fromJson(ongoingTripResponse);
+      if (ongoingData != null) {
+        return WholeTrip.fromJson(ongoingData);
       }
 
-      // 2. If no trip is ongoing, fall back to the newest pending/upcoming trip
-      final fallbackTripResponse = await SupabaseConfig.client
+      // 2. Second priority: Upcoming pending trips in the future
+      final upcomingData = await SupabaseConfig.client
           .from('whole_trips')
           .select()
-          .eq('user_id', targetUserId)
+          .eq('user_id', userId)
           .neq('status', 'completed')
+          .gt('start_date', nowIso)
+          .order('start_date', ascending: true)
+          .limit(1)
+          .maybeSingle();
+
+      if (upcomingData != null) {
+        return WholeTrip.fromJson(upcomingData);
+      }
+
+      // 3. Fallback: Most recently created trip
+      final fallbackData = await SupabaseConfig.client
+          .from('whole_trips')
+          .select()
+          .eq('user_id', userId)
           .order('created_at', ascending: false)
           .limit(1)
           .maybeSingle();
 
-      if (fallbackTripResponse == null) {
-        return null;
-      }
-
-      return WholeTrip.fromJson(fallbackTripResponse);
+      return fallbackData != null ? WholeTrip.fromJson(fallbackData) : null;
     } catch (e) {
-      debugPrint('Error in fetchLatestTrip: $e');
+      debugPrint('Error fetching prioritized trip: $e');
       return null;
     }
   }

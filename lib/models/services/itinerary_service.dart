@@ -550,6 +550,7 @@ class ItineraryService implements IItineraryService {
     return await GooglePlacesApiConfig.getAutocompleteSuggestions(query);
   }
 
+  // weisong
   @override
   Future<List<Activity>> generateBudgetRecoveryItinerary({
     required String tripId,

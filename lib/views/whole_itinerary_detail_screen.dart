@@ -481,28 +481,47 @@ class _WholeItineraryDetailScreenState
   }
 
   Widget _buildTimeline(
-    BuildContext context,
-    WholeItineraryDetailViewModel viewModel, {
-    required bool isReadOnly,
-  }) {
+      BuildContext context,
+      WholeItineraryDetailViewModel viewModel, {
+        required bool isReadOnly,
+      }) {
     if (viewModel.uiState.isLoading) {
       return Center(
         child: CircularProgressIndicator(color: appTheme.teal_A700),
       );
     }
 
-    final activities = viewModel.uiState.activities;
+    // 1. Create a sorted copy of the activities
+    final activities = List<dynamic>.from(viewModel.uiState.activities);
+    activities.sort((a, b) {
+      // Primary sort: Date
+      final DateTime aDate = a.date is DateTime ? a.date : DateTime.parse(a.date.toString());
+      final DateTime bDate = b.date is DateTime ? b.date : DateTime.parse(b.date.toString());
+
+      final dateCompare = DateTime(aDate.year, aDate.month, aDate.day)
+          .compareTo(DateTime(bDate.year, bDate.month, bDate.day));
+      if (dateCompare != 0) return dateCompare;
+
+      // Secondary sort: startTime (HH:mm)
+      final String aTime = (a.startTime as String?)?.trim() ?? '00:00';
+      final String bTime = (b.startTime as String?)?.trim() ?? '00:00';
+      return aTime.compareTo(bTime);
+    });
+
     List<Widget> children = [];
     int currentDayCount = 1;
     DateTime? lastDate;
 
     for (int i = 0; i < activities.length; i++) {
       final activity = activities[i];
+      final DateTime actDate = activity.date is DateTime
+          ? activity.date
+          : DateTime.parse(activity.date.toString());
 
       if (lastDate == null ||
-          lastDate.year != activity.date.year ||
-          lastDate.month != activity.date.month ||
-          lastDate.day != activity.date.day) {
+          lastDate.year != actDate.year ||
+          lastDate.month != actDate.month ||
+          lastDate.day != actDate.day) {
         if (lastDate != null) currentDayCount++;
 
         children.add(
@@ -520,13 +539,15 @@ class _WholeItineraryDetailScreenState
             ),
           ),
         );
-        lastDate = activity.date;
+        lastDate = actDate;
       }
 
       final bool isLast =
           i == activities.length - 1 ||
-          (i + 1 < activities.length &&
-              (activities[i + 1].date.day != activity.date.day));
+              (i + 1 < activities.length &&
+                  (activities[i + 1].date.day != actDate.day ||
+                      activities[i + 1].date.month != actDate.month ||
+                      activities[i + 1].date.year != actDate.year));
 
       children.add(
         _buildTimelineItem(

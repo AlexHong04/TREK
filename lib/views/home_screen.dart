@@ -259,6 +259,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final state = viewModel.uiState;
 
     if (state.isLoading) {
+      debugPrint('[_buildPlanCard] State is loading...');
       return Container(
         width: double.infinity,
         height: 260,
@@ -271,6 +272,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (!state.hasPlan || state.latestTrip == null) {
+      debugPrint('[_buildPlanCard] No active plan found in state.');
       return Container(
         width: double.infinity,
         height: 260,
@@ -306,6 +308,14 @@ class _HomeScreenState extends State<HomeScreen> {
     final status = trip.computedStatus.toLowerCase();
     final bool isOngoing = status == 'ongoing';
     final bool isCompleted = status == 'completed';
+
+    // Print diagnostic status details on every build
+    debugPrint('----------------------------------------');
+    debugPrint('[_buildPlanCard] Destination: ${trip.destination}');
+    debugPrint('[_buildPlanCard] DB Status: ${trip.status}');
+    debugPrint('[_buildPlanCard] Computed Status: $status');
+    debugPrint('[_buildPlanCard] Dates: ${trip.startDate} -> ${trip.endDate}');
+    debugPrint('----------------------------------------');
 
     // Prioritize resolved banner from state, falling back to trip.imgUrl
     final String? activeImageUrl = (state.bannerImgUrl?.trim().isNotEmpty == true)
