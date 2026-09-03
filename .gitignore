@@ -18,10 +18,8 @@ migrate_working_dir/
 *.iws
 .idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
+# Local VS Code settings
+.vscode/
 
 # Flutter/Dart/Pub related
 **/doc/api/
@@ -50,7 +48,6 @@ app.*.map.json
 /android/gradle.properties
 *.properties
 
-# Chat export files
-ChatGPT-Collaborative Assignment-20260901-0110.md
-antigravity_trek_export.md
-codex_android_export.md
+# Local chat/export files
+*.md
+assets/splash.mp4
