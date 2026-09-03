@@ -40,22 +40,6 @@ class CameraSource {
     return savedFile.path;
   }
 
-  // open gallery and pick photo
-  Future<String?> pickPhotoFromGallery({int imageQuality = 80}) async {
-    final status = await Permission.photos.request();
-    if(!status.isGranted && !status.isLimited) {
-      final storageStatus = await Permission.storage.request();
-      if(!storageStatus.isGranted) return null;
-    }
-    final XFile? image = await _picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: imageQuality,
-    );
-    if(image == null) return null;
-    return await _saveToPermanentStorage(image.path);
-
-  }
-
   /// Opens the device crop tool and returns a permanent copy of the cropped
   /// image. Returning null means the tourist cancelled cropping.
   Future<String?> cropReceiptImage(String imagePath) async {

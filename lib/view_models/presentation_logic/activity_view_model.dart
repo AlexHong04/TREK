@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../models/entities/activity.dart';
 import '../../models/entities/expense_item.dart';
 import '../../models/local_data_source/camera_source.dart';
+import '../../models/local_data_source/gallery_source.dart';
 import '../../models/local_data_source/notification_source.dart';
 import '../../models/repository/expense_repository.dart';
 import '../../models/repository/i_expense_repository.dart';
@@ -25,6 +26,7 @@ class ActivityViewModel extends ChangeNotifier {
   final IExpenseTrackingService _expenseTrackingService;
   final IExpenseRepository _expenseRepository;
   final CameraSource _cameraSource = CameraSource();
+  final GallerySource _gallerySource = GallerySource();
   final NotificationSource _notificationSource = NotificationSource();
 
   ActivityViewModel({
@@ -234,7 +236,7 @@ class ActivityViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final localPath = await _cameraSource.pickPhotoFromGallery();
+      final localPath = await _gallerySource.pickPhoto();
       if (localPath == null) {
         _uiState = _uiState.copyWith(isPickingReceipt: false);
         notifyListeners();
