@@ -154,9 +154,13 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                         opacity: state.isLoading ? 0.55 : 1,
                         child: SizedBox(
                           width: double.infinity,
+                          height: 56,
                           child: SignInButton(
                             Buttons.google,
                             text: 'Sign up with Google',
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
                             onPressed: viewModel.onGoogleSignInPressed,
                           ),
                         ),

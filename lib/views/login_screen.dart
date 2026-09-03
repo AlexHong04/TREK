@@ -214,9 +214,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         opacity: state.isLoading ? 0.55 : 1,
                         child: SizedBox(
                           width: double.infinity,
+                          height: 56,
                           child: SignInButton(
                             Buttons.google,
                             text: 'Continue with Google',
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
                             onPressed: viewModel.onGoogleSignInPressed,
                           ),
                         ),
