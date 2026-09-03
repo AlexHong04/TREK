@@ -420,6 +420,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                   for (final item in expenseItems)
                     ListTile(
                       contentPadding: EdgeInsets.zero,
+                      onTap: () => _showExpenseItemDetails(item),
                       title: Text(item.itemName),
                       subtitle: Text(
                         '${DateFormat('dd MMM yyyy, hh:mm a').format(item.expenseDateTime)}\n'
@@ -516,6 +517,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     return Card(
       margin: EdgeInsets.only(bottom: 12),
       child: ListTile(
+        onTap: () => _showExpenseItemDetails(item),
         leading: CircleAvatar(
           backgroundColor: appTheme.teal_A700,
           child: Icon(Icons.receipt_long_outlined, color: appTheme.white_A700),
@@ -546,10 +548,86 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     );
   }
 
+  Future<void> _showExpenseItemDetails(ExpenseItem item) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        titlePadding: EdgeInsets.fromLTRB(24, 20, 8, 0),
+        title: Row(
+          children: [
+            Expanded(child: Text(item.itemName)),
+            IconButton(
+              tooltip: 'Close',
+              onPressed: () => Navigator.pop(dialogContext),
+              icon: Icon(Icons.close),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildItemDetailRow('Item Name', item.itemName),
+              _buildItemDetailRow(
+                'Description',
+                item.itemDescription?.trim().isNotEmpty == true
+                    ? item.itemDescription!
+                    : 'Not provided',
+              ),
+              _buildItemDetailRow(
+                'Merchant',
+                item.merchantName?.trim().isNotEmpty == true
+                    ? item.merchantName!
+                    : 'Not provided',
+              ),
+              _buildItemDetailRow(
+                'Date/Time',
+                DateFormat('dd MMM yyyy, hh:mm a')
+                    .format(item.expenseDateTime),
+              ),
+              _buildItemDetailRow('Quantity', item.quantity.toString()),
+              _buildItemDetailRow(
+                'Unit Price',
+                'RM${item.unitPrice.toStringAsFixed(2)}',
+              ),
+              _buildItemDetailRow(
+                'Subtotal',
+                'RM${item.subtotal.toStringAsFixed(2)}',
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildItemDetailRow(String label, String value) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 96,
+            child: Text(
+              label,
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+          Expanded(child: Text(value)),
+        ],
+      ),
+    );
+  }
+
   Widget _buildItemForm() {
     final quantity = int.tryParse(_quantityController.text) ?? 0;
     final unitPrice = _parsePrice(_unitPriceController.text) ?? 0;
     final subtotal = quantity * unitPrice;
+    final itemNameTextStyle = Theme.of(
+      context,
+    ).textTheme.bodyLarge!.copyWith(color: appTheme.gray_900);
 
     return Container(
       decoration: BoxDecoration(
@@ -584,38 +662,65 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'ITEM ENTRY',
-                        style: TextStyle(
-                          color: appTheme.blue_gray_300,
-                          fontFamily: 'Inter',
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: .5,
-                        ),
+                        'Item Entry',
+                        style: _fieldLabelStyle,
                       ),
-                      TextField(
-                        controller: _itemNameController,
-                        readOnly: !_isEditingItem,
-                        onChanged: (_) => setState(() {}),
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                      if (_isEditingItem)
+                        ConstrainedBox(
+                          constraints: BoxConstraints(maxWidth: 220),
+                          child: TextField(
+                            controller: _itemNameController,
+                            autofocus: true,
+                            onChanged: (_) => setState(() {}),
+                            style: itemNameTextStyle,
+                            decoration: InputDecoration(
+                              hintText: 'Item',
+                              hintStyle: TextStyle(color: appTheme.blue_gray_300),
+                              isDense: true,
+                              filled: true,
+                              fillColor: appTheme.gray_50,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(6),
+                                borderSide: BorderSide(color: appTheme.gray_100),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(6),
+                                borderSide: BorderSide(color: appTheme.gray_100),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(6),
+                                borderSide: BorderSide(
+                                  color: appTheme.teal_A700,
+                                  width: 2,
+                                ),
+                              ),
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 5,
+                              ),
+                            ),
+                          ),
+                        )
+                      else
+                        Text(
+                          _itemNameController.text.trim().isEmpty
+                              ? 'Item'
+                              : _itemNameController.text.trim(),
+                          style: itemNameTextStyle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        decoration: InputDecoration(
-                          hintText: 'Item Entry',
-                          isDense: true,
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                      ),
                     ],
                   ),
                 ),
                 IconButton(
-                  onPressed: () => setState(() => _isEditingItem = true),
+                  onPressed: _isEditingItem
+                      ? _saveItem
+                      : () => setState(() => _isEditingItem = true),
                   icon: Icon(
-                    Icons.edit_outlined,
+                    _isEditingItem
+                        ? Icons.check
+                        : Icons.edit_outlined,
                     color: Color(0xFFB3B3B3),
                   ),
                 ),
