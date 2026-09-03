@@ -152,7 +152,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                       ignoring: state.isLoading,
                       child: Opacity(
                         opacity: state.isLoading ? 0.55 : 1,
-                        child: Center(
+                        child: SizedBox(
+                          width: double.infinity,
                           child: SignInButton(
                             Buttons.google,
                             text: 'Sign up with Google',
