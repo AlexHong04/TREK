@@ -17,6 +17,12 @@ class ActivityUiState {
   final List<ExpenseItem> draftExpenseItems;
   final double draftTaxAmount;
   final double draftTotalAmount;
+  final String originalCurrency;
+  final List<String> availableCurrencies;
+  final bool isConverting;
+  final double? convertedAmount;
+  final String? displayCurrency;
+  final String? currencyError;
   final String paymentMethod;
   final String receiptLocalPath;
   final bool isSavingExpense;
@@ -57,6 +63,12 @@ class ActivityUiState {
     this.draftExpenseItems = const [],
     this.draftTaxAmount = 0.0,
     this.draftTotalAmount = 0.0,
+    this.originalCurrency = '',
+    this.availableCurrencies = const [],
+    this.isConverting = false,
+    this.convertedAmount,
+    this.displayCurrency,
+    this.currencyError,
     this.paymentMethod = '',
     this.receiptLocalPath = '',
     this.isSavingExpense = false,
@@ -134,6 +146,12 @@ class ActivityUiState {
     List<ExpenseItem>? draftExpenseItems,
     double? draftTaxAmount,
     double? draftTotalAmount,
+    String? originalCurrency,
+    List<String>? availableCurrencies,
+    bool? isConverting,
+    double? convertedAmount,
+    String? displayCurrency,
+    String? currencyError,
     String? paymentMethod,
     String? receiptLocalPath,
     bool? isSavingExpense,
@@ -177,6 +195,12 @@ class ActivityUiState {
       draftExpenseItems: draftExpenseItems ?? this.draftExpenseItems,
       draftTaxAmount: draftTaxAmount ?? this.draftTaxAmount,
       draftTotalAmount: draftTotalAmount ?? this.draftTotalAmount,
+      originalCurrency: originalCurrency ?? this.originalCurrency,
+      availableCurrencies: availableCurrencies ?? this.availableCurrencies,
+      isConverting: isConverting ?? this.isConverting,
+      convertedAmount: convertedAmount ?? this.convertedAmount,
+      displayCurrency: displayCurrency ?? this.displayCurrency,
+      currencyError: currencyError ?? this.currencyError,
       paymentMethod: paymentMethod ?? this.paymentMethod,
       receiptLocalPath: receiptLocalPath ?? this.receiptLocalPath,
       isSavingExpense: isSavingExpense ?? this.isSavingExpense,

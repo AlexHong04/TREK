@@ -12,6 +12,7 @@ import '../../models/repository/expense_repository.dart';
 import '../../models/repository/i_expense_repository.dart';
 import '../../models/services/budget_service.dart';
 import '../../models/services/i_budget_service.dart';
+import '../../models/services/i_auth_service.dart';
 import '../../models/services/expense_tracking_service.dart';
 import '../../models/services/i_expense_tracking_service.dart';
 import '../../models/services/itinerary_service.dart';
@@ -27,6 +28,7 @@ class ActivityViewModel extends ChangeNotifier {
   final IBudgetService _budgetService;
   final IExpenseTrackingService _expenseTrackingService;
   final IExpenseRepository _expenseRepository;
+  final IAuthService _authService;
   final CameraSource _cameraSource = CameraSource();
   final GallerySource _gallerySource = GallerySource();
   final NotificationSource _notificationSource = NotificationSource();
@@ -37,16 +39,31 @@ class ActivityViewModel extends ChangeNotifier {
     IBudgetService? budgetService,
     IExpenseTrackingService? expenseTrackingService,
     IExpenseRepository? expenseRepository,
+    required IAuthService authService,
   }) : _itineraryService = itineraryService ?? ItineraryService(),
        _budgetService = budgetService ?? BudgetService(),
        _expenseTrackingService =
            expenseTrackingService ?? ExpenseTrackingService(),
-       _expenseRepository = expenseRepository ?? ExpenseRepository() {
+       _expenseRepository = expenseRepository ?? ExpenseRepository(),
+       _authService = authService {
+    _uiState = _uiState.copyWith(originalCurrency: _authService.preferredCurrency);
+    _loadAvailableCurrencies();
+    _authService.addListener(_handleAuthChanged);
   }
 
   ActivityUiState _uiState = const ActivityUiState();
 
   ActivityUiState get uiState => _uiState;
+
+  void _handleAuthChanged() {
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _authService.removeListener(_handleAuthChanged);
+    super.dispose();
+  }
 
   void selectActivityForExpense(Activity activity) {
     _uiState = _uiState.copyWith(
@@ -55,6 +72,7 @@ class ActivityViewModel extends ChangeNotifier {
       draftExpenseItems: const [],
       draftTotalAmount: 0.0,
       paymentMethod: '',
+      originalCurrency: _authService.preferredCurrency,
       receiptLocalPath: '',
       clearOcrData: true,
       errorMessage: '',
@@ -185,6 +203,63 @@ class ActivityViewModel extends ChangeNotifier {
       successMessage: '',
     );
     notifyListeners();
+  }
+
+  void setOriginalCurrency(String currency) {
+    _uiState = _uiState.copyWith(
+      originalCurrency: currency.trim().toUpperCase(),
+      currencyError: null,
+    );
+    notifyListeners();
+  }
+
+  Future<void> _loadAvailableCurrencies() async {
+    try {
+      final currencies = await _authService.getSupportedCurrencies();
+      _uiState = _uiState.copyWith(availableCurrencies: currencies);
+      notifyListeners();
+    } catch (_) {
+      _uiState = _uiState.copyWith(
+        currencyError: 'Unable to load available currencies.',
+      );
+      notifyListeners();
+    }
+  }
+
+  String get preferredCurrency => _authService.preferredCurrency;
+
+  Future<void> convertAmount({
+    required double amount,
+    required String originalCurrency,
+  }) async {
+    _uiState = _uiState.copyWith(
+      isConverting: true,
+      currencyError: null,
+    );
+    notifyListeners();
+    final targetCurrency = _authService.preferredCurrency;
+    try {
+      final result = await _authService.convertToPreferredCurrency(
+        amount: amount,
+        fromCurrency: originalCurrency,
+      );
+      _uiState = _uiState.copyWith(
+        convertedAmount: result,
+        displayCurrency: result == null ? null : targetCurrency,
+        currencyError: result == null
+            ? 'The exchange rate is currently unavailable.'
+            : null,
+      );
+    } catch (_) {
+      _uiState = _uiState.copyWith(
+        convertedAmount: null,
+        displayCurrency: null,
+        currencyError: 'Unable to convert the amount.',
+      );
+    } finally {
+      _uiState = _uiState.copyWith(isConverting: false);
+      notifyListeners();
+    }
   }
 
   void setPaymentMethod(String paymentMethod) {
@@ -370,7 +445,6 @@ class ActivityViewModel extends ChangeNotifier {
       final receiptText = await _expenseTrackingService.readReceiptText(
         receiptLocalPath,
       );
-      debugPrint('Receipt OCR raw text:\n$receiptText');
       final extractedTotal = _expenseTrackingService.extractReceiptTotal(
         receiptText,
       );
@@ -380,6 +454,8 @@ class ActivityViewModel extends ChangeNotifier {
       final extractedDateTime = _expenseTrackingService.extractReceiptDateTime(
         receiptText,
       );
+      final extractedCurrency =
+          _expenseTrackingService.extractReceiptCurrency(receiptText);
       String extractedTotalError = '';
 
       if (extractedTotal != null) {
@@ -398,6 +474,7 @@ class ActivityViewModel extends ChangeNotifier {
             _expenseTrackingService.extractMerchantName(receiptText) ?? '',
         ocrTransactionDateTime: extractedDateTime,
         clearOcrTransactionDateTime: extractedDateTime == null,
+        originalCurrency: extractedCurrency ?? _uiState.originalCurrency,
         ocrExtractedTotal: extractedTotal,
         clearOcrExtractedTotal: extractedTotal == null,
         ocrExtractedTax: extractedTax,
@@ -428,6 +505,9 @@ class ActivityViewModel extends ChangeNotifier {
       if (_uiState.paymentMethod.trim().isEmpty) {
         throw ArgumentError('Please select a payment method.');
       }
+      if (!RegExp(r'^[A-Z]{3}$').hasMatch(_uiState.originalCurrency)) {
+        throw ArgumentError('Please select the original expense currency.');
+      }
       _expenseTrackingService.validateExpenseItems(_uiState.draftExpenseItems);
       _expenseTrackingService.validateTotalAmount(_uiState.draftTotalAmount);
       return true;
@@ -448,6 +528,10 @@ class ActivityViewModel extends ChangeNotifier {
       _setExpenseError('Please select a payment method.');
       return;
     }
+    if (!RegExp(r'^[A-Z]{3}$').hasMatch(_uiState.originalCurrency)) {
+      _setExpenseError('Please select the original expense currency.');
+      return;
+    }
 
     _uiState = _uiState.copyWith(
       isSavingExpense: true,
@@ -463,6 +547,7 @@ class ActivityViewModel extends ChangeNotifier {
         activitiesId: selectedActivity.activitiesId,
         expenseItems: _uiState.draftExpenseItems,
         paymentMethod: _uiState.paymentMethod.trim(),
+        currency: _uiState.originalCurrency,
         taxAmount: _uiState.draftTaxAmount,
         receiptLocalPath: _uiState.receiptLocalPath.isEmpty
             ? null

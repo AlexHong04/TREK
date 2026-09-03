@@ -12,6 +12,7 @@ import '../models/entities/expense_item.dart';
 import '../theme/app_theme.dart';
 import '../view_models/presentation_logic/activity_view_model.dart';
 import '../view_models/ui_state/activity_ui_state.dart';
+import '../widgets/converted_amount_text.dart';
 
 /// Opens the Expense form for the Activity selected from the itinerary.
 Future<void> showExpenseBottomSheet({
@@ -241,6 +242,19 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     );
   }
 
+  String _activeExpenseCurrency(ActivityUiState uiState) {
+    final originalCurrency = uiState.originalCurrency.trim().toUpperCase();
+    if (originalCurrency.isNotEmpty) return originalCurrency;
+    return context.read<ActivityViewModel>().preferredCurrency.trim().toUpperCase();
+  }
+
+  TextStyle get _moneyTextStyle => TextStyle(
+        color: appTheme.gray_900,
+        fontFamily: 'Inter',
+        fontSize: 14,
+        fontWeight: FontWeight.w700,
+      );
+
   Widget _buildRecordedExpensesSection(ActivityUiState uiState) {
     final expenses = uiState.recordedExpenses;
     return Column(
@@ -342,12 +356,23 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                   ],
                 ),
               ),
-              Text(
-                'RM${expense.totalAmount.toStringAsFixed(2)}',
-                style: TextStyle(
-                  color: appTheme.blueGray900,
-                  fontFamily: 'Inter',
-                  fontWeight: FontWeight.w700,
+              SizedBox(
+                width: 126,
+                child: ConvertedAmountText(
+                  amount: expense.totalAmount,
+                  originalCurrency: expense.currency,
+                  primaryStyle: TextStyle(
+                    color: appTheme.blueGray900,
+                    fontFamily: 'Inter',
+                    fontWeight: FontWeight.w700,
+                  ),
+                  secondaryStyle: TextStyle(
+                    color: appTheme.blue_gray_700,
+                    fontFamily: 'Inter',
+                    fontSize: 11,
+                  ),
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  textAlign: TextAlign.right,
                 ),
               ),
               SizedBox(width: 4),
@@ -390,7 +415,16 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Total: RM${expense.totalAmount.toStringAsFixed(2)}'),
+                ConvertedAmountText(
+                  amount: expense.totalAmount,
+                  originalCurrency: expense.currency,
+                  primaryStyle: TextStyle(
+                    color: appTheme.gray_900,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                SizedBox(height: 8),
                 Text('Payment: ${expense.paymentMethod ?? 'Not specified'}'),
                 Text(
                   expense.createdAt == null
@@ -420,13 +454,26 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                   for (final item in expenseItems)
                     ListTile(
                       contentPadding: EdgeInsets.zero,
-                      onTap: () => _showExpenseItemDetails(item),
+                      onTap: () =>
+                          _showExpenseItemDetails(item, expense.currency),
                       title: Text(item.itemName),
                       subtitle: Text(
                         '${DateFormat('dd MMM yyyy, hh:mm a').format(item.expenseDateTime)}\n'
-                        '${item.quantity} × RM${item.unitPrice.toStringAsFixed(2)}',
+                        '${item.quantity} × '
+                        '${formatCurrencyAmount(expense.currency, item.unitPrice)}',
                       ),
-                      trailing: Text('RM${item.subtotal.toStringAsFixed(2)}'),
+                      trailing: ConvertedAmountText(
+                        amount: item.subtotal,
+                        originalCurrency: expense.currency,
+                        primaryStyle: _moneyTextStyle,
+                        secondaryStyle: TextStyle(
+                          color: appTheme.blue_gray_300,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        textAlign: TextAlign.end,
+                      ),
                     ),
               ],
             ),
@@ -473,7 +520,11 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
           ),
           SizedBox(height: 14),
           for (var index = 0; index < uiState.draftExpenseItems.length; index++)
-            _buildSavedItemCard(uiState.draftExpenseItems[index], index),
+            _buildSavedItemCard(
+              uiState.draftExpenseItems[index],
+              index,
+              _activeExpenseCurrency(uiState),
+            ),
           if (_showItemForm) _buildItemForm(),
           SizedBox(height: 14),
           InkWell(
@@ -513,11 +564,11 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     );
   }
 
-  Widget _buildSavedItemCard(ExpenseItem item, int index) {
+  Widget _buildSavedItemCard(ExpenseItem item, int index, String currency) {
     return Card(
       margin: EdgeInsets.only(bottom: 12),
       child: ListTile(
-        onTap: () => _showExpenseItemDetails(item),
+        onTap: () => _showExpenseItemDetails(item, currency),
         leading: CircleAvatar(
           backgroundColor: appTheme.teal_A700,
           child: Icon(Icons.receipt_long_outlined, color: appTheme.white_A700),
@@ -530,7 +581,8 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
           ),
         ),
         subtitle: Text(
-          '${item.quantity} × RM${item.unitPrice.toStringAsFixed(2)} = RM${item.subtotal.toStringAsFixed(2)}',
+          '${item.quantity} × ${formatCurrencyAmount(currency, item.unitPrice)}'
+          ' = ${formatCurrencyAmount(currency, item.subtotal)}',
         ),
         trailing: Wrap(
           children: [
@@ -548,7 +600,10 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     );
   }
 
-  Future<void> _showExpenseItemDetails(ExpenseItem item) async {
+  Future<void> _showExpenseItemDetails(
+    ExpenseItem item,
+    String currency,
+  ) async {
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -589,11 +644,11 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
               _buildItemDetailRow('Quantity', item.quantity.toString()),
               _buildItemDetailRow(
                 'Unit Price',
-                'RM${item.unitPrice.toStringAsFixed(2)}',
+                formatCurrencyAmount(currency, item.unitPrice),
               ),
               _buildItemDetailRow(
                 'Subtotal',
-                'RM${item.subtotal.toStringAsFixed(2)}',
+                formatCurrencyAmount(currency, item.subtotal),
               ),
             ],
           ),
@@ -622,6 +677,8 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   }
 
   Widget _buildItemForm() {
+    final uiState = context.watch<ActivityViewModel>().uiState;
+    final currency = _activeExpenseCurrency(uiState);
     final quantity = int.tryParse(_quantityController.text) ?? 0;
     final unitPrice = _parsePrice(_unitPriceController.text) ?? 0;
     final subtotal = quantity * unitPrice;
@@ -774,7 +831,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                     SizedBox(width: 12),
                     Expanded(
                       child: _buildTextField(
-                        'Unit Price (RM)',
+                        'Unit Price ($currency)',
                         _unitPriceController,
                         '0.00',
                         TextInputType.numberWithOptions(decimal: true),
@@ -815,7 +872,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                             ),
                           ),
                           Text(
-                            'RM${subtotal.toStringAsFixed(2)}',
+                            formatCurrencyAmount(currency, subtotal),
                             style: TextStyle(
                               fontFamily: 'Inter',
                               fontSize: 20,
@@ -925,6 +982,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   }
 
   Widget _buildTaxSection(ActivityUiState uiState) {
+    final currency = _activeExpenseCurrency(uiState);
     if (_taxController.text.isEmpty && uiState.draftTaxAmount > 0) {
       _taxController.text = uiState.draftTaxAmount.toStringAsFixed(2);
     }
@@ -966,7 +1024,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
               context.read<ActivityViewModel>().setDraftTaxAmount(parsedTax);
             },
             decoration: _fieldDecoration('0.00').copyWith(
-              prefixText: 'RM ',
+              prefixText: '$currency ',
               prefixStyle: TextStyle(
                 color: appTheme.gray_900,
                 fontWeight: FontWeight.w600,
@@ -979,6 +1037,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   }
 
   Widget _buildTotalAmountSection(ActivityUiState uiState) {
+    final currency = _activeExpenseCurrency(uiState);
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(16),
@@ -1001,13 +1060,20 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
             ),
           ),
           SizedBox(height: 4),
-          Text(
-            'RM${uiState.draftTotalAmount.toStringAsFixed(2)}',
-            style: TextStyle(
+          ConvertedAmountText(
+            amount: uiState.draftTotalAmount,
+            originalCurrency: currency,
+            primaryStyle: TextStyle(
               color: appTheme.gray_900,
               fontFamily: 'Inter',
               fontSize: 24,
               fontWeight: FontWeight.w700,
+            ),
+            secondaryStyle: TextStyle(
+              color: appTheme.blue_gray_300,
+              fontFamily: 'Inter',
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -1162,6 +1228,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
 
     final hasOcrDateTime = uiState.ocrTransactionDateTime != null;
     final hasOcrTotal = uiState.ocrExtractedTotal != null;
+    final currency = _activeExpenseCurrency(uiState);
     final ocrFailed =
         uiState.ocrRawText.isEmpty &&
         uiState.errorMessage.startsWith('Unable to read the receipt.');
@@ -1217,13 +1284,13 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
           _buildOcrValue(
             'Extracted tax',
             uiState.ocrExtractedTax != null
-                ? 'RM${uiState.ocrExtractedTax!.toStringAsFixed(2)}'
-                : 'RM0.00 (Not detected)',
+                ? formatCurrencyAmount(currency, uiState.ocrExtractedTax!)
+                : '${formatCurrencyAmount(currency, 0)} (Not detected)',
           ),
           _buildOcrValue(
             'Extracted total',
             hasOcrTotal
-                ? 'RM${uiState.ocrExtractedTotal!.toStringAsFixed(2)}'
+                ? formatCurrencyAmount(currency, uiState.ocrExtractedTotal!)
                 : 'Not detected',
           ),
           if (uiState.ocrItemLines.isNotEmpty) ...[
@@ -1605,10 +1672,12 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     }
 
     final totalAmount = viewModel.uiState.draftTotalAmount;
+    final currency = _activeExpenseCurrency(viewModel.uiState);
     final isConfirmed = await _showConfirmationDialog(
       title: 'Confirm Expense',
       message:
-          'Are you sure you want to record this expense of RM${totalAmount.toStringAsFixed(2)}?',
+          'Are you sure you want to record this expense of '
+          '${formatCurrencyAmount(currency, totalAmount)}?',
       confirmLabel: 'Confirm',
     );
 
@@ -1845,7 +1914,10 @@ class _ExpenseActivitySummary extends StatelessWidget {
                 SizedBox(height: 6),
                 _detail(
                   Icons.account_balance_wallet_outlined,
-                  'RM${activity.allocatedBudget.toStringAsFixed(2)}',
+                  formatCurrencyAmount(
+                    context.watch<ActivityViewModel>().preferredCurrency,
+                    activity.allocatedBudget,
+                  ),
                 ),
               ],
             ),

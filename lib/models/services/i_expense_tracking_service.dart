@@ -19,6 +19,8 @@ abstract interface class IExpenseTrackingService {
 
   DateTime? extractReceiptDateTime(String receiptText);
 
+  String? extractReceiptCurrency(String receiptText);
+
   double? extractReceiptTotal(String receiptText);
 
   double? extractReceiptTax(String receiptText);
@@ -35,6 +37,7 @@ abstract interface class IExpenseTrackingService {
     required String activitiesId,
     required List<ExpenseItem> expenseItems,
     required String paymentMethod,
+    required String currency,
     double taxAmount = 0.0,
     String? receiptLocalPath,
   });

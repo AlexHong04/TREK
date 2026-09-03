@@ -310,8 +310,30 @@ class ExpenseTrackingService implements IExpenseTrackingService {
   /// returned by OCR as separate lines.
   List<String> extractReceiptItemLines(String receiptText) {
     return _extractReceiptItems(receiptText)
-        .map((item) => '${item.name} RM${item.unitPrice.toStringAsFixed(2)}')
+        .map((item) => '${item.name} ${item.unitPrice.toStringAsFixed(2)}')
         .toList();
+  }
+
+  String? extractReceiptCurrency(String receiptText) {
+    final normalized = receiptText.toUpperCase();
+    const currencyPatterns = <String, String>{
+      'MYR': r'\bMYR\b|\bRM\b',
+      'USD': r'\bUSD\b|\$',
+      'EUR': r'\bEUR\b|€',
+      'GBP': r'\bGBP\b|£',
+      'JPY': r'\bJPY\b|¥',
+      'CNY': r'\bCNY\b',
+      'SGD': r'\bSGD\b|S\$',
+      'AUD': r'\bAUD\b|A\$',
+      'CAD': r'\bCAD\b|C\$',
+      'HKD': r'\bHKD\b|HK\$',
+      'THB': r'\bTHB\b|฿',
+      'INR': r'\bINR\b|₹',
+    };
+    for (final entry in currencyPatterns.entries) {
+      if (RegExp(entry.value).hasMatch(normalized)) return entry.key;
+    }
+    return null;
   }
 
   /// Creates temporary expense items from OCR output. The caller still lets
@@ -866,6 +888,7 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     required String activitiesId,
     required List<ExpenseItem> expenseItems,
     required String paymentMethod,
+    required String currency,
     double taxAmount = 0.0,
     String? receiptLocalPath,
   }) async {
@@ -875,6 +898,10 @@ class ExpenseTrackingService implements IExpenseTrackingService {
 
     if (paymentMethod.trim().isEmpty) {
       throw ArgumentError('Please select a payment method.');
+    }
+    final originalCurrency = currency.trim().toUpperCase();
+    if (!RegExp(r'^[A-Z]{3}$').hasMatch(originalCurrency)) {
+      throw ArgumentError('A valid original currency is required.');
     }
 
     validateExpenseItems(expenseItems);
@@ -897,6 +924,7 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       Expense(
         activitiesId: activitiesId,
         totalAmount: totalAmount,
+        currency: originalCurrency,
         paymentMethod: paymentMethod.trim(),
       ),
     );

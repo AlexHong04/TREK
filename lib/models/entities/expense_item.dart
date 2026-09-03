@@ -1,3 +1,4 @@
+/// Monetary values inherit the original currency from the parent [Expense].
 class ExpenseItem {
   final String? expenseItemId;
   final String? expenseId;
