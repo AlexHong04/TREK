@@ -63,11 +63,11 @@ class _TravelInformationInputScreenState
                         children: [
                           if (viewModel.uiState.isSearchingSuggestions) ...[
                             const SizedBox(height: 8.0),
-                            const LinearProgressIndicator(
+                            LinearProgressIndicator(
                               minHeight: 2.0,
-                              backgroundColor: Colors.transparent,
+                              backgroundColor: appTheme.transparentCustom,
                               valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.teal,
+                                appTheme.teal_A700,
                               ),
                             ),
                           ],
@@ -151,6 +151,24 @@ class _TravelInformationInputScreenState
                           lastDate: DateTime.now().add(
                             const Duration(days: 365),
                           ),
+                          selectableDayPredicate:
+                              (DateTime day, DateTime? start, DateTime? end) {
+                                final checkDate = DateTime(
+                                  day.year,
+                                  day.month,
+                                  day.day,
+                                );
+                                for (final range
+                                    in viewModel
+                                        .uiState
+                                        .unavailableDateRanges) {
+                                  if (checkDate.compareTo(range.start) >= 0 &&
+                                      checkDate.compareTo(range.end) <= 0) {
+                                    return false; // Disable if date falls within an existing trip
+                                  }
+                                }
+                                return true;
+                              },
                         );
                         if (picked != null) {
                           viewModel.updateDateRange(picked.start, picked.end);
