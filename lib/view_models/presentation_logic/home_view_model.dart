@@ -8,8 +8,7 @@ import '../../models/services/itinerary_service.dart';
 import '../../models/services/i_auth_service.dart';
 
 class HomeViewModel extends ChangeNotifier {
-  final ItineraryRepository _repository = ItineraryRepository();
-  final ItineraryService _service = ItineraryService();
+  final ItineraryService _itineraryService = ItineraryService();
   final IAuthService _authService;
 
   HomeUiState _uiState = const HomeUiState(email: 'User');
@@ -51,7 +50,7 @@ class HomeViewModel extends ChangeNotifier {
 
     try {
 
-      final result = await _service.fetchLatestTrip();
+      final result = await _itineraryService.fetchLatestTrip();
 
       if (result != null) {
         var trip = result.trip;
@@ -91,7 +90,7 @@ class HomeViewModel extends ChangeNotifier {
       _uiState = _uiState.copyWith(isLoading: true);
       notifyListeners();
 
-      await _service.updateTripStatus(tripId, 'ongoing');
+      await _itineraryService.updateTripStatus(tripId, 'ongoing');
 
       // refresh the UI reflects the updated state
       await fetchLatestTrip();
@@ -115,13 +114,14 @@ class HomeViewModel extends ChangeNotifier {
     super.dispose();
   }
 
+  // weisong
   Future<void> fetchLatestTripWithCurrentUserId() async {
     _uiState = _uiState.copyWith(isLoading: true);
     notifyListeners();
 
     try {
       // Calls the user-scoped fetch method
-      final result = await _service.fetchLatestTripWithCurrentUserId();
+      final result = await _itineraryService.fetchLatestTripWithCurrentUserId();
 
       if (result != null) {
         final trip = result;
