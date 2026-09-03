@@ -198,7 +198,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
       warningText3: 'Plan will be modified automatically.',
       onContinue: () async {
         // 1. Dismiss the dialog
-        Navigator.of(context, rootNavigator: true).pop();
+        // Navigator.of(context, rootNavigator: true).pop();
 
         // 2. Trigger the budget recovery plan generation
         final viewModel = context.read<ActivityViewModel>();

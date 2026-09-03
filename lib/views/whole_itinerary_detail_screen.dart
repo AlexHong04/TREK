@@ -128,7 +128,6 @@ class _WholeItineraryDetailScreenState
                 context: context,
                 onContinue: () {
                   // Trigger re-recommendation with the latest total budget
-                  Navigator.of(context).pop();
                   viewModel.generateItinerary();
                 },
               );
