@@ -59,6 +59,7 @@ abstract interface class IItineraryService {
     required double topUpAmount,
     required List<Activity> remainingActivities,
     required String tripDestination,
+    String? userCoordinates,
     DateTime? currentDate,
   });
 

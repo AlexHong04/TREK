@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../../models/entities/activity.dart';
 import '../../models/entities/expense_item.dart';
@@ -15,6 +16,7 @@ import '../../models/services/expense_tracking_service.dart';
 import '../../models/services/i_expense_tracking_service.dart';
 import '../../models/services/itinerary_service.dart';
 import '../../models/services/i_itinerary_service.dart';
+import '../../models/local_data_source/location_source.dart';
 import '../ui_state/activity_ui_state.dart';
 
 class ActivityViewModel extends ChangeNotifier {
@@ -28,6 +30,7 @@ class ActivityViewModel extends ChangeNotifier {
   final CameraSource _cameraSource = CameraSource();
   final GallerySource _gallerySource = GallerySource();
   final NotificationSource _notificationSource = NotificationSource();
+  final LocationSource _locationSource = LocationSource();
 
   ActivityViewModel({
     IItineraryService? itineraryService,
@@ -1087,6 +1090,17 @@ class ActivityViewModel extends ChangeNotifier {
         return false;
       }
 
+      Position? currentPosition;
+      try {
+        currentPosition = await _locationSource.getCurrentLocation();
+      } catch (e) {
+        debugPrint('LocationSource error: $e');
+      }
+
+      final userCoordinates = currentPosition != null
+          ? 'Lat: ${currentPosition.latitude.toStringAsFixed(5)}, Lon: ${currentPosition.longitude.toStringAsFixed(5)}'
+          : null;
+
       // 2. Delegate generation and Supabase updates completely to Service
       final revisedActivities =
       await _itineraryService.generateBudgetRecoveryItinerary(
@@ -1096,6 +1110,7 @@ class ActivityViewModel extends ChangeNotifier {
         topUpAmount: topUpAmount,
         remainingActivities: remainingActivities,
         tripDestination: _uiState.tripDestination,
+        userCoordinates: userCoordinates,
         currentDate: DateTime.now(),
       );
 

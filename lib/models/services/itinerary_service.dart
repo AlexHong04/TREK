@@ -558,6 +558,7 @@ class ItineraryService implements IItineraryService {
     required double topUpAmount,
     required List<Activity> remainingActivities,
     required String tripDestination,
+    String? userCoordinates,
     DateTime? currentDate,
   }) async {
     // 1. Create lookup map for preserving IDs and metadata
@@ -589,6 +590,7 @@ class ItineraryService implements IItineraryService {
       topUpAmount: topUpAmount,
       remainingActivities: rawActivitiesPayload,
       tripDestination: tripDestination,
+      userCoordinates: userCoordinates,
       currentDate: currentDate,
     );
 

@@ -644,6 +644,7 @@ class ItineraryRepository implements IItineraryRepository {
       final tripResponse = await SupabaseConfig.client
           .from('whole_trips')
           .select()
+          .eq('status', 'ongoing')
           .eq('user_id', targetUserId)
           .order('created_at', ascending: false)
           .limit(1)
