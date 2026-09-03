@@ -476,11 +476,15 @@ class GeminiApiConfig {
     required double topUpAmount,
     required List<Map<String, dynamic>> remainingActivities,
     required String tripDestination,
+    String? userCoordinates,
     DateTime? currentDate,
   }) async {
     final effectiveRemainingBudget =
         (newTotalBudget + topUpAmount) - currentSpentBudget;
 
+    final locationConstraint = userCoordinates != null
+    ? 'Current GPS Coordinates: $userCoordinates (within $tripDestination)'
+    : 'Destination: $tripDestination';
     final prompt =
         '''
     You are an AI travel itinerary and budget optimizer.
@@ -497,17 +501,18 @@ class GeminiApiConfig {
     ${jsonEncode(remainingActivities)}
 
     Instructions:
-    1. Re-adjust and optimize the remaining activities to fit STRICTLY within the max usable budget of RM ${effectiveRemainingBudget.toStringAsFixed(2)}.
-    2. You may replace high-cost attractions or restaurants with affordable or free alternatives (e.g., public parks, free cultural spots, hawker centres).
-    3. Ensure logical time scheduling (startTime, endTime) and maintain sequential flow.
-    4. Output MUST be a valid JSON array of objects with the exact schema below.
+    1. Minimise Transit Time & Costs: Prioritize activities, cultural sights, free parks, or food spots that are within easy walking distance or a short, cheap public transit ride from the tourist's current location ($locationConstraint). Strictly avoid destinations requiring expensive taxi, Grab, or long-distance travel.
+    2. Budget Compliance: The sum of allocatedBudget for all returned items MUST NOT exceed RM ${effectiveRemainingBudget.toStringAsFixed(2)}.
+    3. Slot Continuity: Preserve the original "activitiesId" for modified or replaced slots so database references remain valid.
+    4. Logical Sequence: Organize startTime and endTime chronologically from the current time forward.
+    5. Return ONLY a valid JSON array matching the schema below.
 
     JSON Schema:
     [
       {
         "activitiesId": "keep original ID if retained, or generate a new unique string if replaced",
         "destination": "Activity / Place Name",
-        "description": "Brief description of the activity",
+        "description": "Short explanation highlighting walkability/affordability",
         "date": "YYYY-MM-DDTHH:mm:ss",
         "startTime": "HH:mm",
         "endTime": "HH:mm",
@@ -535,11 +540,11 @@ class GeminiApiConfig {
           ],
           "generationConfig": {"responseMimeType": "application/json"},
         }),
-      ).timeout(
-        const Duration(seconds: 25),
-        onTimeout: () {
-          throw TimeoutException("Gemini API request timed out after 25 seconds. Please Try Again.");
-        }
+      // ).timeout(
+      //   const Duration(seconds: 25),
+      //   onTimeout: () {
+      //     throw TimeoutException("Gemini API request timed out after 25 seconds. Please Try Again.");
+      //   }
       );
 
       if (response.statusCode == 200) {
