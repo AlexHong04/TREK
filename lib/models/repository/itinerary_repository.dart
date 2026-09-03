@@ -641,20 +641,35 @@ class ItineraryRepository implements IItineraryRepository {
 
       final String targetUserId = userRecord?['user_id'] as String? ?? user.id;
 
-      final tripResponse = await SupabaseConfig.client
+      // 1. Try to fetch an active 'ongoing' trip first
+      final ongoingTripResponse = await SupabaseConfig.client
           .from('whole_trips')
           .select()
-          .eq('status', 'ongoing')
           .eq('user_id', targetUserId)
+          .eq('status', 'ongoing')
+          .order('start_date', ascending: true)
+          .limit(1)
+          .maybeSingle();
+
+      if (ongoingTripResponse != null) {
+        return WholeTrip.fromJson(ongoingTripResponse);
+      }
+
+      // 2. If no trip is ongoing, fall back to the newest pending/upcoming trip
+      final fallbackTripResponse = await SupabaseConfig.client
+          .from('whole_trips')
+          .select()
+          .eq('user_id', targetUserId)
+          .neq('status', 'completed')
           .order('created_at', ascending: false)
           .limit(1)
           .maybeSingle();
 
-      if (tripResponse == null) {
+      if (fallbackTripResponse == null) {
         return null;
       }
 
-      return WholeTrip.fromJson(tripResponse);
+      return WholeTrip.fromJson(fallbackTripResponse);
     } catch (e) {
       debugPrint('Error in fetchLatestTrip: $e');
       return null;
