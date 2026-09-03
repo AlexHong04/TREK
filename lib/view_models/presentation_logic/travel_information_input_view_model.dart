@@ -8,7 +8,26 @@ class TravelInformationInputViewModel extends ChangeNotifier {
   final IItineraryService _itineraryService;
 
   TravelInformationInputViewModel({IItineraryService? itineraryService})
-    : _itineraryService = itineraryService ?? ItineraryService();
+    : _itineraryService = itineraryService ?? ItineraryService() {
+    _loadExistingTrips();
+  }
+
+  Future<void> _loadExistingTrips() async {
+    try {
+      final trips = await _itineraryService.fetchAllTrip();
+      final ranges = trips.map((t) {
+        // We normalize the start and end dates to just year/month/day
+        return DateTimeRange(
+          start: DateTime(t.startDate.year, t.startDate.month, t.startDate.day),
+          end: DateTime(t.endDate.year, t.endDate.month, t.endDate.day),
+        );
+      }).toList();
+      _uiState = _uiState.copyWith(unavailableDateRanges: ranges);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading existing trips for dates: $e');
+    }
+  }
 
   final TextEditingController destinationController = TextEditingController();
   final TextEditingController dateController = TextEditingController();

@@ -8,6 +8,7 @@ class TravelInformationUiState {
   final List<String> wishlistItems;
   final List<String> suggestions;
   final bool isSearchingSuggestions;
+  final List<DateTimeRange> unavailableDateRanges;
 
   const TravelInformationUiState({
     this.isLoading = false,
@@ -17,6 +18,7 @@ class TravelInformationUiState {
     this.wishlistItems = const [],
     this.suggestions = const [],
     this.isSearchingSuggestions = false,
+    this.unavailableDateRanges = const [],
   });
 
   TravelInformationUiState copyWith({
@@ -27,6 +29,7 @@ class TravelInformationUiState {
     List<String>? wishlistItems,
     List<String>? suggestions,
     bool? isSearchingSuggestions,
+    List<DateTimeRange>? unavailableDateRanges,
   }) {
     return TravelInformationUiState(
       isLoading: isLoading ?? this.isLoading,
@@ -38,6 +41,8 @@ class TravelInformationUiState {
       suggestions: suggestions ?? this.suggestions,
       isSearchingSuggestions:
           isSearchingSuggestions ?? this.isSearchingSuggestions,
+      unavailableDateRanges:
+          unavailableDateRanges ?? this.unavailableDateRanges,
     );
   }
 }
