@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../theme/app_theme.dart';
 
-class CustomTextField extends StatelessWidget {
+class CustomTextField extends StatefulWidget {
   final String sectionTitle;
   final String hintText;
   final IconData prefixIcon;
@@ -58,14 +58,21 @@ class CustomTextField extends StatelessWidget {
     this.suffixIcon,
     this.margin = const EdgeInsets.symmetric(horizontal: 24.0),
   }) : assert(
-  controller == null || initialValue == null,
-  'controller and initialValue cannot both be provided.',
-  );
+         controller == null || initialValue == null,
+         'controller and initialValue cannot both be provided.',
+       );
+
+  @override
+  State<CustomTextField> createState() => _CustomTextFieldState();
+}
+
+class _CustomTextFieldState extends State<CustomTextField> {
+  bool _hasLostFocus = false;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: margin,
+      margin: widget.margin,
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
       decoration: BoxDecoration(
         color: appTheme.white_A700,
@@ -83,7 +90,7 @@ class CustomTextField extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            sectionTitle,
+            widget.sectionTitle,
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w800,
@@ -94,82 +101,102 @@ class CustomTextField extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6.0),
-          TextFormField(
-            controller: controller,
-            initialValue: initialValue,
-            focusNode: focusNode,
-            enabled: enabled,
-            autovalidateMode: AutovalidateMode.onUserInteraction,
-            readOnly: readOnly,
-            obscureText: obscureText,
-            autocorrect: autocorrect,
-            enableSuggestions: enableSuggestions,
-            onTap: onTap,
-            onFieldSubmitted: onFieldSubmitted,
-            onChanged: onChanged,
-            keyboardType: keyboardType,
-            textInputAction: textInputAction,
-            textCapitalization: textCapitalization,
-            autofillHints: autofillHints,
-            inputFormatters: inputFormatters,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w400,
-              fontFamily: 'Inter',
-              color: appTheme.gray_800,
-            ),
-            decoration: InputDecoration(
-              hintText: hintText,
-              hintStyle: TextStyle(
+          Focus(
+            onFocusChange: (hasFocus) {
+              if (!hasFocus && !_hasLostFocus) {
+                // Field lost focus for the first time
+                setState(() {
+                  _hasLostFocus = true;
+                });
+              }
+            },
+            child: TextFormField(
+              controller: widget.controller,
+              initialValue: widget.initialValue,
+              focusNode: widget.focusNode,
+              enabled: widget.enabled,
+              autovalidateMode: _hasLostFocus
+                  ? AutovalidateMode.always
+                  : AutovalidateMode.onUserInteraction,
+              readOnly: widget.readOnly,
+              obscureText: widget.obscureText,
+              autocorrect: widget.autocorrect,
+              enableSuggestions: widget.enableSuggestions,
+              onTap: widget.onTap,
+              onFieldSubmitted: widget.onFieldSubmitted,
+              onChanged: widget.onChanged,
+              keyboardType: widget.keyboardType,
+              textInputAction: widget.textInputAction,
+              textCapitalization: widget.textCapitalization,
+              autofillHints: widget.autofillHints,
+              inputFormatters: widget.inputFormatters,
+              style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w400,
                 fontFamily: 'Inter',
-                color: appTheme.blue_gray_300,
+                color: appTheme.gray_800,
               ),
-              errorText: errorText,
-              errorMaxLines: errorMaxLines,
-              prefixIcon: Icon(prefixIcon),
-              prefixIconConstraints: const BoxConstraints(
-                minWidth: 44.0,
-                minHeight: 34.0,
+              decoration: InputDecoration(
+                hintText: widget.hintText,
+                hintStyle: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w400,
+                  fontFamily: 'Inter',
+                  color: appTheme.blue_gray_300,
+                ),
+                errorText: widget.errorText,
+                errorMaxLines: widget.errorMaxLines,
+                prefixIcon: Icon(widget.prefixIcon),
+                prefixIconConstraints: const BoxConstraints(
+                  minWidth: 44.0,
+                  minHeight: 34.0,
+                ),
+                suffixIcon: widget.suffixIcon,
+                contentPadding: const EdgeInsets.symmetric(
+                  vertical: 6.0,
+                  horizontal: 12.0,
+                ),
+                filled: true,
+                fillColor: widget.enabled
+                    ? appTheme.white_A700
+                    : appTheme.gray_200,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.0),
+                  borderSide: BorderSide(color: appTheme.gray_200, width: 1.0),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.0),
+                  borderSide: BorderSide(color: appTheme.gray_200, width: 1.0),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.0),
+                  borderSide: BorderSide(color: appTheme.teal_A700, width: 1.0),
+                ),
+                disabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.0),
+                  borderSide: BorderSide(color: appTheme.gray_200, width: 1.0),
+                ),
+                errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.0),
+                  borderSide: BorderSide(
+                    color: appTheme.colorFFEF44,
+                    width: 1.0,
+                  ),
+                ),
+                focusedErrorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.0),
+                  borderSide: BorderSide(
+                    color: appTheme.colorFFEF44,
+                    width: 1.0,
+                  ),
+                ),
               ),
-              suffixIcon: suffixIcon,
-              contentPadding: const EdgeInsets.symmetric(
-                vertical: 6.0,
-                horizontal: 12.0,
-              ),
-              filled: true,
-              fillColor: enabled ? appTheme.white_A700 : appTheme.gray_200,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12.0),
-                borderSide: BorderSide(color: appTheme.gray_200, width: 1.0),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12.0),
-                borderSide: BorderSide(color: appTheme.gray_200, width: 1.0),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12.0),
-                borderSide: BorderSide(color: appTheme.teal_A700, width: 1.0),
-              ),
-              disabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12.0),
-                borderSide: BorderSide(color: appTheme.gray_200, width: 1.0),
-              ),
-              errorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12.0),
-                borderSide: BorderSide(color: appTheme.colorFFEF44, width: 1.0),
-              ),
-              focusedErrorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12.0),
-                borderSide: BorderSide(color: appTheme.colorFFEF44, width: 1.0),
-              ),
+              validator: widget.validator,
             ),
-            validator: validator,
           ),
-          if (bottomWidget != null) ...[
+          if (widget.bottomWidget != null) ...[
             const SizedBox(height: 12.0),
-            bottomWidget!,
+            widget.bottomWidget!,
           ],
         ],
       ),
