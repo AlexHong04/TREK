@@ -61,6 +61,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     List<String>? wishlist,
     List<String>? constraints,
     List<FutureSuggestion>? futureSuggestions,
+    bool suppressWarning = false,
   }) async {
     _uiState = _uiState.copyWith(
       isLoading: true,
@@ -108,7 +109,9 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         totalAllocatedBudget: fetchedResult.totalAllocatedBudget,
         wishlistItemsCoveredCount: fetchedResult.wishlistItemsCoveredCount,
         estimatedExtraBudgetNeeded: fetchedResult.estimatedExtraBudgetNeeded,
-        showWishlistWarning: fetchedResult.estimatedExtraBudgetNeeded > 0,
+        showWishlistWarning: suppressWarning
+            ? false
+            : fetchedResult.estimatedExtraBudgetNeeded > 0,
         errorMessage: null,
       );
     } catch (e) {
@@ -120,7 +123,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> generateItinerary() async {
+  Future<void> generateItinerary({bool suppressWarning = false}) async {
     await initialize(
       destination: _uiState.destinationTitle,
       dates: _uiState.datesText,
@@ -129,6 +132,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
       wishlist: _uiState.wishlist,
       constraints: _uiState.constraints,
       futureSuggestions: _uiState.futureSuggestions,
+      suppressWarning: suppressWarning,
     );
   }
 
@@ -216,7 +220,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     );
     if (slotIndex == -1) return;
 
-      final targetSlot = _uiState.activities[slotIndex];
+    final targetSlot = _uiState.activities[slotIndex];
 
     // Set slot-specific loading state instead of screen-wide loading
     _uiState = _uiState.copyWith(

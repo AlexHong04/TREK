@@ -99,8 +99,11 @@ class _WholeItineraryDetailScreenState
   ) async {
     double minTopUp = viewModel.uiState.estimatedExtraBudgetNeeded * 0.50;
     debugPrint("wishlist: ${viewModel.uiState.wishlist}");
-    debugPrint("estimated extra budget needed: ${viewModel.uiState.estimatedExtraBudgetNeeded}");
-    if (viewModel.uiState.wishlist != null &&
+    debugPrint(
+      "estimated extra budget needed: ${viewModel.uiState.estimatedExtraBudgetNeeded}",
+    );
+    if ((viewModel.uiState.wishlist == null ||
+            viewModel.uiState.wishlist!.isEmpty) &&
         viewModel.uiState.estimatedExtraBudgetNeeded > 0) {
       await showEmptyWishlistInsufficientTotalBudgetDialog(
         context: context,
@@ -128,7 +131,7 @@ class _WholeItineraryDetailScreenState
                 context: context,
                 onContinue: () {
                   // Trigger re-recommendation with the latest total budget
-                  viewModel.generateItinerary();
+                  viewModel.generateItinerary(suppressWarning: true);
                 },
               );
             });
@@ -142,6 +145,7 @@ class _WholeItineraryDetailScreenState
         _wishlistWarningShowing = false;
       }
     } else if (viewModel.uiState.wishlist != null &&
+        viewModel.uiState.wishlist!.isNotEmpty &&
         viewModel.uiState.wishlistItemsCoveredCount == 0) {
       await showInitialTotalBudgetTotallyInsufficientDialog(
         context: context,
@@ -169,7 +173,7 @@ class _WholeItineraryDetailScreenState
                 context: context,
                 onContinue: () {
                   // Trigger re-recommendation with the latest total budget
-                  viewModel.generateItinerary();
+                  viewModel.generateItinerary(suppressWarning: true);
                 },
               );
             });
@@ -182,6 +186,7 @@ class _WholeItineraryDetailScreenState
         _wishlistWarningShowing = false;
       }
     } else if (viewModel.uiState.wishlist != null &&
+        viewModel.uiState.wishlist!.isNotEmpty &&
         viewModel.uiState.wishlistItemsCoveredCount <
             viewModel.uiState.wishlist!.length) {
       await showInitialTotalBudgetInsufficientDialog(
@@ -211,8 +216,7 @@ class _WholeItineraryDetailScreenState
                 context: context,
                 onContinue: () {
                   // Trigger re-recommendation with the latest total budget
-                  Navigator.of(context).pop();
-                  viewModel.generateItinerary();
+                  viewModel.generateItinerary(suppressWarning: true);
                 },
               );
             });
