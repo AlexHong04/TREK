@@ -103,12 +103,39 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         futureSuggestions: resolvedSuggestions,
       );
 
+      // When suppressWarning is true (post-top-up regeneration), calculate
+      // actual wishlist coverage from activities instead of trusting Gemini's
+      // artificially returned 0 (Gemini returns 0 whenever budget is exceeded,
+      // even though wishlist items ARE in the plan).
+      int resolvedWishlistCovered = fetchedResult.wishlistItemsCoveredCount;
+      double resolvedExtraBudget = fetchedResult.estimatedExtraBudgetNeeded;
+
+      if (suppressWarning && wishlist != null && wishlist.isNotEmpty) {
+        final activityDestinations = fetchedResult.activities
+            .map((a) => a.destination.toLowerCase())
+            .toSet();
+        int matchedCount = 0;
+        for (final item in wishlist) {
+          final lowerItem = item.toLowerCase();
+          if (activityDestinations.any(
+            (dest) => dest.contains(lowerItem) || lowerItem.contains(dest),
+          )) {
+            matchedCount++;
+          }
+        }
+        resolvedWishlistCovered = matchedCount > 0
+            ? matchedCount
+            : wishlist.length;
+        // User accepted this budget level, so zero out the shortfall
+        resolvedExtraBudget = 0.0;
+      }
+
       _uiState = _uiState.copyWith(
         isLoading: false,
         activities: fetchedResult.activities,
         totalAllocatedBudget: fetchedResult.totalAllocatedBudget,
-        wishlistItemsCoveredCount: fetchedResult.wishlistItemsCoveredCount,
-        estimatedExtraBudgetNeeded: fetchedResult.estimatedExtraBudgetNeeded,
+        wishlistItemsCoveredCount: resolvedWishlistCovered,
+        estimatedExtraBudgetNeeded: resolvedExtraBudget,
         showWishlistWarning: suppressWarning
             ? false
             : fetchedResult.estimatedExtraBudgetNeeded > 0,
