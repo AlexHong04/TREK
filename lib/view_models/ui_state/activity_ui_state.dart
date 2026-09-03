@@ -43,7 +43,7 @@ class ActivityUiState {
   final int sufficientDays;
   final double shortageAmount;
   final double exceededAmount;
-
+  final Map<String, double> activitySpentMap;
   final String popupAction;
 
   const ActivityUiState({
@@ -80,7 +80,9 @@ class ActivityUiState {
     this.sufficientDays = 0,
     this.shortageAmount = 0.00,
     this.exceededAmount = 0.00,
+    this.activitySpentMap = const {},
     this.popupAction = '',
+
   });
 
   double get itemsSubtotal =>
@@ -161,6 +163,7 @@ class ActivityUiState {
     double? usedPercentageValue,
     double? shortageAmount,
     double? exceededAmount,
+    Map<String, double>? activitySpentMap,
     String? popupAction,
   }) {
     return ActivityUiState(
@@ -208,6 +211,7 @@ class ActivityUiState {
       sufficientDays: sufficientDays ?? this.sufficientDays,
       shortageAmount: shortageAmount ?? this.shortageAmount,
       exceededAmount: exceededAmount ?? this.exceededAmount,
+      activitySpentMap: activitySpentMap ?? this.activitySpentMap,
       popupAction: popupAction ?? this.popupAction,
     );
   }

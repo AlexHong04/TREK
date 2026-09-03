@@ -722,6 +722,15 @@ class _ActivityScreenState extends State<ActivityScreen> {
       ActivityUiState uiState, {
         VoidCallback? onTap,
       }) {
+    final spent = uiState.activitySpentMap[activity.activitiesId] ?? 0.0;
+    final bool hasOverspent = spent > activity.allocatedBudget;
+    debugPrint('----------------------------------------');
+    debugPrint('[ActivityScreen] Destination: ${activity.destination}');
+    debugPrint('[ActivityScreen] Allocated Budget: RM${activity.allocatedBudget}');
+    debugPrint('[ActivityScreen] Spent Budget: RM$spent');
+    debugPrint('[ActivityScreen] Overspend Amount: RM${activity.overspendAmount}');
+    debugPrint('[ActivityScreen] Is Overspend: ${activity.isOverspend}');
+    debugPrint('----------------------------------------');
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -798,13 +807,15 @@ class _ActivityScreenState extends State<ActivityScreen> {
                       backgroundColor: appTheme.amber_200,
                       textColor: appTheme.lime_900,
                     ),
-                    if (activity.isOverspend == true &&
-                        activity.overspendAmount != null)
+                    if (spent > 0)
                       _buildChip(
-                        label:
-                        'RM${activity.overspendAmount!.toStringAsFixed(0)}',
-                        backgroundColor: appTheme.blue_gray_50,
-                        textColor: appTheme.blueGray900,
+                        label: 'Spent: RM${spent.toStringAsFixed(0)}',
+                        backgroundColor: hasOverspent
+                            ? appTheme.wholeAlertBudgetStroke
+                            : appTheme.teal_50,
+                        textColor: hasOverspent
+                            ? appTheme.wholeAlertBudgetText
+                            : appTheme.teal_700,
                       ),
                   ],
                 ),

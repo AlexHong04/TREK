@@ -638,8 +638,7 @@ class _WholeItineraryDetailScreenState
             ),
           ),
         ),
-        if (!isLast)
-          Container(width: 2.0, height: 380.0, color: appTheme.blue_gray_300),
+          Container(width: 2.0, height: 350.0, color: appTheme.blue_gray_300),
       ],
     );
   }

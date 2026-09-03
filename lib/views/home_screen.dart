@@ -309,14 +309,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final bool isOngoing = status == 'ongoing';
     final bool isCompleted = status == 'completed';
 
-    // Print diagnostic status details on every build
-    debugPrint('----------------------------------------');
-    debugPrint('[_buildPlanCard] Destination: ${trip.destination}');
-    debugPrint('[_buildPlanCard] DB Status: ${trip.status}');
-    debugPrint('[_buildPlanCard] Computed Status: $status');
-    debugPrint('[_buildPlanCard] Dates: ${trip.startDate} -> ${trip.endDate}');
-    debugPrint('----------------------------------------');
-
     // Prioritize resolved banner from state, falling back to trip.imgUrl
     final String? activeImageUrl = (state.bannerImgUrl?.trim().isNotEmpty == true)
         ? state.bannerImgUrl!.trim()
