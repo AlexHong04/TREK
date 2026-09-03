@@ -604,13 +604,18 @@ class ActivityViewModel extends ChangeNotifier {
       final allActivities = await _itineraryService.fetchAllActivitiesByTrip(tripId);
       final tripResult = await _itineraryService.fetchLatestTrip();
 
-      // 1. Calculate the initial spent budget across all activities
+      // 1. Calculate the initial spent budget across all activities & populate the map
+      final Map<String, double> spentMap = {};
       double totalSpent = 0.0;
-      for(final act in allActivities) {
+
+      for (final act in allActivities) {
         final expenses = await _expenseRepository.getExpensesByActivityId(act.activitiesId);
+        double actSpent = 0.0;
         for (final exp in expenses) {
-          totalSpent += exp.totalAmount;
+          actSpent += exp.totalAmount;
         }
+        spentMap[act.activitiesId] = actSpent;
+        totalSpent += actSpent;
       }
 
       // 2. Calculate initial overspent amount from trip days
@@ -622,8 +627,11 @@ class ActivityViewModel extends ChangeNotifier {
 
       // 3. Calculate initial sufficient days
       int initialSufficientDays = 0;
-      if(allActivities.isNotEmpty) {
-        initialSufficientDays = await _budgetService.calculateSufficientDays(tripId, allActivities.first.activitiesId);
+      if (allActivities.isNotEmpty) {
+        initialSufficientDays = await _budgetService.calculateSufficientDays(
+          tripId,
+          allActivities.first.activitiesId,
+        );
       }
 
       final currentDateActivities = allActivities.where((act) {
@@ -634,6 +642,7 @@ class ActivityViewModel extends ChangeNotifier {
         isLoading: false,
         activities: currentDateActivities,
         totalBudget: tripResult?.trip.totalBudget ?? _uiState.totalBudget,
+        activitySpentMap: spentMap,
         spentBudget: totalSpent,
         overspentBudget: totalOverspend,
         sufficientDays: initialSufficientDays,
