@@ -1177,11 +1177,34 @@ class ActivityViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  //weisong
   Future<bool> generateBudgetRecoveryPlan({
     required String? dayTripId,
     required double availableBudget,
     double topUpAmount = 0.0,
   }) async {
+
+    final now = DateTime.now();
+
+    final remainingActivities = _uiState.activities.where((a) {
+      if (a.dayTripId != dayTripId || a.status == 'completed') return false;
+
+      // Filter out activities that have already passed based on endTime
+      try {
+        final endParts = a.endTime?.split(':');
+        final activityEndTime = DateTime(
+          a.date.year,
+          a.date.month,
+          a.date.day,
+          int.parse(endParts?[0] ?? '0'),
+          int.parse(endParts?[1] ?? '0'),
+        );
+        return activityEndTime.isAfter(now);
+      } catch (_) {
+        return true;
+      }
+    }).toList();
+
     if (dayTripId == null) return false;
 
     _uiState = _uiState.copyWith(isLoading: true, errorMessage: '');
@@ -1213,11 +1236,13 @@ class ActivityViewModel extends ChangeNotifier {
           ? 'Lat: ${currentPosition.latitude.toStringAsFixed(5)}, Lon: ${currentPosition.longitude.toStringAsFixed(5)}'
           : null;
 
+      final effectiveRemainingBudget = _uiState.totalBudget - _uiState.spentBudget;
+
       // 2. Delegate generation and Supabase updates completely to Service
       final revisedActivities =
       await _itineraryService.generateBudgetRecoveryItinerary(
         tripId: _uiState.tripId ?? '',
-        newTotalBudget: _uiState.totalBudget,
+        effectiveRemainingBudget: effectiveRemainingBudget,
         currentSpentBudget: _uiState.spentBudget,
         topUpAmount: topUpAmount,
         remainingActivities: remainingActivities,
@@ -1250,6 +1275,43 @@ class ActivityViewModel extends ChangeNotifier {
       );
       notifyListeners();
       return false;
+    }
+  }
+
+  // weisong
+  Future<void> refreshSpentAmounts() async {
+    debugPrint('DEBUG: [refreshSpentAmounts] invoked. Current activityId: "${_uiState.currentActivityId}", Activities count: ${_uiState.activities.length}');
+
+    // 1. Guard against empty activities list instead of currentActivityId
+    final activityIds = _uiState.activities
+        .map((a) => a.activitiesId)
+        .where((id) => id.isNotEmpty)
+        .toList();
+
+    if (activityIds.isEmpty) {
+      debugPrint('DEBUG: [refreshSpentAmounts] Aborted: No activity IDs found in _uiState.activities.');
+      return;
+    }
+
+    try {
+      debugPrint('DEBUG: Calling _itineraryService.getTripSpentSummary for ${activityIds.length} activities...');
+      final summary = await _itineraryService.getTripSpentSummary(activityIds);
+
+      // Safely cast num to double to avoid cast exceptions if Supabase returns int
+      final double freshSpent = (summary['totalSpent'] as num?)?.toDouble() ?? 0.0;
+      final Map<String, double> freshActivityMap =
+      Map<String, double>.from(summary['activitySpentMap'] ?? {});
+
+      _uiState = _uiState.copyWith(
+        spentBudget: freshSpent,
+        activitySpentMap: freshActivityMap,
+      );
+
+      debugPrint("[refreshSpentAmounts] Success! Total Spent: $freshSpent, Map: $freshActivityMap");
+      notifyListeners();
+    } catch (e, stack) {
+      debugPrint('Error refreshing spent amounts: $e');
+      debugPrint('Stack trace: $stack');
     }
   }
 }

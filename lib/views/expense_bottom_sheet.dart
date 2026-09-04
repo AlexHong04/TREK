@@ -1599,9 +1599,12 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   }
 
   Future<void> _confirmExpense() async {
+    debugPrint('DEBUG: [_confirmExpense] Button action reached');
     final viewModel = context.read<ActivityViewModel>();
     await viewModel.confirmExpense();
     if (!mounted) return;
+
+    debugPrint('DEBUG: confirmExpense done. Error: "${viewModel.uiState.errorMessage}", Success: "${viewModel.uiState.successMessage}"');
 
     if (viewModel.uiState.errorMessage.isNotEmpty) {
       _showValidationMessage(viewModel.uiState.errorMessage);
@@ -1618,6 +1621,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
           'Expense #$expenseNumber has been successfully recorded. Would you like to record another expense for this activity?',
       confirmLabel: 'Yes, Record Another',
     );
+    await viewModel.refreshSpentAmounts();
     if (!mounted) return;
 
     if (recordAnotherExpense) {

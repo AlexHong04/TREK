@@ -264,7 +264,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!mounted) return;
 
-            _showInsufficientTopUpDialog(latestState);
+            _showInsufficientTopUpDialog(latestState, topUpAmount: amount);
           });
         }
 
@@ -273,7 +273,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
     );
   }
 
-  void _showInsufficientTopUpDialog(ActivityUiState state) {
+  void _showInsufficientTopUpDialog(ActivityUiState state, {required double topUpAmount}) {
     showInsufficientTopUpBudgetRecoveryDialog(
       context: context,
       onContinue: () async {
@@ -326,7 +326,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
           success = await viewModel.generateBudgetRecoveryPlan(
             dayTripId: state.selectedActivity?.dayTripId,
             availableBudget: state.totalBudget - state.spentBudget,
+            topUpAmount: topUpAmount,
           );
+          debugPrint("[Activity Insufficient Budget] Remaining budget after entering top up budget: ${state.remainingBudget}");
         } catch (e) {
           debugPrint('Recovery plan error: $e');
         } finally {
