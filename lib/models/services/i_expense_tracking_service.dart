@@ -53,6 +53,8 @@ abstract interface class IExpenseTrackingService {
 
   void validateTotalAmount(double totalAmount);
 
+  void validateTaxAmount(double taxAmount);
+
   Future<ExpenseProcessingResult> processExpense({
     required String tripId,
     required String currentActivityId,

@@ -905,6 +905,7 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     }
 
     validateExpenseItems(expenseItems);
+    validateTaxAmount(taxAmount);
 
     final itemsWithCalculatedSubtotals = expenseItems
         .map(
@@ -998,6 +999,12 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       throw ArgumentError(
         'Amount must be a positive number within the allowed transaction limit.',
       );
+    }
+  }
+
+  void validateTaxAmount(double taxAmount) {
+    if (taxAmount < 0 || taxAmount > 99999) {
+      throw ArgumentError('Tax amount must be between 0 and 99,999.');
     }
   }
 

@@ -508,6 +508,7 @@ class ActivityViewModel extends ChangeNotifier {
       if (!RegExp(r'^[A-Z]{3}$').hasMatch(_uiState.originalCurrency)) {
         throw ArgumentError('Please select the original expense currency.');
       }
+      _expenseTrackingService.validateTaxAmount(_uiState.draftTaxAmount);
       _expenseTrackingService.validateExpenseItems(_uiState.draftExpenseItems);
       _expenseTrackingService.validateTotalAmount(_uiState.draftTotalAmount);
       return true;
