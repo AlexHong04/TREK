@@ -54,7 +54,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   TimeOfDay _selectedTime = TimeOfDay.now();
   int? _editingItemIndex;
   bool _isEditingItem = false;
-  bool _showItemForm = true;
+  bool _showItemForm = false;
   bool _isRecordingNewExpense = false;
   bool _hasAppliedOcrValues = false;
   String? _topMessage;
@@ -248,6 +248,12 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     return context.read<ActivityViewModel>().preferredCurrency.trim().toUpperCase();
   }
 
+  String _savedExpenseCurrency(Expense expense) {
+    final currency = expense.currency.trim().toUpperCase();
+    if (currency.isNotEmpty) return currency;
+    return context.read<ActivityViewModel>().preferredCurrency.trim().toUpperCase();
+  }
+
   TextStyle get _moneyTextStyle => TextStyle(
         color: appTheme.gray_900,
         fontFamily: 'Inter',
@@ -308,6 +314,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   }
 
   Widget _buildRecordedExpenseCard(Expense expense, int expenseNumber) {
+    final currency = _savedExpenseCurrency(expense);
     final recordedOn = expense.createdAt == null
         ? 'Recorded expense'
         : DateFormat('dd MMM yyyy, hh:mm a').format(expense.createdAt!);
@@ -360,7 +367,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                 width: 126,
                 child: ConvertedAmountText(
                   amount: expense.totalAmount,
-                  originalCurrency: expense.currency,
+                  originalCurrency: currency,
                   primaryStyle: TextStyle(
                     color: appTheme.blueGray900,
                     fontFamily: 'Inter',
@@ -395,6 +402,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     }
 
     final viewModel = context.read<ActivityViewModel>();
+    final currency = _savedExpenseCurrency(expense);
     await viewModel.loadRecordedExpenseItems(expenseId);
     if (!mounted) return;
 
@@ -417,7 +425,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
               children: [
                 ConvertedAmountText(
                   amount: expense.totalAmount,
-                  originalCurrency: expense.currency,
+                  originalCurrency: currency,
                   primaryStyle: TextStyle(
                     color: appTheme.gray_900,
                     fontSize: 15,
@@ -454,17 +462,16 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                   for (final item in expenseItems)
                     ListTile(
                       contentPadding: EdgeInsets.zero,
-                      onTap: () =>
-                          _showExpenseItemDetails(item, expense.currency),
+                      onTap: () => _showExpenseItemDetails(item, currency),
                       title: Text(item.itemName),
                       subtitle: Text(
                         '${DateFormat('dd MMM yyyy, hh:mm a').format(item.expenseDateTime)}\n'
                         '${item.quantity} × '
-                        '${formatCurrencyAmount(expense.currency, item.unitPrice)}',
+                        '${formatCurrencyAmount(currency, item.unitPrice)}',
                       ),
                       trailing: ConvertedAmountText(
                         amount: item.subtotal,
-                        originalCurrency: expense.currency,
+                        originalCurrency: currency,
                         primaryStyle: _moneyTextStyle,
                         secondaryStyle: TextStyle(
                           color: appTheme.blue_gray_300,
@@ -547,7 +554,9 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                   Icon(Icons.add, color: appTheme.blue_gray_300, size: 18),
                   SizedBox(width: 6),
                   Text(
-                    'Add Another Item',
+                    uiState.draftExpenseItems.isEmpty
+                        ? 'Add Item'
+                        : 'Add Another Item',
                     style: TextStyle(
                       color: appTheme.blue_gray_300,
                       fontFamily: 'Inter',
@@ -969,7 +978,9 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
             controller: _taxController,
             keyboardType: TextInputType.numberWithOptions(decimal: true),
             inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'^\d*[.,]?\d{0,2}')),
+              FilteringTextInputFormatter.allow(
+                RegExp(r'^\d{0,5}([.,]\d{0,2})?$'),
+              ),
             ],
             onChanged: (value) {
               final parsedTax = _parsePrice(value) ?? 0.0;
@@ -980,6 +991,11 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
               prefixStyle: TextStyle(
                 color: appTheme.gray_900,
                 fontWeight: FontWeight.w600,
+              ),
+              suffixIcon: IconButton(
+                onPressed: _confirmTaxAmount,
+                icon: Icon(Icons.check, color: appTheme.teal_A700),
+                tooltip: 'Confirm tax amount',
               ),
             ),
           ),
@@ -1371,6 +1387,17 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   String? _nullIfEmpty(String value) =>
       value.trim().isEmpty ? null : value.trim();
 
+  void _confirmTaxAmount() {
+    final tax = _parsePrice(_taxController.text) ?? 0.0;
+    if (tax > 99999) {
+      _showValidationMessage('Tax amount must be between 0 and 99,999.');
+      return;
+    }
+    _taxController.text = tax > 0 ? tax.toStringAsFixed(2) : '';
+    context.read<ActivityViewModel>().setDraftTaxAmount(tax);
+    FocusScope.of(context).unfocus();
+  }
+
   double? _parsePrice(String value) {
     return double.tryParse(value.trim().replaceAll(',', '.'));
   }
@@ -1604,8 +1631,8 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     setState(() {
       _isRecordingNewExpense = true;
       _editingItemIndex = null;
-      _isEditingItem = true;
-      _showItemForm = true;
+      _isEditingItem = false;
+      _showItemForm = false;
       _itemNameController.clear();
       _descriptionController.clear();
       _merchantController.clear();
