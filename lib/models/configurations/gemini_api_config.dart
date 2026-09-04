@@ -482,8 +482,9 @@ class GeminiApiConfig {
   }
 
   // weisong
+  // budget recovery point and change remaining activities
   static Future<List<Map<String, dynamic>>> generateRecoveryItinerary({
-    required double newTotalBudget,
+    required double effectiveRemainingBudget,
     required double currentSpentBudget,
     required double topUpAmount,
     required List<Map<String, dynamic>> remainingActivities,
@@ -491,8 +492,6 @@ class GeminiApiConfig {
     String? userCoordinates,
     DateTime? currentDate,
   }) async {
-    final effectiveRemainingBudget =
-        (newTotalBudget + topUpAmount) - currentSpentBudget;
 
     final locationConstraint = userCoordinates != null
         ? 'Current GPS Coordinates: $userCoordinates (within $tripDestination)'

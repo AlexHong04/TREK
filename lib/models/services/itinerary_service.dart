@@ -556,7 +556,7 @@ class ItineraryService implements IItineraryService {
   @override
   Future<List<Activity>> generateBudgetRecoveryItinerary({
     required String tripId,
-    required double newTotalBudget,
+    required double effectiveRemainingBudget,
     required double currentSpentBudget,
     required double topUpAmount,
     required List<Activity> remainingActivities,
@@ -588,7 +588,7 @@ class ItineraryService implements IItineraryService {
     // 2. Call Gemini API endpoint
     final List<Map<String, dynamic>> rawResponseList =
         await GeminiApiConfig.generateRecoveryItinerary(
-          newTotalBudget: newTotalBudget,
+          effectiveRemainingBudget: effectiveRemainingBudget,
           currentSpentBudget: currentSpentBudget,
           topUpAmount: topUpAmount,
           remainingActivities: rawActivitiesPayload,
@@ -637,15 +637,16 @@ class ItineraryService implements IItineraryService {
         isOverspend: false,
       );
     }).toList();
+    final oldIdsToReplace = remainingActivities.map((a) => a.activitiesId).toList();
 
     // 4. Update the database through the repository
     if (revisedActivities.isNotEmpty) {
-      await _itineraryRepository.replaceTripActivities(
-        tripId: tripId,
+      await _itineraryRepository.replaceRemainingActivities(
+        dayTripId: defaultDayTripId,
+        oldRemainingActivityIds: oldIdsToReplace,
         newActivities: revisedActivities,
       );
     }
-
     return revisedActivities;
   }
 
@@ -674,5 +675,15 @@ class ItineraryService implements IItineraryService {
   @override
   Future<WholeTrip?> fetchLatestTripWithCurrentUserId() {
     return _itineraryRepository.fetchLatestTrip();
+  }
+
+  @override
+  Future<Map<String, dynamic>> getTripSpentSummary(List<String> activityIds) async {
+    try {
+      return await _itineraryRepository.fetchSpentSummaryByActivityIds(activityIds);
+    } catch (e) {
+      debugPrint('Error in getTripSpentSummary service: $e');
+    rethrow;
+    }
   }
 }

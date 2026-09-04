@@ -700,4 +700,63 @@ class ItineraryRepository implements IItineraryRepository {
       return null;
     }
   }
+
+  // weisong
+  @override
+  Future<void> replaceRemainingActivities({
+    required String dayTripId,
+    required List<String> oldRemainingActivityIds,
+    required List<Activity> newActivities,
+  }) async {
+    // 1. Only delete the uncompleted remaining slots that are actually being replaced
+    if (oldRemainingActivityIds.isNotEmpty) {
+      await SupabaseConfig.client
+          .from('activities')
+          .delete()
+          .inFilter('activities_id', oldRemainingActivityIds);
+    }
+
+    // 2. Insert the new replacement activities
+    final insertPayload = newActivities.map((a) => a.toJson()).toList();
+    await SupabaseConfig.client.from('activities').insert(insertPayload);
+  }
+
+  // weisong
+  @override
+  Future<Map<String, dynamic>> fetchSpentSummaryByActivityIds(
+      List<String> activityIds,
+      ) async {
+    if (activityIds.isEmpty) {
+      return {
+        'totalSpent': 0.0,
+        'activitySpentMap': <String, double>{},
+      };
+    }
+
+    // Fetch all expense rows for these activities
+    final response = await SupabaseConfig.client
+        .from('expenses')
+        .select('activities_id, total_amount')
+        .inFilter('activities_id', activityIds);
+
+    final List<dynamic> records = response as List<dynamic>;
+
+    double totalSpent = 0.0;
+    final Map<String, double> activityMap = {};
+
+    for (final row in records) {
+      final double amt = ((row['total_amount'] as num?)?.toDouble()) ?? 0.0;
+      final String actId = row['activities_id']?.toString() ?? '';
+
+      totalSpent += amt;
+      if (actId.isNotEmpty) {
+        activityMap[actId] = (activityMap[actId] ?? 0.0) + amt;
+      }
+    }
+
+    return {
+      'totalSpent': totalSpent,
+      'activitySpentMap': activityMap,
+    };
+  }
 }

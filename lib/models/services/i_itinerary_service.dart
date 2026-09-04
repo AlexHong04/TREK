@@ -55,7 +55,7 @@ abstract interface class IItineraryService {
 
   Future<List<Activity>> generateBudgetRecoveryItinerary({
     required String tripId,
-    required double newTotalBudget,
+    required double effectiveRemainingBudget,
     required double currentSpentBudget,
     required double topUpAmount,
     required List<Activity> remainingActivities,
@@ -69,4 +69,6 @@ abstract interface class IItineraryService {
   Future<List<WholeTrip>> fetchAllTrip();
 
   Future<WholeTrip?> fetchLatestTripWithCurrentUserId();
+
+  Future<Map<String,dynamic>> getTripSpentSummary(List<String> activityIds);
 }
