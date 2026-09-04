@@ -661,6 +661,9 @@ class ActivityViewModel extends ChangeNotifier {
           totalBudget: result.trip.totalBudget,
           sufficientDays: days,
         );
+        await refreshSpentAmounts();
+
+        _uiState = _uiState.copyWith(isLoading: false);
         unawaited(_prepareExpenseReminders(result.activities));
       } else {
         // 2. Clear trip state if trip has ended, is not ongoing, or has no activities
@@ -752,6 +755,7 @@ class ActivityViewModel extends ChangeNotifier {
         filterDate: targetDate,
         tripId: tripId,
       );
+      await refreshSpentAmounts();
       unawaited(_prepareExpenseReminders(allActivities));
     } catch (e) {
       _uiState = _uiState.copyWith(
@@ -1302,11 +1306,34 @@ class ActivityViewModel extends ChangeNotifier {
       final Map<String, double> freshActivityMap =
       Map<String, double>.from(summary['activitySpentMap'] ?? {});
 
+      double recalculatedOverspend = 0.0;
+      for (final activity in _uiState.activities) {
+        final double actSpent = freshActivityMap[activity.activitiesId] ?? 0.0;
+        final double actBudget = activity.allocatedBudget;
+        final double actDiff = actSpent - actBudget;
+        debugPrint('🚨 [OVERSPENT DETECTED] Activity: "${activity.destination}" '
+            '(ID: ${activity.activitiesId}) | '
+            'Allocated: ${activity.allocatedBudget} | '
+            'Spent: $actSpent | '
+            'Over by: $actDiff');
+
+
+        debugPrint(
+        '>>> [DEBUG Activity Overspend Check] ID: ${activity.activitiesId} | '
+        'Name: "${activity.destination}" | '
+        'Spent: $actSpent | '
+        'Allocated: $actBudget | '
+        'Diff: $actDiff',
+        );
+      }
+
       _uiState = _uiState.copyWith(
         spentBudget: freshSpent,
         activitySpentMap: freshActivityMap,
+        overspentBudget: recalculatedOverspend,
       );
 
+      debugPrint('>>> [DEBUG refreshSpentAmounts] New uiState.overspentBudget after copyWith: ${_uiState.overspentBudget}');
       debugPrint("[refreshSpentAmounts] Success! Total Spent: $freshSpent, Map: $freshActivityMap");
       notifyListeners();
     } catch (e, stack) {

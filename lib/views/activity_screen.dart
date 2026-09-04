@@ -421,6 +421,19 @@ class _ActivityScreenState extends State<ActivityScreen> {
     );
   }
 
+  // yellow when 50% and red when 90% (of total budget)
+  Color _getSpentRemainingColor(double spent, double total) {
+    if (total <= 0) return appTheme.gray_900;
+    final double ratio = spent / total;
+
+    if (ratio >= 0.90) {
+      return appTheme.errorRed; // Red at 90%+
+    } else if (ratio >= 0.50) {
+      return Colors.amber.shade800; // Yellow/Amber at 50%+
+    }
+    return appTheme.gray_900; // Default color below 50%
+  }
+
   Widget _buildBudgetCard(ActivityUiState uiState) {
     final progressColor = _getBudgetProgressColor(
       uiState.spentBudget,
@@ -428,6 +441,15 @@ class _ActivityScreenState extends State<ActivityScreen> {
     );
 
     final badgeBgColor = progressColor.withValues(alpha: 0.12);
+    final Color alertColor = _getSpentRemainingColor(
+      uiState.spentBudget,
+      uiState.totalBudget,
+    );
+
+    final Color spentColor = alertColor;
+    final Color remainingColor = (alertColor == appTheme.gray_900)
+        ? appTheme.teal_A700
+        : alertColor;
 
     return Container(
       width: double.infinity,
@@ -521,7 +543,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                 child: _buildSubBudgetCard(
                   title: 'SPENT',
                   amount: 'RM ${uiState.spentBudget.toStringAsFixed(2)}',
-                  amountColor: appTheme.gray_900,
+                  amountColor: spentColor,
                 ),
               ),
               const SizedBox(width: 12.0),
@@ -529,7 +551,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                 child: _buildSubBudgetCard(
                   title: 'REMAINING',
                   amount: 'RM ${uiState.remainingBudget.toStringAsFixed(2)}',
-                  amountColor: appTheme.teal_A700,
+                  amountColor: remainingColor,
                 ),
               ),
             ],
@@ -728,7 +750,19 @@ class _ActivityScreenState extends State<ActivityScreen> {
         VoidCallback? onTap,
       }) {
     final spent = uiState.activitySpentMap[activity.activitiesId] ?? 0.0;
-    final bool hasOverspent = spent > activity.allocatedBudget;
+
+// Flag as alert if spending reaches 90% or more (including overspent)
+    final bool isAlert = activity.allocatedBudget > 0 &&
+        (spent >= activity.allocatedBudget * 0.80);
+
+    final Color chipBgColor = isAlert
+        ? appTheme.wholeAlertBudgetStroke
+        : appTheme.teal_50;
+
+    final Color chipTextColor = isAlert
+        ? appTheme.expenseOverspendText
+        : appTheme.teal_700;
+
     debugPrint('----------------------------------------');
     debugPrint('[ActivityScreen] Destination: ${activity.destination}');
     debugPrint('[ActivityScreen] Allocated Budget: RM${activity.allocatedBudget}');
@@ -815,12 +849,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
                     if (spent > 0)
                       _buildChip(
                         label: 'RM${spent.toStringAsFixed(0)}',
-                        backgroundColor: hasOverspent
-                            ? appTheme.wholeAlertBudgetStroke
-                            : appTheme.teal_50,
-                        textColor: hasOverspent
-                            ? appTheme.wholeAlertBudgetText
-                            : appTheme.teal_700,
+                        backgroundColor: chipBgColor,
+                        textColor: chipTextColor,
                       ),
                   ],
                 ),
