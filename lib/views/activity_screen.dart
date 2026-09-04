@@ -122,6 +122,12 @@ class _ActivityScreenState extends State<ActivityScreen> {
     viewModel.clearPopupAction();
 
     switch (action) {
+      case 'warning_50':
+        _show50WarningDialog(state);
+
+      case 'warning_80':
+        _show80WarningDialog(state);
+
       case 'successful':
         _showUnderThresholdDialog(state);
         break;
@@ -143,6 +149,48 @@ class _ActivityScreenState extends State<ActivityScreen> {
         );
         break;
     }
+  }
+
+  void _show50WarningDialog(ActivityUiState state) {
+    final activity = state.selectedActivity;
+    if (activity == null) return;
+
+    final double allocated = activity.allocatedBudget;
+    final double spent = state.activitySpentMap[activity.activitiesId] ?? 0.0;
+    final double remaining = (allocated - spent).clamp(0.0, double.infinity);
+
+    showNearLimitWarningDialog(
+      context: context,
+      activityTitle: activity.destination,
+      allocatedBudget: 'RM ${allocated.toStringAsFixed(2)}',
+      currentSpent: 'RM ${spent.toStringAsFixed(2)}',
+      remainingInActivity: 'RM ${remaining.toStringAsFixed(2)}',
+      warningText1:
+      'You have spent RM ${spent.toStringAsFixed(2)} (50% or more) of the budget for this activity.',
+      warningText2:
+      'Keep an eye on your remaining allowance to avoid exceeding the plan.',
+    );
+  }
+
+  void _show80WarningDialog(ActivityUiState state) {
+    final activity = state.selectedActivity;
+    if (activity == null) return;
+
+    final double allocated = activity.allocatedBudget;
+    final double spent = state.activitySpentMap[activity.activitiesId] ?? 0.0;
+    final double remaining = (allocated - spent).clamp(0.0, double.infinity);
+
+    showNearLimitWarningDialog(
+      context: context,
+      activityTitle: activity.destination,
+      allocatedBudget: 'RM ${allocated.toStringAsFixed(2)}',
+      currentSpent: 'RM ${spent.toStringAsFixed(2)}',
+      remainingInActivity: 'RM ${remaining.toStringAsFixed(2)}',
+      warningText1:
+      'You have spent RM ${spent.toStringAsFixed(2)} (80% or more) of the budget for this activity.',
+      warningText2:
+      'Your remaining budget for this activity is running low. Consider minimizing further expenses.',
+    );
   }
 
   void _showUnderThresholdDialog(ActivityUiState state) {
@@ -848,7 +896,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                     ),
                     if (spent > 0)
                       _buildChip(
-                        label: 'RM${spent.toStringAsFixed(0)}',
+                        label: 'Spent: RM${spent.toStringAsFixed(0)}',
                         backgroundColor: chipBgColor,
                         textColor: chipTextColor,
                       ),

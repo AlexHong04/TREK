@@ -1112,6 +1112,8 @@ class ActivityViewModel extends ChangeNotifier {
 
       debugPrint("result: ${response}");
 
+      await refreshSpentAmounts();
+
       final days = await _itineraryService.getDaysByTripId(_uiState.tripId);
 
       double overspend = 0.00;
@@ -1146,7 +1148,27 @@ class ActivityViewModel extends ChangeNotifier {
 
       switch (response) {
         case ExpenseProcessingResult.withinBudget:
-          _uiState = _uiState.copyWith(popupAction: '');
+          final currentActivity = _uiState.activities.firstWhere(
+              (a) => a.activitiesId == _uiState.currentActivityId,
+            orElse: () => _uiState.selectedActivity ?? _uiState.activities.first,
+          );
+
+          final spent = _uiState.activitySpentMap[currentActivity.activitiesId] ?? 0.0;
+          final allocated = currentActivity.allocatedBudget;
+
+          if(allocated > 0 && spent >= (allocated * 0.50) && spent <= allocated) {
+            _uiState = _uiState.copyWith(
+              popupAction: 'warning_50',
+              selectedActivity: currentActivity,
+            );
+          } else if(allocated > 0 && spent >= (allocated * 0.80) && spent <= allocated) {
+            _uiState = _uiState.copyWith(
+              popupAction: 'warning_80',
+              selectedActivity: currentActivity,
+            );
+          } else{
+            _uiState = _uiState.copyWith(popupAction: '');
+          }
           break;
 
         case ExpenseProcessingResult.reallocatedSuccessfully:
