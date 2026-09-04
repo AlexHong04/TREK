@@ -630,7 +630,12 @@ class ItineraryRepository implements IItineraryRepository {
   @override
   Future<WholeTrip?> fetchLatestTrip() async {
     try {
-      final nowIso = DateTime.now().toUtc().toIso8601String();
+      final now = DateTime.now();
+      // Use start and end of day in UTC/local to safely match today's date boundaries
+      final startOfTodayIso = DateTime(now.year, now.month, now.day).toUtc().toIso8601String();
+      final endOfTodayIso = DateTime(now.year, now.month, now.day, 23, 59, 59).toUtc().toIso8601String();
+      final nowIso = now.toUtc().toIso8601String();
+
       final user = SupabaseConfig.client.auth.currentUser;
       if (user == null) return null;
 
@@ -642,49 +647,56 @@ class ItineraryRepository implements IItineraryRepository {
 
       final String userId = userRecord?['user_id'] as String? ?? user.id;
 
-      // 1. First priority: Check if a trip is ongoing today by dates
+      // 1. Priority 1: Ongoing Trip
+      // Checks for status == 'ongoing' OR a trip scheduled for today that isn't completed
       final ongoingData = await SupabaseConfig.client
           .from('whole_trips')
           .select()
           .eq('user_id', userId)
           .neq('status', 'completed')
-          .lte('start_date', nowIso) // Started on or before today
-          .gte('end_date', nowIso)   // Ends on or after today
-          .order('start_date', ascending: true)
+          .or('status.eq.ongoing,and(start_date.lte.$endOfTodayIso,end_date.gte.$startOfTodayIso)')
+          .order('start_date', ascending: false)
           .limit(1)
           .maybeSingle();
 
       if (ongoingData != null) {
+        debugPrint('--> Found Ongoing/Today Trip: ${ongoingData['trip_id']}');
         return WholeTrip.fromJson(ongoingData);
       }
 
-      // 2. Second priority: Upcoming pending trips in the future
-      final upcomingData = await SupabaseConfig.client
+      // 2. Priority 2: Future Pending Trip (Must NOT have already ended)
+      final pendingData = await SupabaseConfig.client
           .from('whole_trips')
           .select()
           .eq('user_id', userId)
-          .neq('status', 'completed')
-          .gt('start_date', nowIso)
+          .eq('status', 'pending')
+          .gt('start_date', endOfTodayIso) // Strictly in the future
           .order('start_date', ascending: true)
           .limit(1)
           .maybeSingle();
 
-      if (upcomingData != null) {
-        return WholeTrip.fromJson(upcomingData);
+      if (pendingData != null) {
+        debugPrint('--> Found Future Pending Trip: ${pendingData['trip_id']}');
+        return WholeTrip.fromJson(pendingData);
       }
 
-      // 3. Fallback: Most recently created trip
-      final fallbackData = await SupabaseConfig.client
+      // 3. Priority 3: Fallback to Completed / Expired Trips
+      final completedData = await SupabaseConfig.client
           .from('whole_trips')
           .select()
           .eq('user_id', userId)
-          .order('created_at', ascending: false)
+          .order('end_date', ascending: false)
           .limit(1)
           .maybeSingle();
 
-      return fallbackData != null ? WholeTrip.fromJson(fallbackData) : null;
+      if (completedData != null) {
+        debugPrint('--> Found Completed/Past Trip: ${completedData['trip_id']}');
+        return WholeTrip.fromJson(completedData);
+      }
+
+      return null;
     } catch (e) {
-      debugPrint('Error fetching prioritized trip: $e');
+      debugPrint('Error in fetchLatestTripWithCurrentUserId: $e');
       return null;
     }
   }
