@@ -719,44 +719,16 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Item Entry',
+                        'ITEM ENTRY',
                         style: _fieldLabelStyle,
                       ),
+                      SizedBox(height: 6),
                       if (_isEditingItem)
-                        ConstrainedBox(
-                          constraints: BoxConstraints(maxWidth: 220),
-                          child: TextField(
-                            controller: _itemNameController,
-                            autofocus: true,
-                            onChanged: (_) => setState(() {}),
-                            style: itemNameTextStyle,
-                            decoration: InputDecoration(
-                              hintText: 'Item',
-                              hintStyle: TextStyle(color: appTheme.blue_gray_300),
-                              isDense: true,
-                              filled: true,
-                              fillColor: appTheme.gray_50,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(6),
-                                borderSide: BorderSide(color: appTheme.gray_100),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(6),
-                                borderSide: BorderSide(color: appTheme.gray_100),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(6),
-                                borderSide: BorderSide(
-                                  color: appTheme.teal_A700,
-                                  width: 2,
-                                ),
-                              ),
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 5,
-                              ),
-                            ),
-                          ),
+                        TextField(
+                          controller: _itemNameController,
+                          autofocus: true,
+                          onChanged: (_) => setState(() {}),
+                          decoration: _fieldDecoration('Item'),
                         )
                       else
                         Text(
@@ -769,26 +741,6 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                         ),
                     ],
                   ),
-                ),
-                IconButton(
-                  onPressed: _isEditingItem
-                      ? _saveItem
-                      : () => setState(() => _isEditingItem = true),
-                  icon: Icon(
-                    _isEditingItem
-                        ? Icons.check
-                        : Icons.edit_outlined,
-                    color: Color(0xFFB3B3B3),
-                  ),
-                ),
-                IconButton(
-                  onPressed: _editingItemIndex == null
-                      ? null
-                      : () => _confirmDeleteItem(
-                          _editingItemIndex!,
-                          clearEditor: true,
-                        ),
-                  icon: Icon(Icons.close, color: Color(0xFFB3B3B3)),
                 ),
               ],
             ),
