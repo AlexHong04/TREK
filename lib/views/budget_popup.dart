@@ -8,6 +8,7 @@ class BaseBudgetDialog extends StatelessWidget {
   final Color? titleColor;
   final Widget? summaryCard;
   final String? warningText;
+  final Color? warningTextColor;
   final Widget? contentCard;
   final Widget actions;
 
@@ -17,6 +18,7 @@ class BaseBudgetDialog extends StatelessWidget {
     this.titleColor,
     this.summaryCard,
     this.warningText,
+    this.warningTextColor,
     this.contentCard,
     required this.actions,
   });
@@ -53,6 +55,11 @@ class BaseBudgetDialog extends StatelessWidget {
                 _buildWarningRow(warningText!),
               ],
 
+              if (warningTextColor != null && warningTextColor != appTheme.popupWarningMsg) ...[
+                const SizedBox(height: 16),
+                _buildWarningRow(warningText!, color: warningTextColor),
+              ],
+
               if (contentCard != null) ...[
                 const SizedBox(height: 16),
                 contentCard!,
@@ -68,13 +75,14 @@ class BaseBudgetDialog extends StatelessWidget {
     );
   }
 
-  static Widget _buildWarningRow(String text) {
+  static Widget _buildWarningRow(String text, {Color? color}) {
+    final effectiveColor = color ?? appTheme.popupWarningMsg;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(
           Icons.warning_amber_rounded,
-          color: appTheme.popupWarningMsg,
+          color: effectiveColor,
           size: 22,
         ),
         const SizedBox(width: 8),
@@ -84,7 +92,7 @@ class BaseBudgetDialog extends StatelessWidget {
             style: TextStyle(
               fontFamily: 'Inter',
               fontSize: 14,
-              color: appTheme.popupWarningMsg,
+              color: effectiveColor,
               height: 1.4,
             ),
           ),
@@ -319,6 +327,55 @@ Widget _buildTopUpCard(TextEditingController controller) {
         ),
       ],
     ),
+  );
+}
+
+Future<void> showNearLimitWarningDialog({
+  required BuildContext context,
+  required String activityTitle,
+  required String allocatedBudget,
+  required String currentSpent,
+  required String remainingInActivity,
+  required String warningText1,
+  String? warningText2,
+  VoidCallback? onContinue,
+}) {
+  return showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) {
+      return BaseBudgetDialog(
+        title: 'Budget Alert',
+        titleColor: appTheme.warningPopupHeader,
+
+        summaryCard: _buildSummaryCard(
+          primaryLabel: 'Activity Budget:',
+          primaryValue: allocatedBudget,
+          secondaryLabel: 'Current Spent:',
+          secondaryValue: currentSpent,
+          thirdLabel: 'Remaining Allowance:',
+          thirdValue: remainingInActivity,
+          thirdValueColor: appTheme.popupBrownBudget,
+        ),
+
+        warningText: warningText1,
+
+        warningTextColor: appTheme.popupWarningMsg,
+
+        contentCard: (warningText2 != null && warningText2.isNotEmpty)
+            ? BaseBudgetDialog._buildWarningRow(warningText2, color: appTheme.popupWarningMsg)
+            : null,
+
+        actions: _buildActionButton(
+          text: 'Understood',
+          backgroundColor: appTheme.teal_A700,
+          onPressed: () {
+            Navigator.of(dialogContext).pop();
+            onContinue?.call();
+          },
+        ),
+      );
+    },
   );
 }
 
