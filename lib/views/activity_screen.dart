@@ -812,7 +812,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                     ),
                     if (spent > 0)
                       _buildChip(
-                        label: 'Spent: RM${spent.toStringAsFixed(0)}',
+                        label: 'RM${spent.toStringAsFixed(0)}',
                         backgroundColor: hasOverspent
                             ? appTheme.wholeAlertBudgetStroke
                             : appTheme.teal_50,

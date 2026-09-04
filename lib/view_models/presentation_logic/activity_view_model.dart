@@ -640,13 +640,18 @@ class ActivityViewModel extends ChangeNotifier {
     try {
       final result = await _itineraryService.fetchLatestTrip();
 
-      if (result != null) {
+      // 1. Verify trip exists, is ongoing, and contains activities
+      final bool isTripActive = result != null &&
+          result.trip.status == 'ongoing' && // Check your exact active status string
+          result.activities.isNotEmpty;
+
+      if (isTripActive) {
         final days = await _budgetService.calculateSufficientDays(
           result.trip.tripId!,
           result.activities.first.activitiesId,
         );
 
-        debugPrint("days ${days}");
+        debugPrint("days $days");
 
         _uiState = _uiState.copyWith(
           isLoading: false,
@@ -657,10 +662,22 @@ class ActivityViewModel extends ChangeNotifier {
         );
         unawaited(_prepareExpenseReminders(result.activities));
       } else {
-        _uiState = _uiState.copyWith(isLoading: false);
+        // 2. Clear trip state if trip has ended, is not ongoing, or has no activities
+        _uiState = _uiState.copyWith(
+          isLoading: false,
+          tripId: '',
+          activities: const [],
+          totalBudget: 0.0,
+          spentBudget: 0.0,
+          sufficientDays: 0,
+        );
       }
     } catch (e) {
-      _uiState = _uiState.copyWith(isLoading: false);
+      _uiState = _uiState.copyWith(
+        isLoading: false,
+        tripId: '',
+        activities: const [],
+      );
       debugPrint('Error in ActivityViewModel.initialize: $e');
     }
     notifyListeners();

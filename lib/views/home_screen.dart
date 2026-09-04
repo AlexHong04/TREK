@@ -1,3 +1,4 @@
+import 'package:Trek/view_models/presentation_logic/activity_view_model.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -302,7 +303,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     final trip = state.latestTrip!;
-    final startDateStr = DateFormat('MMM dd').format(trip.startDate);
+    final startDateStr = DateFormat('MMM dd').format( trip.startDate);
     final endDateStr = DateFormat('MMM dd, yyyy').format(trip.endDate);
 
     final status = trip.computedStatus.toLowerCase();
@@ -580,7 +581,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       '/travelInformationInputScreen',
                     );
                     if (context.mounted) {
-                      viewModel.fetchLatestTripWithCurrentUserId();
+                      await viewModel.fetchLatestTripWithCurrentUserId();
+                      await context.read<ActivityViewModel>().initialize();
                     }
                   },
                   borderRadius: BorderRadius.circular(14),
