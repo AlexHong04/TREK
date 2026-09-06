@@ -1,4 +1,4 @@
-# trek
+# TREK
 
 A new Flutter project.
 
