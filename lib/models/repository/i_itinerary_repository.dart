@@ -53,4 +53,6 @@ abstract interface class IItineraryRepository {
   Future<void> replaceRemainingActivities({required String dayTripId, required List<String> oldRemainingActivityIds, required List<Activity> newActivities});
 
   Future<Map<String, dynamic>> fetchSpentSummaryByActivityIds(List<String> activityIds);
+
+  Future<void> deleteWholeTrip(String tripId);
 }

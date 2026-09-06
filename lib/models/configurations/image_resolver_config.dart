@@ -20,6 +20,7 @@ class ImageResolverConfig {
   };
 
   /// Resolves an image URL and corrected title for a given keyword.
+  /// Dynamically find and attach high quality image at the destination cover
   ///
   /// Resolution chain:
   /// 1. English Wikipedia (page image + title correction)

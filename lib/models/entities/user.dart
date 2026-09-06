@@ -2,6 +2,10 @@ import 'personal_constraint.dart';
 
 class User {
   final String userId;
+  // this authId handles password, JWT tokens and login sessions.
+  // acts as a Foreign key that bridges between auth.users with the user table
+  // no longer using share preference to store the login session while this authId store the logged in userId
+  // the app read this authId to know what userId is logged in and never render the information by other userId
   final String authId;
   final String fullName;
   final String email;

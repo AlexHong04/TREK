@@ -71,4 +71,6 @@ abstract interface class IItineraryService {
   Future<WholeTrip?> fetchLatestTripWithCurrentUserId();
 
   Future<Map<String,dynamic>> getTripSpentSummary(List<String> activityIds);
+
+  Future<void> deleteWholeTrip(String tripId);
 }

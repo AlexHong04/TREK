@@ -759,4 +759,12 @@ class ItineraryRepository implements IItineraryRepository {
       'activitySpentMap': activityMap,
     };
   }
+
+  @override
+  Future<void> deleteWholeTrip(String tripId) async {
+    await SupabaseConfig.client
+        .from('whole_trips')
+        .delete()
+        .eq('trip_id', tripId);
+  }
 }
