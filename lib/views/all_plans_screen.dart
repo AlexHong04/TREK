@@ -161,6 +161,7 @@ class _AllPlansScreenState extends State<AllPlansScreen> {
     final status = trip.computedStatus.toLowerCase();
     final bool isOngoing = status == 'ongoing';
     final bool isCompleted = status == 'completed';
+    final bool isPending = status == 'pending';
 
     final String? activeImageUrl =
     (trip.imgUrl != null && trip.imgUrl!.trim().isNotEmpty)
@@ -204,6 +205,30 @@ class _AllPlansScreenState extends State<AllPlansScreen> {
                       activeImageUrl,
                       destination: trip.destination,
                     ),
+                    if(isPending)
+                      Positioned(
+                        top: 12,
+                        right: 12,
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(20),
+                            onTap: () => _confirmDelete(context, trip),
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: appTheme.blueGray900,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.delete_outline,
+                                size: 20,
+                                color: Colors.red,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                     Positioned(
                       top: 16,
                       left: 16,
@@ -349,5 +374,32 @@ class _AllPlansScreenState extends State<AllPlansScreen> {
         child: Icon(Icons.landscape, size: 48, color: appTheme.blue_gray_300),
       ),
     );
+  }
+
+  // weisong
+  // delete the trip only when it is still pending status in view all plan screen from profile
+  Future<void> _confirmDelete(BuildContext context, WholeTrip trip) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Plan'),
+        content: Text('Are you sure you want to delete your trip to ${trip.destination}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      await context.read<WholeItineraryDetailViewModel>().deletePendingTrip(trip.tripId);
+    }
   }
 }

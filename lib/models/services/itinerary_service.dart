@@ -686,4 +686,15 @@ class ItineraryService implements IItineraryService {
     rethrow;
     }
   }
+
+  // call the delete trip method from repository
+  @override
+  Future<void> deleteWholeTrip(String tripId) async {
+    try {
+      await _itineraryRepository.deleteWholeTrip(tripId);
+    } catch (e) {
+      debugPrint('Error deleting whole trip: $e');
+      rethrow;
+    }
+  }
 }

@@ -383,4 +383,31 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     }
     notifyListeners();
   }
+
+  Future<void> deletePendingTrip(String? tripId) async {
+
+    _uiState = _uiState.copyWith(isLoading: true);
+    notifyListeners();
+
+    try{
+      if(tripId != null && tripId.isNotEmpty) {
+
+        await _itineraryService.deleteWholeTrip(tripId);
+
+        final updatedTrips = _uiState.allTrips.where((trip) => trip.tripId != tripId).toList();
+        _uiState = _uiState.copyWith(allTrips: updatedTrips, isLoading: false);
+
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('[ViewModel] Failed to delete trip: $e');
+      _uiState = _uiState.copyWith(
+        isLoading: false,
+        errorMessage: e.toString(),
+      );
+    } finally{
+      _uiState = _uiState.copyWith(isLoading: false);
+      notifyListeners();
+    }
+  }
 }
