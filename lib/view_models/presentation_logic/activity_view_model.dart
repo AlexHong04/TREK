@@ -46,7 +46,9 @@ class ActivityViewModel extends ChangeNotifier {
            expenseTrackingService ?? ExpenseTrackingService(),
        _expenseRepository = expenseRepository ?? ExpenseRepository(),
        _authService = authService {
-    _uiState = _uiState.copyWith(originalCurrency: _authService.preferredCurrency);
+    _uiState = _uiState.copyWith(
+      originalCurrency: _defaultExpenseCurrency(),
+    );
     _loadAvailableCurrencies();
     _authService.addListener(_handleAuthChanged);
   }
@@ -57,6 +59,34 @@ class ActivityViewModel extends ChangeNotifier {
 
   void _handleAuthChanged() {
     notifyListeners();
+  }
+
+  String _defaultExpenseCurrency([Activity? activity]) {
+    final destination = [
+      _uiState.tripDestination,
+      activity?.destination ?? '',
+    ].join(' ').toLowerCase();
+
+    if (destination.contains('malaysia') ||
+        destination.contains('kuala lumpur') ||
+        destination.contains('sarawak') ||
+        destination.contains('sabah') ||
+        destination.contains('selangor') ||
+        destination.contains('penang') ||
+        destination.contains('johor') ||
+        destination.contains('melaka') ||
+        destination.contains('perak') ||
+        destination.contains('kedah') ||
+        destination.contains('kelantan') ||
+        destination.contains('terengganu') ||
+        destination.contains('pahang') ||
+        destination.contains('negeri sembilan') ||
+        destination.contains('putrajaya') ||
+        destination.contains('labuan')) {
+      return 'MYR';
+    }
+
+    return _authService.preferredCurrency;
   }
 
   @override
@@ -72,7 +102,7 @@ class ActivityViewModel extends ChangeNotifier {
       draftExpenseItems: const [],
       draftTotalAmount: 0.0,
       paymentMethod: '',
-      originalCurrency: _authService.preferredCurrency,
+      originalCurrency: _defaultExpenseCurrency(activity),
       receiptLocalPath: '',
       clearOcrData: true,
       errorMessage: '',
@@ -511,6 +541,10 @@ class ActivityViewModel extends ChangeNotifier {
       _expenseTrackingService.validateTaxAmount(_uiState.draftTaxAmount);
       _expenseTrackingService.validateExpenseItems(_uiState.draftExpenseItems);
       _expenseTrackingService.validateTotalAmount(_uiState.draftTotalAmount);
+      _expenseTrackingService.validateExpenseWithinRemainingBudget(
+        totalAmount: _uiState.draftTotalAmount,
+        remainingBudget: _uiState.remainingBudget,
+      );
       return true;
     } catch (error) {
       _setExpenseError(_readableError(error));
@@ -531,6 +565,19 @@ class ActivityViewModel extends ChangeNotifier {
     }
     if (!RegExp(r'^[A-Z]{3}$').hasMatch(_uiState.originalCurrency)) {
       _setExpenseError('Please select the original expense currency.');
+      return;
+    }
+
+    try {
+      _expenseTrackingService.validateTaxAmount(_uiState.draftTaxAmount);
+      _expenseTrackingService.validateExpenseItems(_uiState.draftExpenseItems);
+      _expenseTrackingService.validateTotalAmount(_uiState.draftTotalAmount);
+      _expenseTrackingService.validateExpenseWithinRemainingBudget(
+        totalAmount: _uiState.draftTotalAmount,
+        remainingBudget: _uiState.remainingBudget,
+      );
+    } catch (error) {
+      _setExpenseError(_readableError(error));
       return;
     }
 
@@ -754,6 +801,7 @@ class ActivityViewModel extends ChangeNotifier {
         sufficientDays: initialSufficientDays,
         filterDate: targetDate,
         tripId: tripId,
+        tripDestination: tripResult?.trip.destination ?? _uiState.tripDestination,
       );
       await refreshSpentAmounts();
       unawaited(_prepareExpenseReminders(allActivities));

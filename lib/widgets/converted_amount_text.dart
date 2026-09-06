@@ -153,20 +153,19 @@ class _ConvertedAmountTextState extends State<ConvertedAmountText> {
     Widget convertedLine;
     if (_isLoading) {
       convertedLine = Text(
-        '${widget.convertedLabel}: Converting to $preferredCurrency...',
+        'Converting to $preferredCurrency...',
         textAlign: widget.textAlign,
         style: secondaryStyle,
       );
     } else if (_errorMessage != null || _convertedAmount == null) {
       convertedLine = Text(
-        '${widget.convertedLabel}: ${_errorMessage ?? 'Unable to convert'}',
+        _errorMessage ?? 'Unable to convert',
         textAlign: widget.textAlign,
         style: secondaryStyle.copyWith(color: appTheme.errorRed),
       );
     } else {
       convertedLine = Text(
-        '${widget.convertedLabel}: '
-        '${formatCurrencyAmount(preferredCurrency, _convertedAmount!)}',
+        formatCurrencyAmount(preferredCurrency, _convertedAmount!),
         textAlign: widget.textAlign,
         style: secondaryStyle,
       );
@@ -177,8 +176,7 @@ class _ConvertedAmountTextState extends State<ConvertedAmountText> {
       crossAxisAlignment: widget.crossAxisAlignment,
       children: [
         Text(
-          '${widget.originalLabel}: '
-          '${formatCurrencyAmount(displayCurrency, widget.amount)}',
+          formatCurrencyAmount(displayCurrency, widget.amount),
           textAlign: widget.textAlign,
           style: primaryStyle,
         ),

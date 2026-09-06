@@ -316,23 +316,20 @@ class ExpenseTrackingService implements IExpenseTrackingService {
 
   String? extractReceiptCurrency(String receiptText) {
     final normalized = receiptText.toUpperCase();
-    const currencyPatterns = <String, String>{
-      'MYR': r'\bMYR\b|\bRM\b',
-      'USD': r'\bUSD\b|\$',
-      'EUR': r'\bEUR\b|€',
-      'GBP': r'\bGBP\b|£',
-      'JPY': r'\bJPY\b|¥',
-      'CNY': r'\bCNY\b',
-      'SGD': r'\bSGD\b|S\$',
-      'AUD': r'\bAUD\b|A\$',
-      'CAD': r'\bCAD\b|C\$',
-      'HKD': r'\bHKD\b|HK\$',
-      'THB': r'\bTHB\b|฿',
-      'INR': r'\bINR\b|₹',
-    };
-    for (final entry in currencyPatterns.entries) {
-      if (RegExp(entry.value).hasMatch(normalized)) return entry.key;
+    if (RegExp(r'\bMYR\b|\bRM\s*(?=\d)|\bRM\b').hasMatch(normalized)) {
+      return 'MYR';
     }
+    if (RegExp(r'\bSGD\b|S\$').hasMatch(normalized)) return 'SGD';
+    if (RegExp(r'\bAUD\b|A\$').hasMatch(normalized)) return 'AUD';
+    if (RegExp(r'\bCAD\b|C\$').hasMatch(normalized)) return 'CAD';
+    if (RegExp(r'\bHKD\b|HK\$').hasMatch(normalized)) return 'HKD';
+    if (RegExp(r'\bUSD\b|\$').hasMatch(normalized)) return 'USD';
+    if (RegExp(r'\bEUR\b|€').hasMatch(normalized)) return 'EUR';
+    if (RegExp(r'\bGBP\b|£').hasMatch(normalized)) return 'GBP';
+    if (RegExp(r'\bJPY\b|¥').hasMatch(normalized)) return 'JPY';
+    if (RegExp(r'\bCNY\b').hasMatch(normalized)) return 'CNY';
+    if (RegExp(r'\bTHB\b|฿').hasMatch(normalized)) return 'THB';
+    if (RegExp(r'\bINR\b|₹').hasMatch(normalized)) return 'INR';
     return null;
   }
 
@@ -1005,6 +1002,17 @@ class ExpenseTrackingService implements IExpenseTrackingService {
   void validateTaxAmount(double taxAmount) {
     if (taxAmount < 0 || taxAmount > 99999) {
       throw ArgumentError('Tax amount must be between 0 and 99,999.');
+    }
+  }
+
+  void validateExpenseWithinRemainingBudget({
+    required double totalAmount,
+    required double remainingBudget,
+  }) {
+    if (totalAmount - remainingBudget > 0.005) {
+      throw ArgumentError(
+        'Expense amount cannot exceed the remaining trip balance.',
+      );
     }
   }
 
