@@ -56,3 +56,14 @@ abstract interface class IItineraryRepository {
 
   Future<void> deleteWholeTrip(String tripId);
 }
+
+abstract interface class ISharedPreferencesRepo{
+  /// Fetches activities for a trip, using local cache first if available.
+  Future<List<Activity>> getActivities(String tripId, {bool forceRefresh = false});
+
+  /// Saves activities to local storage cache.
+  Future<void> saveActivitiesLocally(String tripId, List<Activity> activities);
+
+  /// Clears local cached activities for a specific trip.
+  Future<void> clearLocalActivities(String tripId);
+}

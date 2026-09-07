@@ -1,11 +1,16 @@
+import 'dart:convert';
 import 'dart:typed_data';
+import 'package:Trek/models/local_data_source/activity_local_data_source.dart';
+import 'package:Trek/view_models/ui_state/activity_ui_state.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../configurations/supabase_config.dart';
 import '../entities/activity.dart';
 import '../entities/whole_trip.dart';
 import '../entities/day_trip.dart';
 import '../../utils/id_generator.dart';
+import '../local_data_source/activity_local_data_source.dart';
 
 import 'i_itinerary_repository.dart';
 
@@ -766,5 +771,47 @@ class ItineraryRepository implements IItineraryRepository {
         .from('whole_trips')
         .delete()
         .eq('trip_id', tripId);
+  }
+}
+
+class ActivityLocalCache implements ISharedPreferencesRepo {
+
+  final ActivityLocalDataSource _localDataSource;
+  final IItineraryRepository _itineraryRepository;
+
+  ActivityLocalCache({
+    ActivityLocalDataSource? localDataSource,
+    IItineraryRepository? itineraryRepository,
+  })  : _localDataSource = localDataSource ?? ActivityLocalDataSource(),
+        _itineraryRepository = itineraryRepository ?? ItineraryRepository();
+
+  @override
+  Future<List<Activity>> getActivities(String tripId, {bool forceRefresh = false}) async {
+    // 1. Try reading from local cache
+    if (!forceRefresh) {
+      final cachedActivities = await _localDataSource.loadActivities(tripId);
+      if (cachedActivities != null && cachedActivities.isNotEmpty) {
+        return cachedActivities;
+      }
+    }
+
+    // 2. Fallback to network/service
+    // this is used when the local does not have the data.
+    final freshActivities = await _itineraryRepository.fetchAllActivitiesByTrip(tripId);
+
+    // 3. Update local cache
+    await _localDataSource.saveActivities(tripId, freshActivities);
+
+    return freshActivities;
+  }
+
+  @override
+  Future<void> saveActivitiesLocally(String tripId, List<Activity> activities) async {
+    await _localDataSource.saveActivities(tripId, activities);
+  }
+
+  @override
+  Future<void> clearLocalActivities(String tripId) async {
+    await _localDataSource.clearActivities(tripId);
   }
 }

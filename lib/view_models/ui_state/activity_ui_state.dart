@@ -110,21 +110,21 @@ class ActivityUiState {
 
   // Computed Getter automatically filters activities
   List<Activity> get displayActivities {
-    final filtered = filterDate == null
+    final target = filterDate?.toLocal();
+
+    final filtered = target == null
         ? List<Activity>.from(activities)
         : activities.where((a) {
-      return a.date.year == filterDate!.year &&
-          a.date.month == filterDate!.month &&
-          a.date.day == filterDate!.day;
+      final localActDate = a.date.toLocal();
+      return localActDate.year == target.year &&
+          localActDate.month == target.month &&
+          localActDate.day == target.day;
     }).toList();
 
-    // Sort chronologically by date and startTime
     filtered.sort((a, b) {
-      // 1. Primary sort: Date
       final dateCompare = a.date.compareTo(b.date);
       if (dateCompare != 0) return dateCompare;
 
-      // 2. Secondary sort: startTime (e.g. "09:00", "10:30", "17:00")
       final aTime = a.startTime ?? '00:00';
       final bTime = b.startTime ?? '00:00';
       return aTime.compareTo(bTime);
@@ -133,6 +133,53 @@ class ActivityUiState {
     return filtered;
   }
 
+  Map<String, dynamic> toMap() {
+    return {
+      'tripId': tripId,
+      'currentActivityId': currentActivityId,
+      'tripDestination': tripDestination,
+      'filterDate': filterDate?.toIso8601String(),
+      'totalBudget': totalBudget,
+      'spentBudget': spentBudget,
+      'overspentBudget': overspentBudget,
+      'sufficientDays': sufficientDays,
+      'shortageAmount': shortageAmount,
+      'exceededAmount': exceededAmount,
+      'activitySpentMap': activitySpentMap,
+      // Use .toMap() to mirror .fromMap()
+      'activities': activities.map((a) => a.toJson()).toList(),
+      'recordedExpenses': recordedExpenses.map((e) => e.toJson()).toList(),
+    };
+  }
+
+  factory ActivityUiState.fromMap(Map<String, dynamic> map) {
+    return ActivityUiState(
+      tripId: map['tripId'] ?? '',
+      currentActivityId: map['currentActivityId'] ?? '',
+      tripDestination: map['tripDestination'] ?? '',
+      filterDate: map['filterDate'] != null
+          ? DateTime.tryParse(map['filterDate'])
+          : null,
+      totalBudget: (map['totalBudget'] as num?)?.toDouble() ?? 0.0,
+      spentBudget: (map['spentBudget'] as num?)?.toDouble() ?? 0.0,
+      overspentBudget: (map['overspentBudget'] as num?)?.toDouble() ?? 0.0,
+      sufficientDays: (map['sufficientDays'] as num?)?.toInt() ?? 0,
+      shortageAmount: (map['shortageAmount'] as num?)?.toDouble() ?? 0.0,
+      exceededAmount: (map['exceededAmount'] as num?)?.toDouble() ?? 0.0,
+      activitySpentMap: (map['activitySpentMap'] as Map<String, dynamic>?)?.map(
+            (key, value) => MapEntry(key, (value as num).toDouble()),
+      ) ??
+          const {},
+      activities: (map['activities'] as List<dynamic>?)
+          ?.map((item) => Activity.fromJson(item as Map<String, dynamic>))
+          .toList() ??
+          const [],
+      recordedExpenses: (map['recordedExpenses'] as List<dynamic>?)
+          ?.map((item) => Expense.fromJson(item as Map<String, dynamic>))
+          .toList() ??
+          const [],
+    );
+  }
 
   ActivityUiState copyWith({
     bool? isLoading,

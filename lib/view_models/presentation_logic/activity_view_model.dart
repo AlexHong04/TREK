@@ -29,6 +29,7 @@ class ActivityViewModel extends ChangeNotifier {
   final IExpenseTrackingService _expenseTrackingService;
   final IExpenseRepository _expenseRepository;
   final IAuthService _authService;
+  final ICachedActivity _cachedActivity;
   final CameraSource _cameraSource = CameraSource();
   final GallerySource _gallerySource = GallerySource();
   final NotificationSource _notificationSource = NotificationSource();
@@ -39,13 +40,15 @@ class ActivityViewModel extends ChangeNotifier {
     IBudgetService? budgetService,
     IExpenseTrackingService? expenseTrackingService,
     IExpenseRepository? expenseRepository,
+    ICachedActivity? cachedActivity,
     required IAuthService authService,
   }) : _itineraryService = itineraryService ?? ItineraryService(),
        _budgetService = budgetService ?? BudgetService(),
        _expenseTrackingService =
            expenseTrackingService ?? ExpenseTrackingService(),
        _expenseRepository = expenseRepository ?? ExpenseRepository(),
-       _authService = authService {
+       _authService = authService,
+       _cachedActivity = cachedActivity ?? GetCachedActivities() {
     _uiState = _uiState.copyWith(
       originalCurrency: _defaultExpenseCurrency(),
     );
@@ -677,25 +680,48 @@ class ActivityViewModel extends ChangeNotifier {
         .replaceFirst('Invalid argument(s): ', '');
   }
 
-  Future<void> initialize({DateTime? filterDate}) async {
-    _uiState = _uiState.copyWith(
-      isLoading: true,
-      filterDate: filterDate,
-      clearFilterDate: filterDate == null,
-    );
-    notifyListeners();
+  Future<void> initialize({DateTime? filterDate, bool forceRefresh = false}) async {
+
+    // try to read the latest trip state from the local storage first
+    if(!forceRefresh) {
+      try{
+        final cachedState = await _cachedActivity.getActivitiesForTrip('latest_ongoing_trip');
+        if (cachedState.isNotEmpty) {
+          _uiState = _uiState.copyWith(
+            isLoading: false,
+            activities: cachedState,
+            filterDate: filterDate,
+            clearFilterDate: filterDate == null,
+          );
+          notifyListeners();
+        }
+      } catch (e) {
+        debugPrint('Local cache read error: $e');
+      }
+    }
+
+    final bool hasCachedData = _uiState.activities.isNotEmpty;
+    if(!hasCachedData || forceRefresh) {
+      _uiState = _uiState.copyWith(
+        isLoading: true,
+        filterDate: filterDate,
+        clearFilterDate: filterDate == null,
+      );
+      notifyListeners();
+    }
 
     try {
       final result = await _itineraryService.fetchLatestTrip();
 
-      // 1. Verify trip exists, is ongoing, and contains activities
+      // Verify trip exists, is ongoing, and contains activities
       final bool isTripActive = result != null &&
           result.trip.status == 'ongoing' && // Check your exact active status string
           result.activities.isNotEmpty;
 
       if (isTripActive) {
+        final tripId = result.trip.tripId!;
         final days = await _budgetService.calculateSufficientDays(
-          result.trip.tripId!,
+          tripId,
           result.activities.first.activitiesId,
         );
 
@@ -710,6 +736,10 @@ class ActivityViewModel extends ChangeNotifier {
         );
         await refreshSpentAmounts();
 
+        await _cachedActivity.saveActivitiesLocally('latest_ongoing_trip', result.activities);
+        await _cachedActivity.saveActivitiesLocally(tripId, result.activities);
+
+
         _uiState = _uiState.copyWith(isLoading: false);
         unawaited(_prepareExpenseReminders(result.activities));
       } else {
@@ -722,37 +752,57 @@ class ActivityViewModel extends ChangeNotifier {
           spentBudget: 0.0,
           sufficientDays: 0,
         );
+        await _cachedActivity.clearLocalActivities('latest_ongoing_trip');
       }
     } catch (e) {
       _uiState = _uiState.copyWith(
         isLoading: false,
         tripId: '',
         activities: const [],
+        errorMessage: _uiState.activities.isEmpty ? e.toString() : '',
       );
       debugPrint('Error in ActivityViewModel.initialize: $e');
     }
     notifyListeners();
   }
 
-  Future<void> loadTripItinerary(String tripId, {DateTime? filterDate}) async {
+  Future<void> loadTripItinerary(String tripId, {DateTime? filterDate, bool forceRefresh = false}) async {
 
     final now = DateTime.now();
     final targetDate = filterDate != null
         ? DateTime(filterDate.year, filterDate.month, filterDate.day)
         : DateTime(now.year, now.month, now.day);
-    _uiState = _uiState.copyWith(
-      isLoading: true,
-      tripId: tripId,
-      filterDate: targetDate,
-      activities: const [],
-      spentBudget: 0.0,
-      totalBudget: 0.0,
-      overspentBudget: 0.0,
-      sufficientDays: 0,
-      errorMessage: '',
-    );
-    notifyListeners();
 
+    // 1. Instant Cache Load
+    if (!forceRefresh) {
+      try {
+        final cachedActivities = await _cachedActivity.getActivitiesForTrip(tripId.isNotEmpty ? tripId : 'latest_ongoing_trip');
+        if (cachedActivities.isNotEmpty) {
+          final currentDateCached = cachedActivities.where((act) => _isSameDate(act.date, targetDate)).toList();
+          _uiState = _uiState.copyWith(
+            isLoading: false,
+            tripId: tripId,
+            filterDate: targetDate,
+            activities: currentDateCached.isNotEmpty ? currentDateCached : cachedActivities,
+          );
+          notifyListeners(); // Renders cache immediately without wiping!
+        }
+      } catch (e) {
+        debugPrint('Cache read error: $e');
+      }
+    }
+
+    // 2. Only show full loader if we have NO activities loaded
+    if (_uiState.activities.isEmpty || forceRefresh) {
+      _uiState = _uiState.copyWith(
+        isLoading: true,
+        tripId: tripId,
+        filterDate: targetDate,
+      );
+      notifyListeners();
+    }
+
+    // Fallback: Network Fetch
     try {
       final allActivities = await _itineraryService.fetchAllActivitiesByTrip(tripId);
       final tripResult = await _itineraryService.fetchLatestTrip();
@@ -803,6 +853,11 @@ class ActivityViewModel extends ChangeNotifier {
         tripId: tripId,
         tripDestination: tripResult?.trip.destination ?? _uiState.tripDestination,
       );
+
+      // Save to cache
+      await _cachedActivity.saveActivitiesLocally(tripId, allActivities);
+      await _cachedActivity.saveActivitiesLocally('latest_ongoing_trip', allActivities);
+
       await refreshSpentAmounts();
       unawaited(_prepareExpenseReminders(allActivities));
     } catch (e) {
@@ -1263,6 +1318,11 @@ class ActivityViewModel extends ChangeNotifier {
     final remainingActivities = _uiState.activities.where((a) {
       if (a.dayTripId != dayTripId || a.status == 'completed') return false;
 
+      // another condition that kick the activities only don't have expense records
+      final hasRecordedExpense = (a.allocatedBudget > 0) || (a.isOverspend == true) || (a.overspendAmount != null && a.overspendAmount! > 0);
+
+      if(hasRecordedExpense) return false;
+
       // Filter out activities that have already passed based on endTime
       try {
         final endParts = a.endTime?.split(':');
@@ -1285,19 +1345,6 @@ class ActivityViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // 1. Extract remaining activities that require optimization
-      final remainingActivities = _uiState.activities
-          .where((a) => a.dayTripId == dayTripId && a.status != 'completed')
-          .toList();
-
-      if (remainingActivities.isEmpty) {
-        _uiState = _uiState.copyWith(
-          isLoading: false,
-          errorMessage: 'No remaining activities to optimize.',
-        );
-        notifyListeners();
-        return false;
-      }
 
       Position? currentPosition;
       try {

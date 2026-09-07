@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:Trek/models/configurations/google_places_api_config.dart';
 import 'package:http/http.dart' as http;
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter/foundation.dart';
@@ -492,43 +493,67 @@ class GeminiApiConfig {
     String? userCoordinates,
     DateTime? currentDate,
   }) async {
-
     final locationConstraint = userCoordinates != null
         ? 'Current GPS Coordinates: $userCoordinates (within $tripDestination)'
         : 'Destination: $tripDestination';
-    final prompt =
-        '''
-    You are an AI travel itinerary and budget optimizer.
-    A tourist has hit a critical budget threshold and needs a revised schedule for their remaining trip.
 
-    Trip Constraints:
-    - Destination: $tripDestination
+    // 1. Minify input payload to keep prompt fast and focused
+    final sanitizedRemainingSlots = remainingActivities.map((act) => {
+      'activitiesId': act['activitiesId'],
+      'category': act['activityCategory'] ?? act['category'] ?? 'Attraction',
+      'originalDestination': act['destination'],
+      'startTime': act['startTime'],
+      'endTime': act['endTime'],
+      'allocatedBudget': act['allocatedBudget'],
+    }).toList();
+
+    // cache existing image while no need to re-query google place api
+    final existingImageMap = <String, String>{};
+    for (final act in remainingActivities) {
+      final dest = act['destination']?.toString().trim().toLowerCase();
+      final img = act['activityImgUrl']?.toString().trim();
+      if(dest != null && dest.isNotEmpty && img != null && img.isNotEmpty) {
+        existingImageMap[dest] = img;
+      }
+    }
+
+    final prompt = '''
+    You are an expert travel itinerary budget recovery engine.
+    The tourist has reached a budget constraint. Re-plan their remaining itinerary slots to strictly fit the remaining funds.
+    
+    Constraints:
+    - Location / Base: $locationConstraint
     - Current Date/Time: ${currentDate?.toIso8601String() ?? DateTime.now().toIso8601String()}
-    - Total Spent So Far: RM ${currentSpentBudget.toStringAsFixed(2)}
-    - Added Top-Up: RM ${topUpAmount.toStringAsFixed(2)}
-    - Max Usable Budget for Remaining Plan: RM ${effectiveRemainingBudget.toStringAsFixed(2)}
-
-    Remaining Activities Before Re-planning:
-    ${jsonEncode(remainingActivities)}
-
-    Instructions:
-    1. Minimise Transit Time & Costs: Prioritize activities, cultural sights, free parks, or food spots that are within easy walking distance or a short, cheap public transit ride from the tourist's current location ($locationConstraint). Strictly avoid destinations requiring expensive taxi, Grab, or long-distance travel.
-    2. Budget Compliance: The sum of allocatedBudget for all returned items MUST NOT exceed RM ${effectiveRemainingBudget.toStringAsFixed(2)}.
-    3. Slot Continuity: Preserve the original "activitiesId" for modified or replaced slots so database references remain valid.
-    4. Logical Sequence: Organize startTime and endTime chronologically from the current time forward.
-    5. Return ONLY a valid JSON array matching the schema below.
-
-    JSON Schema:
+    - Effective Remaining Budget Ceiling: RM ${effectiveRemainingBudget.toStringAsFixed(2)}
+    
+    Remaining Time Slots to Fill:
+    ${jsonEncode(sanitizedRemainingSlots)}
+    
+    Rules:
+    1. Strict Slot Count (1-to-1 Mapping):
+       - You MUST return an array with EXACTLY ${sanitizedRemainingSlots.length} items.
+       - For every slot, PRESERVE the exact "activitiesId", "startTime", and "endTime" passed in the input. Do NOT generate new IDs.
+    2. Category Preservation:
+       - Match the slot's original category. If the original slot was a restaurant/food category, replace it with an affordable local food spot/hawker stall; do NOT replace a meal slot with a park.
+    3. Budget & Realism:
+       - The sum of ALL "allocatedBudget" values across the returned items MUST be <= RM ${effectiveRemainingBudget.toStringAsFixed(2)}.
+       - If remaining budget is RM 0 or near 0, use free activities (public parks, walking tours, free galleries) and minimal meal costs (hawker food RM 5-10).
+       - Public parks, walking tours, and free sights MUST have "allocatedBudget": 0.0.
+    4. Geographic Proximity:
+       - All venues must be within close walking distance or short public transit of $locationConstraint. Never suggest cross-city travel.
+       - Every destination must be a specific, real-world Google Maps place name (no generic names like "Local Eatery").
+    
+    Output Schema:
+    Return ONLY a raw JSON array matching this structure (no markdown fences, no extra text):
     [
       {
-        "activitiesId": "keep original ID if retained, or generate a new unique string if replaced",
-        "destination": "Activity / Place Name",
-        "description": "Short explanation highlighting walkability/affordability",
-        "date": "YYYY-MM-DDTHH:mm:ss",
+        "activitiesId": "exact activitiesId from input",
+        "destination": "Exact Place Name",
+        "description": "Short 1-sentence reason (e.g., Free entrance landmark near current location)",
+        "activityCategory": "Restaurant | Attraction | Transportation",
         "startTime": "HH:mm",
         "endTime": "HH:mm",
-        "allocatedBudget": 0.0,
-        "activityImgUrl": "placeholder or original URL"
+        "allocatedBudget": 0.0
       }
     ]
     ''';
@@ -551,11 +576,6 @@ class GeminiApiConfig {
           ],
           "generationConfig": {"responseMimeType": "application/json"},
         }),
-        // ).timeout(
-        //   const Duration(seconds: 25),
-        //   onTimeout: () {
-        //     throw TimeoutException("Gemini API request timed out after 25 seconds. Please Try Again.");
-        //   }
       );
 
       if (response.statusCode == 200) {
@@ -569,16 +589,39 @@ class GeminiApiConfig {
             if (rawText != null && rawText.isNotEmpty) {
               final decoded = jsonDecode(rawText);
               if (decoded is List) {
-                return List<Map<String, dynamic>>.from(decoded);
+                final rawItems =  List<Map<String, dynamic>>.from(decoded);
+
+                // fetch images concurrently using Google Place
+                final enrichedActivities = await Future.wait(
+                  rawItems.map((item) async {
+                    final tripDestination = item['destination']?.toString().trim() ?? '';
+                    final lowerDest = tripDestination.toLowerCase();
+                    // Fetch image for the destination
+
+                    // if the same activity occur then use the same image first
+                    if(existingImageMap.containsKey(lowerDest)) {
+                      item['activityImgUrl'] = existingImageMap[lowerDest];
+                      return item;
+                    }
+
+                    // if the image url does not exist then get the url from google place
+                    try {
+                      final url = await GooglePlacesApiConfig.searchPlacePhotoUrl(tripDestination);
+                      item['activityImgUrl'] = url ?? '';
+                    } catch (e) {
+                      debugPrint('Error fetching place photo for $tripDestination: $e');
+                      item['activityImgUrl'] = '';
+                    }
+                    return item;
+                  })
+                );
               }
             }
           }
         }
         return [];
       } else {
-        throw Exception(
-          'Gemini Error: ${response.statusCode} - ${response.body}',
-        );
+        throw Exception('Gemini Error: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       debugPrint('Error generating recovery itinerary: $e');

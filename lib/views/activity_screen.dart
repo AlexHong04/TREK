@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -201,7 +202,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
       remainingBudget: state.remainingBudget.toStringAsFixed(2),
       exceededAmount: state.overspentBudget.toStringAsFixed(2),
       warningText1:
-      'You have overspent ${state.overspentBudget.toStringAsFixed(2)} so far on this trip.',
+      'You have overspent RM${state.overspentBudget.toStringAsFixed(2)} so far for entire trip.',
       warningText2:
       'The budget allocated for remaining restaurants have been modified.',
     );
@@ -941,22 +942,19 @@ class _ActivityScreenState extends State<ActivityScreen> {
     }
 
     if (url.startsWith('http://') || url.startsWith('https://')) {
-      return Image.network(
-        url,
+      return CachedNetworkImage(
+        imageUrl: url,
         height: height,
         width: double.infinity,
         fit: BoxFit.cover,
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
-          return Container(
-            height: height,
-            color: appTheme.gray_100,
-            child: const Center(
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          );
-        },
-        errorBuilder: (context, error, stackTrace) {
+        placeholder: (context, url) => Container(
+          height: height,
+          color: appTheme.gray_100,
+          child: const Center(
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+        errorWidget: (context, error, stackTrace) {
           debugPrint('Image load error for URL $url: $error');
           return _buildImagePlaceholder(height);
         },

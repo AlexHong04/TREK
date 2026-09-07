@@ -1,4 +1,5 @@
 import 'package:Trek/models/entities/day_trip.dart';
+import 'package:Trek/view_models/ui_state/activity_ui_state.dart';
 
 import '../entities/activity.dart';
 import '../entities/whole_trip.dart';
@@ -73,4 +74,10 @@ abstract interface class IItineraryService {
   Future<Map<String,dynamic>> getTripSpentSummary(List<String> activityIds);
 
   Future<void> deleteWholeTrip(String tripId);
+}
+
+abstract interface class ICachedActivity {
+  Future<List<Activity>> getActivitiesForTrip(String tripId, {bool forceRefresh = false});
+  Future<void> saveActivitiesLocally(String tripId, List<Activity> activities);
+  Future<void> clearLocalActivities(String tripId);
 }

@@ -698,3 +698,30 @@ class ItineraryService implements IItineraryService {
     }
   }
 }
+
+class GetCachedActivities implements ICachedActivity {
+
+  final ISharedPreferencesRepo _itineraryRepository = ActivityLocalCache();
+
+  @override
+  Future<List<Activity>> getActivitiesForTrip(
+      String tripId, {
+        bool forceRefresh = false,
+      }) async {
+    // Service delegates entirely to repository
+    return await _itineraryRepository.getActivities(
+      tripId,
+      forceRefresh: forceRefresh,
+    );
+  }
+
+  @override
+  Future<void> saveActivitiesLocally(String tripId, List<Activity> activities) async {
+    await _itineraryRepository.saveActivitiesLocally(tripId, activities);
+  }
+
+  @override
+  Future<void> clearLocalActivities(String tripId) async {
+    await _itineraryRepository.clearLocalActivities(tripId);
+  }
+}

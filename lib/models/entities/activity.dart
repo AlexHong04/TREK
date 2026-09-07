@@ -71,26 +71,41 @@ class Activity {
 
   // directly retrieve data from Supabase
   factory Activity.fromJson(Map<String, dynamic> json) {
+    DateTime parsedDate;
+    final rawDate = json['date'] ?? json['start_date'];
+    if (rawDate is String && rawDate.isNotEmpty) {
+      parsedDate = DateTime.tryParse(rawDate) ?? DateTime.now();
+    } else if (rawDate is DateTime) {
+      parsedDate = rawDate;
+    } else {
+      parsedDate = DateTime.now();
+    }
+
+    // 2. Safe number parser
+    double parseDouble(dynamic value, [double fallback = 0.0]) {
+      if (value == null) return fallback;
+      if (value is num) return value.toDouble();
+      return double.tryParse(value.toString()) ?? fallback;
+    }
+
     return Activity(
-      activitiesId: json['activities_id'],
-      destination: json['destination'],
-      description: json['description'],
-      activityImgUrl: (json['activity_img_url'] ?? '').toString(),
-      date: DateTime.parse(json['date']),
-      allocatedBudget: (json['allocated_budget'] as num).toDouble(),
-      status: json['status'],
-      startTime: json['start_time'],
-      endTime: json['end_time'],
-      duration: json['duration'],
-      activityCategory: json['activity_category'],
-      isOverspend: json['is_overspend'] as bool?,
-      overspendAmount: (json['overspend_amount'] as num?)?.toDouble(),
-      dayTripId: json['day_trip_id'],
-      minAllocatedBudget: json['min_allocated_budget'] != null
-          ? (json['min_allocated_budget'] as num).toDouble()
-          : (json['minAllocatedBudget'] != null
-                ? (json['minAllocatedBudget'] as num).toDouble()
-                : null),
+      activitiesId: (json['activities_id'] ?? json['activitiesId'] ?? '').toString(),
+      destination: (json['destination'] ?? 'Activity').toString(),
+      description: (json['description'] ?? '').toString(),
+      activityImgUrl: (json['activity_img_url'] ?? json['activityImgUrl'] ?? '').toString(),
+      date: parsedDate,
+      allocatedBudget: parseDouble(json['allocated_budget'] ?? json['allocatedBudget']),
+      status: (json['status'] ?? 'pending').toString(),
+      startTime: json['start_time'] ?? json['startTime'],
+      endTime: json['end_time'] ?? json['endTime'],
+      duration: json['duration']?.toString(),
+      activityCategory: (json['activity_category'] ?? json['activityCategory'] ?? 'General').toString(),
+      isOverspend: (json['is_overspend'] ?? json['isOverspend']) as bool? ?? false,
+      overspendAmount: parseDouble(json['overspend_amount'] ?? json['overspendAmount']),
+      dayTripId: (json['day_trip_id'] ?? json['dayTripId'] ?? '').toString(),
+      minAllocatedBudget: json['min_allocated_budget'] != null || json['minAllocatedBudget'] != null
+          ? parseDouble(json['min_allocated_budget'] ?? json['minAllocatedBudget'])
+          : null,
     );
   }
 
