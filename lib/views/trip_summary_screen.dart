@@ -132,42 +132,72 @@ class TripSummaryScreen extends StatelessWidget {
 
   Widget _buildBudgetOverview(TripSummaryUiState uiState) {
     final isOverspent = uiState.remainingBudget < 0;
-    final progress = (uiState.spentPercentage / 100).clamp(0.0, 1.0);
+    final isUnhealthy = uiState.financialHealth == 'Unhealthy';
+    final expenseColor = isOverspent
+        ? appTheme.errorRed
+        : isUnhealthy
+        ? appTheme.warningPopupHeader
+        : appTheme.teal_800;
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final donut = SizedBox(
-          width: 138,
-          height: 138,
-          child: CustomPaint(
-            painter: HealthDonutPainter(
-              progress: progress,
-              progressColor: isOverspent
-                  ? appTheme.errorRed
-                  : appTheme.teal_800,
-              remainderColor: appTheme.gray_200,
-            ),
-            child: Center(
-              child: Text(
-                '${uiState.spentPercentage.round()}%',
-                style: TextStyle(
-                  color: isOverspent ? appTheme.errorRed : appTheme.gray_900,
-                  fontSize: 25,
-                  fontWeight: FontWeight.w800,
+        final budgetRings = SizedBox(
+          width: 168,
+          child: Column(
+            children: [
+              SizedBox(
+                width: 152,
+                height: 152,
+                child: CustomPaint(
+                  painter: HealthDonutPainter(
+                    showActualBudget: isUnhealthy,
+                    actualBudgetProgress: uiState.actualBudgetRingProgress,
+                    allocatedBudgetProgress:
+                        uiState.allocatedBudgetRingProgress,
+                    expenseProgress: uiState.expenseRingProgress,
+                    actualBudgetColor: appTheme.teal_A700,
+                    allocatedBudgetColor: appTheme.blue_gray_300,
+                    expenseColor: expenseColor,
+                    backgroundColor: appTheme.gray_200,
+                  ),
+                  child: Center(
+                    child: Text(
+                      '${uiState.spentPercentage.round()}%',
+                      style: TextStyle(
+                        color: expenseColor,
+                        fontSize: 23,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(height: 12),
+              if (isUnhealthy) ...[
+                _BudgetRingLegend(color: appTheme.teal_A700, label: 'Actual'),
+                const SizedBox(height: 6),
+              ],
+              _BudgetRingLegend(
+                color: appTheme.blue_gray_300,
+                label: 'Allocated',
+              ),
+              const SizedBox(height: 6),
+              _BudgetRingLegend(color: expenseColor, label: 'Expense'),
+            ],
           ),
         );
         final metrics = _BudgetMetricsCard(uiState: uiState);
 
-        if (constraints.maxWidth < 340) {
-          return Column(children: [donut, const SizedBox(height: 18), metrics]);
+        if (constraints.maxWidth < 430) {
+          return Column(
+            children: [budgetRings, const SizedBox(height: 20), metrics],
+          );
         }
         return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            donut,
-            const SizedBox(width: 16),
+            budgetRings,
+            const SizedBox(width: 18),
             Expanded(child: metrics),
           ],
         );
@@ -176,12 +206,11 @@ class TripSummaryScreen extends StatelessWidget {
   }
 
   Widget _buildFinancialHealth(TripSummaryUiState uiState) {
-    final isOverspent = uiState.financialHealth == 'Overspent';
-    final isWarning = uiState.financialHealth == 'Warning';
-    final color = isOverspent
-        ? appTheme.errorRed
-        : isWarning
-        ? appTheme.warningPopupHeader
+    final isUnhealthy = uiState.financialHealth == 'Unhealthy';
+    final color = isUnhealthy
+        ? uiState.remainingBudget < 0
+              ? appTheme.errorRed
+              : appTheme.warningPopupHeader
         : appTheme.wholeGoodBudgetProgress;
 
     return Row(
@@ -636,6 +665,31 @@ class TripSummaryScreen extends StatelessWidget {
       return 'From ${startDate.day}-${DateFormat('d MMM, yyyy').format(endDate)}';
     }
     return 'From ${DateFormat('d MMM, yyyy').format(startDate)} - ${DateFormat('d MMM, yyyy').format(endDate)}';
+  }
+}
+
+class _BudgetRingLegend extends StatelessWidget {
+  final Color color;
+  final String label;
+
+  const _BudgetRingLegend({required this.color, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 9,
+          height: 9,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 7),
+        Text(
+          label,
+          style: TextStyle(color: appTheme.blue_gray_700, fontSize: 11),
+        ),
+      ],
+    );
   }
 }
 

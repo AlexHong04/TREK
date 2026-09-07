@@ -117,6 +117,22 @@ class TripSummaryUiState {
     this.futureRecommendations = const [],
   });
 
+  double get budgetRingMaximum {
+    var maximum = actualBudget;
+    if (allocatedBudget > maximum) maximum = allocatedBudget;
+    if (totalExpense > maximum) maximum = totalExpense;
+    return maximum <= 0 ? 1 : maximum;
+  }
+
+  double get actualBudgetRingProgress =>
+      (actualBudget / budgetRingMaximum).clamp(0.0, 1.0).toDouble();
+
+  double get allocatedBudgetRingProgress =>
+      (allocatedBudget / budgetRingMaximum).clamp(0.0, 1.0).toDouble();
+
+  double get expenseRingProgress =>
+      (totalExpense / budgetRingMaximum).clamp(0.0, 1.0).toDouble();
+
   TripSummaryUiState copyWith({
     bool? isLoading,
     bool? isLoadingCostSavingTips,

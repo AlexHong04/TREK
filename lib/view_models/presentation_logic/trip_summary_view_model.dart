@@ -5,11 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../models/services/financial_dashboard_service.dart';
+import '../../models/services/i_financial_dashboard_service.dart';
 import '../ui_state/trip_summary_ui_state.dart';
 
 export '../ui_state/trip_summary_ui_state.dart';
 
 class TripSummaryViewModel extends ChangeNotifier {
+  static const double _unhealthyAllocatedOverrunRatio = 0.05;
+
   final String tripId;
   final IFinancialDashboardService _service;
 
@@ -73,7 +76,10 @@ class TripSummaryViewModel extends ChangeNotifier {
           remainingBudget: actualBudget - expense,
           remainingBudgetText: _formatMoney(actualBudget - expense),
           spentPercentage: rawPercentage,
-          financialHealth: _healthLabel(rawPercentage),
+          financialHealth: _healthLabel(
+            allocatedBudget: allocatedBudget,
+            totalExpense: expense,
+          ),
           categories: summary.categories
               .map(
                 (category) => TripSummaryCategoryUiState(
@@ -339,10 +345,18 @@ class TripSummaryViewModel extends ChangeNotifier {
     );
   }
 
-  String _healthLabel(double spentPercentage) {
-    if (spentPercentage > 100) return 'Overspent';
-    if (spentPercentage > 80) return 'Warning';
-    return 'Healthy';
+  String _healthLabel({
+    required double allocatedBudget,
+    required double totalExpense,
+  }) {
+    if (allocatedBudget <= 0) {
+      return totalExpense > 0 ? 'Unhealthy' : 'Healthy';
+    }
+    final allocatedOverrunRatio =
+        (totalExpense - allocatedBudget) / allocatedBudget;
+    return allocatedOverrunRatio > _unhealthyAllocatedOverrunRatio
+        ? 'Unhealthy'
+        : 'Healthy';
   }
 
   String _formatMoney(double amount) {
@@ -352,45 +366,95 @@ class TripSummaryViewModel extends ChangeNotifier {
 }
 
 class HealthDonutPainter extends CustomPainter {
-  final double progress;
-  final Color progressColor;
-  final Color remainderColor;
+  final bool showActualBudget;
+  final double actualBudgetProgress;
+  final double allocatedBudgetProgress;
+  final double expenseProgress;
+  final Color actualBudgetColor;
+  final Color allocatedBudgetColor;
+  final Color expenseColor;
+  final Color backgroundColor;
 
   const HealthDonutPainter({
-    required this.progress,
-    required this.progressColor,
-    required this.remainderColor,
+    required this.showActualBudget,
+    required this.actualBudgetProgress,
+    required this.allocatedBudgetProgress,
+    required this.expenseProgress,
+    required this.actualBudgetColor,
+    required this.allocatedBudgetColor,
+    required this.expenseColor,
+    required this.backgroundColor,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = math.min(size.width, size.height) / 2 - 13;
+    final outerRadius = math.min(size.width, size.height) / 2 - 7;
+
+    if (showActualBudget) {
+      _drawRing(
+        canvas: canvas,
+        center: center,
+        radius: outerRadius,
+        progress: actualBudgetProgress,
+        color: actualBudgetColor,
+      );
+    }
+    _drawRing(
+      canvas: canvas,
+      center: center,
+      radius: showActualBudget ? outerRadius - 15 : outerRadius - 8,
+      progress: allocatedBudgetProgress,
+      color: allocatedBudgetColor,
+    );
+    _drawRing(
+      canvas: canvas,
+      center: center,
+      radius: showActualBudget ? outerRadius - 30 : outerRadius - 27,
+      progress: expenseProgress,
+      color: expenseColor,
+    );
+  }
+
+  void _drawRing({
+    required Canvas canvas,
+    required Offset center,
+    required double radius,
+    required double progress,
+    required Color color,
+  }) {
     final rect = Rect.fromCircle(center: center, radius: radius);
     final paint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 24;
+      ..strokeWidth = 8
+      ..strokeCap = StrokeCap.round;
 
     canvas.drawArc(
       rect,
       -math.pi / 2,
       math.pi * 2,
       false,
-      paint..color = remainderColor,
+      paint..color = backgroundColor,
     );
+    if (progress <= 0) return;
     canvas.drawArc(
       rect,
       -math.pi / 2,
       math.pi * 2 * progress,
       false,
-      paint..color = progressColor,
+      paint..color = color,
     );
   }
 
   @override
   bool shouldRepaint(covariant HealthDonutPainter oldDelegate) {
-    return oldDelegate.progress != progress ||
-        oldDelegate.progressColor != progressColor ||
-        oldDelegate.remainderColor != remainderColor;
+    return oldDelegate.showActualBudget != showActualBudget ||
+        oldDelegate.actualBudgetProgress != actualBudgetProgress ||
+        oldDelegate.allocatedBudgetProgress != allocatedBudgetProgress ||
+        oldDelegate.expenseProgress != expenseProgress ||
+        oldDelegate.actualBudgetColor != actualBudgetColor ||
+        oldDelegate.allocatedBudgetColor != allocatedBudgetColor ||
+        oldDelegate.expenseColor != expenseColor ||
+        oldDelegate.backgroundColor != backgroundColor;
   }
 }
