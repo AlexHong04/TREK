@@ -1,16 +1,13 @@
-import 'dart:convert';
 import 'dart:typed_data';
-import 'package:Trek/models/local_data_source/activity_local_data_source.dart';
+import 'package:Trek/models/local_data_source/shared_preferences_source.dart';
 import 'package:Trek/view_models/ui_state/activity_ui_state.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import '../configurations/supabase_config.dart';
 import '../entities/activity.dart';
 import '../entities/whole_trip.dart';
 import '../entities/day_trip.dart';
 import '../../utils/id_generator.dart';
-import '../local_data_source/activity_local_data_source.dart';
 
 import 'i_itinerary_repository.dart';
 
@@ -378,6 +375,27 @@ class ItineraryRepository implements IItineraryRepository {
           .eq('day_trip_id', day.dayTripId!);
     } on Exception catch (e) {
       print('Budget Recovery Update Balance Error: $e');
+      throw Exception('DB Error: $e');
+    }
+  }
+
+  // Reconciles a day's stored overspend (amount + flag) to the authoritative
+  // net value, so stale per-day overspend amounts are cleaned up.
+  Future<void> updateDayOverspend(DayTrip day) async {
+    if (day.dayTripId == null) {
+      throw Exception('Cannot update daily overspend: dayTripId is null.');
+    }
+    final double netOverspend = day.overspendAmount ?? 0.0;
+    try {
+      await SupabaseConfig.client
+          .from('day_trips')
+          .update({
+            'overspend_amount': netOverspend,
+            'is_overspend': netOverspend > 0,
+          })
+          .eq('day_trip_id', day.dayTripId!);
+    } on Exception catch (e) {
+      print('Budget Recovery Update Overspend Error: $e');
       throw Exception('DB Error: $e');
     }
   }

@@ -554,4 +554,127 @@ class BudgetService implements IBudgetService {
 
     return sufficientDays.floor();
   }
+
+  // weisong
+  @override
+  Future<double> reconcileDayBudget({
+    required String tripId,
+    required String dayTripId,
+    required DateTime date,
+    required Map<String, double> activitySpentMap,
+  }) async {
+    // 1. Fetch all activities for the entire trip
+    final allActivities = await _itineraryRepository.fetchAllActivitiesByTrip(tripId);
+
+    // 2. Filter activities for the target day
+    final dayActivities = allActivities.where((act) {
+      return act.dayTripId == dayTripId ||
+          (act.date.year == date.year &&
+              act.date.month == date.month &&
+              act.date.day == date.day);
+    }).toList();
+
+    if (dayActivities.isEmpty) return 0.0;
+
+    // 3. Sum up total allocated vs total spent for this specific day
+    double totalDayAllocated = 0.0;
+    double totalDaySpent = 0.0;
+
+    for (final act in dayActivities) {
+      totalDayAllocated += act.allocatedBudget;
+      totalDaySpent += (activitySpentMap[act.activitiesId] ?? 0.0);
+    }
+
+    // 4. Calculate Net Overspend:
+    // If totalDaySpent <= totalDayAllocated, the result is strictly 0.0.
+    final double netDayOverspend = (totalDaySpent - totalDayAllocated).clamp(0.0, double.infinity);
+
+    debugPrint('========== DAY BUDGET RECONCILIATION ==========');
+    debugPrint('DayTrip ID: $dayTripId | Date: ${date.toIso8601String().split('T').first}');
+    debugPrint('Day Allocated: RM ${totalDayAllocated.toStringAsFixed(2)}');
+    debugPrint('Day Spent: RM ${totalDaySpent.toStringAsFixed(2)}');
+    debugPrint('Net Day Overspend: RM ${netDayOverspend.toStringAsFixed(2)}');
+    debugPrint('==============================================');
+
+    // 5. Persist the updated day overspend in database/repository
+    final currentDay = await _itineraryRepository.getCurrentDay(dayTripId);
+    final updatedDay = currentDay.copyWith(
+      overspendAmount: netDayOverspend,
+      isOverspend: netDayOverspend > 0,
+    );
+    await _itineraryRepository.updateDayOverspend(updatedDay);
+
+    return netDayOverspend;
+  }
+
+  // Reconciles EVERY activity/day against real spending and persists the
+  // results, clearing stale per-day/per-activity overspend amounts left behind
+  // by earlier submissions.
+  //
+  // Overspend is defined PER ACTIVITY as: how much an activity's recorded
+  // spending exceeds ITS OWN allocation (max(0, spent - allocated)), counted
+  // even when the allocated budget is 0. A day's / the trip's overspend is the
+  // sum of those activity-level amounts. Returns the whole-trip total.
+  @override
+  Future<double> reconcileTripOverspend({required String tripId}) async {
+    if (tripId.trim().isEmpty) return 0.0;
+
+    final allActivities = await _itineraryRepository.fetchAllActivitiesByTrip(
+      tripId,
+    );
+    final days = await _itineraryRepository.fetchDaysByTripId(tripId);
+
+    // Total spent per activity for the whole trip in a single query.
+    final spentSummary = await _itineraryRepository
+        .fetchSpentSummaryByActivityIds(
+          allActivities.map((a) => a.activitiesId).toList(),
+        );
+    final spentByActivity = Map<String, double>.from(
+      (spentSummary['activitySpentMap'] as Map?) ?? const {},
+    );
+
+    final overspendByDay = <String, double>{};
+    final activitiesToUpdate = <Activity>[];
+    double totalTripOverspent = 0.0;
+
+    for (final act in allActivities) {
+      final double spent = spentByActivity[act.activitiesId] ?? 0.0;
+      final double allocated = act.allocatedBudget;
+      final double gross = spent > allocated ? spent - allocated : 0.0;
+      final bool isOver = spent > allocated;
+
+      if (gross > 0) {
+        overspendByDay[act.dayTripId] =
+            (overspendByDay[act.dayTripId] ?? 0.0) + gross;
+        totalTripOverspent += gross;
+      }
+
+      // Only persist when the stored values are out of sync with reality.
+      final double storedAmount = act.overspendAmount ?? 0.0;
+      final bool storedFlag = act.isOverspend ?? false;
+      if (storedFlag != isOver || (storedAmount - gross).abs() > 0.001) {
+        activitiesToUpdate.add(
+          act.copyWith(isOverspend: isOver, overspendAmount: gross),
+        );
+      }
+    }
+
+    if (activitiesToUpdate.isNotEmpty) {
+      await _itineraryRepository.updateActivities(activitiesToUpdate);
+    }
+
+    for (final day in days) {
+      final dayId = day.dayTripId;
+      if (dayId == null) continue;
+
+      final double dayOverspend = overspendByDay[dayId] ?? 0.0;
+      final updatedDay = day.copyWith(
+        overspendAmount: dayOverspend,
+        isOverspend: dayOverspend > 0,
+      );
+      await _itineraryRepository.updateDayOverspend(updatedDay);
+    }
+
+    return totalTripOverspent;
+  }
 }
