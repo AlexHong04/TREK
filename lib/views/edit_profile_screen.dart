@@ -53,7 +53,7 @@ class EditProfileScreen extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(20, 22, 20, 32),
                 children: [
                   CustomTextField(
-                    sectionTitle: 'FULL NAME (OPTIONAL)',
+                    sectionTitle: 'FULL NAME',
                     hintText: 'Enter your full name',
                     prefixIcon: Icons.badge_outlined,
                     margin: EdgeInsets.zero,
@@ -75,15 +75,12 @@ class EditProfileScreen extends StatelessWidget {
                     keyboardType: TextInputType.emailAddress,
                   ),
                   const SizedBox(height: 12),
-                  _FieldCard(
-                    label: 'PREFERRED CURRENCY',
-                    child: CurrencyPickerField(
-                      value: state.currency,
-                      currencies: state.availableCurrencies,
-                      errorText: state.currencyError,
-                      enabled: !state.isSaving,
-                      onChanged: viewModel.onCurrencyChanged,
-                    ),
+                  CurrencyPickerField(
+                    value: state.currency,
+                    currencies: state.availableCurrencies,
+                    errorText: state.currencyError,
+                    enabled: !state.isSaving,
+                    onChanged: viewModel.onCurrencyChanged,
                   ),
                   const SizedBox(height: 42),
                   FilledButton.icon(
@@ -121,46 +118,4 @@ class EditProfileScreen extends StatelessWidget {
     );
   }
 
-}
-
-class _FieldCard extends StatelessWidget {
-  final String label;
-  final Widget child;
-
-  const _FieldCard({required this.label, required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(13),
-      decoration: BoxDecoration(
-        color: appTheme.white_A700,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: appTheme.gray_100),
-        boxShadow: [
-          BoxShadow(
-            color: appTheme.black_900_0c,
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: appTheme.blue_gray_300,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.7,
-            ),
-          ),
-          const SizedBox(height: 7),
-          child,
-        ],
-      ),
-    );
-  }
 }

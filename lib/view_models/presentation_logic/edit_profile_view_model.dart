@@ -82,9 +82,7 @@ class EditProfileViewModel extends ChangeNotifier {
     final enteredName = _uiState.fullName.trim();
     final savedName = enteredName.isNotEmpty
         ? enteredName
-        : (_uiState.originalFullName.trim().isNotEmpty
-        ? _uiState.originalFullName.trim()
-        : 'Tourist');
+        : _nameFromEmail(_uiState.email);
 
     _uiState = _uiState.copyWith(
       isSaving: true,
@@ -118,6 +116,15 @@ class EditProfileViewModel extends ChangeNotifier {
 
   void consumeErrorMessage() {
     _uiState = _uiState.copyWith(clearErrorMessage: true);
+  }
+
+  static String _nameFromEmail(String email) {
+    final normalizedEmail = email.trim();
+    final separatorIndex = normalizedEmail.indexOf('@');
+    final localPart = separatorIndex == -1
+        ? normalizedEmail
+        : normalizedEmail.substring(0, separatorIndex);
+    return localPart.trim().isEmpty ? 'Tourist' : localPart.trim();
   }
 }
 

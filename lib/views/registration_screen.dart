@@ -125,7 +125,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    const AuthFieldLabel('PREFERRED CURRENCY'),
                     CurrencyPickerField(
                       value: state.currency,
                       currencies: state.availableCurrencies,
