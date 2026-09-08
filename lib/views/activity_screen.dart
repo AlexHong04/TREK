@@ -123,12 +123,6 @@ class _ActivityScreenState extends State<ActivityScreen> {
     viewModel.clearPopupAction();
 
     switch (action) {
-      case 'warning_50':
-        _show50WarningDialog(state);
-
-      case 'warning_80':
-        _show80WarningDialog(state);
-
       case 'successful':
         _showUnderThresholdDialog(state);
         break;
@@ -150,48 +144,6 @@ class _ActivityScreenState extends State<ActivityScreen> {
         );
         break;
     }
-  }
-
-  void _show50WarningDialog(ActivityUiState state) {
-    final activity = state.selectedActivity;
-    if (activity == null) return;
-
-    final double allocated = activity.allocatedBudget;
-    final double spent = state.activitySpentMap[activity.activitiesId] ?? 0.0;
-    final double remaining = (allocated - spent).clamp(0.0, double.infinity);
-
-    showNearLimitWarningDialog(
-      context: context,
-      activityTitle: activity.destination,
-      allocatedBudget: 'RM ${allocated.toStringAsFixed(2)}',
-      currentSpent: 'RM ${spent.toStringAsFixed(2)}',
-      remainingInActivity: 'RM ${remaining.toStringAsFixed(2)}',
-      warningText1:
-      'You have spent RM ${spent.toStringAsFixed(2)} (50% or more) of the budget for this activity.',
-      warningText2:
-      'Keep an eye on your remaining allowance to avoid exceeding the plan.',
-    );
-  }
-
-  void _show80WarningDialog(ActivityUiState state) {
-    final activity = state.selectedActivity;
-    if (activity == null) return;
-
-    final double allocated = activity.allocatedBudget;
-    final double spent = state.activitySpentMap[activity.activitiesId] ?? 0.0;
-    final double remaining = (allocated - spent).clamp(0.0, double.infinity);
-
-    showNearLimitWarningDialog(
-      context: context,
-      activityTitle: activity.destination,
-      allocatedBudget: 'RM ${allocated.toStringAsFixed(2)}',
-      currentSpent: 'RM ${spent.toStringAsFixed(2)}',
-      remainingInActivity: 'RM ${remaining.toStringAsFixed(2)}',
-      warningText1:
-      'You have spent RM ${spent.toStringAsFixed(2)} (80% or more) of the budget for this activity.',
-      warningText2:
-      'Your remaining budget for this activity is running low. Consider minimizing further expenses.',
-    );
   }
 
   void _showUnderThresholdDialog(ActivityUiState state) {
@@ -800,9 +752,16 @@ class _ActivityScreenState extends State<ActivityScreen> {
       }) {
     final spent = uiState.activitySpentMap[activity.activitiesId] ?? 0.0;
 
-// Flag as alert if spending reaches 90% or more (including overspent)
-    final bool isAlert = activity.allocatedBudget > 0 &&
-        (spent >= activity.allocatedBudget * 0.80);
+    // Red as soon as spending EXCEEDS the allocated budget. This also covers
+    // zero-budget activities (allocatedBudget == 0), where any spending at all
+    // is already an overspend.
+    final bool isOverBudget = spent > activity.allocatedBudget;
+
+    // Warn (red) slightly earlier for budgeted activities: 80% or more used.
+    final bool reachedAlertThreshold = activity.allocatedBudget > 0 &&
+        spent >= activity.allocatedBudget * 0.80;
+
+    final bool isAlert = isOverBudget || reachedAlertThreshold;
 
     final Color chipBgColor = isAlert
         ? appTheme.wholeAlertBudgetStroke
