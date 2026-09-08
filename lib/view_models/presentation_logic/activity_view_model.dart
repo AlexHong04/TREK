@@ -50,7 +50,10 @@ class ActivityViewModel extends ChangeNotifier {
        _expenseRepository = expenseRepository ?? ExpenseRepository(),
        _authService = authService,
        _cachedActivity = cachedActivity ?? GetCachedActivities() {
-    _uiState = _uiState.copyWith(originalCurrency: _defaultExpenseCurrency());
+    _uiState = _uiState.copyWith(
+      originalCurrency: _defaultExpenseCurrency(),
+      displayCurrency: _authService.preferredCurrency,
+    );
     _loadAvailableCurrencies();
     _authService.addListener(_handleAuthChanged);
   }
@@ -1547,9 +1550,7 @@ class ActivityViewModel extends ChangeNotifier {
         '${totalTripOverspent.toStringAsFixed(2)}',
       );
 
-      _uiState = _uiState.copyWith(
-        overspentBudget: totalTripOverspent,
-      );
+      _uiState = _uiState.copyWith(overspentBudget: totalTripOverspent);
       notifyListeners();
     } catch (e) {
       debugPrint('Error reconciling trip overspend: $e');
