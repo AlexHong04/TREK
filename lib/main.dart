@@ -103,9 +103,9 @@ Future<void> main() async {
   final IItineraryRepository itineraryRepository = ItineraryRepository();
   final IExpenseRepository expenseRepository = ExpenseRepository();
   final IItineraryService itineraryService = ItineraryService();
-  final IBudgetService budgetService = BudgetService();
+  final IBudgetService budgetService = BudgetService(authService: authService);
   final IExpenseTrackingService expenseTrackingService =
-      ExpenseTrackingService();
+      ExpenseTrackingService(authService: authService);
 
   runApp(
     MultiProvider(

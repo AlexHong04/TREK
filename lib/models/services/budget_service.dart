@@ -4,17 +4,28 @@ import '../entities/activity.dart';
 import '../entities/whole_trip.dart';
 import '../repository/i_itinerary_repository.dart';
 import '../repository/itinerary_repository.dart';
+import 'auth_service.dart';
+import 'i_auth_service.dart';
 import 'i_budget_service.dart';
 
 class BudgetService implements IBudgetService {
-  final IItineraryRepository _itineraryRepository = ItineraryRepository();
+  final IItineraryRepository _itineraryRepository;
+  final IAuthService _authService;
+
+  BudgetService({
+    required IAuthService authService
+  })
+      : _itineraryRepository = ItineraryRepository(),
+        _authService = authService;
 
   @override
   Future<WholeTrip> deductRemainingBudget({
     required String tripId,
     required double expenseAmount,
   }) async {
-    if (tripId.trim().isEmpty) {
+    if (tripId
+        .trim()
+        .isEmpty) {
       throw ArgumentError(
         'A trip must be selected before recording an expense.',
       );
@@ -52,15 +63,19 @@ class BudgetService implements IBudgetService {
 
     final oldRemaining = currentTrip.remainingBalance ?? 0.0;
     final oldTotal = currentTrip.totalBudget;
-
     final oldTopup = currentDay.topUpBudget ?? 0.00;
 
+    double topUpAmountConverted = await _authService.convertToPreferredCurrency(amount: topupAmount, fromCurrency: 'MYR') ?? topupAmount;
+    double newRemaining = oldRemaining + topUpAmountConverted;
+    double newTotal = oldTotal + topUpAmountConverted;
+    double newTopUp = oldTopup + topUpAmountConverted;
+
     final updatedTrip = currentTrip.copyWith(
-      remainingBalance: oldRemaining + topupAmount,
-      totalBudget: oldTotal + topupAmount,
+      remainingBalance: newRemaining,
+      totalBudget: newTotal,
     );
 
-    final updatedDay = currentDay.copyWith(topUpBudget: oldTopup + topupAmount);
+    final updatedDay = currentDay.copyWith(topUpBudget: newTopUp);
 
     debugPrint('updatedTrip ${updatedTrip}');
     debugPrint('updatedDay ${updatedDay}');
@@ -90,10 +105,8 @@ class BudgetService implements IBudgetService {
   //   return true;
   // }
 
-  Future<List<Activity>> getRemainingActivities(
-    String tripId,
-    DateTime currentDateTime,
-  ) async {
+  Future<List<Activity>> getRemainingActivities(String tripId,
+      DateTime currentDateTime,) async {
     try {
       final activities = await _itineraryRepository.fetchAllActivitiesByTrip(
         tripId,
@@ -128,11 +141,9 @@ class BudgetService implements IBudgetService {
     return DateTime(date.year, date.month, date.day, hour, minute);
   }
 
-  Future<List<Activity>> reallocateBudget(
-    String tripId,
-    Activity currentActivity,
-    double overspentAmount,
-  ) async {
+  Future<List<Activity>> reallocateBudget(String tripId,
+      Activity currentActivity,
+      double overspentAmount,) async {
     debugPrint('========== START BUDGET REALLOCATION ==========');
     debugPrint('Trip ID: $tripId');
     debugPrint('Current Activity ID: ${currentActivity.activitiesId}');
@@ -149,29 +160,29 @@ class BudgetService implements IBudgetService {
     for (final activity in allRemainingActivities) {
       debugPrint(
         'Remaining Activity: '
-        '${activity.activitiesId} | '
-        '${activity.destination} | '
-        'Category: ${activity.activityCategory} | '
-        'Date: ${activity.date} | '
-        'Start: ${activity.startTime} | '
-        'Budget: RM ${activity.allocatedBudget.toStringAsFixed(2)}',
+            '${activity.activitiesId} | '
+            '${activity.destination} | '
+            'Category: ${activity.activityCategory} | '
+            'Date: ${activity.date} | '
+            'Start: ${activity.startTime} | '
+            'Budget: RM ${activity.allocatedBudget.toStringAsFixed(2)}',
       );
     }
 
     // Find restaurant activities here.
     final List<Activity> remainingRestaurantActivities = allRemainingActivities
         .where((activity) {
-          final bool isRestaurant =
-              activity.activityCategory.toLowerCase() == 'restaurant';
+      final bool isRestaurant =
+          activity.activityCategory.toLowerCase() == 'restaurant';
 
-          debugPrint(
-            '[CHECK] ${activity.activitiesId} | '
+      debugPrint(
+        '[CHECK] ${activity.activitiesId} | '
             '${activity.destination} | '
             'Restaurant: $isRestaurant',
-          );
+      );
 
-          return isRestaurant;
-        })
+      return isRestaurant;
+    })
         .toList();
 
     // Sort restaurants according to start time.
@@ -200,13 +211,13 @@ class BudgetService implements IBudgetService {
 
     debugPrint(
       'Remaining restaurants: '
-      '${remainingRestaurantActivities.length}',
+          '${remainingRestaurantActivities.length}',
     );
 
     if (remainingRestaurantActivities.isEmpty) {
       debugPrint(
         '[REALLOCATION FAILED] '
-        'No remaining restaurant activities.',
+            'No remaining restaurant activities.',
       );
       debugPrint('========== END BUDGET REALLOCATION ==========');
       return [];
@@ -225,7 +236,7 @@ class BudgetService implements IBudgetService {
 
     debugPrint(
       'Deduction per restaurant: '
-      'RM ${deductionPerRestaurant.toStringAsFixed(2)}',
+          'RM ${deductionPerRestaurant.toStringAsFixed(2)}',
     );
 
     // Check whether all restaurants can absorb the deduction
@@ -238,7 +249,7 @@ class BudgetService implements IBudgetService {
 
       debugPrint(
         '[MIN PRICE CHECK] ${restaurant.activitiesId} | '
-        '${restaurant.destination}',
+            '${restaurant.destination}',
       );
 
       debugPrint('Old Budget: RM ${oldBudget.toStringAsFixed(2)}');
@@ -253,17 +264,17 @@ class BudgetService implements IBudgetService {
       if (newAllocatedBudget <= minPrice) {
         debugPrint(
           '[REALLOCATION FAILED] ${restaurant.destination} '
-          'would fall to or below minimum price.',
+              'would fall to or below minimum price.',
         );
 
         debugPrint(
           'New Budget: RM '
-          '${newAllocatedBudget.toStringAsFixed(2)}',
+              '${newAllocatedBudget.toStringAsFixed(2)}',
         );
 
         debugPrint(
           'Min Price: RM '
-          '${minPrice.toStringAsFixed(2)}',
+              '${minPrice.toStringAsFixed(2)}',
         );
 
         debugPrint('========== END BUDGET REALLOCATION ==========');
@@ -291,7 +302,7 @@ class BudgetService implements IBudgetService {
 
       debugPrint(
         '[REALLOCATE] ${restaurant.activitiesId} | '
-        '${restaurant.destination}',
+            '${restaurant.destination}',
       );
 
       debugPrint('Old Budget: RM ${oldBudget.toStringAsFixed(2)}');
@@ -306,8 +317,8 @@ class BudgetService implements IBudgetService {
     for (final activity in modifiedActivities) {
       debugPrint(
         '${activity.activitiesId} | '
-        '${activity.destination} | '
-        'New Budget: RM ${activity.allocatedBudget.toStringAsFixed(2)}',
+            '${activity.destination} | '
+            'New Budget: RM ${activity.allocatedBudget.toStringAsFixed(2)}',
       );
     }
 
@@ -503,10 +514,8 @@ class BudgetService implements IBudgetService {
   //   return modifiedActivities;
   // }
 
-  Future<int> calculateSufficientDays(
-    String tripId,
-    String currentActivityId,
-  ) async {
+  Future<int> calculateSufficientDays(String tripId,
+      String currentActivityId,) async {
     final trip = await _itineraryRepository.getTrip(tripId);
     debugPrint(
       "trip ${trip.tripId}, ${trip.remainingBalance}, ${trip.totalBudget}",
@@ -549,7 +558,9 @@ class BudgetService implements IBudgetService {
     );
 
     // including today
-    final daysUntilEnd = endDate.difference(todayDate).inDays + 1;
+    final daysUntilEnd = endDate
+        .difference(todayDate)
+        .inDays + 1;
 
     if (sufficientDays > daysUntilEnd) {
       return daysUntilEnd;
@@ -599,7 +610,10 @@ class BudgetService implements IBudgetService {
 
     debugPrint('========== DAY BUDGET RECONCILIATION ==========');
     debugPrint(
-      'DayTrip ID: $dayTripId | Date: ${date.toIso8601String().split('T').first}',
+      'DayTrip ID: $dayTripId | Date: ${date
+          .toIso8601String()
+          .split('T')
+          .first}',
     );
     debugPrint('Day Allocated: RM ${totalDayAllocated.toStringAsFixed(2)}');
     debugPrint('Day Spent: RM ${totalDaySpent.toStringAsFixed(2)}');
@@ -626,7 +640,9 @@ class BudgetService implements IBudgetService {
   // sum of those activity-level amounts. Returns the whole-trip total.
   @override
   Future<double> reconcileTripOverspend({required String tripId}) async {
-    if (tripId.trim().isEmpty) return 0.0;
+    if (tripId
+        .trim()
+        .isEmpty) return 0.0;
 
     final allActivities = await _itineraryRepository.fetchAllActivitiesByTrip(
       tripId,
@@ -636,8 +652,8 @@ class BudgetService implements IBudgetService {
     // Total spent per activity for the whole trip in a single query.
     final spentSummary = await _itineraryRepository
         .fetchSpentSummaryByActivityIds(
-          allActivities.map((a) => a.activitiesId).toList(),
-        );
+      allActivities.map((a) => a.activitiesId).toList(),
+    );
     final spentByActivity = Map<String, double>.from(
       (spentSummary['activitySpentMap'] as Map?) ?? const {},
     );

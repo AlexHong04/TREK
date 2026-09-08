@@ -11,6 +11,7 @@ import '../repository/i_expense_repository.dart';
 import '../repository/itinerary_repository.dart';
 import '../repository/i_itinerary_repository.dart';
 import 'budget_service.dart';
+import 'i_auth_service.dart';
 import 'i_budget_service.dart';
 import 'i_expense_tracking_service.dart';
 
@@ -27,9 +28,18 @@ class _ExtractedReceiptItem {
 }
 
 class ExpenseTrackingService implements IExpenseTrackingService {
-  final IItineraryRepository _itineraryRepository = ItineraryRepository();
-  final IBudgetService _budgetService = BudgetService();
-  final IExpenseRepository _expenseRepository = ExpenseRepository();
+  final IItineraryRepository _itineraryRepository;
+  final IBudgetService _budgetService;
+  final IExpenseRepository _expenseRepository;
+
+  ExpenseTrackingService({required IAuthService authService})
+    : _itineraryRepository = ItineraryRepository(),
+      _expenseRepository = ExpenseRepository(),
+      _budgetService = BudgetService(authService: authService);
+
+  // final IItineraryRepository _itineraryRepository = ItineraryRepository();
+  // final IBudgetService _budgetService = BudgetService();
+  // final IExpenseRepository _expenseRepository = ExpenseRepository();
 
   static const int _maximumReceiptSizeInBytes = 15 * 1024 * 1024;
 
@@ -265,7 +275,9 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     final totalIndex = lines.lastIndexWhere(
       (line) => line.toLowerCase().contains('total'),
     );
-    if (subtotalIndex >= 0 && taxIndex > subtotalIndex && totalIndex > taxIndex) {
+    if (subtotalIndex >= 0 &&
+        taxIndex > subtotalIndex &&
+        totalIndex > taxIndex) {
       final summaryAmounts = lines
           .skip(subtotalIndex + 1)
           .expand(_amountsFromLine)
@@ -530,8 +542,7 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       final productNames = lines
           .skip(lastAddressIndex >= 0 ? lastAddressIndex + 1 : 0)
           .take(
-            subtotalIndex -
-                (lastAddressIndex >= 0 ? lastAddressIndex + 1 : 0),
+            subtotalIndex - (lastAddressIndex >= 0 ? lastAddressIndex + 1 : 0),
           )
           .where(
             (line) =>
@@ -547,15 +558,13 @@ class ExpenseTrackingService implements IExpenseTrackingService {
           .skip(subtotalIndex + 1)
           .expand(_amountsFromLine)
           .toList();
-      if (productNames.isNotEmpty && amounts.length >= productNames.length + 3) {
+      if (productNames.isNotEmpty &&
+          amounts.length >= productNames.length + 3) {
         final itemAmounts = amounts.take(productNames.length).toList();
         return List.generate(
           productNames.length,
           (index) => _ExtractedReceiptItem(
-            name: productNames[index].replaceFirst(
-              RegExp(r'^\d+\s+'),
-              '',
-            ),
+            name: productNames[index].replaceFirst(RegExp(r'^\d+\s+'), ''),
             quantity: 1,
             unitPrice: itemAmounts[index],
           ),
@@ -572,8 +581,10 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     if (serverIndex >= 0 && grandTotalIndex > serverIndex) {
       final itemRegion = lines.sublist(serverIndex + 1, grandTotalIndex);
       final firstPriceIndex = itemRegion.indexWhere(
-        (line) => RegExp(r'(?:rm|rn|[$£€])\s*\d', caseSensitive: false)
-            .hasMatch(line),
+        (line) => RegExp(
+          r'(?:rm|rn|[$£€])\s*\d',
+          caseSensitive: false,
+        ).hasMatch(line),
       );
       if (firstPriceIndex > 0) {
         final productNames = itemRegion
@@ -658,15 +669,19 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     // Supermarket receipts often list a barcode line immediately before each
     // product name, while prices are returned separately by OCR. Use those
     // barcode/name pairs so metadata and discount lines are never items.
-    final barcodePattern = RegExp(r'^\s*(?:[1il]x|[1il]s|[1il]k)\s*\d{8,}$',
-        caseSensitive: false);
+    final barcodePattern = RegExp(
+      r'^\s*(?:[1il]x|[1il]s|[1il]k)\s*\d{8,}$',
+      caseSensitive: false,
+    );
     final barcodeItemNames = <String>[];
     for (var index = 0; index < lines.length; index++) {
       if (!barcodePattern.hasMatch(lines[index])) continue;
 
-      for (var nameIndex = index + 1;
-          nameIndex < lines.length && nameIndex <= index + 2;
-          nameIndex++) {
+      for (
+        var nameIndex = index + 1;
+        nameIndex < lines.length && nameIndex <= index + 2;
+        nameIndex++
+      ) {
         final candidate = lines[nameIndex].trim();
         if (candidate.isEmpty ||
             _isReceiptLabel(candidate) ||

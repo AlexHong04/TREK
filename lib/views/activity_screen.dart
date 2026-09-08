@@ -171,11 +171,11 @@ class _ActivityScreenState extends State<ActivityScreen> {
     showBudgetExceededDialog(
       context: context,
       allocatedBudget:
-      'RM ${state.selectedActivity?.allocatedBudget.toStringAsFixed(2)}',
-      remainingBudget: state.remainingBudget.toStringAsFixed(2),
-      exceededAmount: _activityExceededAmount(state).toStringAsFixed(2),
+      '${state.originalCurrency} ${state.selectedActivity?.allocatedBudget.toStringAsFixed(2)}',
+      remainingBudget: '${state.originalCurrency} ${state.remainingBudget.toStringAsFixed(2)}',
+      exceededAmount: '${state.originalCurrency} ${_activityExceededAmount(state).toStringAsFixed(2)}',
       warningText1:
-      'You have overspent RM${state.overspentBudget.toStringAsFixed(2)} so far for entire trip.',
+      'You have overspent ${state.originalCurrency} ${state.overspentBudget.toStringAsFixed(2)} so far for entire trip.',
       warningText2:
       'The budget allocated for remaining restaurants have been modified.',
     );
@@ -214,11 +214,11 @@ class _ActivityScreenState extends State<ActivityScreen> {
     showBudgetExceededThresholdDialog(
       context: context,
       allocatedBudget:
-      'RM ${state.selectedActivity?.allocatedBudget.toStringAsFixed(2)}',
-      remainingBudget: state.remainingBudget.toStringAsFixed(2),
-      exceededAmount: _activityExceededAmount(state).toStringAsFixed(2),
+      '${state.originalCurrency} ${state.selectedActivity?.allocatedBudget.toStringAsFixed(2)}',
+      remainingBudget: '${state.originalCurrency} ${state.remainingBudget.toStringAsFixed(2)}',
+      exceededAmount: '${state.originalCurrency} ${_activityExceededAmount(state).toStringAsFixed(2)}',
       warningText1:
-      'You have overspent ${state.overspentBudget.toStringAsFixed(2)} so far on this trip.',
+      'You have overspent ${state.originalCurrency} ${state.overspentBudget.toStringAsFixed(2)} so far on this trip.',
       estimatedDays: state.sufficientDays.toString(),
       warningText3: 'Plan will be modified automatically.',
       onContinue: () async {
@@ -321,11 +321,11 @@ class _ActivityScreenState extends State<ActivityScreen> {
     final minTopUp = uiState.shortageAmount * 0.50;
     showBudgetRecoveryDialog(
       context: context,
-      shortageAmount: uiState.shortageAmount.toStringAsFixed(2),
-      minTopUp: minTopUp.toStringAsFixed(2),
-      remainingBudget: uiState.remainingBudget.toStringAsFixed(2),
+      shortageAmount: '${uiState.originalCurrency} ${uiState.shortageAmount.toStringAsFixed(2)}',
+      minTopUp: '${uiState.originalCurrency} ${minTopUp.toStringAsFixed(2)}',
+      remainingBudget: '${uiState.originalCurrency} ${uiState.remainingBudget.toStringAsFixed(2)}',
       warningText:
-      'Top-up amount should at least ${minTopUp.toStringAsFixed(2)}, insufficient top-up amount will trigger alternative recommendation directly.',
+      'Top-up amount should at least ${uiState.originalCurrency} ${minTopUp.toStringAsFixed(2)}, insufficient top-up amount will trigger alternative recommendation directly.',
       onEndTrip: onEndTrip,
       onTopUpBudget: (amount) async {
         final success = await onTopUpBudget(amount);
@@ -447,7 +447,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
       },
     );
   }
-
+  
   @override
   Widget build(BuildContext context) {
     final viewModel = context.watch<ActivityViewModel>();
