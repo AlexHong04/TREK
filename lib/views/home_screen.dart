@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../theme/app_theme.dart';
 import '../view_models/presentation_logic/home_view_model.dart';
+import '../widgets/dual_currency_amount.dart';
 import 'financial_dashboard_screen.dart';
 import 'profile_screen.dart';
 
@@ -411,59 +412,76 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      trip.destination,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        fontFamily: 'Inter',
-                        color: appTheme.gray_900,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 12),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: appTheme.gray_100,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.calendar_today_outlined,
-                                size: 14,
-                                color: appTheme.teal_A700,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                '$startDateStr - $endDateStr',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  fontFamily: 'Inter',
-                                ).copyWith(color: appTheme.gray_800),
-                              ),
-                            ],
+                        Expanded(
+                          child: Text(
+                            trip.destination,
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: 'Inter',
+                              color: appTheme.gray_900,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        Text(
-                          'RM${trip.totalBudget.toStringAsFixed(0)}',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'Inter',
-                            color: appTheme.gray_900,
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: DualCurrencyAmount(
+                            amount: trip.totalBudget,
+                            baseCurrency: 'MYR',
+                            baseLabel: 'RM',
+                            textAlign: TextAlign.end,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            primaryStyle: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Inter',
+                              color: appTheme.gray_900,
+                            ),
+                            secondaryStyle: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              fontFamily: 'Inter',
+                              color: appTheme.blue_gray_700,
+                            ),
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: appTheme.gray_100,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.calendar_today_outlined,
+                            size: 14,
+                            color: appTheme.teal_A700,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '$startDateStr - $endDateStr',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              fontFamily: 'Inter',
+                            ).copyWith(color: appTheme.gray_800),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),

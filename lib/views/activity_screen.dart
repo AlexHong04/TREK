@@ -10,6 +10,7 @@ import '../models/services/i_auth_service.dart';
 import '../view_models/presentation_logic/activity_view_model.dart';
 import '../view_models/ui_state/activity_ui_state.dart';
 import '../widgets/custom_app_bar.dart';
+import '../widgets/dual_currency_amount.dart';
 import 'budget_popup.dart';
 import 'expense_bottom_sheet.dart';
 
@@ -603,14 +604,56 @@ class _ActivityScreenState extends State<ActivityScreen> {
                   letterSpacing: 0.5,
                 ),
               ),
-              Text(
-                'RM ${uiState.spentBudget.toStringAsFixed(2)} / RM ${uiState.totalBudget.toStringAsFixed(2)}',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  fontFamily: 'Inter',
-                  color: appTheme.gray_900,
-                ),
+              Row(
+                children: [
+                  DualCurrencyAmount(
+                    amount: uiState.spentBudget,
+                    baseCurrency: 'MYR',
+                    baseLabel: 'RM',
+                    primaryStyle: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      fontFamily: 'Inter',
+                      color: appTheme.gray_900,
+                    ),
+                    secondaryStyle: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Inter',
+                      color: appTheme.blue_gray_700,
+                    ),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    textAlign: TextAlign.start,
+                  ),
+                  Text(
+                    ' / ',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      fontFamily: 'Inter',
+                      color: appTheme.gray_900,
+                    ),
+                  ),
+                  DualCurrencyAmount(
+                    amount: uiState.totalBudget,
+                    baseCurrency: 'MYR',
+                    baseLabel: 'RM',
+                    primaryStyle: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      fontFamily: 'Inter',
+                      color: appTheme.gray_900,
+                    ),
+                    secondaryStyle: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Inter',
+                      color: appTheme.blue_gray_700,
+                    ),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    textAlign: TextAlign.start,
+                  ),
+                ],
               ),
             ],
           ),
@@ -630,16 +673,50 @@ class _ActivityScreenState extends State<ActivityScreen> {
               Expanded(
                 child: _buildSubBudgetCard(
                   title: 'SPENT',
-                  amount: 'RM ${uiState.spentBudget.toStringAsFixed(2)}',
-                  amountColor: spentColor,
+                  amountWidget: DualCurrencyAmount(
+                    amount: uiState.spentBudget,
+                    baseCurrency: 'MYR',
+                    baseLabel: 'RM',
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    textAlign: TextAlign.start,
+                    primaryStyle: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      fontFamily: 'Inter',
+                      color: spentColor,
+                    ),
+                    secondaryStyle: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      fontFamily: 'Inter',
+                      color: appTheme.blue_gray_700,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 12.0),
               Expanded(
                 child: _buildSubBudgetCard(
                   title: 'REMAINING',
-                  amount: 'RM ${uiState.remainingBudget.toStringAsFixed(2)}',
-                  amountColor: remainingColor,
+                  amountWidget: DualCurrencyAmount(
+                    amount: uiState.remainingBudget,
+                    baseCurrency: 'MYR',
+                    baseLabel: 'RM',
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    textAlign: TextAlign.start,
+                    primaryStyle: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      fontFamily: 'Inter',
+                      color: remainingColor,
+                    ),
+                    secondaryStyle: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      fontFamily: 'Inter',
+                      color: appTheme.blue_gray_700,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -650,8 +727,25 @@ class _ActivityScreenState extends State<ActivityScreen> {
               Expanded(
                 child: _buildSubBudgetCard(
                   title: 'OVERSPENT',
-                  amount: 'RM ${uiState.overspentBudget.toStringAsFixed(2)}',
-                  amountColor: appTheme.gray_900,
+                  amountWidget: DualCurrencyAmount(
+                    amount: uiState.overspentBudget,
+                    baseCurrency: 'MYR',
+                    baseLabel: 'RM',
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    textAlign: TextAlign.start,
+                    primaryStyle: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      fontFamily: 'Inter',
+                      color: appTheme.gray_900,
+                    ),
+                    secondaryStyle: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      fontFamily: 'Inter',
+                      color: appTheme.blue_gray_700,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 12.0),
@@ -671,8 +765,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
   Widget _buildSubBudgetCard({
     required String title,
-    required String amount,
-    required Color amountColor,
+    String? amount,
+    Color? amountColor,
+    Widget? amountWidget,
   }) {
     return Container(
       padding: const EdgeInsets.all(12.0),
@@ -695,15 +790,16 @@ class _ActivityScreenState extends State<ActivityScreen> {
             ),
           ),
           const SizedBox(height: 6.0),
-          Text(
-            amount,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-              fontFamily: 'Inter',
-              color: amountColor,
-            ),
-          ),
+          amountWidget ??
+              Text(
+                amount!,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  fontFamily: 'Inter',
+                  color: amountColor!,
+                ),
+              ),
         ],
       ),
     );
@@ -937,15 +1033,71 @@ class _ActivityScreenState extends State<ActivityScreen> {
                         textColor: appTheme.teal_800,
                       ),
                     _buildChip(
-                      label: 'RM${activity.allocatedBudget.toStringAsFixed(0)}',
                       backgroundColor: appTheme.amber_200,
                       textColor: appTheme.lime_900,
+                      child: DualCurrencyAmount(
+                        amount: activity.allocatedBudget,
+                        baseCurrency: 'MYR',
+                        baseLabel: 'RM',
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        textAlign: TextAlign.start,
+                        primaryStyle: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          fontFamily: 'Inter',
+                          color: appTheme.lime_900,
+                          height: 1.2,
+                        ),
+                        secondaryStyle: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Inter',
+                          color: appTheme.lime_900.withValues(alpha: 0.7),
+                          height: 1.2,
+                        ),
+                      ),
                     ),
                     if (spent > 0)
                       _buildChip(
-                        label: 'Spent: RM${spent.toStringAsFixed(0)}',
                         backgroundColor: chipBgColor,
                         textColor: chipTextColor,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Spent: ',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                fontFamily: 'Inter',
+                                color: chipTextColor,
+                                height: 1.2,
+                              ),
+                            ),
+                            DualCurrencyAmount(
+                              amount: spent,
+                              baseCurrency: 'MYR',
+                              baseLabel: 'RM',
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              textAlign: TextAlign.start,
+                              primaryStyle: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                fontFamily: 'Inter',
+                                color: chipTextColor,
+                                height: 1.2,
+                              ),
+                              secondaryStyle: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'Inter',
+                                color: chipTextColor.withValues(alpha: 0.7),
+                                height: 1.2,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                   ],
                 ),
@@ -958,9 +1110,10 @@ class _ActivityScreenState extends State<ActivityScreen> {
   }
 
   Widget _buildChip({
-    required String label,
+    String? label,
     required Color backgroundColor,
     required Color textColor,
+    Widget? child,
   }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -968,15 +1121,16 @@ class _ActivityScreenState extends State<ActivityScreen> {
         color: backgroundColor,
         borderRadius: BorderRadius.circular(20),
       ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w800,
-          fontFamily: 'Inter',
-          color: textColor,
-        ).copyWith(height: 1.2),
-      ),
+      child: child ??
+          Text(
+            label!,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              fontFamily: 'Inter',
+              color: textColor,
+            ).copyWith(height: 1.2),
+          ),
     );
   }
 
