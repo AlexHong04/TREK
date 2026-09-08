@@ -733,27 +733,13 @@ class ActivityViewModel extends ChangeNotifier {
 
         debugPrint("days $days");
 
-        double convertedTotalBudget =
-            await _authService.convertToPreferredCurrency(
-              amount: result.trip.totalBudget,
-              fromCurrency: 'MYR',
-            ) ??
-            result.trip.totalBudget;
-        debugPrint("total budget: ${convertedTotalBudget}");
         _uiState = _uiState.copyWith(
           isLoading: false,
           tripId: result.trip.tripId,
           activities: result.activities,
-          totalBudget: convertedTotalBudget,
+          totalBudget: result.trip.totalBudget,
           sufficientDays: days,
         );
-        // _uiState = _uiState.copyWith(
-        //   isLoading: false,
-        //   tripId: result.trip.tripId,
-        //   activities: result.activities,
-        //   totalBudget: result.trip.totalBudget,
-        //   sufficientDays: days,
-        // );
         await refreshSpentAmounts();
 
         await _cachedActivity.saveActivitiesLocally(
@@ -869,27 +855,12 @@ class ActivityViewModel extends ChangeNotifier {
         return _isSameDate(act.date, targetDate);
       }).toList();
 
-      double convertedTotalBudget =
-          await _authService.convertToPreferredCurrency(
-            amount: tripResult?.trip.totalBudget ?? 0.00,
-            fromCurrency: 'MYR',
-          ) ??
-          _uiState.totalBudget;
-
-      debugPrint("total budget: ${convertedTotalBudget}");
-      double convertedTotalSpent =
-          await _authService.convertToPreferredCurrency(
-            amount: totalSpent,
-            fromCurrency: 'MYR',
-          ) ??
-          totalSpent;
-
       _uiState = _uiState.copyWith(
         isLoading: false,
         activities: currentDateActivities,
-        totalBudget: convertedTotalBudget,
+        totalBudget: tripResult?.trip.totalBudget ?? _uiState.totalBudget,
         activitySpentMap: spentMap,
-        spentBudget: convertedTotalSpent,
+        spentBudget: totalSpent,
         sufficientDays: initialSufficientDays,
         filterDate: targetDate,
         tripId: tripId,
@@ -1543,15 +1514,8 @@ class ActivityViewModel extends ChangeNotifier {
       // knows the filtered (_uiState.activities) date, so computing a "trip"
       // overspent here produced different figures depending on the filter.
       // The authoritative whole-trip value comes from reconcileTripOverspend().
-      double convertedFreshSpent =
-          await _authService.convertToPreferredCurrency(
-            amount: freshSpent,
-            fromCurrency: 'MYR',
-          ) ??
-          freshSpent;
-
       _uiState = _uiState.copyWith(
-        spentBudget: convertedFreshSpent,
+        spentBudget: freshSpent,
         activitySpentMap: freshActivityMap,
       );
 
@@ -1582,15 +1546,9 @@ class ActivityViewModel extends ChangeNotifier {
         '>>> [DEBUG reconcileTripOverspend] Reconciled total overspent: '
         '${totalTripOverspent.toStringAsFixed(2)}',
       );
-      double convertedTotalTripOverspent =
-          await _authService.convertToPreferredCurrency(
-            amount: totalTripOverspent,
-            fromCurrency: 'MYR',
-          ) ??
-          totalTripOverspent;
 
       _uiState = _uiState.copyWith(
-        overspentBudget: convertedTotalTripOverspent,
+        overspentBudget: totalTripOverspent,
       );
       notifyListeners();
     } catch (e) {
