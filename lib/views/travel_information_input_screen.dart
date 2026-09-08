@@ -1,4 +1,4 @@
-﻿import '../theme/app_theme.dart';
+import '../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -56,7 +56,10 @@ class _TravelInformationInputScreenState
                       hintText: 'Search wishlist...',
                       prefixIcon: Icons.favorite,
                       controller: viewModel.wishlistController,
-                      onFieldSubmitted: viewModel.addWishlistItem,
+                      // Wishlist items can only be added by tapping a
+                      // suggestion, so submitting the field dismisses the keyboard.
+                      textInputAction: TextInputAction.search,
+                      onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
                       onChanged: viewModel.onWishlistChanged,
                       bottomWidget: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
