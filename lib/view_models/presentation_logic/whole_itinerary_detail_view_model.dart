@@ -53,6 +53,22 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
   int get plannedStopsCount => _uiState.activities
       .where((a) => a.status != 'empty' && a.destination.isNotEmpty)
       .length;
+
+  /// True while any time slot is still empty (deleted, or not yet filled),
+  /// which blocks confirming the plan.
+  bool get hasEmptyActivitySlots => _uiState.activities.any(
+        (a) =>
+            a.status == 'empty' ||
+            (a.destination.trim().isEmpty && a.description.trim().isEmpty),
+      );
+
+  /// Confirm is only allowed once every time slot has been filled and we are
+  /// not busy generating.
+  bool get canConfirmItinerary =>
+      !_uiState.isLoading &&
+      _uiState.activities.isNotEmpty &&
+      !hasEmptyActivitySlots;
+
   Future<void> initialize({
     required String destination,
     required String dates,

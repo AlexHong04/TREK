@@ -598,11 +598,8 @@ class BudgetService implements IBudgetService {
 
     // 5. Persist the updated day overspend in database/repository
     final currentDay = await _itineraryRepository.getCurrentDay(dayTripId);
-    final updatedDay = currentDay.copyWith(
-      overspendAmount: netDayOverspend,
-      isOverspend: netDayOverspend > 0,
-    );
-    await _itineraryRepository.updateDayOverspend(updatedDay);
+    final updatedDay = currentDay.copyWith(overspendAmount: netDayOverspend);
+    await _itineraryRepository.updateDayTopUpBudget(updatedDay); // Or updateDayOverspend repository call
 
     return netDayOverspend;
   }

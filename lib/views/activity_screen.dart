@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../theme/app_theme.dart';
 import '../utils/date_time_formatter.dart';
+import '../main.dart';
 import '../models/services/i_auth_service.dart';
 import '../view_models/presentation_logic/activity_view_model.dart';
 import '../view_models/ui_state/activity_ui_state.dart';
@@ -146,13 +147,32 @@ class _ActivityScreenState extends State<ActivityScreen> {
     }
   }
 
+  /// The overspent amount for the single activity the user just recorded an
+  /// expense for (spent - allocated when over budget), NOT the whole trip.
+  double _activityExceededAmount(ActivityUiState state) {
+    Activity? activity = state.selectedActivity;
+    if (activity == null) {
+      for (final candidate in state.activities) {
+        if (candidate.activitiesId == state.currentActivityId) {
+          activity = candidate;
+          break;
+        }
+      }
+    }
+    if (activity == null) return state.exceededAmount;
+
+    final spent = state.activitySpentMap[activity.activitiesId] ?? 0.0;
+    final exceeded = spent - activity.allocatedBudget;
+    return exceeded > 0 ? exceeded : state.exceededAmount;
+  }
+
   void _showUnderThresholdDialog(ActivityUiState state) {
     showBudgetExceededDialog(
       context: context,
       allocatedBudget:
       'RM ${state.selectedActivity?.allocatedBudget.toStringAsFixed(2)}',
       remainingBudget: state.remainingBudget.toStringAsFixed(2),
-      exceededAmount: state.overspentBudget.toStringAsFixed(2),
+      exceededAmount: _activityExceededAmount(state).toStringAsFixed(2),
       warningText1:
       'You have overspent RM${state.overspentBudget.toStringAsFixed(2)} so far for entire trip.',
       warningText2:
@@ -195,32 +215,99 @@ class _ActivityScreenState extends State<ActivityScreen> {
       allocatedBudget:
       'RM ${state.selectedActivity?.allocatedBudget.toStringAsFixed(2)}',
       remainingBudget: state.remainingBudget.toStringAsFixed(2),
-      exceededAmount: state.exceededAmount.toStringAsFixed(2),
+      exceededAmount: _activityExceededAmount(state).toStringAsFixed(2),
       warningText1:
       'You have overspent ${state.overspentBudget.toStringAsFixed(2)} so far on this trip.',
       estimatedDays: state.sufficientDays.toString(),
       warningText3: 'Plan will be modified automatically.',
       onContinue: () async {
-        // 1. Dismiss the dialog
-        // Navigator.of(context, rootNavigator: true).pop();
-
-        // 2. Trigger the budget recovery plan generation
-        final viewModel = context.read<ActivityViewModel>();
-        final success = await viewModel.generateBudgetRecoveryPlan(
-          dayTripId: state.selectedActivity?.dayTripId,
-          availableBudget: state.totalBudget - state.spentBudget,
-        );
-
-        // 3. Optional: Provide UI feedback if recovery fails
-        if (!success && mounted) {
-          final error = viewModel.uiState.errorMessage;
-          if (error.isNotEmpty) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(error),
+        // 1. Show a labelled, non-dismissible loading dialog while the plan is
+        // being re-optimized (instead of the bare screen-wide spinner).
+        BuildContext? loadingDialogContext;
+        showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogCtx) {
+            loadingDialogContext = dialogCtx;
+            return PopScope(
+              canPop: false,
+              child: Center(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 40),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 28,
+                    vertical: 24,
+                  ),
+                  decoration: BoxDecoration(
+                    color: appTheme.white_A700,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(color: appTheme.teal_A700),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Re-optimizing your itinerary...',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Inter',
+                          color: appTheme.gray_900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             );
+          },
+        );
+
+        // 2. Trigger the budget recovery plan generation. Always dismiss the
+        // loading dialog afterwards, even if generation throws.
+        final viewModel = context.read<ActivityViewModel>();
+        bool success;
+        try {
+          success = await viewModel.generateBudgetRecoveryPlan(
+            dayTripId: state.selectedActivity?.dayTripId,
+            availableBudget: state.totalBudget - state.spentBudget,
+          );
+        } catch (e) {
+          debugPrint('Recovery plan error: $e');
+          success = false;
+        } finally {
+          if (loadingDialogContext != null &&
+              loadingDialogContext!.mounted) {
+            Navigator.of(loadingDialogContext!, rootNavigator: true).pop();
           }
+        }
+
+        if (!mounted) return;
+
+        if (success) {
+          showThreeSecondMessage(
+            context,
+            'Your plan has been optimized to fit your remaining budget.',
+          );
+          // 4. Take the tourist straight to the updated plan so they can see
+          // the re-optimized (future) activities instead of a static screen.
+          Navigator.of(context).pushNamed(
+            AppRoutes.wholeItineraryDetailScreen,
+            arguments: <String, dynamic>{
+              'isReadOnly': true,
+              'tripId': viewModel.uiState.tripId,
+            },
+          );
+        } else {
+          final error = viewModel.uiState.errorMessage;
+          showThreeSecondMessage(
+            context,
+            error.isNotEmpty
+                ? error
+                : 'Failed to optimize the plan. Please try again.',
+            isError: true,
+          );
         }
       },
     );

@@ -1303,44 +1303,30 @@ class ActivityViewModel extends ChangeNotifier {
 
     final now = DateTime.now();
 
-    // Re-plan the activities that are still ahead in the trip and have NOT yet
-    // had any expense recorded against them (the recovery engine must be free
-    // to re-shuffle those slots/budgets). Note: _uiState.activities only holds
-    // the filtered date's activities, so fetch the true remaining trip slots.
-    final allRemaining = await _itineraryService.getRemainingActivities(
+    // Our own "upcoming slots" selection for the recovery. We intentionally do
+    // NOT call the shared getRemainingActivities() (owned by other teammates)
+    // so its behaviour is left untouched. A slot is only optimizable when it
+    // has NOT started yet at this moment: past / ongoing activities are
+    // excluded even if they have no expense record. Missing or malformed start
+    // times are never treated as optimizable.
+    final allTripActivities = await _itineraryService.fetchAllActivitiesByTrip(
       _uiState.tripId,
-      now,
     );
 
-    final remainingActivities = allRemaining.where((a) {
+    final remainingActivities = allTripActivities.where((a) {
       if (a.status == 'completed') return false;
 
-      // An activity is already "used" once money was spent on it, so it must
-      // not be re-planned. Spending is detected from the recorded expenses
-      // (activitySpentMap) and the stored overspend flags - NOT from the
-      // allocated budget, which every planned activity has.
+      final start = _tryActivityStart(a);
+      if (start == null || !start.isAfter(now)) return false;
+
+      // Skip slots that already have money spent on them.
       final spentOnActivity = _uiState.activitySpentMap[a.activitiesId] ?? 0.0;
       final hasRecordedExpense =
           (a.isOverspend == true) ||
           (a.overspendAmount != null && a.overspendAmount! > 0) ||
           spentOnActivity > 0;
 
-      if (hasRecordedExpense) return false;
-
-      // Filter out activities that have already passed based on endTime
-      try {
-        final endParts = a.endTime?.split(':');
-        final activityEndTime = DateTime(
-          a.date.year,
-          a.date.month,
-          a.date.day,
-          int.parse(endParts?[0] ?? '0'),
-          int.parse(endParts?[1] ?? '0'),
-        );
-        return activityEndTime.isAfter(now);
-      } catch (_) {
-        return true;
-      }
+      return !hasRecordedExpense;
     }).toList();
 
     if (dayTripId == null) return false;
@@ -1376,6 +1362,18 @@ class ActivityViewModel extends ChangeNotifier {
         currentDate: DateTime.now(),
       );
 
+      // Nothing was generated (e.g. no slots left to re-plan, or the engine
+      // returned no usable plan) - treat it as a failure so the UI can tell
+      // the user instead of silently doing nothing.
+      if (revisedActivities.isEmpty) {
+        _uiState = _uiState.copyWith(
+          isLoading: false,
+          errorMessage: 'No plan changes could be generated. Please try again.',
+        );
+        notifyListeners();
+        return false;
+      }
+
       // 3. Merge returned domain activities into the state
       final revisedMap = {
         for (final item in revisedActivities) item.activitiesId: item,
@@ -1400,6 +1398,25 @@ class ActivityViewModel extends ChangeNotifier {
       );
       notifyListeners();
       return false;
+    }
+  }
+
+  /// Our own tolerant parser for an activity's scheduled start time. Returns
+  /// null when the time is missing or malformed, so such a slot is never
+  /// considered "upcoming/optimizable".
+  DateTime? _tryActivityStart(Activity activity) {
+    final date = activity.date;
+    final timeParts = activity.startTime?.split(':');
+    if (timeParts == null || timeParts.length < 2) return null;
+
+    final hour = int.tryParse(timeParts[0].trim());
+    final minute = int.tryParse(timeParts[1].trim());
+    if (hour == null || minute == null) return null;
+
+    try {
+      return DateTime(date.year, date.month, date.day, hour, minute);
+    } catch (_) {
+      return null;
     }
   }
 
