@@ -104,42 +104,20 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         strictBudget: suppressWarning,
       );
 
-      // When suppressWarning is true (post-top-up regeneration), calculate
-      // actual wishlist coverage from activities instead of trusting Gemini's
-      // artificially returned 0 (Gemini returns 0 whenever budget is exceeded,
-      // even though wishlist items ARE in the plan).
-      int resolvedWishlistCovered = fetchedResult.wishlistItemsCoveredCount;
-      double resolvedExtraBudget = fetchedResult.estimatedExtraBudgetNeeded;
-
-      if (suppressWarning && wishlist != null && wishlist.isNotEmpty) {
-        final activityDestinations = fetchedResult.activities
-            .map((a) => a.destination.toLowerCase())
-            .toSet();
-        int matchedCount = 0;
-        for (final item in wishlist) {
-          final lowerItem = item.toLowerCase();
-          if (activityDestinations.any(
-            (dest) => dest.contains(lowerItem) || lowerItem.contains(dest),
-          )) {
-            matchedCount++;
-          }
-        }
-        resolvedWishlistCovered = matchedCount > 0
-            ? matchedCount
-            : wishlist.length;
-        // User accepted this budget level, so zero out the shortfall
-        resolvedExtraBudget = 0.0;
-      }
+      final bool wishlistIncomplete = wishlist != null &&
+          wishlist.isNotEmpty &&
+          fetchedResult.wishlistItemsCoveredCount < wishlist.length;
+      final bool hasShortfall = fetchedResult.estimatedExtraBudgetNeeded > 0.0;
+      final bool shouldWarn =
+          !suppressWarning && (hasShortfall || wishlistIncomplete);
 
       _uiState = _uiState.copyWith(
         isLoading: false,
         activities: fetchedResult.activities,
         totalAllocatedBudget: fetchedResult.totalAllocatedBudget,
-        wishlistItemsCoveredCount: resolvedWishlistCovered,
-        estimatedExtraBudgetNeeded: resolvedExtraBudget,
-        showWishlistWarning: suppressWarning
-            ? false
-            : fetchedResult.estimatedExtraBudgetNeeded > 0,
+        wishlistItemsCoveredCount: fetchedResult.wishlistItemsCoveredCount,
+        estimatedExtraBudgetNeeded: fetchedResult.estimatedExtraBudgetNeeded,
+        showWishlistWarning: shouldWarn,
         errorMessage: null,
       );
     } catch (e) {
@@ -385,16 +363,16 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
   }
 
   Future<void> deletePendingTrip(String? tripId) async {
-
     _uiState = _uiState.copyWith(isLoading: true);
     notifyListeners();
 
-    try{
-      if(tripId != null && tripId.isNotEmpty) {
-
+    try {
+      if (tripId != null && tripId.isNotEmpty) {
         await _itineraryService.deleteWholeTrip(tripId);
 
-        final updatedTrips = _uiState.allTrips.where((trip) => trip.tripId != tripId).toList();
+        final updatedTrips = _uiState.allTrips
+            .where((trip) => trip.tripId != tripId)
+            .toList();
         _uiState = _uiState.copyWith(allTrips: updatedTrips, isLoading: false);
 
         notifyListeners();
@@ -405,7 +383,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         isLoading: false,
         errorMessage: e.toString(),
       );
-    } finally{
+    } finally {
       _uiState = _uiState.copyWith(isLoading: false);
       notifyListeners();
     }

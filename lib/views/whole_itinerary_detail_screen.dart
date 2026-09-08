@@ -72,11 +72,10 @@ class _WholeItineraryDetailScreenState
     }
 
     _wishlistWarningShowing = true;
-    viewModel.dismissWishlistWarning();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-
+      viewModel.dismissWishlistWarning();
       _showWishlistWarningDialog(viewModel);
     });
   }
@@ -97,135 +96,134 @@ class _WholeItineraryDetailScreenState
   Future<void> _showWishlistWarningDialog(
     WholeItineraryDetailViewModel viewModel,
   ) async {
-    double minTopUp = viewModel.uiState.estimatedExtraBudgetNeeded * 0.50;
-    debugPrint("wishlist: ${viewModel.uiState.wishlist}");
-    debugPrint(
-      "estimated extra budget needed: ${viewModel.uiState.estimatedExtraBudgetNeeded}",
-    );
-    if ((viewModel.uiState.wishlist == null ||
-            viewModel.uiState.wishlist!.isEmpty) &&
-        viewModel.uiState.estimatedExtraBudgetNeeded > 0) {
-      await showEmptyWishlistInsufficientTotalBudgetDialog(
-        context: context,
-        shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded
-            .toStringAsFixed(2),
-        minTopUp: minTopUp,
-        onCancel: () async {
-          await showCancelTripWithoutWishlistDialog(
-            context: context,
-            onContinue: () {
-              Navigator.of(context).pop();
-            },
-          );
-        },
-
-        onTopUpBudget: (double amount) async {
-          final isSufficient = await viewModel.topUpBudget(amount);
-
-          if (!isSufficient) {
-            // Wait until the first dialog is completely removed.
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!mounted) return;
-
-              showInsufficientTopUpTotalBudgetWithoutWishlistDialog(
-                context: context,
-                onContinue: () {
-                  // Trigger re-recommendation with the latest total budget
-                  viewModel.generateItinerary(suppressWarning: true);
-                },
-              );
-            });
-          }
-
-          return true;
-        },
-      );
-
-      if (mounted) {
-        _wishlistWarningShowing = false;
+    try {
+      double minTopUp = viewModel.uiState.estimatedExtraBudgetNeeded * 0.50;
+      if (minTopUp <= 0.0) {
+        minTopUp = 20.0;
       }
-    } else if (viewModel.uiState.wishlist != null &&
-        viewModel.uiState.wishlist!.isNotEmpty &&
-        viewModel.uiState.wishlistItemsCoveredCount == 0) {
-      await showInitialTotalBudgetTotallyInsufficientDialog(
-        context: context,
-        shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded
-            .toStringAsFixed(2),
-        minTopUp: minTopUp,
-        wishlistCovered: viewModel.uiState.wishlistItemsCoveredCount,
-        onCancel: () async {
-          await showCancelTripDialog(
-            context: context,
-            onContinue: () {
-              Navigator.of(context).pop();
-            },
-          );
-        },
-        onTopUpBudget: (double amount) async {
-          final isSufficient = await viewModel.topUpBudget(amount);
-
-          if (!isSufficient) {
-            // Wait until the first dialog is completely removed.
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!mounted) return;
-
-              showInsufficientTopUpTotalBudgetDialog(
-                context: context,
-                onContinue: () {
-                  // Trigger re-recommendation with the latest total budget
-                  viewModel.generateItinerary(suppressWarning: true);
-                },
-              );
-            });
-          }
-
-          return true;
-        },
+      debugPrint("wishlist: ${viewModel.uiState.wishlist}");
+      debugPrint(
+        "estimated extra budget needed: ${viewModel.uiState.estimatedExtraBudgetNeeded}",
       );
-      if (mounted) {
-        _wishlistWarningShowing = false;
+      debugPrint(
+        "wishlist covered count: ${viewModel.uiState.wishlistItemsCoveredCount}",
+      );
+      if ((viewModel.uiState.wishlist == null ||
+              viewModel.uiState.wishlist!.isEmpty) &&
+          viewModel.uiState.estimatedExtraBudgetNeeded > 0) {
+        await showEmptyWishlistInsufficientTotalBudgetDialog(
+          context: context,
+          shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded
+              .toStringAsFixed(2),
+          minTopUp: minTopUp,
+          onCancel: () async {
+            await showCancelTripWithoutWishlistDialog(
+              context: context,
+              onContinue: () {
+                Navigator.of(context).pop();
+              },
+            );
+          },
+
+          onTopUpBudget: (double amount) async {
+            final isSufficient = await viewModel.topUpBudget(amount);
+
+            if (!isSufficient) {
+              // Wait until the first dialog is completely removed.
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) return;
+
+                showInsufficientTopUpTotalBudgetWithoutWishlistDialog(
+                  context: context,
+                  onContinue: () {
+                    // Trigger re-recommendation with the latest total budget
+                    viewModel.generateItinerary(suppressWarning: true);
+                  },
+                );
+              });
+            }
+
+            return true;
+          },
+        );
+      } else if (viewModel.uiState.wishlist != null &&
+          viewModel.uiState.wishlist!.isNotEmpty &&
+          viewModel.uiState.wishlistItemsCoveredCount == 0) {
+        await showInitialTotalBudgetTotallyInsufficientDialog(
+          context: context,
+          shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded
+              .toStringAsFixed(2),
+          minTopUp: minTopUp,
+          wishlistCovered: viewModel.uiState.wishlistItemsCoveredCount,
+          onCancel: () async {
+            await showCancelTripDialog(
+              context: context,
+              onContinue: () {
+                Navigator.of(context).pop();
+              },
+            );
+          },
+          onTopUpBudget: (double amount) async {
+            final isSufficient = await viewModel.topUpBudget(amount);
+
+            if (!isSufficient) {
+              // Wait until the first dialog is completely removed.
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) return;
+
+                showInsufficientTopUpTotalBudgetDialog(
+                  context: context,
+                  onContinue: () {
+                    // Trigger re-recommendation with the latest total budget
+                    viewModel.generateItinerary(suppressWarning: true);
+                  },
+                );
+              });
+            }
+
+            return true;
+          },
+        );
+      } else if (viewModel.uiState.wishlist != null &&
+          viewModel.uiState.wishlist!.isNotEmpty) {
+        await showInitialTotalBudgetInsufficientDialog(
+          context: context,
+          shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded
+              .toStringAsFixed(2),
+          minTopUp: minTopUp,
+          wishlistCovered: viewModel.uiState.wishlistItemsCoveredCount,
+          onCancel: () async {
+            await showCancelTopUpDialog(
+              context: context,
+              onContinue: () {
+                Navigator.of(context).pop();
+              },
+            );
+          },
+
+          onTopUpBudget: (double amount) async {
+            final isSufficient = await viewModel.topUpBudget(amount);
+
+            if (!isSufficient) {
+              // Wait until the first dialog is completely removed.
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) return;
+
+                showInsufficientTopUpTotalBudgetDialog(
+                  context: context,
+                  onContinue: () {
+                    // Trigger re-recommendation with the latest total budget
+                    viewModel.generateItinerary(suppressWarning: true);
+                  },
+                );
+              });
+            }
+
+            return true;
+          },
+        );
       }
-    } else if (viewModel.uiState.wishlist != null &&
-        viewModel.uiState.wishlist!.isNotEmpty &&
-        viewModel.uiState.wishlistItemsCoveredCount <
-            viewModel.uiState.wishlist!.length) {
-      await showInitialTotalBudgetInsufficientDialog(
-        context: context,
-        shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded
-            .toStringAsFixed(2),
-        minTopUp: minTopUp,
-        wishlistCovered: viewModel.uiState.wishlistItemsCoveredCount,
-        onCancel: () async {
-          await showCancelTopUpDialog(
-            context: context,
-            onContinue: () {
-              Navigator.of(context).pop();
-            },
-          );
-        },
-
-        onTopUpBudget: (double amount) async {
-          final isSufficient = await viewModel.topUpBudget(amount);
-
-          if (!isSufficient) {
-            // Wait until the first dialog is completely removed.
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!mounted) return;
-
-              showInsufficientTopUpTotalBudgetDialog(
-                context: context,
-                onContinue: () {
-                  // Trigger re-recommendation with the latest total budget
-                  viewModel.generateItinerary(suppressWarning: true);
-                },
-              );
-            });
-          }
-
-          return true;
-        },
-      );
-
+    } finally {
       if (mounted) {
         _wishlistWarningShowing = false;
       }

@@ -17,6 +17,7 @@ class ItineraryService implements IItineraryService {
   final IItineraryRepository _itineraryRepository = ItineraryRepository();
 
   // kokhong - Gemini API + Google Places validation + image resolution
+  @override
   Future<ItineraryGenerationResult> generateItinerary({
     required String destination,
     required String dates,
@@ -120,8 +121,12 @@ class ItineraryService implements IItineraryService {
 
           final place = searchCache[destName];
           if (place == null) {
-            allValid = false;
-            currentFailed.add(destName);
+            final category =
+                (item['activityCategory'] as String? ?? '').toLowerCase();
+            if (category != 'transportation') {
+              allValid = false;
+              currentFailed.add(destName);
+            }
           }
         }
 
@@ -175,9 +180,6 @@ class ItineraryService implements IItineraryService {
             (item['allocatedBudget'] as num?)?.toDouble() ?? 0.0;
         final minPriceLocal = item['minPrice'] != null
             ? (item['minPrice'] as num).toDouble()
-            : null;
-        final maxPriceLocal = item['maxPrice'] != null
-            ? (item['maxPrice'] as num).toDouble()
             : null;
 
         final destName = item['destination'] as String? ?? 'Activity';
@@ -273,11 +275,74 @@ class ItineraryService implements IItineraryService {
         // Throttle requests to avoid Wikipedia/Wikimedia 429 rate limiting
         await Future.delayed(const Duration(milliseconds: 300));
       }
+
+      // Calculate actual total cost from activities
+      final double calculatedTotalCost = newActivities.fold(
+        0.0,
+        (sum, a) => sum + a.allocatedBudget,
+      );
+      final double resolvedTotalAllocatedBudget = calculatedTotalCost > 0
+          ? calculatedTotalCost
+          : responseTotalAllocatedBudget;
+
+      // Calculate mathematical budget shortfall
+      final double parsedBudget = double.tryParse(budget) ?? 0.0;
+      final double mathShortfall =
+          (resolvedTotalAllocatedBudget - parsedBudget).clamp(
+        0.0,
+        double.infinity,
+      );
+
+      double resolvedExtraBudget = responseEstimatedExtraBudgetNeeded;
+      if (mathShortfall > resolvedExtraBudget) {
+        resolvedExtraBudget = mathShortfall;
+      }
+
+      // Resolve wishlist coverage from activities and Gemini estimation
+      int resolvedWishlistCovered = responseWishlistItemsCoveredCount;
+      if (wishlist != null && wishlist.isNotEmpty) {
+        final activityDestinations = newActivities
+            .map((a) => a.destination.toLowerCase())
+            .toSet();
+        int matchedCount = 0;
+        for (final item in wishlist) {
+          final lowerItem = item.toLowerCase().trim();
+          if (activityDestinations.any(
+            (dest) => dest.contains(lowerItem) || lowerItem.contains(dest),
+          )) {
+            matchedCount++;
+          }
+        }
+
+        if (strictBudget) {
+          resolvedWishlistCovered = matchedCount > 0
+              ? matchedCount
+              : wishlist.length;
+          resolvedExtraBudget = 0.0;
+        } else {
+          // If Gemini returned 0 or didn't set coverage, but items matched in activities
+          if (resolvedWishlistCovered == 0 && matchedCount > 0) {
+            resolvedWishlistCovered =
+                matchedCount.clamp(0, wishlist.length - 1);
+          } else if (resolvedWishlistCovered > wishlist.length) {
+            resolvedWishlistCovered = wishlist.length;
+          }
+        }
+
+        // When wishlist is incomplete, ensure there is a realistic estimated shortfall for missing items
+        final bool wishlistIncomplete =
+            resolvedWishlistCovered < wishlist.length;
+        if (!strictBudget && wishlistIncomplete && resolvedExtraBudget <= 0.0) {
+          final uncoveredCount = wishlist.length - resolvedWishlistCovered;
+          resolvedExtraBudget = uncoveredCount * 30.0;
+        }
+      }
+
       return ItineraryGenerationResult(
         activities: newActivities,
-        totalAllocatedBudget: responseTotalAllocatedBudget,
-        wishlistItemsCoveredCount: responseWishlistItemsCoveredCount,
-        estimatedExtraBudgetNeeded: responseEstimatedExtraBudgetNeeded,
+        totalAllocatedBudget: resolvedTotalAllocatedBudget,
+        wishlistItemsCoveredCount: resolvedWishlistCovered,
+        estimatedExtraBudgetNeeded: resolvedExtraBudget,
       );
     } catch (e) {
       debugPrint('Service Error generating itinerary: $e');

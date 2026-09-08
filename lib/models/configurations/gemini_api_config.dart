@@ -58,7 +58,7 @@ class GeminiApiConfig {
     ${preference != null ? '- Preference: $preference (You MUST heavily prioritize planning activities that strictly match this theme!)' : ''}
     ${(constraints != null && constraints.isNotEmpty) ? '- Personal Constraints: ' + constraints.join(', ') + ' (You MUST strictly follow these constraints when suggesting places, e.g., food restrictions or accessibility!)' : ''}
     ${(futureSuggestions != null && futureSuggestions.isNotEmpty) ? '- Budget Distribution: ' + futureSuggestions.map((e) => '${e.activityCategory}: ${e.suggestedAmount}%').join(', ') + ' (You MUST strictly allocate the provided Budget according to these category percentages!)' : ''}
-    ${(wishlist != null && wishlist.isNotEmpty) ? '- Wishlist Items: ' + wishlist.join(', ') + (strictBudget ? '\n    CRITICAL RULE FOR WISHLIST (BUDGET-CONSTRAINED MODE):\n    - Try to INCLUDE these wishlist items in the itinerary IF they fit within the Budget (\$$budget).\n    - You MUST adjust other activities (use cheaper restaurants, free attractions, walking instead of transport) to make room for wishlist items.\n    - If a wishlist item genuinely cannot fit even after adjustments, you may exclude it.\n    - Return the actual number of wishlist items successfully included in "wishlistItemsCoveredCount".\n    - "estimatedExtraBudgetNeeded" MUST be 0.0 since the plan MUST fit within \$$budget.' : '\n    CRITICAL RULE FOR WISHLIST:\n    - You MUST ALWAYS INCLUDE ALL of these wishlist items in the generated itinerary, NO MATTER how low or insufficient the Budget (\$$budget) is! NEVER exclude them.\n    - Because you forcefully included them with their TRUE realistic prices, the total cost will likely exceed a low budget. You MUST add this excess to "estimatedExtraBudgetNeeded".\n    - IF the realistic total cost exceeds the Budget (\$$budget), you MUST artificially return "wishlistItemsCoveredCount" as 0 (to flag to the system that the user cannot afford them yet). NEVER return the full count if budget is exceeded! \n    - ONLY if the Budget (\$$budget) is fully sufficient to cover everything without shortfall, return the full number of wishlist items mapped in "wishlistItemsCoveredCount".') : ''}
+    ${(wishlist != null && wishlist.isNotEmpty) ? '- Wishlist Items: ' + wishlist.join(', ') + (strictBudget ? '\n    CRITICAL RULE FOR WISHLIST (BUDGET-CONSTRAINED MODE):\n    - Try to INCLUDE these wishlist items in the itinerary IF they fit within the Budget (\$$budget).\n    - You MUST adjust other activities (use cheaper restaurants, free attractions, walking instead of transport) to make room for wishlist items.\n    - If a wishlist item genuinely cannot fit even after adjustments, you may exclude it.\n    - Return the actual number of wishlist items successfully included in "wishlistItemsCoveredCount".\n    - "estimatedExtraBudgetNeeded" MUST be 0.0 since the plan MUST fit within \$$budget.' : '\n    CRITICAL RULE FOR WISHLIST:\n    - You MUST ALWAYS INCLUDE ALL of these wishlist items in the generated itinerary, NO MATTER how low or insufficient the Budget (\$$budget) is! NEVER exclude them.\n    - Because you forcefully included them with their TRUE realistic prices, the total cost will likely exceed a low budget. You MUST add this excess to "estimatedExtraBudgetNeeded".\n    - For "wishlistItemsCoveredCount", calculate how many wishlist items can realistically be covered by the user\'s Budget (\$$budget) after prioritizing basic daily meals and transport:\n      * If the Budget (\$$budget) cannot even cover basic meals and transport, or cannot afford any wishlist item at all, return 0 in "wishlistItemsCoveredCount".\n      * If the Budget (\$$budget) can cover basic meals and transport plus SOME of the wishlist items (e.g. 1, 2, or more, but not all), return the exact count of wishlist items that fit in "wishlistItemsCoveredCount".\n      * Only if the Budget (\$$budget) is fully sufficient to cover all activities and all wishlist items without any shortfall, return the total count of all wishlist items in "wishlistItemsCoveredCount".') : ''}
 
     Please provide a structured day-by-day itinerary with estimated costs and durations for each activity.
     ${strictBudget ? '''
@@ -68,7 +68,7 @@ class GeminiApiConfig {
     - "totalAllocatedBudget" MUST be <= \$$budget.
     - "estimatedExtraBudgetNeeded" MUST be 0.0.
     - Public parks, sightseeing of landmarks, walking tours, and free attractions MUST have an allocatedBudget of 0.
-    - "Transportation" activities MUST have a realistic but minimal allocatedBudget (e.g., MRT/LRT tickets RM2-5).
+    - "Transportation" activities: If consecutive activities are close (walking distance), set "allocatedBudget" to 0.0 (Walking). Only assign minimal transit fare (RM2-5) if they are far.
     - Only assign costs to food/dining, transportation, and places that explicitly require entrance tickets.
     ''' : '''
     CRITICAL RULE FOR BUDGET & PRICING: 
@@ -80,7 +80,9 @@ class GeminiApiConfig {
     - If the \$$budget is sufficient, distribute it fairly but DO NOT artificially inflate prices beyond realistic maximums.
     - "totalAllocatedBudget" MUST ALWAYS perfectly match the mathematical sum of all "allocatedBudget" fields in the activities list. (It is completely fine if this total sum exceeds the \$$budget).
     - Public parks, sightseeing of landmarks, walking tours, and free attractions MUST have an allocatedBudget of 0.
-    - "Transportation" activities MUST ALWAYS have a realistic allocatedBudget greater than 0 (e.g., Grab fare, MRT tickets). NEVER assign 0 to Transportation!
+    - "Transportation" pricing rule:
+      * If consecutive activities are CLOSE to each other (walking distance, e.g. within ~1km or in the same complex/neighborhood), transit is by WALKING and "allocatedBudget" MUST be 0.0.
+      * If activities are FAR (different areas or > 1km requiring public transit, LRT, MRT, Monorail, or Grab), "allocatedBudget" MUST have a realistic transit fare greater than 0 (e.g., RM 2.00 - RM 15.00).
     - Only assign costs to food/dining, transportation, and places that explicitly require entrance tickets.
     '''}
     
@@ -93,14 +95,22 @@ class GeminiApiConfig {
     - THIS IS THE MOST IMPORTANT RULE: You MUST generate an itinerary exactly for $numberOfDays day(s). If $numberOfDays is 3, return exactly 3 days. If $numberOfDays is 4, return exactly 4 days. The number of days returned MUST strictly match $numberOfDays!
     - The "dayNumber" MUST go sequentially from 1 up to exactly $numberOfDays. DO NOT generate less or more days than $numberOfDays!
     - EVERY single day of the itinerary MUST strictly start at exactly 09:00 and the FINAL activity MUST end at exactly 21:00.
-    - You MUST provide between 6 to 8 activities per day to completely fill the 12-hour span from 09:00 to 21:00.
+    - You MUST provide a complete schedule of activities (typically 10 to 12 activities per day, including destination visits and connecting transportation between them) to completely fill the 12-hour span from 09:00 to 21:00.
     - Do not schedule any activities before 09:00 or after 21:00. 
     - The first activity of EACH day MUST have a startTime of "09:00". 
     - The absolute last activity of EACH day MUST have an endTime of "21:00". THIS IS MANDATORY. Do NOT end the day at 18:00, 19:00, or 20:00. If your last activity ends before 21:00, YOU TRIPLE CHECK AND ADD A NEW SUPPER/NIGHT MARKET ACTIVITY TO REACH EXACTLY 21:00.
+    - The endTime of each activity must smoothly connect to the startTime of the next activity without large gaps.
 
-    CRITICAL RULE FOR COMPOSITION:
+    CRITICAL RULE FOR COMPOSITION & TRANSPORTATION:
     - EVERY day MUST include at least THREE "Restaurant" category activities (strictly representing Breakfast, Lunch, and Dinner).
-    - EVERY day MUST include at least ONE "Transportation" category activity representing the journey/commute. For "Transportation", the "destination" MUST be the exact name of the physical station or arrival landmark (e.g. "KL Sentral", "Bukit Bintang MRT Stage", NOT vague terms like "Grab", "Taxi" or "Walking").
+    - MANDATORY TRANSPORTATION BETWEEN ACTIVITIES (WALK IF CLOSE, VEHICLE IF FAR):
+      * Between consecutive destination activities (Attractions and Restaurants), there MUST be a dedicated "Transportation" category activity representing the commute or walk between them.
+      * PROXIMITY & TRANSIT MODE RULE:
+        - If two consecutive activities are CLOSE to each other (within walking distance, e.g. < 1km, adjacent streets, or within the same mall/complex like Pavilion KL to Lot 10, or Suria KLCC to KLCC Park):
+          + Transit mode is WALKING: set "destination" to "Walk to [Next Destination]" or "Pedestrian Walkway", "description" to "Short 5-10 min walk to the next venue", "duration" to "5-15 min", and "allocatedBudget" to 0.0 (Walking is completely free!).
+        - If two consecutive activities are FAR from each other (requiring motorized transit, different neighborhoods, or > 1km):
+          + Transit mode is VEHICULAR (MRT, LRT, Bus, or Grab): set "destination" to the station, terminal, or transit route (e.g. "KLCC LRT Station", "Bukit Bintang MRT Station"), "description" to describe the transit route (e.g. "Take MRT Kajang Line / Grab ride to destination"), "duration" to "15-30 min", and "allocatedBudget" to a realistic fare greater than 0 (e.g. RM 3.00 - RM 15.00).
+      * "activityCategory" for all of these transfer activities MUST strictly be "Transportation".
 
     CRITICAL RULE FOR DESTINATIONS/RESTAURANTS:
     - Every destination, restaurant, cafe, or eatery MUST be specified using its full, real-world, specific business or place name.
@@ -419,7 +429,7 @@ class GeminiApiConfig {
     CRITICAL RULES FOR DESTINATION & BUDGET:
     - The destination MUST be an EXACT, FULL official business name or landmark on Google Maps (e.g., "Museum of Illusions Kuala Lumpur", "Limapulo: Baba Can Cook"). Do NOT use generic names (e.g., "Local Cafe", "Museum Visit").
     - Public parks, sightseeing of landmarks, walking tours, and free attractions MUST have an "allocatedBudget" of 0.
-    - "Transportation" activities MUST ALWAYS have a realistic allocatedBudget greater than 0. Do NEVER assign 0 to Transportation.
+    - "Transportation" activities: 0.0 if walking distance, or realistic fare (> 0) if public transit/Grab is required.
     - Only assign costs to food/dining, transportation, and places that explicitly require entrance tickets.
     - "activityCategory" MUST strictly be one of: "Transportation", "Attraction", or "Restaurant".
 
@@ -498,26 +508,32 @@ class GeminiApiConfig {
         : 'Destination: $tripDestination';
 
     // 1. Minify input payload to keep prompt fast and focused
-    final sanitizedRemainingSlots = remainingActivities.map((act) => {
-      'activitiesId': act['activitiesId'],
-      'category': act['activityCategory'] ?? act['category'] ?? 'Attraction',
-      'originalDestination': act['destination'],
-      'startTime': act['startTime'],
-      'endTime': act['endTime'],
-      'allocatedBudget': act['allocatedBudget'],
-    }).toList();
+    final sanitizedRemainingSlots = remainingActivities
+        .map(
+          (act) => {
+            'activitiesId': act['activitiesId'],
+            'category':
+                act['activityCategory'] ?? act['category'] ?? 'Attraction',
+            'originalDestination': act['destination'],
+            'startTime': act['startTime'],
+            'endTime': act['endTime'],
+            'allocatedBudget': act['allocatedBudget'],
+          },
+        )
+        .toList();
 
     // cache existing image while no need to re-query google place api
     final existingImageMap = <String, String>{};
     for (final act in remainingActivities) {
       final dest = act['destination']?.toString().trim().toLowerCase();
       final img = act['activityImgUrl']?.toString().trim();
-      if(dest != null && dest.isNotEmpty && img != null && img.isNotEmpty) {
+      if (dest != null && dest.isNotEmpty && img != null && img.isNotEmpty) {
         existingImageMap[dest] = img;
       }
     }
 
-    final prompt = '''
+    final prompt =
+        '''
     You are an expert travel itinerary budget recovery engine.
     The tourist has reached a budget constraint. Re-plan their remaining itinerary slots to strictly fit the remaining funds.
     
@@ -589,31 +605,37 @@ class GeminiApiConfig {
             if (rawText != null && rawText.isNotEmpty) {
               final decoded = jsonDecode(rawText);
               if (decoded is List) {
-                final rawItems =  List<Map<String, dynamic>>.from(decoded);
+                final rawItems = List<Map<String, dynamic>>.from(decoded);
 
                 // fetch images concurrently using Google Place
                 final enrichedActivities = await Future.wait(
                   rawItems.map((item) async {
-                    final tripDestination = item['destination']?.toString().trim() ?? '';
+                    final tripDestination =
+                        item['destination']?.toString().trim() ?? '';
                     final lowerDest = tripDestination.toLowerCase();
                     // Fetch image for the destination
 
                     // if the same activity occur then use the same image first
-                    if(existingImageMap.containsKey(lowerDest)) {
+                    if (existingImageMap.containsKey(lowerDest)) {
                       item['activityImgUrl'] = existingImageMap[lowerDest];
                       return item;
                     }
 
                     // if the image url does not exist then get the url from google place
                     try {
-                      final url = await GooglePlacesApiConfig.searchPlacePhotoUrl(tripDestination);
+                      final url =
+                          await GooglePlacesApiConfig.searchPlacePhotoUrl(
+                            tripDestination,
+                          );
                       item['activityImgUrl'] = url ?? '';
                     } catch (e) {
-                      debugPrint('Error fetching place photo for $tripDestination: $e');
+                      debugPrint(
+                        'Error fetching place photo for $tripDestination: $e',
+                      );
                       item['activityImgUrl'] = '';
                     }
                     return item;
-                  })
+                  }),
                 );
 
                 // Return the enriched recovery activities instead of dropping them.
@@ -624,7 +646,9 @@ class GeminiApiConfig {
         }
         return [];
       } else {
-        throw Exception('Gemini Error: ${response.statusCode} - ${response.body}');
+        throw Exception(
+          'Gemini Error: ${response.statusCode} - ${response.body}',
+        );
       }
     } catch (e) {
       debugPrint('Error generating recovery itinerary: $e');
