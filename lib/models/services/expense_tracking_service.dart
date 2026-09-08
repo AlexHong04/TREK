@@ -1257,10 +1257,16 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     Activity currentActivity,
     double overspentAmount,
   ) async {
+    debugPrint("🔥 calculateOverspendPercentage CALLED");
+
     // final double allocatedBudget = currentActivity.allocatedBudget;
     final double allocatedBudget = currentActivity.allocatedBudget <= 0
         ? 10.0
         : currentActivity.allocatedBudget;
+
+    debugPrint("allocated budget: ${allocatedBudget}");
+    debugPrint("current activity: ${currentActivity.activitiesId}");
+    debugPrint("current activity: ${currentActivity.description}");
 
     double overspendThresholdPercentage;
 
@@ -1273,7 +1279,7 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     }
 
     final double allowedOverspendLimit =
-        allocatedBudget * overspendThresholdPercentage;
+        allocatedBudget * (1 + overspendThresholdPercentage);
 
     return overspentAmount > allowedOverspendLimit;
   }
