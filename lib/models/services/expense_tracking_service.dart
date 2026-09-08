@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import 'package:path/path.dart';
 
 import '../entities/activity.dart';
 import '../entities/expense.dart';
@@ -1102,12 +1103,19 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       totalAllocatedBudget += activity.allocatedBudget;
     }
 
+    debugPrint("total allocated budget: ${totalAllocatedBudget}");
+
     final double remainingBudget = currentTrip.remainingBalance ?? 0.00;
+
+    debugPrint("remaining budget: ${remainingBudget}");
+
 
     // Get current activity
     final currentActivity = await _itineraryRepository.getCurrentActivity(
       currentActivityId,
     );
+
+    debugPrint("activity allocated budget: ${currentActivity.allocatedBudget}");
 
     // Get current day
     final currentDay = await _itineraryRepository.getCurrentDay(
@@ -1130,10 +1138,10 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     // Calculate overspent amount
     final double overspentAmount =
         totalActivityExpense - currentActivity.allocatedBudget;
-    final double previousActivityOverspend =
-        currentActivity.overspendAmount ?? 0.0;
-    final double overspendIncrease =
-        overspentAmount - previousActivityOverspend;
+    // final double previousActivityOverspend =
+    //     currentActivity.overspendAmount ?? 0.0;
+    // final double overspendIncrease =
+    //     overspentAmount - previousActivityOverspend;
 
     debugPrint("Overspent amount: $overspentAmount");
 
@@ -1143,6 +1151,7 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       isOverspend: true,
     );
 
+    debugPrint("updated activity overspend ${updatedActivity.overspendAmount}");
     // Update current day
     final existingCategories =
         currentDay.overspendCategory
@@ -1159,7 +1168,7 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     }
 
     final updatedDay = currentDay.copyWith(
-      overspendAmount: ((currentDay.overspendAmount ?? 0.0) + overspendIncrease)
+      overspendAmount: ((currentDay.overspendAmount ?? 0.0) + overspentAmount)
           .clamp(0.0, double.infinity)
           .toDouble(),
       overspendCategory: existingCategories.join(', '),
