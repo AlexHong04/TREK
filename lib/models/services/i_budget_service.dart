@@ -29,4 +29,13 @@ abstract interface class IBudgetService {
     String tripId,
     String currentActivityId,
   );
+
+  Future<double> reconcileDayBudget({
+    required String tripId,
+    required String dayTripId,
+    required DateTime date,
+    required Map<String, double> activitySpentMap,
+  });
+
+  Future<double> reconcileTripOverspend({required String tripId});
 }

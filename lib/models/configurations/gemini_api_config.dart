@@ -615,6 +615,9 @@ class GeminiApiConfig {
                     return item;
                   })
                 );
+
+                // Return the enriched recovery activities instead of dropping them.
+                return enrichedActivities;
               }
             }
           }

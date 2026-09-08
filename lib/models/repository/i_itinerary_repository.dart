@@ -28,6 +28,8 @@ abstract interface class IItineraryRepository {
 
   Future<void> updateDayTopUpBudget(DayTrip day);
 
+  Future<void> updateDayOverspend(DayTrip day);
+
   Future<bool> updateCriticalDetails(String tripId);
 
   Future<bool> updateActivities(List<Activity> activities);

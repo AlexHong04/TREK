@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
-import '../../models/entities/activity.dart';
 import '../../models/entities/expense_item.dart';
 import '../../models/local_data_source/camera_source.dart';
 import '../../models/local_data_source/gallery_source.dart';
@@ -821,14 +820,7 @@ class ActivityViewModel extends ChangeNotifier {
         totalSpent += actSpent;
       }
 
-      // 2. Calculate initial overspent amount from trip days
-      final days = await _itineraryService.getDaysByTripId(tripId);
-      double totalOverspend = 0.0;
-      for (final day in days) {
-        totalOverspend += (day.overspendAmount ?? 0.0);
-      }
-
-      // 3. Calculate initial sufficient days
+      // 2. Calculate initial sufficient days
       int initialSufficientDays = 0;
       if (allActivities.isNotEmpty) {
         initialSufficientDays = await _budgetService.calculateSufficientDays(
@@ -847,7 +839,6 @@ class ActivityViewModel extends ChangeNotifier {
         totalBudget: tripResult?.trip.totalBudget ?? _uiState.totalBudget,
         activitySpentMap: spentMap,
         spentBudget: totalSpent,
-        overspentBudget: totalOverspend,
         sufficientDays: initialSufficientDays,
         filterDate: targetDate,
         tripId: tripId,
@@ -859,6 +850,10 @@ class ActivityViewModel extends ChangeNotifier {
       await _cachedActivity.saveActivitiesLocally('latest_ongoing_trip', allActivities);
 
       await refreshSpentAmounts();
+
+      // Clean stale per-day overspend values in the DB and publish the
+      // authoritative whole-trip overspentBudget.
+      await reconcileTripOverspend();
       unawaited(_prepareExpenseReminders(allActivities));
     } catch (e) {
       _uiState = _uiState.copyWith(
@@ -1217,13 +1212,17 @@ class ActivityViewModel extends ChangeNotifier {
 
       await refreshSpentAmounts();
 
-      final days = await _itineraryService.getDaysByTripId(_uiState.tripId);
+      final currentActivity = _uiState.activities.firstWhere(
+            (a) => a.activitiesId == _uiState.currentActivityId,
+        orElse: () => _uiState.selectedActivity ?? _uiState.activities.first,
+      );
 
-      double overspend = 0.00;
-
-      for (var day in days) {
-        overspend += day.overspendAmount!;
-      }
+      // Reconciles the current day's budget in the DB and updates the
+      // trip-level overspentBudget from the reconciled data (authoritative).
+      await evaluateDayOverspend(
+        dayTripId: currentActivity.dayTripId,
+        date: currentActivity.date,
+      );
 
       final activities = await _itineraryService.getRemainingActivities(
         _uiState.tripId,
@@ -1240,10 +1239,16 @@ class ActivityViewModel extends ChangeNotifier {
         _uiState.currentActivityId,
       );
 
-      final exceededAmount = await _expenseTrackingService.getExceededAmount(_uiState.tripId, _uiState.currentActivityId);
+      final exceededAmount = await _expenseTrackingService.getExceededAmount(
+          _uiState.tripId,
+          _uiState.currentActivityId
+      );
 
       _uiState = _uiState.copyWith(
-        overspentBudget: overspend,
+        // NOTE: overspentBudget is intentionally left untouched here - it was
+        // already set by evaluateDayOverspend() from the reconciled DB days.
+        // Re-writing it with a stale/pre-reconcile value caused the OVERSPENT
+        // card to jump to an incorrect figure after expense submission.
         shortageAmount: shortageAmount,
         sufficientDays: sufficientDays,
         exceededAmount: exceededAmount
@@ -1251,27 +1256,10 @@ class ActivityViewModel extends ChangeNotifier {
 
       switch (response) {
         case ExpenseProcessingResult.withinBudget:
-          final currentActivity = _uiState.activities.firstWhere(
-              (a) => a.activitiesId == _uiState.currentActivityId,
-            orElse: () => _uiState.selectedActivity ?? _uiState.activities.first,
+          _uiState = _uiState.copyWith(
+            popupAction: '',
+            selectedActivity: currentActivity,
           );
-
-          final spent = _uiState.activitySpentMap[currentActivity.activitiesId] ?? 0.0;
-          final allocated = currentActivity.allocatedBudget;
-
-          if(allocated > 0 && spent >= (allocated * 0.50) && spent <= allocated) {
-            _uiState = _uiState.copyWith(
-              popupAction: 'warning_50',
-              selectedActivity: currentActivity,
-            );
-          } else if(allocated > 0 && spent >= (allocated * 0.80) && spent <= allocated) {
-            _uiState = _uiState.copyWith(
-              popupAction: 'warning_80',
-              selectedActivity: currentActivity,
-            );
-          } else{
-            _uiState = _uiState.copyWith(popupAction: '');
-          }
           break;
 
         case ExpenseProcessingResult.reallocatedSuccessfully:
@@ -1315,13 +1303,29 @@ class ActivityViewModel extends ChangeNotifier {
 
     final now = DateTime.now();
 
-    final remainingActivities = _uiState.activities.where((a) {
-      if (a.dayTripId != dayTripId || a.status == 'completed') return false;
+    // Re-plan the activities that are still ahead in the trip and have NOT yet
+    // had any expense recorded against them (the recovery engine must be free
+    // to re-shuffle those slots/budgets). Note: _uiState.activities only holds
+    // the filtered date's activities, so fetch the true remaining trip slots.
+    final allRemaining = await _itineraryService.getRemainingActivities(
+      _uiState.tripId,
+      now,
+    );
 
-      // another condition that kick the activities only don't have expense records
-      final hasRecordedExpense = (a.allocatedBudget > 0) || (a.isOverspend == true) || (a.overspendAmount != null && a.overspendAmount! > 0);
+    final remainingActivities = allRemaining.where((a) {
+      if (a.status == 'completed') return false;
 
-      if(hasRecordedExpense) return false;
+      // An activity is already "used" once money was spent on it, so it must
+      // not be re-planned. Spending is detected from the recorded expenses
+      // (activitySpentMap) and the stored overspend flags - NOT from the
+      // allocated budget, which every planned activity has.
+      final spentOnActivity = _uiState.activitySpentMap[a.activitiesId] ?? 0.0;
+      final hasRecordedExpense =
+          (a.isOverspend == true) ||
+          (a.overspendAmount != null && a.overspendAmount! > 0) ||
+          spentOnActivity > 0;
+
+      if (hasRecordedExpense) return false;
 
       // Filter out activities that have already passed based on endTime
       try {
@@ -1362,7 +1366,7 @@ class ActivityViewModel extends ChangeNotifier {
       // 2. Delegate generation and Supabase updates completely to Service
       final revisedActivities =
       await _itineraryService.generateBudgetRecoveryItinerary(
-        tripId: _uiState.tripId ?? '',
+        tripId: _uiState.tripId,
         effectiveRemainingBudget: effectiveRemainingBudget,
         currentSpentBudget: _uiState.spentBudget,
         topUpAmount: topUpAmount,
@@ -1423,7 +1427,6 @@ class ActivityViewModel extends ChangeNotifier {
       final Map<String, double> freshActivityMap =
       Map<String, double>.from(summary['activitySpentMap'] ?? {});
 
-      double recalculatedOverspend = 0.0;
       for (final activity in _uiState.activities) {
         final double actSpent = freshActivityMap[activity.activitiesId] ?? 0.0;
         final double actBudget = activity.allocatedBudget;
@@ -1434,7 +1437,6 @@ class ActivityViewModel extends ChangeNotifier {
             'Spent: $actSpent | '
             'Over by: $actDiff');
 
-
         debugPrint(
         '>>> [DEBUG Activity Overspend Check] ID: ${activity.activitiesId} | '
         'Name: "${activity.destination}" | '
@@ -1444,18 +1446,50 @@ class ActivityViewModel extends ChangeNotifier {
         );
       }
 
+      // NOTE: overspentBudget is intentionally NOT set here. This method only
+      // knows the filtered (_uiState.activities) date, so computing a "trip"
+      // overspent here produced different figures depending on the filter.
+      // The authoritative whole-trip value comes from reconcileTripOverspend().
       _uiState = _uiState.copyWith(
         spentBudget: freshSpent,
         activitySpentMap: freshActivityMap,
-        overspentBudget: recalculatedOverspend,
       );
 
-      debugPrint('>>> [DEBUG refreshSpentAmounts] New uiState.overspentBudget after copyWith: ${_uiState.overspentBudget}');
+      debugPrint('>>> [DEBUG refreshSpentAmounts] Spent refresh done (overspentBudget untouched).');
       debugPrint("[refreshSpentAmounts] Success! Total Spent: $freshSpent, Map: $freshActivityMap");
       notifyListeners();
     } catch (e, stack) {
       debugPrint('Error refreshing spent amounts: $e');
       debugPrint('Stack trace: $stack');
     }
+  }
+
+  // weisong
+  // Reconciles EVERY trip day against real spending, persists each day's net
+  // overspend (which clears stale day values), and publishes the authoritative
+  // whole-trip overspentBudget to the top card.
+  Future<void> reconcileTripOverspend() async {
+    if (_uiState.tripId.isEmpty) return;
+    try {
+      final totalTripOverspent = await _budgetService.reconcileTripOverspend(
+        tripId: _uiState.tripId,
+      );
+      debugPrint('>>> [DEBUG reconcileTripOverspend] Reconciled total overspent: '
+          '${totalTripOverspent.toStringAsFixed(2)}');
+      _uiState = _uiState.copyWith(overspentBudget: totalTripOverspent);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error reconciling trip overspend: $e');
+    }
+  }
+
+  // Re-evaluates a day's net overspend and updates trip-level overspentBudget.
+  // Reconciling the whole trip (not just this day) keeps the OVERSPENT figure
+  // consistent and removes phantom leftover amounts from other days.
+  Future<void> evaluateDayOverspend({
+    required String dayTripId,
+    required DateTime date,
+  }) async {
+    await reconcileTripOverspend();
   }
 }
