@@ -8,6 +8,7 @@ import '../main.dart';
 import '../widgets/custom_app_bar.dart';
 import '../widgets/custom_text_field.dart';
 import '../utils/malaysia_states.dart';
+import '../view_models/ui_state/travel_information_ui_state.dart';
 
 class TravelInformationInputScreen extends StatefulWidget {
   const TravelInformationInputScreen({super.key});
@@ -30,9 +31,7 @@ class _TravelInformationInputScreenState
   late final TextEditingController _dateController;
   late final TextEditingController _budgetController;
   late final TextEditingController _wishlistController;
-  late final TextEditingController _arrivalLocationController;
-  late final TextEditingController _departureLocationController;
-  late final TextEditingController _hotelLocationController;
+  final List<TextEditingController> _hotelLocationControllers = [];
 
   @override
   void initState() {
@@ -40,9 +39,7 @@ class _TravelInformationInputScreenState
     _dateController = TextEditingController();
     _budgetController = TextEditingController();
     _wishlistController = TextEditingController();
-    _arrivalLocationController = TextEditingController();
-    _departureLocationController = TextEditingController();
-    _hotelLocationController = TextEditingController();
+    _hotelLocationControllers.add(TextEditingController());
   }
 
   @override
@@ -50,15 +47,62 @@ class _TravelInformationInputScreenState
     _dateController.dispose();
     _budgetController.dispose();
     _wishlistController.dispose();
-    _arrivalLocationController.dispose();
-    _departureLocationController.dispose();
-    _hotelLocationController.dispose();
+    for (final c in _hotelLocationControllers) {
+      c.dispose();
+    }
     super.dispose();
+  }
+
+  void _addArrival(TravelInformationInputViewModel viewModel) {
+    viewModel.addArrival();
+  }
+
+  void _removeArrival(int index, TravelInformationInputViewModel viewModel) {
+    viewModel.removeArrival(index);
+  }
+
+  void _addDeparture(TravelInformationInputViewModel viewModel) {
+    viewModel.addDeparture();
+  }
+
+  void _removeDeparture(int index, TravelInformationInputViewModel viewModel) {
+    viewModel.removeDeparture(index);
+  }
+
+  void _syncHotelControllers(List<HotelStay> hotels) {
+    while (_hotelLocationControllers.length < hotels.length) {
+      final index = _hotelLocationControllers.length;
+      _hotelLocationControllers.add(
+        TextEditingController(text: hotels[index].location),
+      );
+    }
+    while (_hotelLocationControllers.length > hotels.length) {
+      _hotelLocationControllers.removeLast().dispose();
+    }
+  }
+
+  void _addHotel(TravelInformationInputViewModel viewModel) {
+    setState(() {
+      _hotelLocationControllers.add(TextEditingController());
+    });
+    viewModel.addHotel();
+  }
+
+  void _removeHotel(int index, TravelInformationInputViewModel viewModel) {
+    if (_hotelLocationControllers.length > 1 &&
+        index < _hotelLocationControllers.length) {
+      setState(() {
+        _hotelLocationControllers[index].dispose();
+        _hotelLocationControllers.removeAt(index);
+      });
+      viewModel.removeHotel(index);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final viewModel = context.watch<TravelInformationInputViewModel>();
+    _syncHotelControllers(viewModel.uiState.hotels);
 
     return Scaffold(
       backgroundColor: appTheme.gray_50_02,
@@ -68,7 +112,17 @@ class _TravelInformationInputScreenState
         child: Column(
           children: [
             Expanded(
-              child: SingleChildScrollView(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: () {
+                  if (viewModel.uiState.activeHotelField != null) {
+                    viewModel.clearHotelSuggestions();
+                  }
+                  if (viewModel.uiState.suggestions.isNotEmpty) {
+                    viewModel.clearSuggestions();
+                  }
+                },
+                child: SingleChildScrollView(
                 child: Column(
                   children: [
                     const SizedBox(height: 22.0),
@@ -80,7 +134,8 @@ class _TravelInformationInputScreenState
                           viewModel.uiState.selectedDestinations.isNotEmpty
                           ? 'Search places in ${viewModel.uiState.selectedDestinations.join(", ")}...'
                           : 'Search wishlist...',
-                      prefixIcon: Icons.favorite,
+                      prefixIcon: Icons.favorite_outline,
+                      prefixIconColor: appTheme.teal_A700,
                       controller: _wishlistController,
                       // Wishlist items can only be added by tapping a
                       // suggestion, so submitting the field dismisses the keyboard.
@@ -172,6 +227,7 @@ class _TravelInformationInputScreenState
                       sectionTitle: 'WHEN?',
                       hintText: 'Select dates',
                       prefixIcon: Icons.calendar_today_outlined,
+                      prefixIconColor: appTheme.teal_A700,
                       controller: _dateController,
                       readOnly: true,
                       onTap: () async {
@@ -181,6 +237,19 @@ class _TravelInformationInputScreenState
                           lastDate: DateTime.now().add(
                             const Duration(days: 365),
                           ),
+                          builder: (context, child) {
+                            return Theme(
+                              data: Theme.of(context).copyWith(
+                                colorScheme: ColorScheme.light(
+                                  primary: appTheme.teal_A700,
+                                  onPrimary: appTheme.white_A700,
+                                  surface: appTheme.white_A700,
+                                  onSurface: appTheme.gray_800,
+                                ),
+                              ),
+                              child: child!,
+                            );
+                          },
                           selectableDayPredicate:
                               (DateTime day, DateTime? start, DateTime? end) {
                                 final checkDate = DateTime(
@@ -218,6 +287,7 @@ class _TravelInformationInputScreenState
                       sectionTitle: 'TRIP BUDGET',
                       hintText: 'Total Trip Budget (\$)',
                       prefixIcon: Icons.account_balance_wallet_outlined,
+                      prefixIconColor: appTheme.teal_A700,
                       controller: _budgetController,
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
@@ -231,7 +301,8 @@ class _TravelInformationInputScreenState
                 ),
               ),
             ),
-            _buildBottomSection(viewModel),
+          ),
+          _buildBottomSection(viewModel),
           ],
         ),
       ),
@@ -254,15 +325,18 @@ class _TravelInformationInputScreenState
         children: [
           Row(
             children: [
-              Icon(Icons.favorite, color: appTheme.teal_A700, size: 20.0),
-              const SizedBox(width: 8.0),
+              Icon(Icons.favorite, color: appTheme.teal_A700, size: 16.0),
+              const SizedBox(width: 6.0),
               Text(
-                'Travel Preferences',
+                'TRAVEL PREFERENCES',
                 style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
                   fontFamily: 'Inter',
-                ).copyWith(height: 1.22),
+                  color: appTheme.blue_gray_300,
+                  letterSpacing: 1,
+                  height: 1.2,
+                ),
               ),
             ],
           ),
@@ -289,7 +363,7 @@ class _TravelInformationInputScreenState
                       color: isSelected
                           ? appTheme.teal_A700
                           : appTheme.gray_200,
-                      width: isSelected ? 2.0 : 1.0,
+                      width: 2.0,
                     ),
                   ),
                   child: Row(
@@ -377,12 +451,20 @@ class _TravelInformationInputScreenState
                       'budget': _budgetController.text,
                       'preference': viewModel.uiState.selectedPreference,
                       'wishlist': viewModel.uiState.wishlistItems,
-                      'arrivalLocation': _arrivalLocationController.text.trim(),
+                      'arrivals': viewModel.uiState.arrivals
+                          .map((e) => e.toJson())
+                          .toList(),
+                      'departures': viewModel.uiState.departures
+                          .map((e) => e.toJson())
+                          .toList(),
+                      'arrivalLocation': viewModel.uiState.arrivalLocation,
                       'arrivalTime': viewModel.uiState.arrivalTime,
-                      'departureLocation':
-                          _departureLocationController.text.trim(),
+                      'departureLocation': viewModel.uiState.departureLocation,
                       'departureTime': viewModel.uiState.departureTime,
-                      'hotelLocation': _hotelLocationController.text.trim(),
+                      'hotels': viewModel.uiState.hotels
+                          .map((e) => e.toJson())
+                          .toList(),
+                      'hotelLocation': viewModel.uiState.hotelLocation,
                       'hotelCheckInTime': viewModel.uiState.hotelCheckInTime,
                       'hotelCheckOutTime': viewModel.uiState.hotelCheckOutTime,
                     },
@@ -493,7 +575,7 @@ class _TravelInformationInputScreenState
                   Text(
                     'DESTINATION (MALAYSIA)',
                     style: TextStyle(
-                      fontSize: 10,
+                      fontSize: 12,
                       fontWeight: FontWeight.w800,
                       fontFamily: 'Inter',
                       color: appTheme.blue_gray_300,
@@ -532,7 +614,7 @@ class _TravelInformationInputScreenState
                     Icon(
                       Icons.location_on_outlined,
                       color: appTheme.teal_A700,
-                      size: 22.0,
+                      size: 20.0,
                     ),
                     const SizedBox(width: 10.0),
                     Expanded(
@@ -619,9 +701,9 @@ class _TravelInformationInputScreenState
                 const SizedBox(height: 8.0),
                 Text(
                   field.errorText ?? '',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: Colors.red,
+                    color: appTheme.errorRed,
                     fontFamily: 'Inter',
                   ),
                 ),
@@ -670,7 +752,7 @@ class _TravelInformationInputScreenState
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: appTheme.transparentCustom,
       builder: (modalContext) {
         String searchQuery = '';
 
@@ -728,7 +810,7 @@ class _TravelInformationInputScreenState
                             ),
                             const SizedBox(height: 2.0),
                             Text(
-                              '13 States of Malaysia',
+                              'States & Federal Territories of Malaysia',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontFamily: 'Inter',
@@ -978,6 +1060,9 @@ class _TravelInformationInputScreenState
     BuildContext context,
     TravelInformationInputViewModel viewModel,
   ) {
+    final arrivals = viewModel.uiState.arrivals;
+    final departures = viewModel.uiState.departures;
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24.0),
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
@@ -996,127 +1081,375 @@ class _TravelInformationInputScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'ARRIVAL',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              fontFamily: 'Inter',
-              color: appTheme.blue_gray_300,
-              letterSpacing: 1,
-              height: 1.2,
-            ),
-          ),
-          const SizedBox(height: 8.0),
+          // ARRIVALS HEADER
           Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: TextField(
-                  controller: _arrivalLocationController,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w400,
-                    fontFamily: 'Inter',
-                    color: appTheme.gray_800,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'Arrival location (e.g. Airport / Station)',
-                    hintStyle: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w400,
+              Row(
+                children: [
+                  Text(
+                    arrivals.length > 1 ? 'ARRIVALS' : 'ARRIVAL',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
                       fontFamily: 'Inter',
                       color: appTheme.blue_gray_300,
+                      letterSpacing: 1,
+                      height: 1.2,
                     ),
-                    prefixIcon: Icon(
-                      Icons.flight_land_outlined,
-                      color: appTheme.teal_A700,
-                      size: 20,
-                    ),
-                    prefixIconConstraints: const BoxConstraints(
-                      minWidth: 32,
-                      minHeight: 32,
-                    ),
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 8.0),
                   ),
-                ),
+                  if (arrivals.length > 1) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 1.5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: appTheme.gray_100,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '${arrivals.length}',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: 'Inter',
+                          color: appTheme.teal_A700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
-              const SizedBox(width: 8.0),
-              _buildTimePickerButton(
-                context: context,
-                time: viewModel.uiState.arrivalTime,
-                onTap: () => _pickTime(
-                  context: context,
-                  initialTimeString: viewModel.uiState.arrivalTime,
-                  onTimePicked: viewModel.setArrivalTime,
+              InkWell(
+                onTap: () => _addArrival(viewModel),
+                borderRadius: BorderRadius.circular(8.0),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6.0,
+                    vertical: 2.0,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.add_circle_outline_rounded,
+                        size: 14.0,
+                        color: appTheme.teal_A700,
+                      ),
+                      const SizedBox(width: 4.0),
+                      Text(
+                        'Add',
+                        style: TextStyle(
+                          fontSize: 12.0,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Inter',
+                          color: appTheme.teal_A700,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12.0),
+          const SizedBox(height: 8.0),
+
+          // ARRIVALS LIST
+          ...arrivals.asMap().entries.map((entry) {
+            final index = entry.key;
+            final arrival = entry.value;
+
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: index == arrivals.length - 1 ? 0.0 : 8.0,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => _showAirportSelectionModal(
+                        context,
+                        viewModel,
+                        isArrival: true,
+                        index: index,
+                      ),
+                      borderRadius: BorderRadius.circular(10.0),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12.0,
+                          vertical: 10.0,
+                        ),
+                        decoration: BoxDecoration(
+                          color: appTheme.gray_50_01,
+                          borderRadius: BorderRadius.circular(10.0),
+                          border: Border.all(
+                            color: arrival.location.isNotEmpty
+                                ? appTheme.teal_A700.withValues(alpha: 0.35)
+                                : appTheme.gray_200,
+                            width: 1.0,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.flight_land_rounded,
+                              color: appTheme.teal_A700,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8.0),
+                            Expanded(
+                              child: Text(
+                                arrival.location.isNotEmpty
+                                    ? arrival.location
+                                    : (arrivals.length > 1
+                                        ? 'Select arrival airport ${index + 1}'
+                                        : 'Select arrival airport'),
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: arrival.location.isNotEmpty
+                                      ? FontWeight.w600
+                                      : FontWeight.w400,
+                                  fontFamily: 'Inter',
+                                  color: arrival.location.isNotEmpty
+                                      ? appTheme.gray_800
+                                      : appTheme.blue_gray_300,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 4.0),
+                            Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              color: appTheme.blue_gray_300,
+                              size: 18.0,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8.0),
+                  _buildTimePickerButton(
+                    context: context,
+                    time: arrival.time,
+                    onTap: () => _pickTime(
+                      context: context,
+                      initialTimeString: arrival.time,
+                      onTimePicked: (t) =>
+                          viewModel.updateArrivalTime(index, t),
+                    ),
+                  ),
+                  if (arrivals.length > 1) ...[
+                    const SizedBox(width: 4.0),
+                    InkWell(
+                      onTap: () => _removeArrival(index, viewModel),
+                      borderRadius: BorderRadius.circular(8.0),
+                      child: Padding(
+                        padding: const EdgeInsets.all(4.0),
+                        child: Icon(
+                          Icons.close_rounded,
+                          size: 18.0,
+                          color: appTheme.blue_gray_300,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          }),
+
+          const SizedBox(height: 10.0),
+
+          const SizedBox(height: 14.0),
           Divider(color: appTheme.gray_100, height: 1.0),
-          const SizedBox(height: 12.0),
-          Text(
-            'DEPARTURE',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              fontFamily: 'Inter',
-              color: appTheme.blue_gray_300,
-              letterSpacing: 1,
-              height: 1.2,
-            ),
-          ),
-          const SizedBox(height: 8.0),
+          const SizedBox(height: 14.0),
+
+          // DEPARTURES HEADER
           Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: TextField(
-                  controller: _departureLocationController,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w400,
-                    fontFamily: 'Inter',
-                    color: appTheme.gray_800,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'Departure location (e.g. Airport / Station)',
-                    hintStyle: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w400,
+              Row(
+                children: [
+                  Text(
+                    departures.length > 1 ? 'DEPARTURES' : 'DEPARTURE',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
                       fontFamily: 'Inter',
                       color: appTheme.blue_gray_300,
+                      letterSpacing: 1,
+                      height: 1.2,
                     ),
-                    prefixIcon: Icon(
-                      Icons.flight_takeoff_outlined,
-                      color: appTheme.teal_A700,
-                      size: 20,
-                    ),
-                    prefixIconConstraints: const BoxConstraints(
-                      minWidth: 32,
-                      minHeight: 32,
-                    ),
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 8.0),
                   ),
-                ),
+                  if (departures.length > 1) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 1.5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: appTheme.gray_100,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '${departures.length}',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: 'Inter',
+                          color: appTheme.teal_A700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
-              const SizedBox(width: 8.0),
-              _buildTimePickerButton(
-                context: context,
-                time: viewModel.uiState.departureTime,
-                onTap: () => _pickTime(
-                  context: context,
-                  initialTimeString: viewModel.uiState.departureTime,
-                  onTimePicked: viewModel.setDepartureTime,
+              InkWell(
+                onTap: () => _addDeparture(viewModel),
+                borderRadius: BorderRadius.circular(8.0),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6.0,
+                    vertical: 2.0,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.add_circle_outline_rounded,
+                        size: 14.0,
+                        color: appTheme.teal_A700,
+                      ),
+                      const SizedBox(width: 4.0),
+                      Text(
+                        'Add',
+                        style: TextStyle(
+                          fontSize: 12.0,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Inter',
+                          color: appTheme.teal_A700,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 8.0),
+
+          // DEPARTURES LIST
+          ...departures.asMap().entries.map((entry) {
+            final index = entry.key;
+            final departure = entry.value;
+
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: index == departures.length - 1 ? 0.0 : 8.0,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => _showAirportSelectionModal(
+                        context,
+                        viewModel,
+                        isArrival: false,
+                        index: index,
+                      ),
+                      borderRadius: BorderRadius.circular(10.0),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12.0,
+                          vertical: 10.0,
+                        ),
+                        decoration: BoxDecoration(
+                          color: appTheme.gray_50_01,
+                          borderRadius: BorderRadius.circular(10.0),
+                          border: Border.all(
+                            color: departure.location.isNotEmpty
+                                ? appTheme.teal_A700.withValues(alpha: 0.35)
+                                : appTheme.gray_200,
+                            width: 1.0,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.flight_takeoff_rounded,
+                              color: appTheme.teal_A700,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8.0),
+                            Expanded(
+                              child: Text(
+                                departure.location.isNotEmpty
+                                    ? departure.location
+                                    : (departures.length > 1
+                                        ? 'Select departure airport ${index + 1}'
+                                        : 'Select departure airport'),
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: departure.location.isNotEmpty
+                                      ? FontWeight.w600
+                                      : FontWeight.w400,
+                                  fontFamily: 'Inter',
+                                  color: departure.location.isNotEmpty
+                                      ? appTheme.gray_800
+                                      : appTheme.blue_gray_300,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 4.0),
+                            Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              color: appTheme.blue_gray_300,
+                              size: 18.0,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8.0),
+                  _buildTimePickerButton(
+                    context: context,
+                    time: departure.time,
+                    onTap: () => _pickTime(
+                      context: context,
+                      initialTimeString: departure.time,
+                      onTimePicked: (t) =>
+                          viewModel.updateDepartureTime(index, t),
+                    ),
+                  ),
+                  if (departures.length > 1) ...[
+                    const SizedBox(width: 4.0),
+                    InkWell(
+                      onTap: () => _removeDeparture(index, viewModel),
+                      borderRadius: BorderRadius.circular(8.0),
+                      child: Padding(
+                        padding: const EdgeInsets.all(4.0),
+                        child: Icon(
+                          Icons.close_rounded,
+                          size: 18.0,
+                          color: appTheme.blue_gray_300,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          }),
         ],
       ),
     );
@@ -1126,6 +1459,8 @@ class _TravelInformationInputScreenState
     BuildContext context,
     TravelInformationInputViewModel viewModel,
   ) {
+    final hotels = viewModel.uiState.hotels;
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24.0),
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
@@ -1144,112 +1479,264 @@ class _TravelInformationInputScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'ACCOMMODATION / HOTEL',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              fontFamily: 'Inter',
-              color: appTheme.blue_gray_300,
-              letterSpacing: 1,
-              height: 1.2,
-            ),
-          ),
-          const SizedBox(height: 8.0),
-          TextField(
-            controller: _hotelLocationController,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w400,
-              fontFamily: 'Inter',
-              color: appTheme.gray_800,
-            ),
-            decoration: InputDecoration(
-              hintText: 'Hotel name or area (e.g. George Town)',
-              hintStyle: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w400,
-                fontFamily: 'Inter',
-                color: appTheme.blue_gray_300,
-              ),
-              prefixIcon: Icon(
-                Icons.hotel_outlined,
-                color: appTheme.teal_A700,
-                size: 20,
-              ),
-              prefixIconConstraints: const BoxConstraints(
-                minWidth: 32,
-                minHeight: 32,
-              ),
-              border: InputBorder.none,
-              isDense: true,
-              contentPadding: const EdgeInsets.symmetric(vertical: 8.0),
-            ),
-          ),
-          const SizedBox(height: 12.0),
-          Divider(color: appTheme.gray_100, height: 1.0),
-          const SizedBox(height: 12.0),
+          // HOTEL HEADER
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'CHECK-IN',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        fontFamily: 'Inter',
-                        color: appTheme.blue_gray_300,
-                        letterSpacing: 0.5,
-                      ),
+              Row(
+                children: [
+                  Text(
+                    hotels.length > 1
+                        ? 'ACCOMMODATIONS / HOTELS'
+                        : 'ACCOMMODATION / HOTEL',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      fontFamily: 'Inter',
+                      color: appTheme.blue_gray_300,
+                      letterSpacing: 1,
+                      height: 1.2,
                     ),
-                    const SizedBox(height: 6.0),
-                    _buildTimePickerButton(
-                      context: context,
-                      time: viewModel.uiState.hotelCheckInTime,
-                      isFullWidth: true,
-                      onTap: () => _pickTime(
-                        context: context,
-                        initialTimeString: viewModel.uiState.hotelCheckInTime,
-                        onTimePicked: viewModel.setHotelCheckInTime,
+                  ),
+                  if (hotels.length > 1) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 1.5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: appTheme.gray_100,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '${hotels.length}',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: 'Inter',
+                          color: appTheme.teal_A700,
+                        ),
                       ),
                     ),
                   ],
-                ),
+                ],
               ),
-              const SizedBox(width: 12.0),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'CHECK-OUT',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        fontFamily: 'Inter',
-                        color: appTheme.blue_gray_300,
-                        letterSpacing: 0.5,
+              InkWell(
+                onTap: () => _addHotel(viewModel),
+                borderRadius: BorderRadius.circular(8.0),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6.0,
+                    vertical: 2.0,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.add_circle_outline_rounded,
+                        size: 14.0,
+                        color: appTheme.teal_A700,
                       ),
-                    ),
-                    const SizedBox(height: 6.0),
-                    _buildTimePickerButton(
-                      context: context,
-                      time: viewModel.uiState.hotelCheckOutTime,
-                      isFullWidth: true,
-                      onTap: () => _pickTime(
-                        context: context,
-                        initialTimeString: viewModel.uiState.hotelCheckOutTime,
-                        onTimePicked: viewModel.setHotelCheckOutTime,
+                      const SizedBox(width: 4.0),
+                      Text(
+                        'Add',
+                        style: TextStyle(
+                          fontSize: 12.0,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Inter',
+                          color: appTheme.teal_A700,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 10.0),
+
+          // HOTELS LIST
+          ...hotels.asMap().entries.map((entry) {
+            final index = entry.key;
+            final hotel = entry.value;
+            final controller = index < _hotelLocationControllers.length
+                ? _hotelLocationControllers[index]
+                : null;
+            final isCurrentActive =
+                viewModel.uiState.activeHotelField == 'hotel_$index';
+
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: index == hotels.length - 1 ? 0.0 : 14.0,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (hotels.length > 1) ...[
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'HOTEL ${index + 1}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            fontFamily: 'Inter',
+                            color: appTheme.blue_gray_300,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        InkWell(
+                          onTap: () => _removeHotel(index, viewModel),
+                          borderRadius: BorderRadius.circular(8.0),
+                          child: Padding(
+                            padding: const EdgeInsets.all(4.0),
+                            child: Icon(
+                              Icons.close_rounded,
+                              size: 18.0,
+                              color: appTheme.blue_gray_300,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4.0),
+                  ],
+                  TextField(
+                    controller: controller,
+                    onTap: () => viewModel.onHotelFocused(index),
+                    onChanged: (text) =>
+                        viewModel.onHotelLocationChanged(index, text),
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w400,
+                      fontFamily: 'Inter',
+                      color: appTheme.gray_800,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: hotels.length > 1
+                          ? 'Hotel ${index + 1} name or area'
+                          : 'Hotel name or area (e.g. George Town)',
+                      hintStyle: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                        fontFamily: 'Inter',
+                        color: appTheme.blue_gray_300,
+                      ),
+                      prefixIcon: Icon(
+                        Icons.hotel_outlined,
+                        color: appTheme.teal_A700,
+                        size: 20,
+                      ),
+                      prefixIconConstraints: const BoxConstraints(
+                        minWidth: 32,
+                        minHeight: 32,
+                      ),
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 8.0),
+                    ),
+                  ),
+                  if (isCurrentActive) ...[
+                    if (viewModel.uiState.isSearchingHotelSuggestions) ...[
+                      const SizedBox(height: 6.0),
+                      LinearProgressIndicator(
+                        minHeight: 2.0,
+                        backgroundColor: appTheme.transparentCustom,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          appTheme.teal_A700,
+                        ),
+                      ),
+                    ],
+                    if (viewModel.uiState.hotelSuggestions.isNotEmpty) ...[
+                      const SizedBox(height: 6.0),
+                      _buildHotelSuggestionBox(
+                        suggestions: viewModel.uiState.hotelSuggestions,
+                        onSelect: (suggestion) {
+                          if (controller != null) {
+                            controller.text = suggestion;
+                            controller.selection = TextSelection.fromPosition(
+                              TextPosition(offset: suggestion.length),
+                            );
+                          }
+                          viewModel.selectHotelSuggestion(index, suggestion);
+                        },
+                      ),
+                    ],
+                  ],
+                  const SizedBox(height: 10.0),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'CHECK-IN',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                fontFamily: 'Inter',
+                                color: appTheme.blue_gray_300,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 6.0),
+                            _buildTimePickerButton(
+                              context: context,
+                              time: hotel.checkInTime,
+                              isFullWidth: true,
+                              onTap: () => _pickTime(
+                                context: context,
+                                initialTimeString: hotel.checkInTime,
+                                onTimePicked: (t) =>
+                                    viewModel.updateHotelCheckInTime(index, t),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12.0),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'CHECK-OUT',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                fontFamily: 'Inter',
+                                color: appTheme.blue_gray_300,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 6.0),
+                            _buildTimePickerButton(
+                              context: context,
+                              time: hotel.checkOutTime,
+                              isFullWidth: true,
+                              onTap: () => _pickTime(
+                                context: context,
+                                initialTimeString: hotel.checkOutTime,
+                                onTimePicked: (t) =>
+                                    viewModel.updateHotelCheckOutTime(index, t),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (index < hotels.length - 1) ...[
+                    const SizedBox(height: 14.0),
+                    Divider(color: appTheme.gray_100, height: 1.0),
+                  ],
+                ],
+              ),
+            );
+          }),
         ],
       ),
     );
@@ -1273,8 +1760,9 @@ class _TravelInformationInputScreenState
         ),
         child: Row(
           mainAxisSize: isFullWidth ? MainAxisSize.max : MainAxisSize.min,
-          mainAxisAlignment:
-              isFullWidth ? MainAxisAlignment.center : MainAxisAlignment.start,
+          mainAxisAlignment: isFullWidth
+              ? MainAxisAlignment.center
+              : MainAxisAlignment.start,
           children: [
             Icon(
               Icons.access_time_rounded,
@@ -1343,5 +1831,458 @@ class _TravelInformationInputScreenState
       final formatted = '${hour.toString().padLeft(2, '0')}:$minute $period';
       onTimePicked(formatted);
     }
+  }
+
+  Future<void> _showAirportSelectionModal(
+    BuildContext context,
+    TravelInformationInputViewModel viewModel, {
+    required bool isArrival,
+    required int index,
+  }) {
+    final currentSelected = isArrival
+        ? (index < viewModel.uiState.arrivals.length
+            ? viewModel.uiState.arrivals[index].location
+            : '')
+        : (index < viewModel.uiState.departures.length
+            ? viewModel.uiState.departures[index].location
+            : '');
+
+    final destinations = viewModel.uiState.selectedDestinations;
+    final recommendedAirports = getTransitHubSuggestions(destinations);
+    final allAirports = getAllMalaysiaAirports();
+
+    return showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: appTheme.transparentCustom,
+      builder: (modalContext) {
+        String searchQuery = '';
+
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final query = searchQuery.trim().toLowerCase();
+
+            final filteredRecommended = query.isEmpty
+                ? recommendedAirports
+                : recommendedAirports
+                    .where((a) => a.toLowerCase().contains(query))
+                    .toList();
+
+            final otherAirports = allAirports
+                .where((a) => !recommendedAirports.contains(a))
+                .toList();
+
+            final filteredOthers = query.isEmpty
+                ? otherAirports
+                : otherAirports
+                    .where((a) => a.toLowerCase().contains(query))
+                    .toList();
+
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.78,
+              decoration: BoxDecoration(
+                color: appTheme.white_A700,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24.0),
+                ),
+              ),
+              child: Column(
+                children: [
+                  // Handle bar
+                  Container(
+                    margin: const EdgeInsets.only(top: 12.0, bottom: 8.0),
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: appTheme.gray_200,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+
+                  // Header
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20.0,
+                      vertical: 8.0,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              isArrival
+                                  ? 'Select Arrival Airport'
+                                  : 'Select Departure Airport',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                fontFamily: 'Inter',
+                                color: appTheme.gray_800,
+                              ),
+                            ),
+                            const SizedBox(height: 2.0),
+                            Text(
+                              destinations.isNotEmpty
+                                  ? 'Based on destination: ${destinations.join(", ")}'
+                                  : 'Major Commercial Airports of Malaysia',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontFamily: 'Inter',
+                                color: appTheme.blue_gray_300,
+                              ),
+                            ),
+                          ],
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.close, color: appTheme.gray_800),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Search Bar
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20.0,
+                      vertical: 8.0,
+                    ),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: appTheme.gray_50_01,
+                        borderRadius: BorderRadius.circular(12.0),
+                        border: Border.all(color: appTheme.gray_200),
+                      ),
+                      child: TextField(
+                        onChanged: (val) {
+                          setModalState(() {
+                            searchQuery = val;
+                          });
+                        },
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontFamily: 'Inter',
+                          color: appTheme.gray_800,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'Search airport or city (e.g. KLIA, Penang)...',
+                          hintStyle: TextStyle(
+                            fontSize: 14,
+                            fontFamily: 'Inter',
+                            color: appTheme.blue_gray_300,
+                          ),
+                          prefixIcon: Icon(
+                            Icons.search,
+                            color: appTheme.blue_gray_300,
+                            size: 20,
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 12.0,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  if (currentSelected.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20.0,
+                        vertical: 4.0,
+                      ),
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: InkWell(
+                          onTap: () {
+                            if (isArrival) {
+                              viewModel.updateArrivalLocation(index, '');
+                            } else {
+                              viewModel.updateDepartureLocation(index, '');
+                            }
+                            Navigator.pop(context);
+                          },
+                          child: Text(
+                            'Clear airport selection',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              fontFamily: 'Inter',
+                              color: appTheme.errorRed,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 4.0),
+                  Divider(height: 1.0, color: appTheme.gray_100),
+
+                  // Airport List
+                  Expanded(
+                    child: (filteredRecommended.isEmpty && filteredOthers.isEmpty)
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.search_off_rounded,
+                                  size: 48,
+                                  color: appTheme.blue_gray_300,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'No airports found',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontFamily: 'Inter',
+                                    color: appTheme.blue_gray_300,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20.0,
+                              vertical: 12.0,
+                            ),
+                            children: [
+                              if (destinations.isNotEmpty &&
+                                  filteredRecommended.isNotEmpty) ...[
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.stars_rounded,
+                                      size: 15,
+                                      color: appTheme.teal_A700,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'RECOMMENDED FOR YOUR TRIP',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                        fontFamily: 'Inter',
+                                        color: appTheme.teal_A700,
+                                        letterSpacing: 0.8,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8.0),
+                                ...filteredRecommended.map((airport) {
+                                  final isSelected = currentSelected == airport;
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 8.0),
+                                    child: _buildAirportModalItem(
+                                      airport: airport,
+                                      isSelected: isSelected,
+                                      isRecommended: true,
+                                      onTap: () {
+                                        if (isArrival) {
+                                          viewModel.updateArrivalLocation(
+                                            index,
+                                            airport,
+                                          );
+                                        } else {
+                                          viewModel.updateDepartureLocation(
+                                            index,
+                                            airport,
+                                          );
+                                        }
+                                        Navigator.pop(context);
+                                      },
+                                    ),
+                                  );
+                                }),
+                                const SizedBox(height: 12.0),
+                              ],
+
+                              if (filteredOthers.isNotEmpty) ...[
+                                if (destinations.isNotEmpty &&
+                                    filteredRecommended.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 8.0),
+                                    child: Text(
+                                      'OTHER MALAYSIA AIRPORTS',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                        fontFamily: 'Inter',
+                                        color: appTheme.blue_gray_300,
+                                        letterSpacing: 0.8,
+                                      ),
+                                    ),
+                                  ),
+                                ...filteredOthers.map((airport) {
+                                  final isSelected = currentSelected == airport;
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 8.0),
+                                    child: _buildAirportModalItem(
+                                      airport: airport,
+                                      isSelected: isSelected,
+                                      isRecommended: false,
+                                      onTap: () {
+                                        if (isArrival) {
+                                          viewModel.updateArrivalLocation(
+                                            index,
+                                            airport,
+                                          );
+                                        } else {
+                                          viewModel.updateDepartureLocation(
+                                            index,
+                                            airport,
+                                          );
+                                        }
+                                        Navigator.pop(context);
+                                      },
+                                    ),
+                                  );
+                                }),
+                              ],
+                            ],
+                          ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildAirportModalItem({
+    required String airport,
+    required bool isSelected,
+    required bool isRecommended,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12.0),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 14.0,
+          vertical: 12.0,
+        ),
+        decoration: BoxDecoration(
+          color: isSelected ? appTheme.gray_50_01 : appTheme.white_A700,
+          borderRadius: BorderRadius.circular(12.0),
+          border: Border.all(
+            color: isSelected
+                ? appTheme.teal_A700
+                : (isRecommended
+                    ? appTheme.teal_A700.withValues(alpha: 0.35)
+                    : appTheme.gray_100),
+            width: isSelected ? 1.5 : 1.0,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8.0),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? appTheme.teal_50
+                    : (isRecommended ? appTheme.teal_50 : appTheme.gray_50_01),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.local_airport_rounded,
+                size: 18.0,
+                color: (isSelected || isRecommended)
+                    ? appTheme.teal_A700
+                    : appTheme.blue_gray_300,
+              ),
+            ),
+            const SizedBox(width: 12.0),
+            Expanded(
+              child: Text(
+                airport,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  fontFamily: 'Inter',
+                  color: isSelected ? appTheme.teal_A700 : appTheme.gray_800,
+                ),
+              ),
+            ),
+            Icon(
+              isSelected
+                  ? Icons.check_circle_rounded
+                  : Icons.radio_button_unchecked,
+              color: isSelected ? appTheme.teal_A700 : appTheme.gray_200,
+              size: 22.0,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHotelSuggestionBox({
+    required List<String> suggestions,
+    required ValueChanged<String> onSelect,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: appTheme.white_A700,
+        borderRadius: BorderRadius.circular(12.0),
+        border: Border.all(
+          color: appTheme.gray_200,
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: appTheme.black_900_0c,
+            offset: const Offset(0, 2),
+            blurRadius: 6,
+          ),
+        ],
+      ),
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: suggestions.length,
+        separatorBuilder: (context, index) => Divider(
+          color: appTheme.gray_100,
+          height: 1.0,
+        ),
+        itemBuilder: (context, index) {
+          final suggestion = suggestions[index];
+          return ListTile(
+            leading: Icon(
+              Icons.hotel_rounded,
+              size: 18.0,
+              color: appTheme.teal_A700,
+            ),
+            title: Text(
+              suggestion,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13.5,
+                fontFamily: 'Inter',
+                fontWeight: FontWeight.w500,
+                color: appTheme.gray_800,
+              ),
+            ),
+            trailing: Icon(
+              Icons.arrow_forward_ios,
+              size: 13.0,
+              color: appTheme.blue_gray_300,
+            ),
+            dense: true,
+            visualDensity: const VisualDensity(vertical: -2),
+            onTap: () => onSelect(suggestion),
+          );
+        },
+      ),
+    );
   }
 }

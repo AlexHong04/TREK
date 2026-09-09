@@ -6,6 +6,7 @@ import 'package:Trek/view_models/ui_state/activity_ui_state.dart';
 import '../entities/activity.dart';
 import '../entities/whole_trip.dart';
 import '../entities/future_suggestion.dart';
+import '../../view_models/ui_state/travel_information_ui_state.dart';
 
 abstract interface class IItineraryService {
   Future<ItineraryGenerationResult> generateItinerary({
@@ -17,6 +18,9 @@ abstract interface class IItineraryService {
     List<String>? constraints,
     List<FutureSuggestion>? futureSuggestions,
     bool strictBudget = false,
+    List<TransitPoint>? arrivals,
+    List<TransitPoint>? departures,
+    List<HotelStay>? hotels,
     String? arrivalLocation,
     String? arrivalTime,
     String? departureLocation,
@@ -62,6 +66,16 @@ abstract interface class IItineraryService {
   );
 
   Future<List<String>> getAutocompleteSuggestions(
+    String query, {
+    List<String>? destinations,
+  });
+
+  Future<List<String>> getAirportAutocompleteSuggestions(
+    String query, {
+    List<String>? destinations,
+  });
+
+  Future<List<String>> getHotelAutocompleteSuggestions(
     String query, {
     List<String>? destinations,
   });
@@ -121,10 +135,7 @@ abstract interface class IBudgetService {
     double overspendAmount,
   );
 
-  Future<int> calculateSufficientDays(
-    String tripId,
-    String currentActivityId,
-  );
+  Future<int> calculateSufficientDays(String tripId, String currentActivityId);
 
   Future<double> reconcileDayBudget({
     required String tripId,

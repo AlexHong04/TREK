@@ -2,6 +2,8 @@ import '../../models/entities/activity.dart';
 import '../../models/entities/whole_trip.dart';
 export '../../models/entities/activity.dart';
 export '../../models/entities/whole_trip.dart';
+import 'travel_information_ui_state.dart';
+export 'travel_information_ui_state.dart' show TransitPoint, HotelStay;
 import '../../models/entities/future_suggestion.dart';
 
 class WholeItineraryUiState {
@@ -23,13 +25,22 @@ class WholeItineraryUiState {
   final List<String>? wishlist;
   final List<String>? constraints;
   final List<FutureSuggestion>? futureSuggestions;
-  final String? arrivalLocation;
-  final String? arrivalTime;
-  final String? departureLocation;
-  final String? departureTime;
-  final String? hotelLocation;
-  final String? hotelCheckInTime;
-  final String? hotelCheckOutTime;
+  final List<TransitPoint> arrivals;
+  final List<TransitPoint> departures;
+  final List<HotelStay> hotels;
+
+  String? get arrivalLocation =>
+      arrivals.isNotEmpty ? arrivals.first.location : null;
+  String? get arrivalTime => arrivals.isNotEmpty ? arrivals.first.time : null;
+  String? get departureLocation =>
+      departures.isNotEmpty ? departures.first.location : null;
+  String? get departureTime =>
+      departures.isNotEmpty ? departures.first.time : null;
+  String? get hotelLocation => hotels.isNotEmpty ? hotels.first.location : null;
+  String? get hotelCheckInTime =>
+      hotels.isNotEmpty ? hotels.first.checkInTime : null;
+  String? get hotelCheckOutTime =>
+      hotels.isNotEmpty ? hotels.first.checkOutTime : null;
 
   const WholeItineraryUiState({
     this.isLoading = false,
@@ -50,13 +61,12 @@ class WholeItineraryUiState {
     this.wishlist,
     this.constraints,
     this.futureSuggestions,
-    this.arrivalLocation,
-    this.arrivalTime,
-    this.departureLocation,
-    this.departureTime,
-    this.hotelLocation,
-    this.hotelCheckInTime,
-    this.hotelCheckOutTime,
+    this.arrivals = const [],
+    this.departures = const [],
+    this.hotels = const [],
+    String? hotelLocation,
+    String? hotelCheckInTime,
+    String? hotelCheckOutTime,
   });
 
   List<WholeTrip> get filteredTrips {
@@ -89,6 +99,9 @@ class WholeItineraryUiState {
     List<String>? wishlist,
     List<String>? constraints,
     List<FutureSuggestion>? futureSuggestions,
+    List<TransitPoint>? arrivals,
+    List<TransitPoint>? departures,
+    List<HotelStay>? hotels,
     String? arrivalLocation,
     String? arrivalTime,
     String? departureLocation,
@@ -97,6 +110,57 @@ class WholeItineraryUiState {
     String? hotelCheckInTime,
     String? hotelCheckOutTime,
   }) {
+    List<TransitPoint>? resolvedArrivals = arrivals;
+    if (resolvedArrivals == null &&
+        (arrivalLocation != null || arrivalTime != null)) {
+      final currentFirst = this.arrivals.isNotEmpty
+          ? this.arrivals.first
+          : const TransitPoint(id: 'arr_0');
+      final updatedFirst = currentFirst.copyWith(
+        location: arrivalLocation ?? currentFirst.location,
+        time: arrivalTime ?? currentFirst.time,
+      );
+      resolvedArrivals = [
+        updatedFirst,
+        if (this.arrivals.length > 1) ...this.arrivals.sublist(1),
+      ];
+    }
+
+    List<TransitPoint>? resolvedDepartures = departures;
+    if (resolvedDepartures == null &&
+        (departureLocation != null || departureTime != null)) {
+      final currentFirst = this.departures.isNotEmpty
+          ? this.departures.first
+          : const TransitPoint(id: 'dep_0');
+      final updatedFirst = currentFirst.copyWith(
+        location: departureLocation ?? currentFirst.location,
+        time: departureTime ?? currentFirst.time,
+      );
+      resolvedDepartures = [
+        updatedFirst,
+        if (this.departures.length > 1) ...this.departures.sublist(1),
+      ];
+    }
+
+    List<HotelStay>? resolvedHotels = hotels;
+    if (resolvedHotels == null &&
+        (hotelLocation != null ||
+            hotelCheckInTime != null ||
+            hotelCheckOutTime != null)) {
+      final currentFirst = this.hotels.isNotEmpty
+          ? this.hotels.first
+          : const HotelStay(id: 'hotel_0');
+      final updatedFirst = currentFirst.copyWith(
+        location: hotelLocation ?? currentFirst.location,
+        checkInTime: hotelCheckInTime ?? currentFirst.checkInTime,
+        checkOutTime: hotelCheckOutTime ?? currentFirst.checkOutTime,
+      );
+      resolvedHotels = [
+        updatedFirst,
+        if (this.hotels.length > 1) ...this.hotels.sublist(1),
+      ];
+    }
+
     return WholeItineraryUiState(
       isLoading: isLoading ?? this.isLoading,
       regeneratingSlotId: clearRegeneratingSlot
@@ -120,13 +184,9 @@ class WholeItineraryUiState {
       wishlist: wishlist ?? this.wishlist,
       constraints: constraints ?? this.constraints,
       futureSuggestions: futureSuggestions ?? this.futureSuggestions,
-      arrivalLocation: arrivalLocation ?? this.arrivalLocation,
-      arrivalTime: arrivalTime ?? this.arrivalTime,
-      departureLocation: departureLocation ?? this.departureLocation,
-      departureTime: departureTime ?? this.departureTime,
-      hotelLocation: hotelLocation ?? this.hotelLocation,
-      hotelCheckInTime: hotelCheckInTime ?? this.hotelCheckInTime,
-      hotelCheckOutTime: hotelCheckOutTime ?? this.hotelCheckOutTime,
+      arrivals: resolvedArrivals ?? this.arrivals,
+      departures: resolvedDepartures ?? this.departures,
+      hotels: resolvedHotels ?? this.hotels,
     );
   }
 }

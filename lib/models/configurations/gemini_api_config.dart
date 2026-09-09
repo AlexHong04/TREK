@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter/foundation.dart';
 import '../entities/future_suggestion.dart';
+import '../../view_models/ui_state/travel_information_ui_state.dart';
 
 class GeminiApiRequestException implements Exception {
   final int statusCode;
@@ -37,6 +38,9 @@ class GeminiApiConfig {
     List<String>? constraints,
     List<FutureSuggestion>? futureSuggestions,
     bool strictBudget = false,
+    List<TransitPoint>? arrivals,
+    List<TransitPoint>? departures,
+    List<HotelStay>? hotels,
     String? arrivalLocation,
     String? arrivalTime,
     String? departureLocation,
@@ -55,6 +59,51 @@ class GeminiApiConfig {
       }
     } catch (_) {}
 
+    final List<TransitPoint> resolvedArrivals = [];
+    if (arrivals != null && arrivals.isNotEmpty) {
+      resolvedArrivals.addAll(
+        arrivals.where((a) => a.location.trim().isNotEmpty),
+      );
+    } else if (arrivalLocation != null && arrivalLocation.trim().isNotEmpty) {
+      resolvedArrivals.add(
+        TransitPoint(
+          id: 'arr_0',
+          location: arrivalLocation,
+          time: arrivalTime ?? '09:00 AM',
+        ),
+      );
+    }
+
+    final List<TransitPoint> resolvedDepartures = [];
+    if (departures != null && departures.isNotEmpty) {
+      resolvedDepartures.addAll(
+        departures.where((d) => d.location.trim().isNotEmpty),
+      );
+    } else if (departureLocation != null &&
+        departureLocation.trim().isNotEmpty) {
+      resolvedDepartures.add(
+        TransitPoint(
+          id: 'dep_0',
+          location: departureLocation,
+          time: departureTime ?? '06:00 PM',
+        ),
+      );
+    }
+
+    final List<HotelStay> resolvedHotels = [];
+    if (hotels != null && hotels.isNotEmpty) {
+      resolvedHotels.addAll(hotels.where((h) => h.location.trim().isNotEmpty));
+    } else if (hotelLocation != null && hotelLocation.trim().isNotEmpty) {
+      resolvedHotels.add(
+        HotelStay(
+          id: 'hotel_0',
+          location: hotelLocation,
+          checkInTime: hotelCheckInTime ?? '03:00 PM',
+          checkOutTime: hotelCheckOutTime ?? '12:00 PM',
+        ),
+      );
+    }
+
     final prompt =
         '''
     You are an expert travel planner. Please help me generate a travel itinerary in Malaysia.
@@ -63,19 +112,15 @@ class GeminiApiConfig {
     - Dates: $dates (Total: $numberOfDays days)
     - Budget: \$$budget
     ${preference != null ? '- Preference: $preference (You MUST heavily prioritize planning activities that strictly match this theme!)' : ''}
-    ${(arrivalLocation != null && arrivalLocation.trim().isNotEmpty) || (arrivalTime != null && arrivalTime.trim().isNotEmpty) ? '''- Arrival Details:
-      * Location: ${arrivalLocation != null && arrivalLocation.trim().isNotEmpty ? arrivalLocation : 'Main transit hub / entry point'}
-      * Arrival Time: ${arrivalTime ?? '09:00 AM'}
-      * CRITICAL FOR DAY 1: The traveler arrives at ${arrivalTime ?? '09:00 AM'} at ${arrivalLocation ?? 'the arrival point'}. Day 1 schedule MUST start after this arrival time!''' : ''}
-    ${(departureLocation != null && departureLocation.trim().isNotEmpty) || (departureTime != null && departureTime.trim().isNotEmpty) ? '''- Departure Details:
-      * Location: ${departureLocation != null && departureLocation.trim().isNotEmpty ? departureLocation : 'Main transit hub / departure point'}
-      * Departure Time: ${departureTime ?? '06:00 PM'}
-      * CRITICAL FOR FINAL DAY: The traveler departs at ${departureTime ?? '06:00 PM'} from ${departureLocation ?? 'the departure point'}. Final day schedule MUST finish in time for the traveler to reach the departure location before ${departureTime ?? '06:00 PM'}!''' : ''}
-    ${(hotelLocation != null && hotelLocation.trim().isNotEmpty) ? '''- Accommodation / Hotel:
-      * Hotel Location: $hotelLocation
-      * Check-in Time: ${hotelCheckInTime ?? '03:00 PM'}
-      * Check-out Time: ${hotelCheckOutTime ?? '12:00 PM'}
-      * CRITICAL FOR HOTEL: Daily activities should conveniently route to/from this hotel area. Factor in hotel check-in on Day 1 (around ${hotelCheckInTime ?? '03:00 PM'}) and check-out on the final day (around ${hotelCheckOutTime ?? '12:00 PM'}).''' : ''}
+    ${resolvedArrivals.isNotEmpty ? '''- Arrival Details:
+${resolvedArrivals.asMap().entries.map((e) => '      * Arrival ${e.key + 1}: ${e.value.location} at ${e.value.time}').join('\n')}
+      * CRITICAL FOR DAY 1: Day 1 activities MUST start after the initial arrival time (${resolvedArrivals.first.time}) at "${resolvedArrivals.first.location}". Route connecting activities accordingly!''' : ''}
+    ${resolvedDepartures.isNotEmpty ? '''- Departure Details:
+${resolvedDepartures.asMap().entries.map((e) => '      * Departure ${e.key + 1}: ${e.value.location} at ${e.value.time}').join('\n')}
+      * CRITICAL FOR FINAL DAY: Final day schedule MUST finish in time for the traveler to reach "${resolvedDepartures.last.location}" before ${resolvedDepartures.last.time}!''' : ''}
+    ${resolvedHotels.isNotEmpty ? '''- Accommodation / Hotel:
+${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.value.location} (Check-in: ${e.value.checkInTime}, Check-out: ${e.value.checkOutTime})').join('\n')}
+      * CRITICAL FOR HOTEL: Daily activities should conveniently route to/from this accommodation area. Factor in hotel check-in on Day 1 (around ${resolvedHotels.first.checkInTime}) and check-out on the final day (around ${resolvedHotels.last.checkOutTime}).''' : ''}
     ${(constraints != null && constraints.isNotEmpty) ? '- Personal Constraints: ' + constraints.join(', ') + ' (You MUST strictly follow these constraints when suggesting places, e.g., food restrictions or accessibility!)' : ''}
     ${(futureSuggestions != null && futureSuggestions.isNotEmpty) ? '- Budget Distribution: ' + futureSuggestions.map((e) => '${e.activityCategory}: ${e.suggestedAmount}%').join(', ') + ' (You MUST strictly allocate the provided Budget according to these category percentages!)' : ''}
     ${(wishlist != null && wishlist.isNotEmpty) ? '- Wishlist Items: ' + wishlist.join(', ') + (strictBudget ? '''
@@ -133,12 +178,14 @@ class GeminiApiConfig {
     CRITICAL RULE FOR TIME SCHEDULING:
     - THIS IS THE MOST IMPORTANT RULE: You MUST generate an itinerary exactly for $numberOfDays day(s). If $numberOfDays is 3, return exactly 3 days. If $numberOfDays is 4, return exactly 4 days. The number of days returned MUST strictly match $numberOfDays!
     - The "dayNumber" MUST go sequentially from 1 up to exactly $numberOfDays. DO NOT generate less or more days than $numberOfDays!
-    - EVERY single day of the itinerary MUST strictly start at exactly 09:00 and the FINAL activity MUST end at exactly 21:00.
-    - You MUST provide a complete schedule of activities (typically 10 to 12 activities per day, including destination visits and connecting transportation between them) to completely fill the 12-hour span from 09:00 to 21:00.
-    - Do not schedule any activities before 09:00 or after 21:00. 
-    - The first activity of EACH day MUST have a startTime of "09:00". 
-    - The absolute last activity of EACH day MUST have an endTime of "21:00". THIS IS MANDATORY. Do NOT end the day at 18:00, 19:00, or 20:00. If your last activity ends before 21:00, YOU TRIPLE CHECK AND ADD A NEW SUPPER/NIGHT MARKET ACTIVITY TO REACH EXACTLY 21:00.
+    - Daily schedule timing:
+      * Day 1 starts at ${resolvedArrivals.isNotEmpty ? resolvedArrivals.first.time : '09:00'} (accommodating traveler arrival).
+      * The final day ends at ${resolvedDepartures.isNotEmpty ? resolvedDepartures.last.time : '21:00'} (accommodating traveler departure).
+      * All intermediate days strictly start at 09:00 and end at 21:00.
+      * Provide a complete continuous schedule filling the active hours, with connecting transportation between destinations.
     - The endTime of each activity must smoothly connect to the startTime of the next activity without large gaps.
+    - Do not schedule any activities before 09:00 or after 21:00. 
+    - The absolute last activity of EACH day MUST reach the end time specified (or 21:00). If your last activity ends before this time, YOU TRIPLE CHECK AND ADD A NEW SUPPER/NIGHT MARKET ACTIVITY TO REACH THE REQUIRED END TIME.
 
     CRITICAL RULE FOR COMPOSITION & TRANSPORTATION:
     - EVERY day MUST include at least THREE "Restaurant" category activities (strictly representing Breakfast, Lunch, and Dinner).
