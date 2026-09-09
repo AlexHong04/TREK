@@ -22,6 +22,7 @@ class FinancialExpenseDetail {
   final String activityImageUrl;
   final String? activityStartTime;
   final double amount;
+  final String currency;
   final String? paymentMethod;
   final String? receiptImageUrl;
   final DateTime? recordedAt;
@@ -32,6 +33,7 @@ class FinancialExpenseDetail {
     required this.activityImageUrl,
     required this.activityStartTime,
     required this.amount,
+    required this.currency,
     required this.paymentMethod,
     required this.receiptImageUrl,
     required this.recordedAt,

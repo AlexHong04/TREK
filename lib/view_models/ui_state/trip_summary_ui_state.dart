@@ -57,6 +57,11 @@ class TripSummaryUiState {
   final bool isLoadingCostSavingTips;
   final String? errorMessage;
   final String? costSavingTipsErrorMessage;
+  final bool isConvertingCurrency;
+  final String preferredCurrency;
+  final bool isPreferredCurrencyPrimary;
+  final Map<String, double> preferredCurrencyRates;
+  final String? currencyConversionErrorMessage;
   final bool hasTrip;
   final String tripId;
   final String destination;
@@ -89,6 +94,11 @@ class TripSummaryUiState {
     this.isLoadingCostSavingTips = false,
     this.errorMessage,
     this.costSavingTipsErrorMessage,
+    this.isConvertingCurrency = false,
+    this.preferredCurrency = 'MYR',
+    this.isPreferredCurrencyPrimary = true,
+    this.preferredCurrencyRates = const {},
+    this.currencyConversionErrorMessage,
     this.hasTrip = false,
     this.tripId = '',
     this.destination = '',
@@ -140,6 +150,12 @@ class TripSummaryUiState {
     bool clearError = false,
     String? costSavingTipsErrorMessage,
     bool clearCostSavingTipsError = false,
+    bool? isConvertingCurrency,
+    String? preferredCurrency,
+    bool? isPreferredCurrencyPrimary,
+    Map<String, double>? preferredCurrencyRates,
+    String? currencyConversionErrorMessage,
+    bool clearCurrencyConversionError = false,
     bool? hasTrip,
     String? tripId,
     String? destination,
@@ -176,6 +192,16 @@ class TripSummaryUiState {
       costSavingTipsErrorMessage: clearCostSavingTipsError
           ? null
           : costSavingTipsErrorMessage ?? this.costSavingTipsErrorMessage,
+      isConvertingCurrency: isConvertingCurrency ?? this.isConvertingCurrency,
+      preferredCurrency: preferredCurrency ?? this.preferredCurrency,
+      isPreferredCurrencyPrimary:
+          isPreferredCurrencyPrimary ?? this.isPreferredCurrencyPrimary,
+      preferredCurrencyRates:
+          preferredCurrencyRates ?? this.preferredCurrencyRates,
+      currencyConversionErrorMessage: clearCurrencyConversionError
+          ? null
+          : currencyConversionErrorMessage ??
+                this.currencyConversionErrorMessage,
       hasTrip: hasTrip ?? this.hasTrip,
       tripId: tripId ?? this.tripId,
       destination: destination ?? this.destination,

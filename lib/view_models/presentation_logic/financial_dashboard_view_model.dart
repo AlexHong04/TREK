@@ -14,7 +14,9 @@ export '../ui_state/financial_dashboard_ui_state.dart';
 
 class FinancialDashboardViewModel extends ChangeNotifier {
   final IFinancialDashboardService _service;
-  final IAuthService? _authService;
+  final IAuthService _authService;
+  int _currencyConversionRequest = 0;
+  bool _isDisposed = false;
 
   FinancialDashboardUiState _uiState = FinancialDashboardUiState(
     selectedDate: DateTime.now(),
@@ -23,37 +25,50 @@ class FinancialDashboardViewModel extends ChangeNotifier {
 
   FinancialDashboardViewModel({
     IFinancialDashboardService? service,
-    IAuthService? authService,
+    required IAuthService authService,
   }) : _service = service ?? FinancialDashboardService(),
        _authService = authService {
-    _authService?.addListener(_handleAuthUserChanged);
+    _authService.addListener(_handleAuthUserChanged);
     _syncAuthUser(notify: false);
   }
 
   FinancialDashboardUiState get uiState => _uiState;
 
-  void _handleAuthUserChanged() => _syncAuthUser();
+  void _handleAuthUserChanged() {
+    _syncAuthUser();
+    unawaited(_refreshCurrencyConversions());
+  }
 
   void _syncAuthUser({bool notify = true}) {
-    final user = _authService?.currentUser;
+    final user = _authService.currentUser;
     final pictureUrl = user?.profilePicture?.trim();
+    final preferredCurrency = _normalizeCurrency(
+      _authService.preferredCurrency,
+    );
+    final didChangeCurrency = _uiState.preferredCurrency != preferredCurrency;
     _uiState = _uiState.copyWith(
       profileName: user?.fullName ?? '',
       profilePictureUrl: pictureUrl,
       clearProfilePictureUrl: pictureUrl == null || pictureUrl.isEmpty,
+      preferredCurrency: preferredCurrency,
+      isPreferredCurrencyPrimary: didChangeCurrency
+          ? preferredCurrency != 'MYR'
+          : _uiState.isPreferredCurrencyPrimary,
     );
     if (notify) notifyListeners();
   }
 
   Future<void> refreshProfile() async {
-    await _authService?.refreshCurrentUser();
+    await _authService.refreshCurrentUser();
   }
 
   Future<void> loadCurrentDay() => loadDate(DateTime.now());
 
   @override
   void dispose() {
-    _authService?.removeListener(_handleAuthUserChanged);
+    _isDisposed = true;
+    _currencyConversionRequest++;
+    _authService.removeListener(_handleAuthUserChanged);
     super.dispose();
   }
 
@@ -104,6 +119,7 @@ class FinancialDashboardViewModel extends ChangeNotifier {
                           activityImageUrl: detail.activityImageUrl,
                           timeText: _formatTime(detail.activityStartTime, date),
                           amount: detail.amount,
+                          currency: detail.currency,
                           paymentMethod:
                               detail.paymentMethod?.trim().isNotEmpty == true
                               ? detail.paymentMethod!.trim()
@@ -134,6 +150,9 @@ class FinancialDashboardViewModel extends ChangeNotifier {
       );
     }
     notifyListeners();
+    if (_uiState.errorMessage == null) {
+      unawaited(_refreshCurrencyConversions());
+    }
   }
 
   Future<void> loadExpenseItems(String expenseId) async {
@@ -308,12 +327,208 @@ class FinancialDashboardViewModel extends ChangeNotifier {
       return time;
     }
   }
+
+  String formatMoney(
+    double amount, {
+    String originalCurrency = 'MYR',
+    bool compact = false,
+  }) {
+    return _formatCurrencyAmount(
+      amount,
+      _normalizeCurrency(originalCurrency),
+      compact: compact,
+    );
+  }
+
+  String? formatPreferredMoney(
+    double amount, {
+    String originalCurrency = 'MYR',
+    bool compact = false,
+  }) {
+    final sourceCurrency = _normalizeCurrency(originalCurrency);
+    final preferredCurrency = _uiState.preferredCurrency;
+    if (sourceCurrency == preferredCurrency) return null;
+
+    final rate = _uiState.preferredCurrencyRates[sourceCurrency];
+    if (rate == null && amount != 0) return null;
+    return _formatCurrencyAmount(
+      amount == 0 ? 0 : amount * rate!,
+      preferredCurrency,
+      compact: compact,
+    );
+  }
+
+  String formatMoneyPair(
+    double amount, {
+    String originalCurrency = 'MYR',
+    bool compact = false,
+  }) {
+    final primary = formatPrimaryMoney(
+      amount,
+      originalCurrency: originalCurrency,
+      compact: compact,
+    );
+    final secondary = formatSecondaryMoney(
+      amount,
+      originalCurrency: originalCurrency,
+      compact: compact,
+    );
+    return secondary == null ? primary : '$primary\n≈ $secondary';
+  }
+
+  String formatPrimaryMoney(
+    double amount, {
+    String originalCurrency = 'MYR',
+    bool compact = false,
+  }) {
+    final preferred = formatPreferredMoney(
+      amount,
+      originalCurrency: originalCurrency,
+      compact: compact,
+    );
+    if (_uiState.isPreferredCurrencyPrimary && preferred != null) {
+      return preferred;
+    }
+    return formatMoney(
+      amount,
+      originalCurrency: originalCurrency,
+      compact: compact,
+    );
+  }
+
+  String? formatSecondaryMoney(
+    double amount, {
+    String originalCurrency = 'MYR',
+    bool compact = false,
+  }) {
+    final preferred = formatPreferredMoney(
+      amount,
+      originalCurrency: originalCurrency,
+      compact: compact,
+    );
+    if (preferred == null) return null;
+    if (!_uiState.isPreferredCurrencyPrimary) return preferred;
+    return formatMoney(
+      amount,
+      originalCurrency: originalCurrency,
+      compact: compact,
+    );
+  }
+
+  String formatDisplayMoney(
+    double amount, {
+    String originalCurrency = 'MYR',
+    bool compact = false,
+  }) {
+    return formatPrimaryMoney(
+      amount,
+      originalCurrency: originalCurrency,
+      compact: compact,
+    );
+  }
+
+  void selectPrimaryCurrency({required bool usePreferredCurrency}) {
+    if (usePreferredCurrency) {
+      if (_uiState.preferredCurrency == 'MYR' ||
+          !_uiState.preferredCurrencyRates.containsKey('MYR')) {
+        return;
+      }
+    }
+    if (_uiState.isPreferredCurrencyPrimary == usePreferredCurrency) return;
+    _uiState = _uiState.copyWith(
+      isPreferredCurrencyPrimary: usePreferredCurrency,
+    );
+    notifyListeners();
+  }
+
+  Future<void> retryCurrencyConversion() => _refreshCurrencyConversions();
+
+  Future<void> _refreshCurrencyConversions() async {
+    final request = ++_currencyConversionRequest;
+    final preferredCurrency = _normalizeCurrency(
+      _authService.preferredCurrency,
+    );
+    final sourceCurrencies = <String>{
+      'MYR',
+      for (final category in _uiState.categories)
+        for (final detail in category.expenseDetails)
+          _normalizeCurrency(detail.currency),
+    };
+    final currenciesToConvert = sourceCurrencies
+        .where((currency) => currency != preferredCurrency)
+        .toList();
+
+    _uiState = _uiState.copyWith(
+      isConvertingCurrency: currenciesToConvert.isNotEmpty,
+      preferredCurrency: preferredCurrency,
+      preferredCurrencyRates: const {},
+      clearCurrencyConversionError: true,
+    );
+    if (!_isDisposed) notifyListeners();
+    if (currenciesToConvert.isEmpty) return;
+
+    final rates = <String, double>{};
+    var hasUnavailableRate = false;
+    for (final currency in currenciesToConvert) {
+      try {
+        final converted = await _authService.convertToPreferredCurrency(
+          amount: 1,
+          fromCurrency: currency,
+        );
+        if (converted == null) {
+          hasUnavailableRate = true;
+        } else {
+          rates[currency] = converted;
+        }
+      } catch (_) {
+        hasUnavailableRate = true;
+      }
+    }
+
+    if (_isDisposed || request != _currencyConversionRequest) return;
+    _uiState = _uiState.copyWith(
+      isConvertingCurrency: false,
+      preferredCurrency: preferredCurrency,
+      preferredCurrencyRates: Map.unmodifiable(rates),
+      currencyConversionErrorMessage: hasUnavailableRate
+          ? 'Some amounts could not be converted to $preferredCurrency.'
+          : null,
+      clearCurrencyConversionError: !hasUnavailableRate,
+      isPreferredCurrencyPrimary:
+          !rates.containsKey('MYR') && preferredCurrency != 'MYR'
+          ? false
+          : _uiState.isPreferredCurrencyPrimary,
+    );
+    notifyListeners();
+  }
+
+  String _formatCurrencyAmount(
+    double amount,
+    String currency, {
+    required bool compact,
+  }) {
+    final pattern = compact ? '#,##0' : '#,##0.00';
+    final absolute = NumberFormat(pattern).format(amount.abs());
+    final currencyLabel = currency == 'MYR' ? 'RM' : currency;
+    return amount < 0
+        ? '$currencyLabel -$absolute'
+        : '$currencyLabel $absolute';
+  }
+
+  String _normalizeCurrency(String currency) {
+    final normalized = currency.trim().toUpperCase();
+    return normalized.isEmpty || normalized == 'RM' ? 'MYR' : normalized;
+  }
 }
 
 class DashboardDonutChartPainter extends CustomPainter {
   final List<DashboardCategoryUiState> categories;
+  final String Function(double amount) amountLabelBuilder;
 
-  const DashboardDonutChartPainter(this.categories);
+  const DashboardDonutChartPainter(
+    this.categories, {
+    required this.amountLabelBuilder,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -356,9 +571,10 @@ class DashboardDonutChartPainter extends CustomPainter {
           center + Offset(math.cos(middleAngle), math.sin(middleAngle)) * 100;
       final textPainter = TextPainter(
         text: TextSpan(
-          text: 'RM ${category.expense.toStringAsFixed(0)}',
+          text: amountLabelBuilder(category.expense),
           style: TextStyle(color: appTheme.gray_900, fontSize: 14),
         ),
+        textAlign: TextAlign.center,
         textDirection: ui.TextDirection.ltr,
       )..layout();
       final desiredOffset =
@@ -380,7 +596,8 @@ class DashboardDonutChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant DashboardDonutChartPainter oldDelegate) {
-    return oldDelegate.categories != categories;
+    return oldDelegate.categories != categories ||
+        oldDelegate.amountLabelBuilder != amountLabelBuilder;
   }
 }
 
