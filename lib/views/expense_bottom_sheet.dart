@@ -1273,6 +1273,9 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
 
     if (viewModel.uiState.successMessage.isEmpty) return;
 
+    // Haptic feedback on successful expense save.
+    HapticFeedback.mediumImpact();
+
     final expenseNumber = viewModel.uiState.recordedExpenses.length;
     viewModel.clearExpenseMessage();
     final recordAnotherExpense = await _showConfirmationDialog(

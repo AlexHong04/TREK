@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
@@ -126,18 +127,26 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
     switch (action) {
       case 'successful':
+      // Light vibration — overspent but still within manageable range.
+        HapticFeedback.mediumImpact();
         _showUnderThresholdDialog(state);
         break;
 
       case 'fail':
+      // Strong vibration — reallocation failed, needs attention.
+        HapticFeedback.heavyImpact();
         _showFailedDialog(state);
         break;
 
       case 'recommendation':
+      // Strong vibration — overspend approaching critical threshold.
+        HapticFeedback.heavyImpact();
         _showExceedsThresholdDialog(state);
         break;
 
       case 'critical':
+      // Strongest vibration — budget crisis, immediate action needed.
+        HapticFeedback.vibrate();
         _showBudgetRecoveryDialog(
           state,
           onEndTrip: viewModel.endTrip,
@@ -447,7 +456,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
       },
     );
   }
-  
+
   @override
   Widget build(BuildContext context) {
     final viewModel = context.watch<ActivityViewModel>();
@@ -464,7 +473,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildLocationHeader(_destination, uiState.filterDate),
+              _buildLocationHeader(_destination, uiState, viewModel),
               const SizedBox(height: 24.0),
               _buildBudgetCard(uiState),
               const SizedBox(height: 32.0),
@@ -477,7 +486,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
     );
   }
 
-  Widget _buildLocationHeader(String destination, DateTime? filterDate) {
+  Widget _buildLocationHeader(String destination, ActivityUiState uiState, ActivityViewModel viewModel) {
+    final filterDate = uiState.filterDate;
     final String subTitle = filterDate != null
         ? DateFormat('EEEE, MMM dd').format(filterDate)
         : 'Full Itinerary';
@@ -485,28 +495,86 @@ class _ActivityScreenState extends State<ActivityScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          destination.toUpperCase(),
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
-            fontFamily: 'Inter',
-            color: appTheme.teal_800,
-            letterSpacing: 1.0,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                destination.toUpperCase(),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  fontFamily: 'Inter',
+                  color: appTheme.teal_800,
+                  letterSpacing: 1.0,
+                ),
+              ),
+            ),
+            if (uiState.dayLabel.isNotEmpty)
+              Text(
+                uiState.dayLabel,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'Inter',
+                  color: appTheme.blue_gray_700,
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: 8.0),
-        Text(
-          subTitle,
-          style: TextStyle(
-            fontSize: 30,
-            fontWeight: FontWeight.w800,
-            fontFamily: 'Inter',
-            color: appTheme.gray_900,
-            height: 1.1,
-          ),
+        Row(
+          children: [
+            _buildDayArrow(
+              icon: Icons.chevron_left,
+              enabled: uiState.canGoToPreviousDay,
+              onTap: () => viewModel.goToPreviousDay(),
+            ),
+            const SizedBox(width: 8.0),
+            Expanded(
+              child: Center(
+                child: Text(
+                  subTitle,
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    fontFamily: 'Inter',
+                    color: appTheme.gray_900,
+                    height: 1.1,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8.0),
+            _buildDayArrow(
+              icon: Icons.chevron_right,
+              enabled: uiState.canGoToNextDay,
+              onTap: () => viewModel.goToNextDay(),
+            ),
+          ],
         ),
       ],
+    );
+  }
+
+  Widget _buildDayArrow({
+    required IconData icon,
+    required bool enabled,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      child: Container(
+        padding: const EdgeInsets.all(4.0),
+        decoration: BoxDecoration(
+          color: enabled ? appTheme.teal_50 : appTheme.gray_100,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          icon,
+          size: 24,
+          color: enabled ? appTheme.teal_800 : appTheme.blue_gray_300,
+        ),
+      ),
     );
   }
 

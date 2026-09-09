@@ -9,6 +9,8 @@ class ActivityUiState {
   final String tripId;
   final String currentActivityId;
   final List<Activity> activities;
+  final List<Activity> allActivities;
+  final List<DateTime> availableDates;
   final DateTime? filterDate;
   final String tripDestination;
 
@@ -57,6 +59,8 @@ class ActivityUiState {
     this.tripId = '',
     this.currentActivityId = '',
     this.activities = const [],
+    this.allActivities = const [],
+    this.availableDates = const [],
     this.filterDate,
     this.tripDestination = '',
     this.selectedActivity,
@@ -108,6 +112,33 @@ class ActivityUiState {
 
   double get remainingBudget => totalBudget - spentBudget;
 
+  int get currentDayIndex {
+    if (filterDate == null || availableDates.isEmpty) return -1;
+    final target = filterDate!;
+    return availableDates.indexWhere((d) =>
+    d.year == target.year && d.month == target.month && d.day == target.day);
+  }
+
+  bool get canGoToPreviousDay => currentDayIndex > 0;
+
+  bool get canGoToNextDay {
+    if (currentDayIndex < 0 || currentDayIndex >= availableDates.length - 1) {
+      return false;
+    }
+    // Only allow navigating to days that are today or earlier (already went through).
+    final nextDate = availableDates[currentDayIndex + 1];
+    final today = DateTime.now();
+    final todayDate = DateTime(today.year, today.month, today.day);
+    return !nextDate.isAfter(todayDate);
+  }
+
+  String get dayLabel {
+    if (availableDates.isEmpty) return '';
+    final idx = currentDayIndex;
+    if (idx < 0) return '';
+    return 'Day ${idx + 1} of ${availableDates.length}';
+  }
+
   // Computed Getter automatically filters activities
   List<Activity> get displayActivities {
     final target = filterDate?.toLocal();
@@ -148,6 +179,8 @@ class ActivityUiState {
       'activitySpentMap': activitySpentMap,
       // Use .toMap() to mirror .fromMap()
       'activities': activities.map((a) => a.toJson()).toList(),
+      'allActivities': allActivities.map((a) => a.toJson()).toList(),
+      'availableDates': availableDates.map((d) => d.toIso8601String()).toList(),
       'recordedExpenses': recordedExpenses.map((e) => e.toJson()).toList(),
     };
   }
@@ -174,6 +207,14 @@ class ActivityUiState {
           ?.map((item) => Activity.fromJson(item as Map<String, dynamic>))
           .toList() ??
           const [],
+      allActivities: (map['allActivities'] as List<dynamic>?)
+          ?.map((item) => Activity.fromJson(item as Map<String, dynamic>))
+          .toList() ??
+          const [],
+      availableDates: (map['availableDates'] as List<dynamic>?)
+          ?.map((item) => DateTime.parse(item as String))
+          .toList() ??
+          const [],
       recordedExpenses: (map['recordedExpenses'] as List<dynamic>?)
           ?.map((item) => Expense.fromJson(item as Map<String, dynamic>))
           .toList() ??
@@ -186,6 +227,8 @@ class ActivityUiState {
     String? tripId,
     String? currentActivityId,
     List<Activity>? activities,
+    List<Activity>? allActivities,
+    List<DateTime>? availableDates,
     DateTime? filterDate,
     String? tripDestination,
     bool clearFilterDate = false,
@@ -236,6 +279,8 @@ class ActivityUiState {
       tripId: tripId ?? this.tripId,
       currentActivityId: currentActivityId ?? this.currentActivityId,
       activities: activities ?? this.activities,
+      allActivities: allActivities ?? this.allActivities,
+      availableDates: availableDates ?? this.availableDates,
       filterDate: clearFilterDate ? null : (filterDate ?? this.filterDate),
       tripDestination: tripDestination ?? this.tripDestination,
       selectedActivity: selectedActivity ?? this.selectedActivity,
