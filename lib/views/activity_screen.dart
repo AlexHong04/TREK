@@ -998,6 +998,20 @@ class _ActivityScreenState extends State<ActivityScreen> {
                         }
                       }
 
+                      // Non-blocking floating toast for the near/overspent alert
+                      // (no popup). Shown once after the expense sheet closes.
+                      final budgetAlert = viewModel.uiState.budgetAlertMessage;
+                      if (budgetAlert.isNotEmpty) {
+                        viewModel.clearBudgetAlert();
+                        if (mounted) {
+                          showThreeSecondMessage(
+                            context,
+                            budgetAlert,
+                            isError: true,
+                          );
+                        }
+                      }
+
                       _handleUiStateChange();
                     },
                   ),
