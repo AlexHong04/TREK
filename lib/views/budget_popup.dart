@@ -56,7 +56,8 @@ class BaseBudgetDialog extends StatelessWidget {
                 _buildWarningRow(warningText!),
               ],
 
-              if (warningTextColor != null && warningTextColor != appTheme.popupWarningMsg) ...[
+              if (warningTextColor != null &&
+                  warningTextColor != appTheme.popupWarningMsg) ...[
                 const SizedBox(height: 16),
                 _buildWarningRow(warningText!, color: warningTextColor),
               ],
@@ -81,11 +82,7 @@ class BaseBudgetDialog extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(
-          Icons.warning_amber_rounded,
-          color: effectiveColor,
-          size: 22,
-        ),
+        Icon(Icons.warning_amber_rounded, color: effectiveColor, size: 22),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
@@ -174,7 +171,11 @@ Widget _buildSummaryRow(String label, double value, {Color? valueColor}) {
   );
 }
 
-Widget _buildWishlistSummaryRow(String label, String value, {Color? valueColor}) {
+Widget _buildWishlistSummaryRow(
+  String label,
+  String value, {
+  Color? valueColor,
+}) {
   return Row(
     mainAxisAlignment: MainAxisAlignment.spaceBetween,
     children: [
@@ -354,7 +355,6 @@ Widget _buildWishlistSummaryCard({
     ),
   );
 }
-
 
 Widget _buildActionButton({
   required String text,
@@ -666,9 +666,13 @@ Future<void> showBudgetRecoveryDialog({
                   text: 'End Trip',
                   backgroundColor: appTheme.redButton,
                   onPressed: () {
+                    // First close Budget Recovery.
                     Navigator.of(dialogContext).pop();
-                    Navigator.of(dialogContext).pop();
-                    onEndTrip?.call();
+
+                    // Then show End Trip confirmation.
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      onEndTrip?.call();
+                    });
                   },
                 ),
               ),
@@ -723,6 +727,59 @@ Future<void> showInsufficientTopUpBudgetRecoveryDialog({
           'overspent amount. The plan will be modified automatically.',
     ],
     onContinue: onContinue,
+  );
+}
+
+// Show Budget Recovery End Trip Confirmation
+Future<void> showEndTripConfirmationDialog({
+  required BuildContext context,
+  String? warningText,
+  VoidCallback? onCancel,
+  required Future<bool> Function() onEndTrip,
+}) {
+  return showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) {
+      return BaseBudgetDialog(
+        title: 'End Trip',
+
+        warningText:
+        warningText ??
+            'Are you sure you want to end this trip?',
+
+        actions: Row(
+          children: [
+            Expanded(
+              child: _buildActionButton(
+                text: 'Cancel',
+                backgroundColor: appTheme.redButton,
+                onPressed: () {
+                  // Close confirmation.
+                  Navigator.of(dialogContext).pop();
+
+                  // Reopen Budget Recovery after it closes.
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    onCancel?.call();
+                  });
+                },
+              ),
+            ),
+
+            const SizedBox(width: 12),
+
+            Expanded(
+              child: _buildActionButton(
+                text: 'End Trip',
+                onPressed: () async {
+                  await onEndTrip();
+                },
+              ),
+            ),
+          ],
+        ),
+      );
+    },
   );
 }
 
@@ -816,9 +873,10 @@ Future<void> showInitialTotalBudgetInsufficientDialog({
         ),
 
         // First warning
-        warningText: warningText ??
+        warningText:
+            warningText ??
             'Your budget is not sufficient to cover all wishlist items. '
-            'Do you want to add more budget?',
+                'Do you want to add more budget?',
 
         // Top-up field + second warning
         contentCard: Column(
@@ -998,7 +1056,7 @@ Future<void> showEmptyWishlistInsufficientTotalBudgetDialog({
 
         // First warning
         warningText:
-        'Your budget is not sufficient for the trip. '
+            'Your budget is not sufficient for the trip. '
             'Do you want to add more budget?',
 
         // Top-up field + second warning
@@ -1011,7 +1069,7 @@ Future<void> showEmptyWishlistInsufficientTotalBudgetDialog({
 
             BaseBudgetDialog._buildWarningRow(
               'Top-up amount should be at least ${minTopUp.toStringAsFixed(2)}, insufficient top-up amount will trigger alternative '
-                  'recommendation directly.',
+              'recommendation directly.',
             ),
           ],
         ),
@@ -1043,14 +1101,14 @@ Future<void> showEmptyWishlistInsufficientTotalBudgetDialog({
                     text: 'Top-up Budget',
                     onPressed: isValid
                         ? () async {
-                      final amount = double.parse(value.text.trim());
+                            final amount = double.parse(value.text.trim());
 
-                      final success = await onTopUpBudget(amount);
+                            final success = await onTopUpBudget(amount);
 
-                      if (success && dialogContext.mounted) {
-                        Navigator.of(dialogContext).pop();
-                      }
-                    }
+                            if (success && dialogContext.mounted) {
+                              Navigator.of(dialogContext).pop();
+                            }
+                          }
                         : null,
                   );
                 },
@@ -1062,6 +1120,7 @@ Future<void> showEmptyWishlistInsufficientTotalBudgetDialog({
     },
   );
 }
+
 // Initial Total Budget Top-up Insufficient
 Future<void> showInsufficientTopUpTotalBudgetDialog({
   required BuildContext context,

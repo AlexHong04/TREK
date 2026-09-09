@@ -42,14 +42,14 @@ class ActivityViewModel extends ChangeNotifier {
     ICachedActivity? cachedActivity,
     required IAuthService authService,
   }) : _itineraryService = itineraryService ?? ItineraryService(),
-        _budgetService =
-            budgetService ?? BudgetService(authService: authService),
-        _expenseTrackingService =
-            expenseTrackingService ??
-                ExpenseTrackingService(authService: authService),
-        _expenseRepository = expenseRepository ?? ExpenseRepository(),
-        _authService = authService,
-        _cachedActivity = cachedActivity ?? GetCachedActivities() {
+       _budgetService =
+           budgetService ?? BudgetService(authService: authService),
+       _expenseTrackingService =
+           expenseTrackingService ??
+           ExpenseTrackingService(authService: authService),
+       _expenseRepository = expenseRepository ?? ExpenseRepository(),
+       _authService = authService,
+       _cachedActivity = cachedActivity ?? GetCachedActivities() {
     _uiState = _uiState.copyWith(
       originalCurrency: _expenseCurrency,
       displayCurrency: _authService.preferredCurrency,
@@ -388,10 +388,10 @@ class ActivityViewModel extends ChangeNotifier {
 
     final expenseItems = _expenseTrackingService
         .buildDraftExpenseItemsFromReceipt(
-      receiptText: _uiState.ocrRawText,
-      merchantName: _uiState.ocrMerchantName,
-      transactionDateTime: _uiState.ocrTransactionDateTime,
-    );
+          receiptText: _uiState.ocrRawText,
+          merchantName: _uiState.ocrMerchantName,
+          transactionDateTime: _uiState.ocrTransactionDateTime,
+        );
     if (expenseItems.isEmpty) {
       return 0;
     }
@@ -408,12 +408,12 @@ class ActivityViewModel extends ChangeNotifier {
         .map((line) => line.trim().toLowerCase())
         .any(
           (line) =>
-      RegExp(
-        r'\b(?:sales tax|service tax|govt tax|sst|gst)\b',
-      ).hasMatch(line) &&
-          !line.contains(' id') &&
-          !line.contains(' no'),
-    );
+              RegExp(
+                r'\b(?:sales tax|service tax|govt tax|sst|gst)\b',
+              ).hasMatch(line) &&
+              !line.contains(' id') &&
+              !line.contains(' no'),
+        );
     if (!hasTaxLabel) {
       return 0.0;
     }
@@ -425,7 +425,7 @@ class ActivityViewModel extends ChangeNotifier {
 
     final itemsSubtotal = expenseItems.fold(
       0.0,
-          (total, item) => total + item.subtotal,
+      (total, item) => total + item.subtotal,
     );
     final inferredTax = receiptTotal - itemsSubtotal;
     return inferredTax > 0 ? inferredTax : 0.0;
@@ -467,7 +467,7 @@ class ActivityViewModel extends ChangeNotifier {
           _expenseTrackingService.validateTotalAmount(extractedTotal);
         } on ArgumentError {
           extractedTotalError =
-          'The extracted amount is invalid. Please correct it.';
+              'The extracted amount is invalid. Please correct it.';
         }
       }
 
@@ -475,7 +475,7 @@ class ActivityViewModel extends ChangeNotifier {
         isScanningReceipt: false,
         ocrRawText: receiptText,
         ocrMerchantName:
-        _expenseTrackingService.extractMerchantName(receiptText) ?? '',
+            _expenseTrackingService.extractMerchantName(receiptText) ?? '',
         ocrTransactionDateTime: extractedDateTime,
         clearOcrTransactionDateTime: extractedDateTime == null,
         originalCurrency: _expenseCurrency,
@@ -595,7 +595,7 @@ class ActivityViewModel extends ChangeNotifier {
         successMessage: 'The expense record has been successfully saved.',
         totalBudget: updatedTrip.totalBudget,
         spentBudget:
-        updatedTrip.totalBudget - (updatedTrip.remainingBalance ?? 0.0),
+            updatedTrip.totalBudget - (updatedTrip.remainingBalance ?? 0.0),
       );
       await loadRecordedExpensesForSelectedActivity();
 
@@ -688,19 +688,19 @@ class ActivityViewModel extends ChangeNotifier {
   }
 
   void _updateDraftExpenseItems(
-      List<ExpenseItem> items, [
-        double? newTaxAmount,
-      ]) {
+    List<ExpenseItem> items, [
+    double? newTaxAmount,
+  ]) {
     final tax = newTaxAmount ?? _uiState.draftTaxAmount;
     final itemsWithCalculatedSubtotals = items
         .map(
           (item) => item.copyWith(
-        subtotal: _expenseTrackingService.calculateItemSubtotal(
-          item.quantity,
-          item.unitPrice,
-        ),
-      ),
-    )
+            subtotal: _expenseTrackingService.calculateItemSubtotal(
+              item.quantity,
+              item.unitPrice,
+            ),
+          ),
+        )
         .toList();
 
     _uiState = _uiState.copyWith(
@@ -769,9 +769,9 @@ class ActivityViewModel extends ChangeNotifier {
       // Verify trip exists, is ongoing, and contains activities
       final bool isTripActive =
           result != null &&
-              result.trip.status ==
-                  'ongoing' && // Check your exact active status string
-              result.activities.isNotEmpty;
+          result.trip.status ==
+              'ongoing' && // Check your exact active status string
+          result.activities.isNotEmpty;
 
       if (isTripActive) {
         final tripId = result.trip.tripId!;
@@ -826,10 +826,10 @@ class ActivityViewModel extends ChangeNotifier {
   }
 
   Future<void> loadTripItinerary(
-      String tripId, {
-        DateTime? filterDate,
-        bool forceRefresh = false,
-      }) async {
+    String tripId, {
+    DateTime? filterDate,
+    bool forceRefresh = false,
+  }) async {
     final now = DateTime.now();
     final targetDate = filterDate != null
         ? DateTime(filterDate.year, filterDate.month, filterDate.day)
@@ -927,7 +927,7 @@ class ActivityViewModel extends ChangeNotifier {
         filterDate: targetDate,
         tripId: tripId,
         tripDestination:
-        tripResult?.trip.destination ?? _uiState.tripDestination,
+            tripResult?.trip.destination ?? _uiState.tripDestination,
         originalCurrency: _expenseCurrency,
       );
 
@@ -993,8 +993,8 @@ class ActivityViewModel extends ChangeNotifier {
   /// expense yet. This method is intentionally best-effort: notification
   /// setup must never stop the daily plan from loading.
   Future<void> _scheduleActivityEndExpenseReminders(
-      List<Activity> activities,
-      ) async {
+    List<Activity> activities,
+  ) async {
     for (final activity in activities) {
       final reminderTime = _activityEndDateTime(activity);
       if (reminderTime == null || !reminderTime.isAfter(DateTime.now())) {
@@ -1016,14 +1016,14 @@ class ActivityViewModel extends ChangeNotifier {
           scheduledAt: reminderTime,
           title: 'Expense reminder',
           body:
-          'Did you spend at ${activity.destination}? '
+              'Did you spend at ${activity.destination}? '
               'Record your expense now.',
           payload: activity.activitiesId,
         );
       } catch (error) {
         debugPrint(
           'Unable to schedule the expense reminder for '
-              '${activity.activitiesId}: $error',
+          '${activity.activitiesId}: $error',
         );
       }
     }
@@ -1033,8 +1033,8 @@ class ActivityViewModel extends ChangeNotifier {
   /// have no confirmed expense. The count is refreshed after every successful
   /// expense record so the reminder does not use a stale number.
   Future<void> _scheduleEveningExpenseReviewReminder(
-      List<Activity> activities,
-      ) async {
+    List<Activity> activities,
+  ) async {
     final now = DateTime.now();
     final reviewTime = DateTime(
       now.year,
@@ -1064,7 +1064,7 @@ class ActivityViewModel extends ChangeNotifier {
       } catch (error) {
         debugPrint(
           'Unable to check the evening expense reminder for '
-              '${activity.activitiesId}: $error',
+          '${activity.activitiesId}: $error',
         );
       }
     }
@@ -1085,7 +1085,7 @@ class ActivityViewModel extends ChangeNotifier {
         scheduledAt: reviewTime,
         title: 'Expense review reminder',
         body:
-        'You have $activitiesWithoutExpenses $activityLabel without '
+            'You have $activitiesWithoutExpenses $activityLabel without '
             'recorded expenses today. Today ends in 4 hours. '
             'Review your expenses.',
         payload: 'evening_expense_review',
@@ -1104,7 +1104,7 @@ class ActivityViewModel extends ChangeNotifier {
     } catch (error) {
       debugPrint(
         'Unable to cancel the expense reminder for '
-            '${activity.activitiesId}: $error',
+        '${activity.activitiesId}: $error',
       );
     }
   }
@@ -1189,10 +1189,7 @@ class ActivityViewModel extends ChangeNotifier {
       return _isSameDate(act.date, date);
     }).toList();
 
-    _uiState = _uiState.copyWith(
-      filterDate: date,
-      activities: dayActivities,
-    );
+    _uiState = _uiState.copyWith(filterDate: date, activities: dayActivities);
     notifyListeners();
   }
 
@@ -1201,7 +1198,7 @@ class ActivityViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> endTrip() async {
+  Future<bool> endTrip() async {
     final id = _uiState.tripId;
 
     _uiState = _uiState.copyWith(isLoading: true);
@@ -1212,12 +1209,18 @@ class ActivityViewModel extends ChangeNotifier {
 
       if (update) {
         _uiState = _uiState.copyWith(isLoading: false, tripId: '');
+        notifyListeners();
+        return true;
       }
+
+      _uiState = _uiState.copyWith(isLoading: false);
+      notifyListeners();
+      return false;
     } catch (e) {
       _uiState = _uiState.copyWith(isLoading: false);
+      notifyListeners();
+      return false;
     }
-
-    notifyListeners();
   }
 
   Future<bool> topUpBudget(double additionalAmount) async {
@@ -1255,10 +1258,10 @@ class ActivityViewModel extends ChangeNotifier {
 
         // Calculate the NEW shortage.
         final double newShortageAmount =
-        (_uiState.shortageAmount - additionalAmount).clamp(
-          0.0,
-          double.infinity,
-        );
+            (_uiState.shortageAmount - additionalAmount).clamp(
+              0.0,
+              double.infinity,
+            );
 
         debugPrint('========== TOP UP ==========');
         debugPrint('Previous shortage: ${_uiState.shortageAmount}');
@@ -1327,14 +1330,14 @@ class ActivityViewModel extends ChangeNotifier {
       // Snapshot the original allocated budget BEFORE processExpense() runs
       // the reallocation, which modifies allocatedBudget in the DB.
       final currentActivity = _uiState.activities.firstWhere(
-            (a) => a.activitiesId == _uiState.currentActivityId,
+        (a) => a.activitiesId == _uiState.currentActivityId,
         orElse: () => _uiState.selectedActivity ?? _uiState.activities.first,
       );
       final double originalAllocatedBudget = currentActivity.allocatedBudget;
 
       debugPrint(
         '[handleExpenseSubmission] Original allocated budget for '
-            '${currentActivity.activitiesId}: RM${originalAllocatedBudget.toStringAsFixed(2)}',
+        '${currentActivity.activitiesId}: RM${originalAllocatedBudget.toStringAsFixed(2)}',
       );
 
       final response = await _expenseTrackingService.processExpense(
@@ -1378,7 +1381,7 @@ class ActivityViewModel extends ChangeNotifier {
 
       debugPrint(
         '[handleExpenseSubmission] Exceeded = spent($activitySpent) - '
-            'originalBudget($originalAllocatedBudget) = $exceededAmount',
+        'originalBudget($originalAllocatedBudget) = $exceededAmount',
       );
       // final days = await _itineraryService.getDaysByTripId(_uiState.tripId);
       //
@@ -1467,8 +1470,8 @@ class ActivityViewModel extends ChangeNotifier {
       final spentOnActivity = _uiState.activitySpentMap[a.activitiesId] ?? 0.0;
       final hasRecordedExpense =
           (a.isOverspend == true) ||
-              (a.overspendAmount != null && a.overspendAmount! > 0) ||
-              spentOnActivity > 0;
+          (a.overspendAmount != null && a.overspendAmount! > 0) ||
+          spentOnActivity > 0;
 
       return !hasRecordedExpense;
     }).toList();
@@ -1496,15 +1499,15 @@ class ActivityViewModel extends ChangeNotifier {
       // 2. Delegate generation and Supabase updates completely to Service
       final revisedActivities = await _itineraryService
           .generateBudgetRecoveryItinerary(
-        tripId: _uiState.tripId,
-        effectiveRemainingBudget: effectiveRemainingBudget,
-        currentSpentBudget: _uiState.spentBudget,
-        topUpAmount: topUpAmount,
-        remainingActivities: remainingActivities,
-        tripDestination: _uiState.tripDestination,
-        userCoordinates: userCoordinates,
-        currentDate: DateTime.now(),
-      );
+            tripId: _uiState.tripId,
+            effectiveRemainingBudget: effectiveRemainingBudget,
+            currentSpentBudget: _uiState.spentBudget,
+            topUpAmount: topUpAmount,
+            remainingActivities: remainingActivities,
+            tripDestination: _uiState.tripDestination,
+            userCoordinates: userCoordinates,
+            currentDate: DateTime.now(),
+          );
 
       // Nothing was generated (e.g. no slots left to re-plan, or the engine
       // returned no usable plan) - treat it as a failure so the UI can tell
@@ -1602,18 +1605,18 @@ class ActivityViewModel extends ChangeNotifier {
         final double actDiff = actSpent - actBudget;
         debugPrint(
           '🚨 [OVERSPENT DETECTED] Activity: "${activity.destination}" '
-              '(ID: ${activity.activitiesId}) | '
-              'Allocated: ${activity.allocatedBudget} | '
-              'Spent: $actSpent | '
-              'Over by: $actDiff',
+          '(ID: ${activity.activitiesId}) | '
+          'Allocated: ${activity.allocatedBudget} | '
+          'Spent: $actSpent | '
+          'Over by: $actDiff',
         );
 
         debugPrint(
           '>>> [DEBUG Activity Overspend Check] ID: ${activity.activitiesId} | '
-              'Name: "${activity.destination}" | '
-              'Spent: $actSpent | '
-              'Allocated: $actBudget | '
-              'Diff: $actDiff',
+          'Name: "${activity.destination}" | '
+          'Spent: $actSpent | '
+          'Allocated: $actBudget | '
+          'Diff: $actDiff',
         );
       }
 
@@ -1651,7 +1654,7 @@ class ActivityViewModel extends ChangeNotifier {
       );
       debugPrint(
         '>>> [DEBUG reconcileTripOverspend] Reconciled total overspent: '
-            '${totalTripOverspent.toStringAsFixed(2)}',
+        '${totalTripOverspent.toStringAsFixed(2)}',
       );
 
       _uiState = _uiState.copyWith(overspentBudget: totalTripOverspent);
