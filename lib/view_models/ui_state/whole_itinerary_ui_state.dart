@@ -23,6 +23,13 @@ class WholeItineraryUiState {
   final List<String>? wishlist;
   final List<String>? constraints;
   final List<FutureSuggestion>? futureSuggestions;
+  final String? arrivalLocation;
+  final String? arrivalTime;
+  final String? departureLocation;
+  final String? departureTime;
+  final String? hotelLocation;
+  final String? hotelCheckInTime;
+  final String? hotelCheckOutTime;
 
   const WholeItineraryUiState({
     this.isLoading = false,
@@ -43,6 +50,13 @@ class WholeItineraryUiState {
     this.wishlist,
     this.constraints,
     this.futureSuggestions,
+    this.arrivalLocation,
+    this.arrivalTime,
+    this.departureLocation,
+    this.departureTime,
+    this.hotelLocation,
+    this.hotelCheckInTime,
+    this.hotelCheckOutTime,
   });
 
   List<WholeTrip> get filteredTrips {
@@ -75,6 +89,13 @@ class WholeItineraryUiState {
     List<String>? wishlist,
     List<String>? constraints,
     List<FutureSuggestion>? futureSuggestions,
+    String? arrivalLocation,
+    String? arrivalTime,
+    String? departureLocation,
+    String? departureTime,
+    String? hotelLocation,
+    String? hotelCheckInTime,
+    String? hotelCheckOutTime,
   }) {
     return WholeItineraryUiState(
       isLoading: isLoading ?? this.isLoading,
@@ -99,6 +120,13 @@ class WholeItineraryUiState {
       wishlist: wishlist ?? this.wishlist,
       constraints: constraints ?? this.constraints,
       futureSuggestions: futureSuggestions ?? this.futureSuggestions,
+      arrivalLocation: arrivalLocation ?? this.arrivalLocation,
+      arrivalTime: arrivalTime ?? this.arrivalTime,
+      departureLocation: departureLocation ?? this.departureLocation,
+      departureTime: departureTime ?? this.departureTime,
+      hotelLocation: hotelLocation ?? this.hotelLocation,
+      hotelCheckInTime: hotelCheckInTime ?? this.hotelCheckInTime,
+      hotelCheckOutTime: hotelCheckOutTime ?? this.hotelCheckOutTime,
     );
   }
 }

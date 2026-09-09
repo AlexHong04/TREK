@@ -138,9 +138,60 @@ class GooglePlacesApiConfig {
   }
 
   /// Searches Google Places (New) Autocomplete for a query and returns a list of suggested place names.
-  static Future<List<String>> getAutocompleteSuggestions(String query) async {
+  /// When [destinations] is provided, suggestions are biased towards the selected destinations.
+  static Future<List<String>> getAutocompleteSuggestions(
+    String query, {
+    List<String>? destinations,
+  }) async {
     if (!isConfigured) return [];
+    final trimmedQuery = query.trim();
+    if (trimmedQuery.isEmpty) return [];
 
+    final validDestinations = destinations
+        ?.map((d) => d.trim())
+        .where((d) => d.isNotEmpty)
+        .toList();
+
+    if (validDestinations == null || validDestinations.isEmpty) {
+      return await _fetchAutocomplete(trimmedQuery);
+    }
+
+    // If query already contains any of the selected destination names, query directly
+    final lowerQuery = trimmedQuery.toLowerCase();
+    final alreadyIncludesDestination = validDestinations.any(
+      (dest) => lowerQuery.contains(dest.toLowerCase()),
+    );
+
+    if (alreadyIncludesDestination) {
+      return await _fetchAutocomplete(trimmedQuery);
+    }
+
+    // Query for each selected destination in parallel (capped at 3 for performance)
+    final targetDestinations = validDestinations.take(3).toList();
+    final futures = targetDestinations.map(
+      (dest) => _fetchAutocomplete('$trimmedQuery, $dest'),
+    );
+
+    final resultsList = await Future.wait(futures);
+    final Set<String> combined = {};
+    for (final list in resultsList) {
+      for (final item in list) {
+        combined.add(item);
+      }
+    }
+
+    // Supplement with generic search if fewer than 3 results
+    if (combined.length < 3) {
+      final fallback = await _fetchAutocomplete(trimmedQuery);
+      for (final item in fallback) {
+        combined.add(item);
+      }
+    }
+
+    return combined.take(6).toList();
+  }
+
+  static Future<List<String>> _fetchAutocomplete(String inputQuery) async {
     final String directUrlStr =
         'https://places.googleapis.com/v1/places:autocomplete';
 
@@ -148,13 +199,9 @@ class GooglePlacesApiConfig {
       'Content-Type': 'application/json',
       'X-Goog-Api-Key': _apiKey,
     };
-    // if (!kIsWeb) {
-    //   headers['X-Android-Package'] = 'com.example.trek';
-    //   headers['X-Android-Cert'] = '817279A922D846277D95205DE133CEB38DBA0D65';
-    // }
 
     final String body = jsonEncode({
-      "input": query,
+      "input": inputQuery,
       "includedRegionCodes": [
         "my",
       ], // Strictly restrict search results to Malaysia

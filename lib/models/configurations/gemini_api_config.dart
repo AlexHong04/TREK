@@ -37,6 +37,13 @@ class GeminiApiConfig {
     List<String>? constraints,
     List<FutureSuggestion>? futureSuggestions,
     bool strictBudget = false,
+    String? arrivalLocation,
+    String? arrivalTime,
+    String? departureLocation,
+    String? departureTime,
+    String? hotelLocation,
+    String? hotelCheckInTime,
+    String? hotelCheckOutTime,
   }) async {
     int numberOfDays = 1;
     try {
@@ -56,6 +63,19 @@ class GeminiApiConfig {
     - Dates: $dates (Total: $numberOfDays days)
     - Budget: \$$budget
     ${preference != null ? '- Preference: $preference (You MUST heavily prioritize planning activities that strictly match this theme!)' : ''}
+    ${(arrivalLocation != null && arrivalLocation.trim().isNotEmpty) || (arrivalTime != null && arrivalTime.trim().isNotEmpty) ? '''- Arrival Details:
+      * Location: ${arrivalLocation != null && arrivalLocation.trim().isNotEmpty ? arrivalLocation : 'Main transit hub / entry point'}
+      * Arrival Time: ${arrivalTime ?? '09:00 AM'}
+      * CRITICAL FOR DAY 1: The traveler arrives at ${arrivalTime ?? '09:00 AM'} at ${arrivalLocation ?? 'the arrival point'}. Day 1 schedule MUST start after this arrival time!''' : ''}
+    ${(departureLocation != null && departureLocation.trim().isNotEmpty) || (departureTime != null && departureTime.trim().isNotEmpty) ? '''- Departure Details:
+      * Location: ${departureLocation != null && departureLocation.trim().isNotEmpty ? departureLocation : 'Main transit hub / departure point'}
+      * Departure Time: ${departureTime ?? '06:00 PM'}
+      * CRITICAL FOR FINAL DAY: The traveler departs at ${departureTime ?? '06:00 PM'} from ${departureLocation ?? 'the departure point'}. Final day schedule MUST finish in time for the traveler to reach the departure location before ${departureTime ?? '06:00 PM'}!''' : ''}
+    ${(hotelLocation != null && hotelLocation.trim().isNotEmpty) ? '''- Accommodation / Hotel:
+      * Hotel Location: $hotelLocation
+      * Check-in Time: ${hotelCheckInTime ?? '03:00 PM'}
+      * Check-out Time: ${hotelCheckOutTime ?? '12:00 PM'}
+      * CRITICAL FOR HOTEL: Daily activities should conveniently route to/from this hotel area. Factor in hotel check-in on Day 1 (around ${hotelCheckInTime ?? '03:00 PM'}) and check-out on the final day (around ${hotelCheckOutTime ?? '12:00 PM'}).''' : ''}
     ${(constraints != null && constraints.isNotEmpty) ? '- Personal Constraints: ' + constraints.join(', ') + ' (You MUST strictly follow these constraints when suggesting places, e.g., food restrictions or accessibility!)' : ''}
     ${(futureSuggestions != null && futureSuggestions.isNotEmpty) ? '- Budget Distribution: ' + futureSuggestions.map((e) => '${e.activityCategory}: ${e.suggestedAmount}%').join(', ') + ' (You MUST strictly allocate the provided Budget according to these category percentages!)' : ''}
     ${(wishlist != null && wishlist.isNotEmpty) ? '- Wishlist Items: ' + wishlist.join(', ') + (strictBudget ? '''

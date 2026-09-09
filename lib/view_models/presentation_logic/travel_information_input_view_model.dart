@@ -46,10 +46,57 @@ class TravelInformationInputViewModel extends ChangeNotifier {
   ];
 
   String? validateDestination(String? value) {
-    if ((value ?? '').trim().isEmpty) {
-      return 'Please enter a destination';
+    if (_uiState.selectedDestinations.isEmpty && (value ?? '').trim().isEmpty) {
+      return 'Please select at least one destination state';
     }
     return null;
+  }
+
+  String? validateDestinations() {
+    if (_uiState.selectedDestinations.isEmpty) {
+      return 'Please select at least one destination state';
+    }
+    return null;
+  }
+
+  void toggleDestination(String stateName) {
+    final current = List<String>.from(_uiState.selectedDestinations);
+    if (current.contains(stateName)) {
+      current.remove(stateName);
+    } else {
+      current.add(stateName);
+    }
+    _uiState = _uiState.copyWith(selectedDestinations: current);
+    notifyListeners();
+
+    if (_currentWishlistQuery.trim().isNotEmpty) {
+      onWishlistChanged(_currentWishlistQuery);
+    }
+  }
+
+  void removeDestination(String stateName) {
+    final current = List<String>.from(_uiState.selectedDestinations)
+      ..remove(stateName);
+    _uiState = _uiState.copyWith(selectedDestinations: current);
+    notifyListeners();
+
+    if (_currentWishlistQuery.trim().isNotEmpty) {
+      onWishlistChanged(_currentWishlistQuery);
+    }
+  }
+
+  void clearDestinations() {
+    _uiState = _uiState.copyWith(selectedDestinations: const []);
+    notifyListeners();
+  }
+
+  void setSelectedDestinations(List<String> states) {
+    _uiState = _uiState.copyWith(selectedDestinations: states);
+    notifyListeners();
+
+    if (_currentWishlistQuery.trim().isNotEmpty) {
+      onWishlistChanged(_currentWishlistQuery);
+    }
   }
 
   String? validateDate(String? value) {
@@ -72,6 +119,41 @@ class TravelInformationInputViewModel extends ChangeNotifier {
 
   void selectPreference(String label) {
     _uiState = _uiState.copyWith(selectedPreference: label);
+    notifyListeners();
+  }
+
+  void setArrivalTime(String time) {
+    _uiState = _uiState.copyWith(arrivalTime: time);
+    notifyListeners();
+  }
+
+  void setDepartureTime(String time) {
+    _uiState = _uiState.copyWith(departureTime: time);
+    notifyListeners();
+  }
+
+  void setHotelCheckInTime(String time) {
+    _uiState = _uiState.copyWith(hotelCheckInTime: time);
+    notifyListeners();
+  }
+
+  void setHotelCheckOutTime(String time) {
+    _uiState = _uiState.copyWith(hotelCheckOutTime: time);
+    notifyListeners();
+  }
+
+  void setArrivalLocation(String location) {
+    _uiState = _uiState.copyWith(arrivalLocation: location);
+    notifyListeners();
+  }
+
+  void setDepartureLocation(String location) {
+    _uiState = _uiState.copyWith(departureLocation: location);
+    notifyListeners();
+  }
+
+  void setHotelLocation(String location) {
+    _uiState = _uiState.copyWith(hotelLocation: location);
     notifyListeners();
   }
 
@@ -98,7 +180,7 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     String? date,
     String? budget,
   }) {
-    final String? destinationError = validateDestination(destination);
+    final String? destinationError = validateDestinations();
     final String? dateError = validateDate(date);
     final String? budgetError = validateBudget(budget);
 
@@ -132,13 +214,14 @@ class TravelInformationInputViewModel extends ChangeNotifier {
       return;
     }
 
-    _debounce = Timer(const Duration(milliseconds: 600), () async {
+    _debounce = Timer(const Duration(milliseconds: 500), () async {
       _uiState = _uiState.copyWith(isSearchingSuggestions: true);
       notifyListeners();
 
       try {
         final results = await _itineraryService.getAutocompleteSuggestions(
           trimmed,
+          destinations: _uiState.selectedDestinations,
         );
 
         // If the query was cleared while request was in-flight, ignore results

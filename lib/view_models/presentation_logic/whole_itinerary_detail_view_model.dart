@@ -78,6 +78,13 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     List<String>? constraints,
     List<FutureSuggestion>? futureSuggestions,
     bool suppressWarning = false,
+    String? arrivalLocation,
+    String? arrivalTime,
+    String? departureLocation,
+    String? departureTime,
+    String? hotelLocation,
+    String? hotelCheckInTime,
+    String? hotelCheckOutTime,
   }) async {
     _uiState = _uiState.copyWith(
       isLoading: true,
@@ -87,6 +94,13 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
       preference: preference,
       wishlist: wishlist,
       constraints: constraints,
+      arrivalLocation: arrivalLocation ?? _uiState.arrivalLocation,
+      arrivalTime: arrivalTime ?? _uiState.arrivalTime,
+      departureLocation: departureLocation ?? _uiState.departureLocation,
+      departureTime: departureTime ?? _uiState.departureTime,
+      hotelLocation: hotelLocation ?? _uiState.hotelLocation,
+      hotelCheckInTime: hotelCheckInTime ?? _uiState.hotelCheckInTime,
+      hotelCheckOutTime: hotelCheckOutTime ?? _uiState.hotelCheckOutTime,
       errorMessage: null,
     );
     notifyListeners();
@@ -118,6 +132,13 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         constraints: constraints,
         futureSuggestions: resolvedSuggestions,
         strictBudget: suppressWarning,
+        arrivalLocation: arrivalLocation ?? _uiState.arrivalLocation,
+        arrivalTime: arrivalTime ?? _uiState.arrivalTime,
+        departureLocation: departureLocation ?? _uiState.departureLocation,
+        departureTime: departureTime ?? _uiState.departureTime,
+        hotelLocation: hotelLocation ?? _uiState.hotelLocation,
+        hotelCheckInTime: hotelCheckInTime ?? _uiState.hotelCheckInTime,
+        hotelCheckOutTime: hotelCheckOutTime ?? _uiState.hotelCheckOutTime,
       );
 
       final bool wishlistIncomplete =
@@ -156,6 +177,13 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
       constraints: _uiState.constraints,
       futureSuggestions: _uiState.futureSuggestions,
       suppressWarning: suppressWarning,
+      arrivalLocation: _uiState.arrivalLocation,
+      arrivalTime: _uiState.arrivalTime,
+      departureLocation: _uiState.departureLocation,
+      departureTime: _uiState.departureTime,
+      hotelLocation: _uiState.hotelLocation,
+      hotelCheckInTime: _uiState.hotelCheckInTime,
+      hotelCheckOutTime: _uiState.hotelCheckOutTime,
     );
   }
 
