@@ -795,6 +795,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
               Expanded(
                 child: _buildSubBudgetCard(
                   title: 'OVERSPENT',
+                  showWarning: uiState.overspentBudget > 0,
                   amountWidget: DualCurrencyAmount(
                     amount: uiState.overspentBudget,
                     baseCurrency: 'MYR',
@@ -805,13 +806,17 @@ class _ActivityScreenState extends State<ActivityScreen> {
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
                       fontFamily: 'Inter',
-                      color: appTheme.gray_900,
+                      color: uiState.overspentBudget > 0
+                          ? appTheme.errorRed
+                          : appTheme.gray_900,
                     ),
                     secondaryStyle: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w500,
                       fontFamily: 'Inter',
-                      color: appTheme.blue_gray_700,
+                      color: uiState.overspentBudget > 0
+                          ? appTheme.errorRed.withValues(alpha: 0.7)
+                          : appTheme.blue_gray_700,
                     ),
                   ),
                 ),
@@ -836,26 +841,44 @@ class _ActivityScreenState extends State<ActivityScreen> {
     String? amount,
     Color? amountColor,
     Widget? amountWidget,
+    bool showWarning = false,
   }) {
     return Container(
       padding: const EdgeInsets.all(12.0),
       decoration: BoxDecoration(
-        color: appTheme.white_A700,
+        color: showWarning
+            ? appTheme.errorRed.withValues(alpha: 0.06)
+            : appTheme.white_A700,
         borderRadius: BorderRadius.circular(12.0),
-        border: Border.all(color: appTheme.gray_100, width: 1.0),
+        border: Border.all(
+          color: showWarning ? appTheme.errorRed.withValues(alpha: 0.3) : appTheme.gray_100,
+          width: 1.0,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              fontFamily: 'Inter',
-              color: appTheme.gray_800,
-              letterSpacing: 0.5,
-            ),
+          Row(
+            children: [
+              if (showWarning) ...[
+                Icon(
+                  Icons.warning_amber_rounded,
+                  size: 14,
+                  color: appTheme.errorRed,
+                ),
+                const SizedBox(width: 4.0),
+              ],
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  fontFamily: 'Inter',
+                  color: showWarning ? appTheme.errorRed : appTheme.gray_800,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 6.0),
           amountWidget ??
@@ -948,6 +971,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
                     activity,
                     uiState,
                     onTap: () async {
+                      final spentBefore = viewModel.uiState.spentBudget;
+
                       viewModel.selectActivityForExpense(activity);
 
                       await showExpenseBottomSheet(
@@ -955,6 +980,23 @@ class _ActivityScreenState extends State<ActivityScreen> {
                         activity: activity,
                         viewModel: viewModel,
                       );
+
+                      // Haptic alert when the activity's spent chip turns red:
+                      // 80%+ of allocated budget used, or over budget entirely.
+                      if (viewModel.uiState.spentBudget > spentBefore) {
+                        final activitySpent = viewModel.uiState
+                                .activitySpentMap[activity.activitiesId] ?? 0.0;
+                        final allocated = activity.allocatedBudget;
+                        final isOverBudget = activitySpent > allocated;
+                        final reachedAlert = allocated > 0 &&
+                            activitySpent >= allocated * 0.80;
+
+                        if (isOverBudget || reachedAlert) {
+                          HapticFeedback.vibrate();
+                        } else {
+                          HapticFeedback.mediumImpact();
+                        }
+                      }
 
                       _handleUiStateChange();
                     },
