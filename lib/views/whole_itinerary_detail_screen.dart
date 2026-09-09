@@ -403,30 +403,33 @@ class _WholeItineraryDetailScreenState
               ),
             ],
           ),
-          const SizedBox(height: 6.0),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Wishlist Covered',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'Inter',
-                  color: appTheme.blue_gray_700,
+          if (viewModel.uiState.wishlist != null &&
+              viewModel.uiState.wishlist!.isNotEmpty) ...[
+            const SizedBox(height: 6.0),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Wishlist Covered',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Inter',
+                    color: appTheme.blue_gray_700,
+                  ),
                 ),
-              ),
-              Text(
-                '${viewModel.uiState.wishlistItemsCoveredCount} Items',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  fontFamily: 'Inter',
-                  color: appTheme.teal_800,
+                Text(
+                  '${viewModel.uiState.wishlistItemsCoveredCount} / ${viewModel.uiState.wishlist!.length} Items',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    fontFamily: 'Inter',
+                    color: appTheme.teal_800,
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
+          ],
           if (viewModel.uiState.estimatedExtraBudgetNeeded > 0.0) ...[
             const SizedBox(height: 6.0),
             Row(
@@ -479,10 +482,10 @@ class _WholeItineraryDetailScreenState
   }
 
   Widget _buildTimeline(
-      BuildContext context,
-      WholeItineraryDetailViewModel viewModel, {
-        required bool isReadOnly,
-      }) {
+    BuildContext context,
+    WholeItineraryDetailViewModel viewModel, {
+    required bool isReadOnly,
+  }) {
     if (viewModel.uiState.isLoading) {
       return Center(
         child: CircularProgressIndicator(color: appTheme.teal_A700),
@@ -493,11 +496,18 @@ class _WholeItineraryDetailScreenState
     final activities = List<dynamic>.from(viewModel.uiState.activities);
     activities.sort((a, b) {
       // Primary sort: Date
-      final DateTime aDate = a.date is DateTime ? a.date : DateTime.parse(a.date.toString());
-      final DateTime bDate = b.date is DateTime ? b.date : DateTime.parse(b.date.toString());
+      final DateTime aDate = a.date is DateTime
+          ? a.date
+          : DateTime.parse(a.date.toString());
+      final DateTime bDate = b.date is DateTime
+          ? b.date
+          : DateTime.parse(b.date.toString());
 
-      final dateCompare = DateTime(aDate.year, aDate.month, aDate.day)
-          .compareTo(DateTime(bDate.year, bDate.month, bDate.day));
+      final dateCompare = DateTime(
+        aDate.year,
+        aDate.month,
+        aDate.day,
+      ).compareTo(DateTime(bDate.year, bDate.month, bDate.day));
       if (dateCompare != 0) return dateCompare;
 
       // Secondary sort: startTime (HH:mm)
@@ -542,10 +552,10 @@ class _WholeItineraryDetailScreenState
 
       final bool isLast =
           i == activities.length - 1 ||
-              (i + 1 < activities.length &&
-                  (activities[i + 1].date.day != actDate.day ||
-                      activities[i + 1].date.month != actDate.month ||
-                      activities[i + 1].date.year != actDate.year));
+          (i + 1 < activities.length &&
+              (activities[i + 1].date.day != actDate.day ||
+                  activities[i + 1].date.month != actDate.month ||
+                  activities[i + 1].date.year != actDate.year));
 
       children.add(
         _buildTimelineItem(
@@ -636,7 +646,7 @@ class _WholeItineraryDetailScreenState
             ),
           ),
         ),
-          Container(width: 2.0, height: 350.0, color: appTheme.blue_gray_300),
+        Container(width: 2.0, height: 350.0, color: appTheme.blue_gray_300),
       ],
     );
   }
@@ -674,49 +684,51 @@ class _WholeItineraryDetailScreenState
           child: InkWell(
             onTap: canConfirm
                 ? () async {
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (BuildContext context) {
-                  return const Center(child: CircularProgressIndicator());
-                },
-              );
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (BuildContext context) {
+                        return const Center(child: CircularProgressIndicator());
+                      },
+                    );
 
-              final errorMsg = await viewModel.confirmItinerary();
+                    final errorMsg = await viewModel.confirmItinerary();
 
-              if (context.mounted) {
-                Navigator.of(context).pop(); // dismiss loading
-              }
+                    if (context.mounted) {
+                      Navigator.of(context).pop(); // dismiss loading
+                    }
 
-              if (errorMsg == null && context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Itinerary saved to database successfully!'),
-                  ),
-                );
-                // Return to home page, clearing all previous routes
-                Navigator.pushNamedAndRemoveUntil(
-                  context,
-                  AppRoutes.homeScreen,
-                  (route) => false,
-                );
-              } else if (errorMsg != null && context.mounted) {
-                // Show extreme specific error message so we can solve Supabase DB issue!
-                showDialog(
-                  context: context,
-                  builder: (_) => AlertDialog(
-                    title: const Text('Save Failed'),
-                    content: Text(errorMsg),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: Text('OK'),
-                      ),
-                    ],
-                  ),
-                );
-              }
-              }
+                    if (errorMsg == null && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Itinerary saved to database successfully!',
+                          ),
+                        ),
+                      );
+                      // Return to home page, clearing all previous routes
+                      Navigator.pushNamedAndRemoveUntil(
+                        context,
+                        AppRoutes.homeScreen,
+                        (route) => false,
+                      );
+                    } else if (errorMsg != null && context.mounted) {
+                      // Show extreme specific error message so we can solve Supabase DB issue!
+                      showDialog(
+                        context: context,
+                        builder: (_) => AlertDialog(
+                          title: const Text('Save Failed'),
+                          content: Text(errorMsg),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: Text('OK'),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                  }
                 : null,
             borderRadius: BorderRadius.circular(16),
             child: Padding(
@@ -798,12 +810,10 @@ class _WholeItineraryDetailScreenState
                       destination: activity.destination,
                     );
                     final error = viewModel.uiState.errorMessage;
-                    if (error != null &&
-                        error.isNotEmpty &&
-                        context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(error)),
-                      );
+                    if (error != null && error.isNotEmpty && context.mounted) {
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text(error)));
                     }
                   },
                 ),

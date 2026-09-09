@@ -58,7 +58,26 @@ class GeminiApiConfig {
     ${preference != null ? '- Preference: $preference (You MUST heavily prioritize planning activities that strictly match this theme!)' : ''}
     ${(constraints != null && constraints.isNotEmpty) ? '- Personal Constraints: ' + constraints.join(', ') + ' (You MUST strictly follow these constraints when suggesting places, e.g., food restrictions or accessibility!)' : ''}
     ${(futureSuggestions != null && futureSuggestions.isNotEmpty) ? '- Budget Distribution: ' + futureSuggestions.map((e) => '${e.activityCategory}: ${e.suggestedAmount}%').join(', ') + ' (You MUST strictly allocate the provided Budget according to these category percentages!)' : ''}
-    ${(wishlist != null && wishlist.isNotEmpty) ? '- Wishlist Items: ' + wishlist.join(', ') + (strictBudget ? '\n    CRITICAL RULE FOR WISHLIST (BUDGET-CONSTRAINED MODE):\n    - Try to INCLUDE these wishlist items in the itinerary IF they fit within the Budget (\$$budget).\n    - You MUST adjust other activities (use cheaper restaurants, free attractions, walking instead of transport) to make room for wishlist items.\n    - If a wishlist item genuinely cannot fit even after adjustments, you may exclude it.\n    - Return the actual number of wishlist items successfully included in "wishlistItemsCoveredCount".\n    - "estimatedExtraBudgetNeeded" MUST be 0.0 since the plan MUST fit within \$$budget.' : '\n    CRITICAL RULE FOR WISHLIST:\n    - You MUST ALWAYS INCLUDE ALL of these wishlist items in the generated itinerary, NO MATTER how low or insufficient the Budget (\$$budget) is! NEVER exclude them.\n    - Because you forcefully included them with their TRUE realistic prices, the total cost will likely exceed a low budget. You MUST add this excess to "estimatedExtraBudgetNeeded".\n    - For "wishlistItemsCoveredCount", calculate how many wishlist items can realistically be covered by the user\'s Budget (\$$budget) after prioritizing basic daily meals and transport:\n      * If the Budget (\$$budget) cannot even cover basic meals and transport, or cannot afford any wishlist item at all, return 0 in "wishlistItemsCoveredCount".\n      * If the Budget (\$$budget) can cover basic meals and transport plus SOME of the wishlist items (e.g. 1, 2, or more, but not all), return the exact count of wishlist items that fit in "wishlistItemsCoveredCount".\n      * Only if the Budget (\$$budget) is fully sufficient to cover all activities and all wishlist items without any shortfall, return the total count of all wishlist items in "wishlistItemsCoveredCount".') : ''}
+    ${(wishlist != null && wishlist.isNotEmpty) ? '- Wishlist Items: ' + wishlist.join(', ') + (strictBudget ? '''
+    CRITICAL RULE FOR WISHLIST (TOP-UP ALTERNATIVE RE-RECOMMENDATION MODE):
+    - The user has topped up their budget specifically so that ALL wishlist items MUST be covered.
+    - MANDATORY: You MUST INCLUDE EVERY SINGLE ONE of these wishlist items in the generated itinerary: ${wishlist.join(', ')}.
+    - NEVER omit or exclude ANY of these wishlist items under any circumstances! Every single wishlist item MUST appear as a scheduled activity in the itinerary under its actual place name.
+    - To fit the entire plan within the updated Budget (\$$budget), aggressively economize on all other activities:
+      * Choose affordable local eateries/hawker stalls (e.g. RM 5-15) for ordinary meals.
+      * Choose free public attractions, parks, or walking tours for other non-wishlist slots.
+      * Keep transport minimal or walking (RM 0.0).
+    - "wishlistItemsCoveredCount" MUST BE EXACTLY ${wishlist.length} (since 100% of the wishlist items are included).
+    - "estimatedExtraBudgetNeeded" MUST be 0.0 since the plan MUST fit within \$$budget.
+    ''' : '''
+    CRITICAL RULE FOR WISHLIST:
+    - You MUST ALWAYS INCLUDE ALL of these wishlist items in the generated itinerary, NO MATTER how low or insufficient the Budget (\$$budget) is! NEVER exclude them.
+    - Because you forcefully included them with their TRUE realistic prices, the total cost will likely exceed a low budget. You MUST add this excess to "estimatedExtraBudgetNeeded".
+    - For "wishlistItemsCoveredCount", calculate how many wishlist items can realistically be covered by the user's Budget (\$$budget) after prioritizing basic daily meals and transport:
+      * If the Budget (\$$budget) cannot even cover basic meals and transport, or cannot afford any wishlist item at all, return 0 in "wishlistItemsCoveredCount".
+      * If the Budget (\$$budget) can cover basic meals and transport plus SOME of the wishlist items (e.g. 1, 2, or more, but not all), return the exact count of wishlist items that fit in "wishlistItemsCoveredCount".
+      * Only if the Budget (\$$budget) is fully sufficient to cover all activities and all wishlist items without any shortfall, return the total count of all wishlist items in "wishlistItemsCoveredCount".
+    ''') : '- Wishlist Items: None\n    CRITICAL RULE FOR NO WISHLIST:\n    - The user did NOT provide any wishlist items.\n    - "wishlistItemsCoveredCount" MUST BE EXACTLY 0. Do NOT count general attractions, restaurants, or itinerary activities as wishlist items!'}
 
     Please provide a structured day-by-day itinerary with estimated costs and durations for each activity.
     ${strictBudget ? '''
@@ -118,16 +137,22 @@ class GeminiApiConfig {
     - Every "destination" value MUST be an actual, currently operating, highly popular business or landmark that is guaranteed to have a listing and photos on Google Maps. Do NOT invent fictional place names.
     - We will programmatically verify each destination against Google Places API to fetch its image. If a destination is obscure or NOT found on Google Places, the itinerary is invalid.
     
-    CRITICAL RULE FOR UNIQUENESS (NO DUPLICATES):
-    - EVERY single destination and activity across the ENTIRE itinerary MUST be strictly UNIQUE. 
-    - Do NOT propose the same restaurant, attraction, or landmark more than once across all the days. If a place is visited on Day 1, it CANNOT be visited again on any other day.
+    CRITICAL RULE FOR UNIQUENESS (NO DUPLICATES EXCEPT TRANSPORTATION):
+    - EXCEPT for activities with "activityCategory": "Transportation", EVERY single destination, attraction, restaurant, cafe, shop, and landmark across the ENTIRE multi-day itinerary MUST be strictly and 100% UNIQUE.
+    - ZERO REPEATED PLACES:
+      * Do NOT propose the same restaurant, cafe, or eatery more than once across all days. Every breakfast, lunch, and dinner must be at a completely different venue!
+      * Do NOT propose the same attraction, museum, theme park, or landmark more than once across all days. If a place is visited on Day 1, it CANNOT be visited again on Day 2, Day 3, or any other day.
+      * Do NOT visit the same shopping mall, market, or complex multiple times (e.g. do NOT schedule lunch at a mall and then shopping at the same mall, and do NOT revisit it on another day).
+      * Do NOT use slight variations of the same name to bypass this rule (e.g., "Petronas Twin Towers" and "Petronas Towers", or "Pavilion KL" and "Pavilion Kuala Lumpur" are the same venue and MUST NOT both appear).
+    - TRANSPORTATION IS THE ONLY EXCEPTION:
+      * Only commute activities with "activityCategory": "Transportation" (e.g., "Walk to ...", "Take MRT from ... to ...") can be repeated between destinations. All other activities must be distinct.
     ${(avoidPlaces != null && avoidPlaces.isNotEmpty) ? '\nCRITICAL REJECTION LIST FOR RETRY:\nThe following places were previously generated in a prior attempt but COULD NOT be found on Google Places API. You MUST NOT include any of these in your response. Instead, suggest different, verified, operating real-world venues/landmarks that are definitely searchable on Google Places:\n' + avoidPlaces.map((e) => '- "$e"').join('\n') : ''}
     
     Format your response STRICTLY as the following JSON object structure. Do NOT include markdown fences (no ```json ... ```), and do NOT include any extra text:
     
     {
       "totalAllocatedBudget": 200.0,
-      "wishlistItemsCoveredCount": 1,
+      "wishlistItemsCoveredCount": ${(wishlist != null && wishlist.isNotEmpty) ? (strictBudget ? wishlist.length : 1) : 0},
       "estimatedExtraBudgetNeeded": 0.0,
       "activities": [
         {
@@ -147,7 +172,7 @@ class GeminiApiConfig {
 
     Field definitions:
     - totalAllocatedBudget (double): The sum of all allocatedBudget.
-    - wishlistItemsCoveredCount (int): Number of user-provided wishlist items covered.
+    - wishlistItemsCoveredCount (int): Number of user-provided wishlist items covered. If no wishlist items were provided by the user, this MUST BE EXACTLY 0.
     - estimatedExtraBudgetNeeded (double): If the true realistic cost of the itinerary + wishlist items exceeds the \$$budget, return the shortfall amount here. Return 0.0 ONLY if \$$budget is genuinely sufficient.
     - dayNumber (int): Sequential day (1 for Day 1, 2 for Day 2...).
     - destination (String): EXACT, FULL official business name or landmark on Google Maps. No generic names.

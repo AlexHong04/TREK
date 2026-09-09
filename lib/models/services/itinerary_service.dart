@@ -96,10 +96,25 @@ class ItineraryService implements IItineraryService {
         bool allValid = true;
         bool apiDenied = false;
         List<String> currentFailed = [];
+        final Set<String> seenNonTransportDestinations = <String>{};
 
         for (var item in jsonList) {
           final destName = item['destination'] as String? ?? '';
           if (destName.isEmpty) continue;
+          final category = (item['activityCategory'] as String? ?? '')
+              .toLowerCase();
+
+          // Deduplication check: Non-transportation activities MUST be unique
+          if (category != 'transportation') {
+            final normalizedDest = destName.trim().toLowerCase();
+            if (seenNonTransportDestinations.contains(normalizedDest)) {
+              developer.log('Duplicate destination detected: $destName');
+              allValid = false;
+              currentFailed.add(destName);
+            } else {
+              seenNonTransportDestinations.add(normalizedDest);
+            }
+          }
 
           if (!searchCache.containsKey(destName)) {
             try {
@@ -121,8 +136,6 @@ class ItineraryService implements IItineraryService {
 
           final place = searchCache[destName];
           if (place == null) {
-            final category =
-                (item['activityCategory'] as String? ?? '').toLowerCase();
             if (category != 'transportation') {
               allValid = false;
               currentFailed.add(destName);
@@ -140,6 +153,24 @@ class ItineraryService implements IItineraryService {
               (parsedObj['estimatedExtraBudgetNeeded'] as num?)?.toDouble() ??
               0.0;
           break;
+        }
+
+        if (allValid && strictBudget && wishlist != null && wishlist.isNotEmpty) {
+          final destNames = jsonList
+              .map((item) =>
+                  (item['destination'] as String? ?? '').toLowerCase())
+              .toList();
+          final allWishlistIncluded = wishlist.every((w) {
+            final lowerW = w.toLowerCase().trim();
+            return destNames
+                .any((d) => d.contains(lowerW) || lowerW.contains(d));
+          });
+          if (!allWishlistIncluded && retries > 1) {
+            developer.log(
+              'Strict budget plan did not include all wishlist items, retrying...',
+            );
+            allValid = false;
+          }
         }
 
         if (allValid) {
@@ -287,11 +318,8 @@ class ItineraryService implements IItineraryService {
 
       // Calculate mathematical budget shortfall
       final double parsedBudget = double.tryParse(budget) ?? 0.0;
-      final double mathShortfall =
-          (resolvedTotalAllocatedBudget - parsedBudget).clamp(
-        0.0,
-        double.infinity,
-      );
+      final double mathShortfall = (resolvedTotalAllocatedBudget - parsedBudget)
+          .clamp(0.0, double.infinity);
 
       double resolvedExtraBudget = responseEstimatedExtraBudgetNeeded;
       if (mathShortfall > resolvedExtraBudget) {
@@ -299,8 +327,9 @@ class ItineraryService implements IItineraryService {
       }
 
       // Resolve wishlist coverage from activities and Gemini estimation
-      int resolvedWishlistCovered = responseWishlistItemsCoveredCount;
+      int resolvedWishlistCovered = 0;
       if (wishlist != null && wishlist.isNotEmpty) {
+        resolvedWishlistCovered = responseWishlistItemsCoveredCount;
         final activityDestinations = newActivities
             .map((a) => a.destination.toLowerCase())
             .toSet();
@@ -315,15 +344,15 @@ class ItineraryService implements IItineraryService {
         }
 
         if (strictBudget) {
-          resolvedWishlistCovered = matchedCount > 0
-              ? matchedCount
-              : wishlist.length;
+          resolvedWishlistCovered = wishlist.length;
           resolvedExtraBudget = 0.0;
         } else {
           // If Gemini returned 0 or didn't set coverage, but items matched in activities
           if (resolvedWishlistCovered == 0 && matchedCount > 0) {
-            resolvedWishlistCovered =
-                matchedCount.clamp(0, wishlist.length - 1);
+            resolvedWishlistCovered = matchedCount.clamp(
+              0,
+              wishlist.length - 1,
+            );
           } else if (resolvedWishlistCovered > wishlist.length) {
             resolvedWishlistCovered = wishlist.length;
           }
@@ -702,7 +731,9 @@ class ItineraryService implements IItineraryService {
         isOverspend: false,
       );
     }).toList();
-    final oldIdsToReplace = remainingActivities.map((a) => a.activitiesId).toList();
+    final oldIdsToReplace = remainingActivities
+        .map((a) => a.activitiesId)
+        .toList();
 
     // 4. Update the database through the repository
     if (revisedActivities.isNotEmpty) {
@@ -743,12 +774,16 @@ class ItineraryService implements IItineraryService {
   }
 
   @override
-  Future<Map<String, dynamic>> getTripSpentSummary(List<String> activityIds) async {
+  Future<Map<String, dynamic>> getTripSpentSummary(
+    List<String> activityIds,
+  ) async {
     try {
-      return await _itineraryRepository.fetchSpentSummaryByActivityIds(activityIds);
+      return await _itineraryRepository.fetchSpentSummaryByActivityIds(
+        activityIds,
+      );
     } catch (e) {
       debugPrint('Error in getTripSpentSummary service: $e');
-    rethrow;
+      rethrow;
     }
   }
 
@@ -765,14 +800,13 @@ class ItineraryService implements IItineraryService {
 }
 
 class GetCachedActivities implements ICachedActivity {
-
   final ISharedPreferencesRepo _itineraryRepository = ActivityLocalCache();
 
   @override
   Future<List<Activity>> getActivitiesForTrip(
-      String tripId, {
-        bool forceRefresh = false,
-      }) async {
+    String tripId, {
+    bool forceRefresh = false,
+  }) async {
     // Service delegates entirely to repository
     return await _itineraryRepository.getActivities(
       tripId,
@@ -781,7 +815,10 @@ class GetCachedActivities implements ICachedActivity {
   }
 
   @override
-  Future<void> saveActivitiesLocally(String tripId, List<Activity> activities) async {
+  Future<void> saveActivitiesLocally(
+    String tripId,
+    List<Activity> activities,
+  ) async {
     await _itineraryRepository.saveActivitiesLocally(tripId, activities);
   }
 
