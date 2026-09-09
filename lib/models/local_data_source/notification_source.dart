@@ -8,6 +8,8 @@ import 'package:timezone/timezone.dart' as tz;
 class NotificationSource {
   static const _channelId = 'expense_reminders';
   static const _channelName = 'Expense reminders';
+  static const _budgetAlertChannelId = 'budget_alerts';
+  static const _budgetAlertChannelName = 'Budget alerts';
 
   final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
@@ -165,6 +167,46 @@ class NotificationSource {
   /// Removes a previously scheduled reminder, for example after the tourist
   /// has recorded an expense for its activity.
   Future<void> cancelExpenseReminder(int id) async {
+    await initialize();
+    await _notifications.cancel(id: id);
+  }
+
+  /// Immediately posts a heads-up notification that plays the app's reminder
+  /// sound. Used to alert the tourist the moment a recorded expense pushes an
+  /// activity over / close to its budget, without waiting for a scheduled
+  /// reminder. No permission dialog is triggered here; callers should only
+  /// invoke this after notification permission has been granted.
+  Future<void> showBudgetAlert({
+    required int id,
+    required String title,
+    required String body,
+  }) async {
+    await initialize();
+
+    const notificationDetails = NotificationDetails(
+      android: AndroidNotificationDetails(
+        _budgetAlertChannelId,
+        _budgetAlertChannelName,
+        channelDescription: 'Alerts when an activity is near or over budget.',
+        icon: '@mipmap/ic_launcher',
+        importance: Importance.max,
+        priority: Priority.high,
+        playSound: true,
+        sound: RawResourceAndroidNotificationSound('reminder'),
+      ),
+    );
+
+    await _notifications.show(
+      id: id,
+      title: title,
+      body: body,
+      notificationDetails: notificationDetails,
+    );
+  }
+
+  /// Removes an instant budget alert from the notification shade after its
+  /// sound has already been played, so repeated alerts never pile up.
+  Future<void> dismissBudgetAlert(int id) async {
     await initialize();
     await _notifications.cancel(id: id);
   }

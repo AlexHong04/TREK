@@ -54,6 +54,10 @@ class ActivityUiState {
   final Map<String, double> activitySpentMap;
   final String popupAction;
 
+  /// One-off message shown to the tourist after a record that makes an activity
+  /// nearly / already overspent (paired with a vibration). Empty when none.
+  final String budgetAlertMessage;
+
   const ActivityUiState({
     this.isLoading = false,
     this.tripId = '',
@@ -98,6 +102,7 @@ class ActivityUiState {
     this.exceededAmount = 0.00,
     this.activitySpentMap = const {},
     this.popupAction = '',
+    this.budgetAlertMessage = '',
 
   });
 
@@ -273,6 +278,7 @@ class ActivityUiState {
     double? exceededAmount,
     Map<String, double>? activitySpentMap,
     String? popupAction,
+    String? budgetAlertMessage,
   }) {
     return ActivityUiState(
       isLoading: isLoading ?? this.isLoading,
@@ -329,6 +335,7 @@ class ActivityUiState {
       exceededAmount: exceededAmount ?? this.exceededAmount,
       activitySpentMap: activitySpentMap ?? this.activitySpentMap,
       popupAction: popupAction ?? this.popupAction,
+      budgetAlertMessage: budgetAlertMessage ?? this.budgetAlertMessage,
     );
   }
 }
