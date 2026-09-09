@@ -72,11 +72,10 @@ class _WholeItineraryDetailScreenState
     }
 
     _wishlistWarningShowing = true;
-    viewModel.dismissWishlistWarning();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-
+      viewModel.dismissWishlistWarning();
       _showWishlistWarningDialog(viewModel);
     });
   }
@@ -97,135 +96,134 @@ class _WholeItineraryDetailScreenState
   Future<void> _showWishlistWarningDialog(
     WholeItineraryDetailViewModel viewModel,
   ) async {
-    double minTopUp = viewModel.uiState.estimatedExtraBudgetNeeded * 0.50;
-    debugPrint("wishlist: ${viewModel.uiState.wishlist}");
-    debugPrint(
-      "estimated extra budget needed: ${viewModel.uiState.estimatedExtraBudgetNeeded}",
-    );
-    if ((viewModel.uiState.wishlist == null ||
-            viewModel.uiState.wishlist!.isEmpty) &&
-        viewModel.uiState.estimatedExtraBudgetNeeded > 0) {
-      await showEmptyWishlistInsufficientTotalBudgetDialog(
-        context: context,
-        shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded
-            .toStringAsFixed(2),
-        minTopUp: minTopUp,
-        onCancel: () async {
-          await showCancelTripWithoutWishlistDialog(
-            context: context,
-            onContinue: () {
-              Navigator.of(context).pop();
-            },
-          );
-        },
-
-        onTopUpBudget: (double amount) async {
-          final isSufficient = await viewModel.topUpBudget(amount);
-
-          if (!isSufficient) {
-            // Wait until the first dialog is completely removed.
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!mounted) return;
-
-              showInsufficientTopUpTotalBudgetWithoutWishlistDialog(
-                context: context,
-                onContinue: () {
-                  // Trigger re-recommendation with the latest total budget
-                  viewModel.generateItinerary(suppressWarning: true);
-                },
-              );
-            });
-          }
-
-          return true;
-        },
-      );
-
-      if (mounted) {
-        _wishlistWarningShowing = false;
+    try {
+      double minTopUp = viewModel.uiState.estimatedExtraBudgetNeeded * 0.50;
+      if (minTopUp <= 0.0) {
+        minTopUp = 20.0;
       }
-    } else if (viewModel.uiState.wishlist != null &&
-        viewModel.uiState.wishlist!.isNotEmpty &&
-        viewModel.uiState.wishlistItemsCoveredCount == 0) {
-      await showInitialTotalBudgetTotallyInsufficientDialog(
-        context: context,
-        shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded
-            .toStringAsFixed(2),
-        minTopUp: minTopUp,
-        wishlistCovered: viewModel.uiState.wishlistItemsCoveredCount,
-        onCancel: () async {
-          await showCancelTripDialog(
-            context: context,
-            onContinue: () {
-              Navigator.of(context).pop();
-            },
-          );
-        },
-        onTopUpBudget: (double amount) async {
-          final isSufficient = await viewModel.topUpBudget(amount);
-
-          if (!isSufficient) {
-            // Wait until the first dialog is completely removed.
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!mounted) return;
-
-              showInsufficientTopUpTotalBudgetDialog(
-                context: context,
-                onContinue: () {
-                  // Trigger re-recommendation with the latest total budget
-                  viewModel.generateItinerary(suppressWarning: true);
-                },
-              );
-            });
-          }
-
-          return true;
-        },
+      debugPrint("wishlist: ${viewModel.uiState.wishlist}");
+      debugPrint(
+        "estimated extra budget needed: ${viewModel.uiState.estimatedExtraBudgetNeeded}",
       );
-      if (mounted) {
-        _wishlistWarningShowing = false;
+      debugPrint(
+        "wishlist covered count: ${viewModel.uiState.wishlistItemsCoveredCount}",
+      );
+      if ((viewModel.uiState.wishlist == null ||
+              viewModel.uiState.wishlist!.isEmpty) &&
+          viewModel.uiState.estimatedExtraBudgetNeeded > 0) {
+        await showEmptyWishlistInsufficientTotalBudgetDialog(
+          context: context,
+          shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded
+              .toStringAsFixed(2),
+          minTopUp: minTopUp,
+          onCancel: () async {
+            await showCancelTripWithoutWishlistDialog(
+              context: context,
+              onContinue: () {
+                Navigator.of(context).pop();
+              },
+            );
+          },
+
+          onTopUpBudget: (double amount) async {
+            final isSufficient = await viewModel.topUpBudget(amount);
+
+            if (!isSufficient) {
+              // Wait until the first dialog is completely removed.
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) return;
+
+                showInsufficientTopUpTotalBudgetWithoutWishlistDialog(
+                  context: context,
+                  onContinue: () {
+                    // Trigger re-recommendation with the latest total budget
+                    viewModel.generateItinerary(suppressWarning: true);
+                  },
+                );
+              });
+            }
+
+            return true;
+          },
+        );
+      } else if (viewModel.uiState.wishlist != null &&
+          viewModel.uiState.wishlist!.isNotEmpty &&
+          viewModel.uiState.wishlistItemsCoveredCount == 0) {
+        await showInitialTotalBudgetTotallyInsufficientDialog(
+          context: context,
+          shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded
+              .toStringAsFixed(2),
+          minTopUp: minTopUp,
+          wishlistCovered: viewModel.uiState.wishlistItemsCoveredCount,
+          onCancel: () async {
+            await showCancelTripDialog(
+              context: context,
+              onContinue: () {
+                Navigator.of(context).pop();
+              },
+            );
+          },
+          onTopUpBudget: (double amount) async {
+            final isSufficient = await viewModel.topUpBudget(amount);
+
+            if (!isSufficient) {
+              // Wait until the first dialog is completely removed.
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) return;
+
+                showInsufficientTopUpTotalBudgetDialog(
+                  context: context,
+                  onContinue: () {
+                    // Trigger re-recommendation with the latest total budget
+                    viewModel.generateItinerary(suppressWarning: true);
+                  },
+                );
+              });
+            }
+
+            return true;
+          },
+        );
+      } else if (viewModel.uiState.wishlist != null &&
+          viewModel.uiState.wishlist!.isNotEmpty) {
+        await showInitialTotalBudgetInsufficientDialog(
+          context: context,
+          shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded
+              .toStringAsFixed(2),
+          minTopUp: minTopUp,
+          wishlistCovered: viewModel.uiState.wishlistItemsCoveredCount,
+          onCancel: () async {
+            await showCancelTopUpDialog(
+              context: context,
+              onContinue: () {
+                Navigator.of(context).pop();
+              },
+            );
+          },
+
+          onTopUpBudget: (double amount) async {
+            final isSufficient = await viewModel.topUpBudget(amount);
+
+            if (!isSufficient) {
+              // Wait until the first dialog is completely removed.
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) return;
+
+                showInsufficientTopUpTotalBudgetDialog(
+                  context: context,
+                  onContinue: () {
+                    // Trigger re-recommendation with the latest total budget
+                    viewModel.generateItinerary(suppressWarning: true);
+                  },
+                );
+              });
+            }
+
+            return true;
+          },
+        );
       }
-    } else if (viewModel.uiState.wishlist != null &&
-        viewModel.uiState.wishlist!.isNotEmpty &&
-        viewModel.uiState.wishlistItemsCoveredCount <
-            viewModel.uiState.wishlist!.length) {
-      await showInitialTotalBudgetInsufficientDialog(
-        context: context,
-        shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded
-            .toStringAsFixed(2),
-        minTopUp: minTopUp,
-        wishlistCovered: viewModel.uiState.wishlistItemsCoveredCount,
-        onCancel: () async {
-          await showCancelTopUpDialog(
-            context: context,
-            onContinue: () {
-              Navigator.of(context).pop();
-            },
-          );
-        },
-
-        onTopUpBudget: (double amount) async {
-          final isSufficient = await viewModel.topUpBudget(amount);
-
-          if (!isSufficient) {
-            // Wait until the first dialog is completely removed.
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!mounted) return;
-
-              showInsufficientTopUpTotalBudgetDialog(
-                context: context,
-                onContinue: () {
-                  // Trigger re-recommendation with the latest total budget
-                  viewModel.generateItinerary(suppressWarning: true);
-                },
-              );
-            });
-          }
-
-          return true;
-        },
-      );
-
+    } finally {
       if (mounted) {
         _wishlistWarningShowing = false;
       }
@@ -647,14 +645,20 @@ class _WholeItineraryDetailScreenState
     BuildContext context,
     WholeItineraryDetailViewModel viewModel,
   ) {
+    // Confirm is only allowed once EVERY time slot is filled (no deleted /
+    // empty activities) and the plan is not still being generated.
+    final bool canConfirm = viewModel.canConfirmItinerary;
+
     return Container(
       color: appTheme.gray_50_03,
       padding: EdgeInsets.symmetric(horizontal: 16.0),
       child: Container(
         width: double.infinity,
         margin: const EdgeInsets.only(bottom: 12),
+        // Disabled state uses a clearly grey button (not tappable) when an
+        // activity was deleted or an empty slot is still present.
         decoration: BoxDecoration(
-          color: appTheme.teal_A700,
+          color: canConfirm ? appTheme.teal_A700 : appTheme.gray_400,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
@@ -668,7 +672,8 @@ class _WholeItineraryDetailScreenState
           color: appTheme.transparentCustom,
           borderRadius: BorderRadius.circular(16),
           child: InkWell(
-            onTap: () async {
+            onTap: canConfirm
+                ? () async {
               showDialog(
                 context: context,
                 barrierDismissible: false,
@@ -711,7 +716,8 @@ class _WholeItineraryDetailScreenState
                   ),
                 );
               }
-            },
+              }
+                : null,
             borderRadius: BorderRadius.circular(16),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),
@@ -730,6 +736,7 @@ class _WholeItineraryDetailScreenState
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
                       fontFamily: 'Inter',
+                      color: appTheme.white_A700,
                     ).copyWith(height: 22 / 18),
                   ),
                 ],
@@ -763,43 +770,54 @@ class _WholeItineraryDetailScreenState
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              IconButton(
-                icon: Icon(
-                  Icons.add_circle_outline,
-                  size: 32,
-                  color: appTheme.blue_gray_300,
+              // While this specific slot is being regenerated, show an inline
+              // spinner ONLY here instead of blocking the whole screen.
+              if (viewModel.uiState.regeneratingSlotId ==
+                  activity.activitiesId) ...[
+                CircularProgressIndicator(color: appTheme.teal_A700),
+                const SizedBox(height: 12),
+                Text(
+                  'Generating alternative activity...',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Inter',
+                    color: appTheme.blue_gray_300,
+                  ),
                 ),
-                onPressed: () async {
-                  showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (_) => Center(child: CircularProgressIndicator()),
-                  );
-
-                  try {
+              ] else ...[
+                IconButton(
+                  icon: Icon(
+                    Icons.add_circle_outline,
+                    size: 32,
+                    color: appTheme.blue_gray_300,
+                  ),
+                  onPressed: () async {
                     await viewModel.generateAlternativeActivity(
                       slotActivityId: activity.activitiesId,
                       destination: activity.destination,
                     );
-                  } catch (e) {
-                    debugPrint('Error generating alternative activity: $e');
-                  } finally {
-                    if (context.mounted) {
-                      Navigator.of(context, rootNavigator: true).pop();
+                    final error = viewModel.uiState.errorMessage;
+                    if (error != null &&
+                        error.isNotEmpty &&
+                        context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(error)),
+                      );
                     }
-                  }
-                },
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Empty Activity Slot',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'Inter',
-                  color: appTheme.blue_gray_300,
+                  },
                 ),
-              ),
+                const SizedBox(height: 8),
+                Text(
+                  'Empty Activity Slot',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Inter',
+                    color: appTheme.blue_gray_300,
+                  ),
+                ),
+              ],
             ],
           ),
         ),

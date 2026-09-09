@@ -14,7 +14,7 @@ class PlacesApiDeniedException implements Exception {
 
 class GooglePlacesApiConfig {
   // Google Places API Key.
-  static const String _apiKey = 'AIzaSyAro7bHvmh72uWZCKqLkl4-tizXJHiO_k0';
+  static const String _apiKey = 'AIzaSyDbfrJOqxQB9-JTTWRxBQKXrpQNFVejeFw';
 
   /// Check if the API key has been properly configured.
   static bool get isConfigured =>

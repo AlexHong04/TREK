@@ -5,10 +5,12 @@ import 'package:provider/provider.dart';
 
 import '../theme/app_theme.dart';
 import '../utils/date_time_formatter.dart';
+import '../main.dart';
 import '../models/services/i_auth_service.dart';
 import '../view_models/presentation_logic/activity_view_model.dart';
 import '../view_models/ui_state/activity_ui_state.dart';
 import '../widgets/custom_app_bar.dart';
+import '../widgets/dual_currency_amount.dart';
 import 'budget_popup.dart';
 import 'expense_bottom_sheet.dart';
 
@@ -123,12 +125,6 @@ class _ActivityScreenState extends State<ActivityScreen> {
     viewModel.clearPopupAction();
 
     switch (action) {
-      case 'warning_50':
-        _show50WarningDialog(state);
-
-      case 'warning_80':
-        _show80WarningDialog(state);
-
       case 'successful':
         _showUnderThresholdDialog(state);
         break;
@@ -152,57 +148,34 @@ class _ActivityScreenState extends State<ActivityScreen> {
     }
   }
 
-  void _show50WarningDialog(ActivityUiState state) {
-    final activity = state.selectedActivity;
-    if (activity == null) return;
+  /// The overspent amount for the single activity the user just recorded an
+  /// expense for (spent - allocated when over budget), NOT the whole trip.
+  double _activityExceededAmount(ActivityUiState state) {
+    Activity? activity = state.selectedActivity;
+    if (activity == null) {
+      for (final candidate in state.activities) {
+        if (candidate.activitiesId == state.currentActivityId) {
+          activity = candidate;
+          break;
+        }
+      }
+    }
+    if (activity == null) return state.exceededAmount;
 
-    final double allocated = activity.allocatedBudget;
-    final double spent = state.activitySpentMap[activity.activitiesId] ?? 0.0;
-    final double remaining = (allocated - spent).clamp(0.0, double.infinity);
-
-    showNearLimitWarningDialog(
-      context: context,
-      activityTitle: activity.destination,
-      allocatedBudget: 'RM ${allocated.toStringAsFixed(2)}',
-      currentSpent: 'RM ${spent.toStringAsFixed(2)}',
-      remainingInActivity: 'RM ${remaining.toStringAsFixed(2)}',
-      warningText1:
-      'You have spent RM ${spent.toStringAsFixed(2)} (50% or more) of the budget for this activity.',
-      warningText2:
-      'Keep an eye on your remaining allowance to avoid exceeding the plan.',
-    );
-  }
-
-  void _show80WarningDialog(ActivityUiState state) {
-    final activity = state.selectedActivity;
-    if (activity == null) return;
-
-    final double allocated = activity.allocatedBudget;
-    final double spent = state.activitySpentMap[activity.activitiesId] ?? 0.0;
-    final double remaining = (allocated - spent).clamp(0.0, double.infinity);
-
-    showNearLimitWarningDialog(
-      context: context,
-      activityTitle: activity.destination,
-      allocatedBudget: 'RM ${allocated.toStringAsFixed(2)}',
-      currentSpent: 'RM ${spent.toStringAsFixed(2)}',
-      remainingInActivity: 'RM ${remaining.toStringAsFixed(2)}',
-      warningText1:
-      'You have spent RM ${spent.toStringAsFixed(2)} (80% or more) of the budget for this activity.',
-      warningText2:
-      'Your remaining budget for this activity is running low. Consider minimizing further expenses.',
-    );
+    final spent = state.activitySpentMap[activity.activitiesId] ?? 0.0;
+    final exceeded = spent - activity.allocatedBudget;
+    return exceeded > 0 ? exceeded : state.exceededAmount;
   }
 
   void _showUnderThresholdDialog(ActivityUiState state) {
     showBudgetExceededDialog(
       context: context,
       allocatedBudget:
-      'RM ${state.selectedActivity?.allocatedBudget.toStringAsFixed(2)}',
-      remainingBudget: state.remainingBudget.toStringAsFixed(2),
-      exceededAmount: state.overspentBudget.toStringAsFixed(2),
+      '${state.displayCurrency} ${state.selectedActivity?.allocatedBudget.toStringAsFixed(2)}',
+      remainingBudget: '${state.displayCurrency} ${state.remainingBudget.toStringAsFixed(2)}',
+      exceededAmount: '${state.displayCurrency} ${state.exceededAmount.toStringAsFixed(2)}',
       warningText1:
-      'You have overspent RM${state.overspentBudget.toStringAsFixed(2)} so far for entire trip.',
+      'You have overspent ${state.displayCurrency} ${state.overspentBudget.toStringAsFixed(2)} so far for entire trip.',
       warningText2:
       'The budget allocated for remaining restaurants have been modified.',
     );
@@ -241,34 +214,101 @@ class _ActivityScreenState extends State<ActivityScreen> {
     showBudgetExceededThresholdDialog(
       context: context,
       allocatedBudget:
-      'RM ${state.selectedActivity?.allocatedBudget.toStringAsFixed(2)}',
-      remainingBudget: state.remainingBudget.toStringAsFixed(2),
-      exceededAmount: state.exceededAmount.toStringAsFixed(2),
+      '${state.displayCurrency} ${state.selectedActivity?.allocatedBudget.toStringAsFixed(2)}',
+      remainingBudget: '${state.displayCurrency} ${state.remainingBudget.toStringAsFixed(2)}',
+      exceededAmount: '${state.displayCurrency} ${state.exceededAmount.toStringAsFixed(2)}',
       warningText1:
-      'You have overspent ${state.overspentBudget.toStringAsFixed(2)} so far on this trip.',
+      'You have overspent ${state.displayCurrency} ${state.overspentBudget.toStringAsFixed(2)} so far on this trip.',
       estimatedDays: state.sufficientDays.toString(),
       warningText3: 'Plan will be modified automatically.',
       onContinue: () async {
-        // 1. Dismiss the dialog
-        // Navigator.of(context, rootNavigator: true).pop();
-
-        // 2. Trigger the budget recovery plan generation
-        final viewModel = context.read<ActivityViewModel>();
-        final success = await viewModel.generateBudgetRecoveryPlan(
-          dayTripId: state.selectedActivity?.dayTripId,
-          availableBudget: state.totalBudget - state.spentBudget,
-        );
-
-        // 3. Optional: Provide UI feedback if recovery fails
-        if (!success && mounted) {
-          final error = viewModel.uiState.errorMessage;
-          if (error.isNotEmpty) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(error),
+        // 1. Show a labelled, non-dismissible loading dialog while the plan is
+        // being re-optimized (instead of the bare screen-wide spinner).
+        BuildContext? loadingDialogContext;
+        showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogCtx) {
+            loadingDialogContext = dialogCtx;
+            return PopScope(
+              canPop: false,
+              child: Center(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 40),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 28,
+                    vertical: 24,
+                  ),
+                  decoration: BoxDecoration(
+                    color: appTheme.white_A700,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(color: appTheme.teal_A700),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Re-optimizing your itinerary...',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Inter',
+                          color: appTheme.gray_900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             );
+          },
+        );
+
+        // 2. Trigger the budget recovery plan generation. Always dismiss the
+        // loading dialog afterwards, even if generation throws.
+        final viewModel = context.read<ActivityViewModel>();
+        bool success;
+        try {
+          success = await viewModel.generateBudgetRecoveryPlan(
+            dayTripId: state.selectedActivity?.dayTripId,
+            availableBudget: state.totalBudget - state.spentBudget,
+          );
+        } catch (e) {
+          debugPrint('Recovery plan error: $e');
+          success = false;
+        } finally {
+          if (loadingDialogContext != null &&
+              loadingDialogContext!.mounted) {
+            Navigator.of(loadingDialogContext!, rootNavigator: true).pop();
           }
+        }
+
+        if (!mounted) return;
+
+        if (success) {
+          showThreeSecondMessage(
+            context,
+            'Your plan has been optimized to fit your remaining budget.',
+          );
+          // 4. Take the tourist straight to the updated plan so they can see
+          // the re-optimized (future) activities instead of a static screen.
+          Navigator.of(context).pushNamed(
+            AppRoutes.wholeItineraryDetailScreen,
+            arguments: <String, dynamic>{
+              'isReadOnly': true,
+              'tripId': viewModel.uiState.tripId,
+            },
+          );
+        } else {
+          final error = viewModel.uiState.errorMessage;
+          showThreeSecondMessage(
+            context,
+            error.isNotEmpty
+                ? error
+                : 'Failed to optimize the plan. Please try again.',
+            isError: true,
+          );
         }
       },
     );
@@ -281,11 +321,11 @@ class _ActivityScreenState extends State<ActivityScreen> {
     final minTopUp = uiState.shortageAmount * 0.50;
     showBudgetRecoveryDialog(
       context: context,
-      shortageAmount: uiState.shortageAmount.toStringAsFixed(2),
-      minTopUp: minTopUp.toStringAsFixed(2),
-      remainingBudget: uiState.remainingBudget.toStringAsFixed(2),
+      shortageAmount: '${uiState.displayCurrency} ${uiState.shortageAmount.toStringAsFixed(2)}',
+      minTopUp: '${uiState.displayCurrency} ${minTopUp.toStringAsFixed(2)}',
+      remainingBudget: '${uiState.displayCurrency} ${uiState.remainingBudget.toStringAsFixed(2)}',
       warningText:
-      'Top-up amount should at least ${minTopUp.toStringAsFixed(2)}, insufficient top-up amount will trigger alternative recommendation directly.',
+      'Top-up amount should at least ${uiState.displayCurrency} ${minTopUp.toStringAsFixed(2)}, insufficient top-up amount will trigger alternative recommendation directly.',
       onEndTrip: onEndTrip,
       onTopUpBudget: (amount) async {
         final success = await onTopUpBudget(amount);
@@ -407,7 +447,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
       },
     );
   }
-
+  
   @override
   Widget build(BuildContext context) {
     final viewModel = context.watch<ActivityViewModel>();
@@ -564,14 +604,56 @@ class _ActivityScreenState extends State<ActivityScreen> {
                   letterSpacing: 0.5,
                 ),
               ),
-              Text(
-                'RM ${uiState.spentBudget.toStringAsFixed(2)} / RM ${uiState.totalBudget.toStringAsFixed(2)}',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  fontFamily: 'Inter',
-                  color: appTheme.gray_900,
-                ),
+              Row(
+                children: [
+                  DualCurrencyAmount(
+                    amount: uiState.spentBudget,
+                    baseCurrency: 'MYR',
+                    baseLabel: 'RM',
+                    primaryStyle: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      fontFamily: 'Inter',
+                      color: appTheme.gray_900,
+                    ),
+                    secondaryStyle: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Inter',
+                      color: appTheme.blue_gray_700,
+                    ),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    textAlign: TextAlign.start,
+                  ),
+                  Text(
+                    ' / ',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      fontFamily: 'Inter',
+                      color: appTheme.gray_900,
+                    ),
+                  ),
+                  DualCurrencyAmount(
+                    amount: uiState.totalBudget,
+                    baseCurrency: 'MYR',
+                    baseLabel: 'RM',
+                    primaryStyle: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      fontFamily: 'Inter',
+                      color: appTheme.gray_900,
+                    ),
+                    secondaryStyle: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Inter',
+                      color: appTheme.blue_gray_700,
+                    ),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    textAlign: TextAlign.start,
+                  ),
+                ],
               ),
             ],
           ),
@@ -591,16 +673,50 @@ class _ActivityScreenState extends State<ActivityScreen> {
               Expanded(
                 child: _buildSubBudgetCard(
                   title: 'SPENT',
-                  amount: 'RM ${uiState.spentBudget.toStringAsFixed(2)}',
-                  amountColor: spentColor,
+                  amountWidget: DualCurrencyAmount(
+                    amount: uiState.spentBudget,
+                    baseCurrency: 'MYR',
+                    baseLabel: 'RM',
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    textAlign: TextAlign.start,
+                    primaryStyle: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      fontFamily: 'Inter',
+                      color: spentColor,
+                    ),
+                    secondaryStyle: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      fontFamily: 'Inter',
+                      color: appTheme.blue_gray_700,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 12.0),
               Expanded(
                 child: _buildSubBudgetCard(
                   title: 'REMAINING',
-                  amount: 'RM ${uiState.remainingBudget.toStringAsFixed(2)}',
-                  amountColor: remainingColor,
+                  amountWidget: DualCurrencyAmount(
+                    amount: uiState.remainingBudget,
+                    baseCurrency: 'MYR',
+                    baseLabel: 'RM',
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    textAlign: TextAlign.start,
+                    primaryStyle: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      fontFamily: 'Inter',
+                      color: remainingColor,
+                    ),
+                    secondaryStyle: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      fontFamily: 'Inter',
+                      color: appTheme.blue_gray_700,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -611,8 +727,25 @@ class _ActivityScreenState extends State<ActivityScreen> {
               Expanded(
                 child: _buildSubBudgetCard(
                   title: 'OVERSPENT',
-                  amount: 'RM ${uiState.overspentBudget.toStringAsFixed(2)}',
-                  amountColor: appTheme.gray_900,
+                  amountWidget: DualCurrencyAmount(
+                    amount: uiState.overspentBudget,
+                    baseCurrency: 'MYR',
+                    baseLabel: 'RM',
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    textAlign: TextAlign.start,
+                    primaryStyle: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      fontFamily: 'Inter',
+                      color: appTheme.gray_900,
+                    ),
+                    secondaryStyle: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      fontFamily: 'Inter',
+                      color: appTheme.blue_gray_700,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 12.0),
@@ -632,8 +765,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
   Widget _buildSubBudgetCard({
     required String title,
-    required String amount,
-    required Color amountColor,
+    String? amount,
+    Color? amountColor,
+    Widget? amountWidget,
   }) {
     return Container(
       padding: const EdgeInsets.all(12.0),
@@ -656,15 +790,16 @@ class _ActivityScreenState extends State<ActivityScreen> {
             ),
           ),
           const SizedBox(height: 6.0),
-          Text(
-            amount,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-              fontFamily: 'Inter',
-              color: amountColor,
-            ),
-          ),
+          amountWidget ??
+              Text(
+                amount!,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  fontFamily: 'Inter',
+                  color: amountColor!,
+                ),
+              ),
         ],
       ),
     );
@@ -800,9 +935,16 @@ class _ActivityScreenState extends State<ActivityScreen> {
       }) {
     final spent = uiState.activitySpentMap[activity.activitiesId] ?? 0.0;
 
-// Flag as alert if spending reaches 90% or more (including overspent)
-    final bool isAlert = activity.allocatedBudget > 0 &&
-        (spent >= activity.allocatedBudget * 0.80);
+    // Red as soon as spending EXCEEDS the allocated budget. This also covers
+    // zero-budget activities (allocatedBudget == 0), where any spending at all
+    // is already an overspend.
+    final bool isOverBudget = spent > activity.allocatedBudget;
+
+    // Warn (red) slightly earlier for budgeted activities: 80% or more used.
+    final bool reachedAlertThreshold = activity.allocatedBudget > 0 &&
+        spent >= activity.allocatedBudget * 0.80;
+
+    final bool isAlert = isOverBudget || reachedAlertThreshold;
 
     final Color chipBgColor = isAlert
         ? appTheme.wholeAlertBudgetStroke
@@ -891,15 +1033,71 @@ class _ActivityScreenState extends State<ActivityScreen> {
                         textColor: appTheme.teal_800,
                       ),
                     _buildChip(
-                      label: 'RM${activity.allocatedBudget.toStringAsFixed(0)}',
                       backgroundColor: appTheme.amber_200,
                       textColor: appTheme.lime_900,
+                      child: DualCurrencyAmount(
+                        amount: activity.allocatedBudget,
+                        baseCurrency: 'MYR',
+                        baseLabel: 'RM',
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        textAlign: TextAlign.start,
+                        primaryStyle: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          fontFamily: 'Inter',
+                          color: appTheme.lime_900,
+                          height: 1.2,
+                        ),
+                        secondaryStyle: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Inter',
+                          color: appTheme.lime_900.withValues(alpha: 0.7),
+                          height: 1.2,
+                        ),
+                      ),
                     ),
                     if (spent > 0)
                       _buildChip(
-                        label: 'Spent: RM${spent.toStringAsFixed(0)}',
                         backgroundColor: chipBgColor,
                         textColor: chipTextColor,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Spent: ',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                fontFamily: 'Inter',
+                                color: chipTextColor,
+                                height: 1.2,
+                              ),
+                            ),
+                            DualCurrencyAmount(
+                              amount: spent,
+                              baseCurrency: 'MYR',
+                              baseLabel: 'RM',
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              textAlign: TextAlign.start,
+                              primaryStyle: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                fontFamily: 'Inter',
+                                color: chipTextColor,
+                                height: 1.2,
+                              ),
+                              secondaryStyle: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'Inter',
+                                color: chipTextColor.withValues(alpha: 0.7),
+                                height: 1.2,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                   ],
                 ),
@@ -912,9 +1110,10 @@ class _ActivityScreenState extends State<ActivityScreen> {
   }
 
   Widget _buildChip({
-    required String label,
+    String? label,
     required Color backgroundColor,
     required Color textColor,
+    Widget? child,
   }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -922,15 +1121,16 @@ class _ActivityScreenState extends State<ActivityScreen> {
         color: backgroundColor,
         borderRadius: BorderRadius.circular(20),
       ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w800,
-          fontFamily: 'Inter',
-          color: textColor,
-        ).copyWith(height: 1.2),
-      ),
+      child: child ??
+          Text(
+            label!,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              fontFamily: 'Inter',
+              color: textColor,
+            ).copyWith(height: 1.2),
+          ),
     );
   }
 

@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
-import '../../models/entities/activity.dart';
 import '../../models/entities/expense_item.dart';
 import '../../models/local_data_source/camera_source.dart';
 import '../../models/local_data_source/gallery_source.dart';
@@ -43,14 +42,17 @@ class ActivityViewModel extends ChangeNotifier {
     ICachedActivity? cachedActivity,
     required IAuthService authService,
   }) : _itineraryService = itineraryService ?? ItineraryService(),
-       _budgetService = budgetService ?? BudgetService(),
+       _budgetService =
+           budgetService ?? BudgetService(authService: authService),
        _expenseTrackingService =
-           expenseTrackingService ?? ExpenseTrackingService(),
+           expenseTrackingService ??
+           ExpenseTrackingService(authService: authService),
        _expenseRepository = expenseRepository ?? ExpenseRepository(),
        _authService = authService,
        _cachedActivity = cachedActivity ?? GetCachedActivities() {
     _uiState = _uiState.copyWith(
       originalCurrency: _defaultExpenseCurrency(),
+      displayCurrency: _authService.preferredCurrency,
     );
     _loadAvailableCurrencies();
     _authService.addListener(_handleAuthChanged);
@@ -265,10 +267,7 @@ class ActivityViewModel extends ChangeNotifier {
     required double amount,
     required String originalCurrency,
   }) async {
-    _uiState = _uiState.copyWith(
-      isConverting: true,
-      currencyError: null,
-    );
+    _uiState = _uiState.copyWith(isConverting: true, currencyError: null);
     notifyListeners();
     final targetCurrency = _authService.preferredCurrency;
     try {
@@ -415,11 +414,12 @@ class ActivityViewModel extends ChangeNotifier {
       return 0;
     }
 
-    final expenseItems = _expenseTrackingService.buildDraftExpenseItemsFromReceipt(
-      receiptText: _uiState.ocrRawText,
-      merchantName: _uiState.ocrMerchantName,
-      transactionDateTime: _uiState.ocrTransactionDateTime,
-    );
+    final expenseItems = _expenseTrackingService
+        .buildDraftExpenseItemsFromReceipt(
+          receiptText: _uiState.ocrRawText,
+          merchantName: _uiState.ocrMerchantName,
+          transactionDateTime: _uiState.ocrTransactionDateTime,
+        );
     if (expenseItems.isEmpty) {
       return 0;
     }
@@ -436,8 +436,9 @@ class ActivityViewModel extends ChangeNotifier {
         .map((line) => line.trim().toLowerCase())
         .any(
           (line) =>
-              RegExp(r'\b(?:sales tax|service tax|govt tax|sst|gst)\b')
-                  .hasMatch(line) &&
+              RegExp(
+                r'\b(?:sales tax|service tax|govt tax|sst|gst)\b',
+              ).hasMatch(line) &&
               !line.contains(' id') &&
               !line.contains(' no'),
         );
@@ -487,8 +488,9 @@ class ActivityViewModel extends ChangeNotifier {
       final extractedDateTime = _expenseTrackingService.extractReceiptDateTime(
         receiptText,
       );
-      final extractedCurrency =
-          _expenseTrackingService.extractReceiptCurrency(receiptText);
+      final extractedCurrency = _expenseTrackingService.extractReceiptCurrency(
+        receiptText,
+      );
       String extractedTotalError = '';
 
       if (extractedTotal != null) {
@@ -680,12 +682,17 @@ class ActivityViewModel extends ChangeNotifier {
         .replaceFirst('Invalid argument(s): ', '');
   }
 
-  Future<void> initialize({DateTime? filterDate, bool forceRefresh = false}) async {
-
+  Future<void> initialize({
+    DateTime? filterDate,
+    bool forceRefresh = false,
+  }) async {
+    debugPrint("initialize");
     // try to read the latest trip state from the local storage first
-    if(!forceRefresh) {
-      try{
-        final cachedState = await _cachedActivity.getActivitiesForTrip('latest_ongoing_trip');
+    if (!forceRefresh) {
+      try {
+        final cachedState = await _cachedActivity.getActivitiesForTrip(
+          'latest_ongoing_trip',
+        );
         if (cachedState.isNotEmpty) {
           _uiState = _uiState.copyWith(
             isLoading: false,
@@ -701,7 +708,7 @@ class ActivityViewModel extends ChangeNotifier {
     }
 
     final bool hasCachedData = _uiState.activities.isNotEmpty;
-    if(!hasCachedData || forceRefresh) {
+    if (!hasCachedData || forceRefresh) {
       _uiState = _uiState.copyWith(
         isLoading: true,
         filterDate: filterDate,
@@ -714,8 +721,10 @@ class ActivityViewModel extends ChangeNotifier {
       final result = await _itineraryService.fetchLatestTrip();
 
       // Verify trip exists, is ongoing, and contains activities
-      final bool isTripActive = result != null &&
-          result.trip.status == 'ongoing' && // Check your exact active status string
+      final bool isTripActive =
+          result != null &&
+          result.trip.status ==
+              'ongoing' && // Check your exact active status string
           result.activities.isNotEmpty;
 
       if (isTripActive) {
@@ -736,9 +745,11 @@ class ActivityViewModel extends ChangeNotifier {
         );
         await refreshSpentAmounts();
 
-        await _cachedActivity.saveActivitiesLocally('latest_ongoing_trip', result.activities);
+        await _cachedActivity.saveActivitiesLocally(
+          'latest_ongoing_trip',
+          result.activities,
+        );
         await _cachedActivity.saveActivitiesLocally(tripId, result.activities);
-
 
         _uiState = _uiState.copyWith(isLoading: false);
         unawaited(_prepareExpenseReminders(result.activities));
@@ -766,8 +777,11 @@ class ActivityViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> loadTripItinerary(String tripId, {DateTime? filterDate, bool forceRefresh = false}) async {
-
+  Future<void> loadTripItinerary(
+    String tripId, {
+    DateTime? filterDate,
+    bool forceRefresh = false,
+  }) async {
     final now = DateTime.now();
     final targetDate = filterDate != null
         ? DateTime(filterDate.year, filterDate.month, filterDate.day)
@@ -776,14 +790,20 @@ class ActivityViewModel extends ChangeNotifier {
     // 1. Instant Cache Load
     if (!forceRefresh) {
       try {
-        final cachedActivities = await _cachedActivity.getActivitiesForTrip(tripId.isNotEmpty ? tripId : 'latest_ongoing_trip');
+        final cachedActivities = await _cachedActivity.getActivitiesForTrip(
+          tripId.isNotEmpty ? tripId : 'latest_ongoing_trip',
+        );
         if (cachedActivities.isNotEmpty) {
-          final currentDateCached = cachedActivities.where((act) => _isSameDate(act.date, targetDate)).toList();
+          final currentDateCached = cachedActivities
+              .where((act) => _isSameDate(act.date, targetDate))
+              .toList();
           _uiState = _uiState.copyWith(
             isLoading: false,
             tripId: tripId,
             filterDate: targetDate,
-            activities: currentDateCached.isNotEmpty ? currentDateCached : cachedActivities,
+            activities: currentDateCached.isNotEmpty
+                ? currentDateCached
+                : cachedActivities,
           );
           notifyListeners(); // Renders cache immediately without wiping!
         }
@@ -804,7 +824,9 @@ class ActivityViewModel extends ChangeNotifier {
 
     // Fallback: Network Fetch
     try {
-      final allActivities = await _itineraryService.fetchAllActivitiesByTrip(tripId);
+      final allActivities = await _itineraryService.fetchAllActivitiesByTrip(
+        tripId,
+      );
       final tripResult = await _itineraryService.fetchLatestTrip();
 
       // 1. Calculate the initial spent budget across all activities & populate the map
@@ -812,7 +834,9 @@ class ActivityViewModel extends ChangeNotifier {
       double totalSpent = 0.0;
 
       for (final act in allActivities) {
-        final expenses = await _expenseRepository.getExpensesByActivityId(act.activitiesId);
+        final expenses = await _expenseRepository.getExpensesByActivityId(
+          act.activitiesId,
+        );
         double actSpent = 0.0;
         for (final exp in expenses) {
           actSpent += exp.totalAmount;
@@ -821,14 +845,7 @@ class ActivityViewModel extends ChangeNotifier {
         totalSpent += actSpent;
       }
 
-      // 2. Calculate initial overspent amount from trip days
-      final days = await _itineraryService.getDaysByTripId(tripId);
-      double totalOverspend = 0.0;
-      for (final day in days) {
-        totalOverspend += (day.overspendAmount ?? 0.0);
-      }
-
-      // 3. Calculate initial sufficient days
+      // 2. Calculate initial sufficient days
       int initialSufficientDays = 0;
       if (allActivities.isNotEmpty) {
         initialSufficientDays = await _budgetService.calculateSufficientDays(
@@ -847,18 +864,25 @@ class ActivityViewModel extends ChangeNotifier {
         totalBudget: tripResult?.trip.totalBudget ?? _uiState.totalBudget,
         activitySpentMap: spentMap,
         spentBudget: totalSpent,
-        overspentBudget: totalOverspend,
         sufficientDays: initialSufficientDays,
         filterDate: targetDate,
         tripId: tripId,
-        tripDestination: tripResult?.trip.destination ?? _uiState.tripDestination,
+        tripDestination:
+            tripResult?.trip.destination ?? _uiState.tripDestination,
       );
 
       // Save to cache
       await _cachedActivity.saveActivitiesLocally(tripId, allActivities);
-      await _cachedActivity.saveActivitiesLocally('latest_ongoing_trip', allActivities);
+      await _cachedActivity.saveActivitiesLocally(
+        'latest_ongoing_trip',
+        allActivities,
+      );
 
       await refreshSpentAmounts();
+
+      // Clean stale per-day overspend values in the DB and publish the
+      // authoritative whole-trip overspentBudget.
+      await reconcileTripOverspend();
       unawaited(_prepareExpenseReminders(allActivities));
     } catch (e) {
       _uiState = _uiState.copyWith(
@@ -1117,10 +1141,7 @@ class ActivityViewModel extends ChangeNotifier {
     final tripId = _uiState.tripId;
     final activityId = _uiState.currentActivityId;
 
-    _uiState = _uiState.copyWith(
-      isLoading: true,
-      errorMessage: '',
-    );
+    _uiState = _uiState.copyWith(isLoading: true, errorMessage: '');
     notifyListeners();
 
     try {
@@ -1141,8 +1162,10 @@ class ActivityViewModel extends ChangeNotifier {
 
         // Calculate the NEW shortage.
         final double newShortageAmount =
-        (_uiState.shortageAmount - additionalAmount)
-            .clamp(0.0, double.infinity);
+            (_uiState.shortageAmount - additionalAmount).clamp(
+              0.0,
+              double.infinity,
+            );
 
         debugPrint('========== TOP UP ==========');
         debugPrint('Previous shortage: ${_uiState.shortageAmount}');
@@ -1217,20 +1240,24 @@ class ActivityViewModel extends ChangeNotifier {
 
       await refreshSpentAmounts();
 
-      final days = await _itineraryService.getDaysByTripId(_uiState.tripId);
+      final currentActivity = _uiState.activities.firstWhere(
+        (a) => a.activitiesId == _uiState.currentActivityId,
+        orElse: () => _uiState.selectedActivity ?? _uiState.activities.first,
+      );
 
-      double overspend = 0.00;
-
-      for (var day in days) {
-        overspend += day.overspendAmount!;
-      }
+      // Reconciles the current day's budget in the DB and updates the
+      // trip-level overspentBudget from the reconciled data (authoritative).
+      await evaluateDayOverspend(
+        dayTripId: currentActivity.dayTripId,
+        date: currentActivity.date,
+      );
 
       final activities = await _itineraryService.getRemainingActivities(
         _uiState.tripId,
         DateTime.now(),
       );
 
-      var shortageAmount = 0.0;
+      double shortageAmount = 0.0;
       for (var ad in activities) {
         shortageAmount += ad.allocatedBudget;
       }
@@ -1240,38 +1267,40 @@ class ActivityViewModel extends ChangeNotifier {
         _uiState.currentActivityId,
       );
 
-      final exceededAmount = await _expenseTrackingService.getExceededAmount(_uiState.tripId, _uiState.currentActivityId);
+      var exceededAmount = await _expenseTrackingService.getExceededAmount(
+        _uiState.tripId,
+        _uiState.currentActivityId,
+      );
+
+      shortageAmount =
+          await _authService.convertToPreferredCurrency(
+            amount: shortageAmount,
+            fromCurrency: 'MYR',
+          ) ??
+          shortageAmount;
+      exceededAmount =
+          await _authService.convertToPreferredCurrency(
+            amount: exceededAmount,
+            fromCurrency: 'MYR',
+          ) ??
+          exceededAmount;
 
       _uiState = _uiState.copyWith(
-        overspentBudget: overspend,
+        // NOTE: overspentBudget is intentionally left untouched here - it was
+        // already set by evaluateDayOverspend() from the reconciled DB days.
+        // Re-writing it with a stale/pre-reconcile value caused the OVERSPENT
+        // card to jump to an incorrect figure after expense submission.
         shortageAmount: shortageAmount,
         sufficientDays: sufficientDays,
-        exceededAmount: exceededAmount
+        exceededAmount: exceededAmount,
       );
 
       switch (response) {
         case ExpenseProcessingResult.withinBudget:
-          final currentActivity = _uiState.activities.firstWhere(
-              (a) => a.activitiesId == _uiState.currentActivityId,
-            orElse: () => _uiState.selectedActivity ?? _uiState.activities.first,
+          _uiState = _uiState.copyWith(
+            popupAction: '',
+            selectedActivity: currentActivity,
           );
-
-          final spent = _uiState.activitySpentMap[currentActivity.activitiesId] ?? 0.0;
-          final allocated = currentActivity.allocatedBudget;
-
-          if(allocated > 0 && spent >= (allocated * 0.50) && spent <= allocated) {
-            _uiState = _uiState.copyWith(
-              popupAction: 'warning_50',
-              selectedActivity: currentActivity,
-            );
-          } else if(allocated > 0 && spent >= (allocated * 0.80) && spent <= allocated) {
-            _uiState = _uiState.copyWith(
-              popupAction: 'warning_80',
-              selectedActivity: currentActivity,
-            );
-          } else{
-            _uiState = _uiState.copyWith(popupAction: '');
-          }
           break;
 
         case ExpenseProcessingResult.reallocatedSuccessfully:
@@ -1312,31 +1341,32 @@ class ActivityViewModel extends ChangeNotifier {
     required double availableBudget,
     double topUpAmount = 0.0,
   }) async {
-
     final now = DateTime.now();
 
-    final remainingActivities = _uiState.activities.where((a) {
-      if (a.dayTripId != dayTripId || a.status == 'completed') return false;
+    // Our own "upcoming slots" selection for the recovery. We intentionally do
+    // NOT call the shared getRemainingActivities() (owned by other teammates)
+    // so its behaviour is left untouched. A slot is only optimizable when it
+    // has NOT started yet at this moment: past / ongoing activities are
+    // excluded even if they have no expense record. Missing or malformed start
+    // times are never treated as optimizable.
+    final allTripActivities = await _itineraryService.fetchAllActivitiesByTrip(
+      _uiState.tripId,
+    );
 
-      // another condition that kick the activities only don't have expense records
-      final hasRecordedExpense = (a.allocatedBudget > 0) || (a.isOverspend == true) || (a.overspendAmount != null && a.overspendAmount! > 0);
+    final remainingActivities = allTripActivities.where((a) {
+      if (a.status == 'completed') return false;
 
-      if(hasRecordedExpense) return false;
+      final start = _tryActivityStart(a);
+      if (start == null || !start.isAfter(now)) return false;
 
-      // Filter out activities that have already passed based on endTime
-      try {
-        final endParts = a.endTime?.split(':');
-        final activityEndTime = DateTime(
-          a.date.year,
-          a.date.month,
-          a.date.day,
-          int.parse(endParts?[0] ?? '0'),
-          int.parse(endParts?[1] ?? '0'),
-        );
-        return activityEndTime.isAfter(now);
-      } catch (_) {
-        return true;
-      }
+      // Skip slots that already have money spent on them.
+      final spentOnActivity = _uiState.activitySpentMap[a.activitiesId] ?? 0.0;
+      final hasRecordedExpense =
+          (a.isOverspend == true) ||
+          (a.overspendAmount != null && a.overspendAmount! > 0) ||
+          spentOnActivity > 0;
+
+      return !hasRecordedExpense;
     }).toList();
 
     if (dayTripId == null) return false;
@@ -1345,7 +1375,6 @@ class ActivityViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-
       Position? currentPosition;
       try {
         currentPosition = await _locationSource.getCurrentLocation();
@@ -1357,20 +1386,33 @@ class ActivityViewModel extends ChangeNotifier {
           ? 'Lat: ${currentPosition.latitude.toStringAsFixed(5)}, Lon: ${currentPosition.longitude.toStringAsFixed(5)}'
           : null;
 
-      final effectiveRemainingBudget = _uiState.totalBudget - _uiState.spentBudget;
+      final effectiveRemainingBudget =
+          _uiState.totalBudget - _uiState.spentBudget;
 
       // 2. Delegate generation and Supabase updates completely to Service
-      final revisedActivities =
-      await _itineraryService.generateBudgetRecoveryItinerary(
-        tripId: _uiState.tripId ?? '',
-        effectiveRemainingBudget: effectiveRemainingBudget,
-        currentSpentBudget: _uiState.spentBudget,
-        topUpAmount: topUpAmount,
-        remainingActivities: remainingActivities,
-        tripDestination: _uiState.tripDestination,
-        userCoordinates: userCoordinates,
-        currentDate: DateTime.now(),
-      );
+      final revisedActivities = await _itineraryService
+          .generateBudgetRecoveryItinerary(
+            tripId: _uiState.tripId,
+            effectiveRemainingBudget: effectiveRemainingBudget,
+            currentSpentBudget: _uiState.spentBudget,
+            topUpAmount: topUpAmount,
+            remainingActivities: remainingActivities,
+            tripDestination: _uiState.tripDestination,
+            userCoordinates: userCoordinates,
+            currentDate: DateTime.now(),
+          );
+
+      // Nothing was generated (e.g. no slots left to re-plan, or the engine
+      // returned no usable plan) - treat it as a failure so the UI can tell
+      // the user instead of silently doing nothing.
+      if (revisedActivities.isEmpty) {
+        _uiState = _uiState.copyWith(
+          isLoading: false,
+          errorMessage: 'No plan changes could be generated. Please try again.',
+        );
+        notifyListeners();
+        return false;
+      }
 
       // 3. Merge returned domain activities into the state
       final revisedMap = {
@@ -1399,9 +1441,30 @@ class ActivityViewModel extends ChangeNotifier {
     }
   }
 
+  /// Our own tolerant parser for an activity's scheduled start time. Returns
+  /// null when the time is missing or malformed, so such a slot is never
+  /// considered "upcoming/optimizable".
+  DateTime? _tryActivityStart(Activity activity) {
+    final date = activity.date;
+    final timeParts = activity.startTime?.split(':');
+    if (timeParts == null || timeParts.length < 2) return null;
+
+    final hour = int.tryParse(timeParts[0].trim());
+    final minute = int.tryParse(timeParts[1].trim());
+    if (hour == null || minute == null) return null;
+
+    try {
+      return DateTime(date.year, date.month, date.day, hour, minute);
+    } catch (_) {
+      return null;
+    }
+  }
+
   // weisong
   Future<void> refreshSpentAmounts() async {
-    debugPrint('DEBUG: [refreshSpentAmounts] invoked. Current activityId: "${_uiState.currentActivityId}", Activities count: ${_uiState.activities.length}');
+    debugPrint(
+      'DEBUG: [refreshSpentAmounts] invoked. Current activityId: "${_uiState.currentActivityId}", Activities count: ${_uiState.activities.length}',
+    );
 
     // 1. Guard against empty activities list instead of currentActivityId
     final activityIds = _uiState.activities
@@ -1410,52 +1473,97 @@ class ActivityViewModel extends ChangeNotifier {
         .toList();
 
     if (activityIds.isEmpty) {
-      debugPrint('DEBUG: [refreshSpentAmounts] Aborted: No activity IDs found in _uiState.activities.');
+      debugPrint(
+        'DEBUG: [refreshSpentAmounts] Aborted: No activity IDs found in _uiState.activities.',
+      );
       return;
     }
 
     try {
-      debugPrint('DEBUG: Calling _itineraryService.getTripSpentSummary for ${activityIds.length} activities...');
+      debugPrint(
+        'DEBUG: Calling _itineraryService.getTripSpentSummary for ${activityIds.length} activities...',
+      );
       final summary = await _itineraryService.getTripSpentSummary(activityIds);
 
       // Safely cast num to double to avoid cast exceptions if Supabase returns int
-      final double freshSpent = (summary['totalSpent'] as num?)?.toDouble() ?? 0.0;
-      final Map<String, double> freshActivityMap =
-      Map<String, double>.from(summary['activitySpentMap'] ?? {});
+      final double freshSpent =
+          (summary['totalSpent'] as num?)?.toDouble() ?? 0.0;
+      final Map<String, double> freshActivityMap = Map<String, double>.from(
+        summary['activitySpentMap'] ?? {},
+      );
 
-      double recalculatedOverspend = 0.0;
       for (final activity in _uiState.activities) {
         final double actSpent = freshActivityMap[activity.activitiesId] ?? 0.0;
         final double actBudget = activity.allocatedBudget;
         final double actDiff = actSpent - actBudget;
-        debugPrint('🚨 [OVERSPENT DETECTED] Activity: "${activity.destination}" '
-            '(ID: ${activity.activitiesId}) | '
-            'Allocated: ${activity.allocatedBudget} | '
-            'Spent: $actSpent | '
-            'Over by: $actDiff');
-
+        debugPrint(
+          '🚨 [OVERSPENT DETECTED] Activity: "${activity.destination}" '
+          '(ID: ${activity.activitiesId}) | '
+          'Allocated: ${activity.allocatedBudget} | '
+          'Spent: $actSpent | '
+          'Over by: $actDiff',
+        );
 
         debugPrint(
-        '>>> [DEBUG Activity Overspend Check] ID: ${activity.activitiesId} | '
-        'Name: "${activity.destination}" | '
-        'Spent: $actSpent | '
-        'Allocated: $actBudget | '
-        'Diff: $actDiff',
+          '>>> [DEBUG Activity Overspend Check] ID: ${activity.activitiesId} | '
+          'Name: "${activity.destination}" | '
+          'Spent: $actSpent | '
+          'Allocated: $actBudget | '
+          'Diff: $actDiff',
         );
       }
 
+      // NOTE: overspentBudget is intentionally NOT set here. This method only
+      // knows the filtered (_uiState.activities) date, so computing a "trip"
+      // overspent here produced different figures depending on the filter.
+      // The authoritative whole-trip value comes from reconcileTripOverspend().
       _uiState = _uiState.copyWith(
         spentBudget: freshSpent,
         activitySpentMap: freshActivityMap,
-        overspentBudget: recalculatedOverspend,
       );
 
-      debugPrint('>>> [DEBUG refreshSpentAmounts] New uiState.overspentBudget after copyWith: ${_uiState.overspentBudget}');
-      debugPrint("[refreshSpentAmounts] Success! Total Spent: $freshSpent, Map: $freshActivityMap");
+      debugPrint(
+        '>>> [DEBUG refreshSpentAmounts] Spent refresh done (overspentBudget untouched).',
+      );
+      debugPrint(
+        "[refreshSpentAmounts] Success! Total Spent: $freshSpent, Map: $freshActivityMap",
+      );
       notifyListeners();
     } catch (e, stack) {
       debugPrint('Error refreshing spent amounts: $e');
       debugPrint('Stack trace: $stack');
     }
+  }
+
+  // weisong
+  // Reconciles EVERY trip day against real spending, persists each day's net
+  // overspend (which clears stale day values), and publishes the authoritative
+  // whole-trip overspentBudget to the top card.
+  Future<void> reconcileTripOverspend() async {
+    if (_uiState.tripId.isEmpty) return;
+    try {
+      final totalTripOverspent = await _budgetService.reconcileTripOverspend(
+        tripId: _uiState.tripId,
+      );
+      debugPrint(
+        '>>> [DEBUG reconcileTripOverspend] Reconciled total overspent: '
+        '${totalTripOverspent.toStringAsFixed(2)}',
+      );
+
+      _uiState = _uiState.copyWith(overspentBudget: totalTripOverspent);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error reconciling trip overspend: $e');
+    }
+  }
+
+  // Re-evaluates a day's net overspend and updates trip-level overspentBudget.
+  // Reconciling the whole trip (not just this day) keeps the OVERSPENT figure
+  // consistent and removes phantom leftover amounts from other days.
+  Future<void> evaluateDayOverspend({
+    required String dayTripId,
+    required DateTime date,
+  }) async {
+    await reconcileTripOverspend();
   }
 }

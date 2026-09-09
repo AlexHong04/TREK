@@ -90,7 +90,7 @@ class TravelInformationInputViewModel extends ChangeNotifier {
       );
     }
     wishlistController.clear();
-    notifyListeners();
+    clearSuggestions();
   }
 
   void removeWishlistItem(String item) {
@@ -117,6 +117,7 @@ class TravelInformationInputViewModel extends ChangeNotifier {
   }
 
   void clearSuggestions() {
+    _debounce?.cancel();
     _uiState = _uiState.copyWith(
       suggestions: const [],
       isSearchingSuggestions: false,
@@ -141,6 +142,11 @@ class TravelInformationInputViewModel extends ChangeNotifier {
         final results = await _itineraryService.getAutocompleteSuggestions(
           trimmed,
         );
+
+        // If the text was cleared while request was in-flight, ignore results
+        if (wishlistController.text.trim().isEmpty) {
+          return;
+        }
 
         _uiState = _uiState.copyWith(
           suggestions: results,
