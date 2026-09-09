@@ -36,9 +36,6 @@ class Expense {
       if (expenseId != null) 'expense_id': expenseId,
       'activities_id': activitiesId,
       'total_amount': totalAmount,
-      'currency': currency.trim().isEmpty
-          ? 'MYR'
-          : currency.trim().toUpperCase(),
       if (paymentMethod != null) 'payment_method': paymentMethod,
       if (receiptImageUrl != null) 'receipt_image_url': receiptImageUrl,
       if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
