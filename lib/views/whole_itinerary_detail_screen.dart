@@ -139,8 +139,7 @@ class _WholeItineraryDetailScreenState
           viewModel.uiState.estimatedExtraBudgetNeeded > 0) {
         await showEmptyWishlistInsufficientTotalBudgetDialog(
           context: context,
-          shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded
-              .toStringAsFixed(2),
+          shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded,
           minTopUp: minTopUp,
           onCancel: () async {
             await showCancelTripWithoutWishlistDialog(
@@ -177,8 +176,7 @@ class _WholeItineraryDetailScreenState
           viewModel.uiState.wishlistItemsCoveredCount == 0) {
         await showInitialTotalBudgetTotallyInsufficientDialog(
           context: context,
-          shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded
-              .toStringAsFixed(2),
+          shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded,
           minTopUp: minTopUp,
           wishlistCovered: viewModel.uiState.wishlistItemsCoveredCount,
           onCancel: () async {
@@ -217,8 +215,7 @@ class _WholeItineraryDetailScreenState
               viewModel.uiState.estimatedExtraBudgetNeeded > 0)) {
         await showInitialTotalBudgetInsufficientDialog(
           context: context,
-          shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded
-              .toStringAsFixed(2),
+          shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded,
           minTopUp: minTopUp,
           wishlistCovered: viewModel.uiState.wishlistItemsCoveredCount,
           onCancel: () async {

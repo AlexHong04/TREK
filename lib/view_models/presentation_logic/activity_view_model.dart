@@ -1380,25 +1380,20 @@ class ActivityViewModel extends ChangeNotifier {
         '[handleExpenseSubmission] Exceeded = spent($activitySpent) - '
             'originalBudget($originalAllocatedBudget) = $exceededAmount',
       );
-
-      shortageAmount =
-          await _authService.convertToPreferredCurrency(
-            amount: shortageAmount,
-            fromCurrency: 'MYR',
-          ) ??
-              shortageAmount;
-      exceededAmount =
-          await _authService.convertToPreferredCurrency(
-            amount: exceededAmount,
-            fromCurrency: 'MYR',
-          ) ??
-              exceededAmount;
+      // final days = await _itineraryService.getDaysByTripId(_uiState.tripId);
+      //
+      // double overspend = 0.00;
+      //
+      // for (var day in days) {
+      //   overspend += day.overspendAmount!;
+      // }
 
       _uiState = _uiState.copyWith(
         // NOTE: overspentBudget is intentionally left untouched here - it was
         // already set by evaluateDayOverspend() from the reconciled DB days.
         // Re-writing it with a stale/pre-reconcile value caused the OVERSPENT
         // card to jump to an incorrect figure after expense submission.
+        // overspentBudget: overspend,
         shortageAmount: shortageAmount,
         sufficientDays: sufficientDays,
         exceededAmount: exceededAmount,

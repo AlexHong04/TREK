@@ -180,11 +180,11 @@ class _ActivityScreenState extends State<ActivityScreen> {
     showBudgetExceededDialog(
       context: context,
       allocatedBudget:
-      '${state.displayCurrency} ${state.selectedActivity?.allocatedBudget.toStringAsFixed(2)}',
-      remainingBudget: '${state.displayCurrency} ${state.remainingBudget.toStringAsFixed(2)}',
-      exceededAmount: '${state.displayCurrency} ${state.exceededAmount.toStringAsFixed(2)}',
+      state.selectedActivity!.allocatedBudget,
+      remainingBudget: state.remainingBudget,
+      exceededAmount: state.exceededAmount,
       warningText1:
-      'You have overspent ${state.displayCurrency} ${state.overspentBudget.toStringAsFixed(2)} so far for entire trip.',
+      'You have overspent RM ${state.overspentBudget.toStringAsFixed(2)} so far for entire trip.',
       warningText2:
       'The budget allocated for remaining restaurants have been modified.',
     );
@@ -223,11 +223,11 @@ class _ActivityScreenState extends State<ActivityScreen> {
     showBudgetExceededThresholdDialog(
       context: context,
       allocatedBudget:
-      '${state.displayCurrency} ${state.selectedActivity?.allocatedBudget.toStringAsFixed(2)}',
-      remainingBudget: '${state.displayCurrency} ${state.remainingBudget.toStringAsFixed(2)}',
-      exceededAmount: '${state.displayCurrency} ${state.exceededAmount.toStringAsFixed(2)}',
+      state.selectedActivity!.allocatedBudget,
+      remainingBudget: state.remainingBudget,
+      exceededAmount: state.exceededAmount,
       warningText1:
-      'You have overspent ${state.displayCurrency} ${state.overspentBudget.toStringAsFixed(2)} so far on this trip.',
+      'You have overspent RM ${state.overspentBudget.toStringAsFixed(2)} so far on this trip.',
       estimatedDays: state.sufficientDays.toString(),
       warningText3: 'Plan will be modified automatically.',
       onContinue: () async {
@@ -330,11 +330,11 @@ class _ActivityScreenState extends State<ActivityScreen> {
     final minTopUp = uiState.shortageAmount * 0.50;
     showBudgetRecoveryDialog(
       context: context,
-      shortageAmount: '${uiState.displayCurrency} ${uiState.shortageAmount.toStringAsFixed(2)}',
-      minTopUp: '${uiState.displayCurrency} ${minTopUp.toStringAsFixed(2)}',
-      remainingBudget: '${uiState.displayCurrency} ${uiState.remainingBudget.toStringAsFixed(2)}',
+      shortageAmount: uiState.shortageAmount,
+      minTopUp: 'RM ${minTopUp.toStringAsFixed(2)}',
+      remainingBudget: uiState.remainingBudget,
       warningText:
-      'Top-up amount should at least ${uiState.displayCurrency} ${minTopUp.toStringAsFixed(2)}, insufficient top-up amount will trigger alternative recommendation directly.',
+      'Top-up amount should at least RM ${minTopUp.toStringAsFixed(2)}, insufficient top-up amount will trigger alternative recommendation directly.',
       onEndTrip: onEndTrip,
       onTopUpBudget: (amount) async {
         final success = await onTopUpBudget(amount);

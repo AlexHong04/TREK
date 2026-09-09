@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import '../widgets/dual_currency_amount.dart';
 
 // Base
 class BaseBudgetDialog extends StatelessWidget {
@@ -125,7 +126,55 @@ class BaseBudgetDialog extends StatelessWidget {
   }
 }
 
-Widget _buildSummaryRow(String label, String value, {Color? valueColor}) {
+Widget _buildSummaryRow(String label, double value, {Color? valueColor}) {
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Expanded(
+        child: Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: appTheme.popupBrownBudget,
+          ),
+        ),
+      ),
+      const SizedBox(width: 12),
+      DualCurrencyAmount(
+        amount: value,
+        baseCurrency: 'MYR',
+        baseLabel: 'RM',
+        primaryStyle: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          fontFamily: 'Inter',
+          color: valueColor ?? appTheme.black,
+        ),
+        secondaryStyle: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          fontFamily: 'Inter',
+          color: appTheme.blue_gray_700,
+        ),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        textAlign: TextAlign.start,
+      ),
+      // Text(
+      //   value,
+      //   style: TextStyle(
+      //     fontFamily: 'Inter',
+      //     fontSize: 16,
+      //     fontWeight: FontWeight.bold,
+      //     color: valueColor ?? appTheme.black,
+      //   ),
+      // ),
+    ],
+  );
+}
+
+Widget _buildWishlistSummaryRow(String label, String value, {Color? valueColor}) {
   return Row(
     mainAxisAlignment: MainAxisAlignment.spaceBetween,
     children: [
@@ -156,11 +205,11 @@ Widget _buildSummaryRow(String label, String value, {Color? valueColor}) {
 
 Widget _buildSummaryCard({
   required String primaryLabel,
-  required String primaryValue,
+  required double primaryValue,
   String? secondaryLabel,
-  String? secondaryValue,
+  double? secondaryValue,
   String? thirdLabel,
-  String? thirdValue,
+  double? thirdValue,
   Color? primaryValueColor,
   Color? thirdValueColor,
 }) {
@@ -185,14 +234,33 @@ Widget _buildSummaryCard({
           ),
         ),
         const SizedBox(height: 8),
-        Text(
-          primaryValue,
-          style: TextStyle(
-            fontFamily: 'Inter',
+        // Text(
+        //   primaryValue,
+        //   style: TextStyle(
+        //     fontFamily: 'Inter',
+        //     fontSize: 24,
+        //     fontWeight: FontWeight.bold,
+        //     color: primaryValueColor ?? appTheme.errorRed,
+        //   ),
+        // ),
+        DualCurrencyAmount(
+          amount: primaryValue,
+          baseCurrency: 'MYR',
+          baseLabel: 'RM',
+          primaryStyle: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
+            fontFamily: 'Inter',
             color: primaryValueColor ?? appTheme.errorRed,
           ),
+          secondaryStyle: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            fontFamily: 'Inter',
+            color: appTheme.blue_gray_700,
+          ),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          textAlign: TextAlign.start,
         ),
 
         if (secondaryLabel != null && secondaryValue != null) ...[
@@ -210,6 +278,83 @@ Widget _buildSummaryCard({
     ),
   );
 }
+
+Widget _buildWishlistSummaryCard({
+  required String primaryLabel,
+  required double primaryValue,
+  String? secondaryLabel,
+  String? secondaryValue,
+  String? thirdLabel,
+  double? thirdValue,
+  Color? primaryValueColor,
+  Color? thirdValueColor,
+}) {
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: appTheme.popupCreamBg,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: appTheme.popupCreamStroke),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          primaryLabel,
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: appTheme.popupBrownBudget,
+          ),
+        ),
+        const SizedBox(height: 8),
+        // Text(
+        //   primaryValue,
+        //   style: TextStyle(
+        //     fontFamily: 'Inter',
+        //     fontSize: 24,
+        //     fontWeight: FontWeight.bold,
+        //     color: primaryValueColor ?? appTheme.errorRed,
+        //   ),
+        // ),
+        DualCurrencyAmount(
+          amount: primaryValue,
+          baseCurrency: 'MYR',
+          baseLabel: 'RM',
+          primaryStyle: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            fontFamily: 'Inter',
+            color: primaryValueColor ?? appTheme.errorRed,
+          ),
+          secondaryStyle: TextStyle(
+            fontSize: 9,
+            fontWeight: FontWeight.w600,
+            fontFamily: 'Inter',
+            color: appTheme.blue_gray_700,
+          ),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          textAlign: TextAlign.start,
+        ),
+
+        if (secondaryLabel != null && secondaryValue != null) ...[
+          const SizedBox(height: 12),
+          Divider(color: appTheme.popupCreamStroke, height: 1),
+          const SizedBox(height: 12),
+          _buildWishlistSummaryRow(secondaryLabel, secondaryValue),
+        ],
+
+        if (thirdLabel != null && thirdValue != null) ...[
+          const SizedBox(height: 12),
+          _buildSummaryRow(thirdLabel, thirdValue, valueColor: thirdValueColor),
+        ],
+      ],
+    ),
+  );
+}
+
 
 Widget _buildActionButton({
   required String text,
@@ -304,61 +449,61 @@ Widget _buildTopUpCard(TextEditingController controller) {
   );
 }
 
-Future<void> showNearLimitWarningDialog({
-  required BuildContext context,
-  required String activityTitle,
-  required String allocatedBudget,
-  required String currentSpent,
-  required String remainingInActivity,
-  required String warningText1,
-  String? warningText2,
-  VoidCallback? onContinue,
-}) {
-  return showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (dialogContext) {
-      return BaseBudgetDialog(
-        title: 'Budget Alert',
-        titleColor: appTheme.warningPopupHeader,
-
-        summaryCard: _buildSummaryCard(
-          primaryLabel: 'Activity Budget:',
-          primaryValue: allocatedBudget,
-          secondaryLabel: 'Current Spent:',
-          secondaryValue: currentSpent,
-          thirdLabel: 'Remaining Allowance:',
-          thirdValue: remainingInActivity,
-          thirdValueColor: appTheme.popupBrownBudget,
-        ),
-
-        warningText: warningText1,
-
-        warningTextColor: appTheme.popupWarningMsg,
-
-        contentCard: (warningText2 != null && warningText2.isNotEmpty)
-            ? BaseBudgetDialog._buildWarningRow(warningText2, color: appTheme.popupWarningMsg)
-            : null,
-
-        actions: _buildActionButton(
-          text: 'Understood',
-          backgroundColor: appTheme.teal_A700,
-          onPressed: () {
-            Navigator.of(dialogContext).pop();
-            onContinue?.call();
-          },
-        ),
-      );
-    },
-  );
-}
+// Future<void> showNearLimitWarningDialog({
+//   required BuildContext context,
+//   required String activityTitle,
+//   required String allocatedBudget,
+//   required String currentSpent,
+//   required String remainingInActivity,
+//   required String warningText1,
+//   String? warningText2,
+//   VoidCallback? onContinue,
+// }) {
+//   return showDialog(
+//     context: context,
+//     barrierDismissible: false,
+//     builder: (dialogContext) {
+//       return BaseBudgetDialog(
+//         title: 'Budget Alert',
+//         titleColor: appTheme.warningPopupHeader,
+//
+//         summaryCard: _buildSummaryCard(
+//           primaryLabel: 'Activity Budget:',
+//           primaryValue: allocatedBudget,
+//           secondaryLabel: 'Current Spent:',
+//           secondaryValue: currentSpent,
+//           thirdLabel: 'Remaining Allowance:',
+//           thirdValue: remainingInActivity,
+//           thirdValueColor: appTheme.popupBrownBudget,
+//         ),
+//
+//         warningText: warningText1,
+//
+//         warningTextColor: appTheme.popupWarningMsg,
+//
+//         contentCard: (warningText2 != null && warningText2.isNotEmpty)
+//             ? BaseBudgetDialog._buildWarningRow(warningText2, color: appTheme.popupWarningMsg)
+//             : null,
+//
+//         actions: _buildActionButton(
+//           text: 'Understood',
+//           backgroundColor: appTheme.teal_A700,
+//           onPressed: () {
+//             Navigator.of(dialogContext).pop();
+//             onContinue?.call();
+//           },
+//         ),
+//       );
+//     },
+//   );
+// }
 
 // Budget Exceeded - within threshold
 Future<void> showBudgetExceededDialog({
   required BuildContext context,
-  required String allocatedBudget,
-  required String remainingBudget,
-  required String exceededAmount,
+  required double allocatedBudget,
+  required double remainingBudget,
+  required double exceededAmount,
   required String warningText1,
   required String warningText2,
   VoidCallback? onContinue,
@@ -398,9 +543,9 @@ Future<void> showBudgetExceededDialog({
 // Budget Exceeded - above threshold
 Future<void> showBudgetExceededThresholdDialog({
   required BuildContext context,
-  required String allocatedBudget,
-  required String remainingBudget,
-  required String exceededAmount,
+  required double allocatedBudget,
+  required double remainingBudget,
+  required double exceededAmount,
   required String warningText1,
   required String estimatedDays,
   required String warningText3,
@@ -485,9 +630,9 @@ Future<void> showBudgetExceededThresholdDialog({
 // Budget Recovery
 Future<void> showBudgetRecoveryDialog({
   required BuildContext context,
-  required String shortageAmount,
+  required double shortageAmount,
   required String minTopUp,
-  required String remainingBudget,
+  required double remainingBudget,
   required String warningText,
   VoidCallback? onEndTrip,
   required Future<bool> Function(double amount) onTopUpBudget,
@@ -521,6 +666,7 @@ Future<void> showBudgetRecoveryDialog({
                   text: 'End Trip',
                   backgroundColor: appTheme.redButton,
                   onPressed: () {
+                    Navigator.of(dialogContext).pop();
                     Navigator.of(dialogContext).pop();
                     onEndTrip?.call();
                   },
@@ -646,7 +792,7 @@ Future<void> showCancelTripWithoutWishlistDialog({
 // Initial Total Budget Insufficient (Limited Wishlist Coverage)
 Future<void> showInitialTotalBudgetInsufficientDialog({
   required BuildContext context,
-  required String shortageAmount,
+  required double shortageAmount,
   required double minTopUp,
   required int wishlistCovered,
   String? warningText,
@@ -662,7 +808,7 @@ Future<void> showInitialTotalBudgetInsufficientDialog({
       return BaseBudgetDialog(
         title: 'Budget Insufficient',
 
-        summaryCard: _buildSummaryCard(
+        summaryCard: _buildWishlistSummaryCard(
           primaryLabel: 'Estimated Budget Shortage Amount',
           primaryValue: shortageAmount,
           secondaryLabel: 'Wishlist Covered',
@@ -739,7 +885,7 @@ Future<void> showInitialTotalBudgetInsufficientDialog({
 // Initial Total Budget Insufficient (Zero Wishlist Coverage)
 Future<void> showInitialTotalBudgetTotallyInsufficientDialog({
   required BuildContext context,
-  required String shortageAmount,
+  required double shortageAmount,
   required double minTopUp,
   required int wishlistCovered,
   VoidCallback? onCancel,
@@ -754,7 +900,7 @@ Future<void> showInitialTotalBudgetTotallyInsufficientDialog({
       return BaseBudgetDialog(
         title: 'Budget Insufficient',
 
-        summaryCard: _buildSummaryCard(
+        summaryCard: _buildWishlistSummaryCard(
           primaryLabel: 'Estimated Budget Shortage Amount',
           primaryValue: shortageAmount,
           secondaryLabel: 'Wishlist Covered',
@@ -831,7 +977,7 @@ Future<void> showInitialTotalBudgetTotallyInsufficientDialog({
 // Initial Total Budget Insufficient (Wishlist is Empty)
 Future<void> showEmptyWishlistInsufficientTotalBudgetDialog({
   required BuildContext context,
-  required String shortageAmount,
+  required double shortageAmount,
   required double minTopUp,
   VoidCallback? onCancel,
   required Future<bool> Function(double amount) onTopUpBudget,
