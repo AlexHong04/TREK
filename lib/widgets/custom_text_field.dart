@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../theme/app_theme.dart';
@@ -29,6 +29,7 @@ class CustomTextField extends StatefulWidget {
   final Widget? bottomWidget;
   final Widget? suffixIcon;
   final EdgeInsetsGeometry margin;
+  final Color? prefixIconColor;
 
   const CustomTextField({
     super.key,
@@ -57,6 +58,7 @@ class CustomTextField extends StatefulWidget {
     this.bottomWidget,
     this.suffixIcon,
     this.margin = const EdgeInsets.symmetric(horizontal: 24.0),
+    this.prefixIconColor,
   }) : assert(
          controller == null || initialValue == null,
          'controller and initialValue cannot both be provided.',
@@ -92,7 +94,7 @@ class _CustomTextFieldState extends State<CustomTextField> {
           Text(
             widget.sectionTitle,
             style: TextStyle(
-              fontSize: 10,
+              fontSize: 12,
               fontWeight: FontWeight.w800,
               fontFamily: 'Inter',
               color: appTheme.blue_gray_300,
@@ -146,7 +148,11 @@ class _CustomTextFieldState extends State<CustomTextField> {
                 ),
                 errorText: widget.errorText,
                 errorMaxLines: widget.errorMaxLines,
-                prefixIcon: Icon(widget.prefixIcon),
+                prefixIcon: Icon(
+                  widget.prefixIcon,
+                  color: widget.prefixIconColor ?? appTheme.teal_A700,
+                  size: 20.0,
+                ),
                 prefixIconConstraints: const BoxConstraints(
                   minWidth: 44.0,
                   minHeight: 34.0,

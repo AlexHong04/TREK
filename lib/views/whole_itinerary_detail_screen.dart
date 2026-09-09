@@ -1,4 +1,5 @@
 import 'package:Trek/models/entities/whole_trip.dart';
+import '../view_models/ui_state/travel_information_ui_state.dart';
 
 import '../theme/app_theme.dart';
 import 'package:flutter/material.dart';
@@ -31,6 +32,21 @@ class WholeItineraryDetailScreen extends StatefulWidget {
             .toList() ??
         [];
 
+    final rawArrivals = args?['arrivals'] as List?;
+    final arrivals = rawArrivals
+        ?.map((e) => TransitPoint.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+
+    final rawDepartures = args?['departures'] as List?;
+    final departures = rawDepartures
+        ?.map((e) => TransitPoint.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+
+    final rawHotels = args?['hotels'] as List?;
+    final hotels = rawHotels
+        ?.map((e) => HotelStay.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+
     return ChangeNotifierProvider<WholeItineraryDetailViewModel>(
       create: (context) {
         final vm = WholeItineraryDetailViewModel();
@@ -48,6 +64,16 @@ class WholeItineraryDetailScreen extends StatefulWidget {
                 ?.map((e) => e.toString())
                 .toList(),
             constraints: constraints,
+            arrivals: arrivals,
+            departures: departures,
+            hotels: hotels,
+            arrivalLocation: args?['arrivalLocation'] as String?,
+            arrivalTime: args?['arrivalTime'] as String?,
+            departureLocation: args?['departureLocation'] as String?,
+            departureTime: args?['departureTime'] as String?,
+            hotelLocation: args?['hotelLocation'] as String?,
+            hotelCheckInTime: args?['hotelCheckInTime'] as String?,
+            hotelCheckOutTime: args?['hotelCheckOutTime'] as String?,
           );
         }
 
@@ -186,8 +212,9 @@ class _WholeItineraryDetailScreenState
         );
       } else if (viewModel.uiState.wishlist != null &&
           viewModel.uiState.wishlist!.isNotEmpty &&
-          viewModel.uiState.wishlistItemsCoveredCount <
-              viewModel.uiState.wishlist!.length) {
+          (viewModel.uiState.wishlistItemsCoveredCount <
+                  viewModel.uiState.wishlist!.length ||
+              viewModel.uiState.estimatedExtraBudgetNeeded > 0)) {
         await showInitialTotalBudgetInsufficientDialog(
           context: context,
           shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded
@@ -686,6 +713,11 @@ class _WholeItineraryDetailScreenState
           child: InkWell(
             onTap: canConfirm
                 ? () async {
+                    if (viewModel.uiState.estimatedExtraBudgetNeeded > 0) {
+                      await _showWishlistWarningDialog(viewModel);
+                      return;
+                    }
+
                     showDialog(
                       context: context,
                       barrierDismissible: false,

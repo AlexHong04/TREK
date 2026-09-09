@@ -282,6 +282,328 @@ class GooglePlacesApiConfig {
     return [];
   }
 
+  /// Searches Google Places (New) Autocomplete specifically for hotels/accommodations, biased or filtered by [destinations].
+  static Future<List<String>> getHotelAutocompleteSuggestions(
+    String query, {
+    List<String>? destinations,
+  }) async {
+    if (!isConfigured) return [];
+    final trimmedQuery = query.trim();
+
+    final validDestinations = destinations
+        ?.map((d) => d.trim())
+        .where((d) => d.isNotEmpty)
+        .toList();
+
+    // 1. If query is empty: search Google Places API for hotels in each selected destination
+    if (trimmedQuery.isEmpty) {
+      if (validDestinations == null || validDestinations.isEmpty) {
+        return await _fetchHotelAutocomplete('Hotel, Malaysia');
+      }
+
+      final targetDestinations = validDestinations.take(3).toList();
+      final futures = targetDestinations.map(
+        (dest) => _fetchHotelAutocomplete('Hotel, $dest'),
+      );
+      final resultsList = await Future.wait(futures);
+      final Set<String> combined = {};
+      for (final list in resultsList) {
+        combined.addAll(list);
+      }
+      return combined.take(6).toList();
+    }
+
+    // 2. If user typed a query:
+    if (validDestinations == null || validDestinations.isEmpty) {
+      final results = await _fetchHotelAutocomplete(trimmedQuery);
+      if (results.isNotEmpty) return results;
+      return await _fetchHotelAutocomplete('$trimmedQuery Hotel');
+    }
+
+    // If query already contains any destination name
+    final lowerQuery = trimmedQuery.toLowerCase();
+    final alreadyIncludesDestination = validDestinations.any(
+      (dest) => lowerQuery.contains(dest.toLowerCase()),
+    );
+
+    if (alreadyIncludesDestination) {
+      final results = await _fetchHotelAutocomplete(trimmedQuery);
+      if (results.isNotEmpty) return results;
+      return await _fetchHotelAutocomplete('$trimmedQuery Hotel');
+    }
+
+    // Query for each selected destination in parallel
+    final targetDestinations = validDestinations.take(3).toList();
+    final futures = targetDestinations.map(
+      (dest) => _fetchHotelAutocomplete('$trimmedQuery, $dest'),
+    );
+    final resultsList = await Future.wait(futures);
+    final Set<String> combined = {};
+    for (final list in resultsList) {
+      combined.addAll(list);
+    }
+
+    if (combined.length < 2) {
+      final fallback = await _fetchHotelAutocomplete(
+        lowerQuery.contains('hotel') ? trimmedQuery : '$trimmedQuery Hotel',
+      );
+      combined.addAll(fallback);
+    }
+
+    if (combined.isEmpty) {
+      final generic = await _fetchHotelAutocomplete(trimmedQuery);
+      combined.addAll(generic);
+    }
+
+    return combined.take(6).toList();
+  }
+
+  static Future<List<String>> _fetchHotelAutocomplete(
+    String inputQuery,
+  ) async {
+    final String directUrlStr =
+        'https://places.googleapis.com/v1/places:autocomplete';
+
+    final Map<String, String> headers = {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': _apiKey,
+    };
+
+    final String body = jsonEncode({
+      "input": inputQuery,
+      "includedPrimaryTypes": ["lodging"],
+      "includedRegionCodes": ["my"],
+    });
+
+    try {
+      if (kIsWeb) {
+        final proxyUrlStr =
+            'https://corsproxy.io/?${Uri.encodeComponent(directUrlStr)}';
+        final response = await http.post(
+          Uri.parse(proxyUrlStr),
+          headers: headers,
+          body: body,
+        );
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          final suggestions = data['suggestions'] as List?;
+          if (suggestions != null) {
+            return suggestions
+                .map((s) {
+                  final mainText =
+                      s['placePrediction']?['structuredFormat']?['mainText']?['text']
+                          as String?;
+                  final fullText =
+                      s['placePrediction']?['text']?['text'] as String?;
+                  return mainText ?? fullText;
+                })
+                .where((text) => text != null)
+                .cast<String>()
+                .take(5)
+                .toList();
+          }
+        }
+      } else {
+        final response = await http.post(
+          Uri.parse(directUrlStr),
+          headers: headers,
+          body: body,
+        );
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          final suggestions = data['suggestions'] as List?;
+          if (suggestions != null) {
+            return suggestions
+                .map((s) {
+                  final mainText =
+                      s['placePrediction']?['structuredFormat']?['mainText']?['text']
+                          as String?;
+                  final fullText =
+                      s['placePrediction']?['text']?['text'] as String?;
+                  return mainText ?? fullText;
+                })
+                .where((text) => text != null)
+                .cast<String>()
+                .take(5)
+                .toList();
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Google Places Hotel Autocomplete Error: $e');
+    }
+    return [];
+  }
+
+  /// Searches Google Places (New) Autocomplete specifically for airports, biased or filtered by [destinations].
+  static Future<List<String>> getAirportAutocompleteSuggestions(
+    String query, {
+    List<String>? destinations,
+  }) async {
+    if (!isConfigured) return [];
+    final trimmedQuery = query.trim();
+
+    final validDestinations = destinations
+        ?.map((d) => d.trim())
+        .where((d) => d.isNotEmpty)
+        .toList();
+
+    // 1. If query is empty: search Google Places API for each destination's airports
+    if (trimmedQuery.isEmpty) {
+      if (validDestinations == null || validDestinations.isEmpty) {
+        return await _fetchAirportAutocomplete('Malaysia Airport');
+      }
+
+      final targetDestinations = validDestinations.take(3).toList();
+      final futures = targetDestinations.map(
+        (dest) => _fetchAirportAutocomplete('$dest Airport'),
+      );
+      final resultsList = await Future.wait(futures);
+      final Set<String> combined = {};
+      for (final list in resultsList) {
+        combined.addAll(list);
+      }
+      return combined.take(6).toList();
+    }
+
+    // 2. If user typed a query:
+    if (validDestinations == null || validDestinations.isEmpty) {
+      final results = await _fetchAirportAutocomplete(
+        trimmedQuery.toLowerCase().contains('airport')
+            ? trimmedQuery
+            : '$trimmedQuery Airport',
+      );
+      if (results.isNotEmpty) return results;
+      return await _fetchAirportAutocomplete(trimmedQuery);
+    }
+
+    // If query already contains any destination name
+    final lowerQuery = trimmedQuery.toLowerCase();
+    final alreadyIncludesDestination = validDestinations.any(
+      (dest) => lowerQuery.contains(dest.toLowerCase()),
+    );
+
+    if (alreadyIncludesDestination) {
+      final results = await _fetchAirportAutocomplete(
+        lowerQuery.contains('airport') ? trimmedQuery : '$trimmedQuery Airport',
+      );
+      if (results.isNotEmpty) return results;
+      return await _fetchAirportAutocomplete(trimmedQuery);
+    }
+
+    // Query for each selected destination in parallel
+    final targetDestinations = validDestinations.take(3).toList();
+    final futures = targetDestinations.map(
+      (dest) => _fetchAirportAutocomplete('$trimmedQuery, $dest'),
+    );
+    final resultsList = await Future.wait(futures);
+    final Set<String> combined = {};
+    for (final list in resultsList) {
+      combined.addAll(list);
+    }
+
+    if (combined.length < 2) {
+      final fallback = await _fetchAirportAutocomplete(
+        lowerQuery.contains('airport') ? trimmedQuery : '$trimmedQuery Airport',
+      );
+      combined.addAll(fallback);
+    }
+
+    if (combined.isEmpty) {
+      final generic = await _fetchAirportAutocomplete(trimmedQuery);
+      combined.addAll(generic);
+    }
+
+    return combined.take(6).toList();
+  }
+
+  static Future<List<String>> _fetchAirportAutocomplete(
+    String inputQuery,
+  ) async {
+    final String directUrlStr =
+        'https://places.googleapis.com/v1/places:autocomplete';
+
+    final Map<String, String> headers = {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': _apiKey,
+    };
+
+    final String body = jsonEncode({
+      "input": inputQuery,
+      "includedPrimaryTypes": ["airport"],
+      "includedRegionCodes": ["my"],
+    });
+
+    try {
+      if (kIsWeb) {
+        final proxyUrlStr =
+            'https://corsproxy.io/?${Uri.encodeComponent(directUrlStr)}';
+        final response = await http.post(
+          Uri.parse(proxyUrlStr),
+          headers: headers,
+          body: body,
+        );
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          final suggestions = data['suggestions'] as List?;
+          if (suggestions != null) {
+            return suggestions
+                .map((s) {
+                  final mainText =
+                      s['placePrediction']?['structuredFormat']?['mainText']?['text']
+                          as String?;
+                  final fullText =
+                      s['placePrediction']?['text']?['text'] as String?;
+                  return mainText ?? fullText;
+                })
+                .where(
+                  (text) =>
+                      text != null &&
+                      !text.contains('Bhd') &&
+                      !text.contains('Sdn'),
+                )
+                .cast<String>()
+                .take(5)
+                .toList();
+          }
+        }
+      } else {
+        final response = await http.post(
+          Uri.parse(directUrlStr),
+          headers: headers,
+          body: body,
+        );
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          final suggestions = data['suggestions'] as List?;
+          if (suggestions != null) {
+            return suggestions
+                .map((s) {
+                  final mainText =
+                      s['placePrediction']?['structuredFormat']?['mainText']?['text']
+                          as String?;
+                  final fullText =
+                      s['placePrediction']?['text']?['text'] as String?;
+                  return mainText ?? fullText;
+                })
+                .where(
+                  (text) =>
+                      text != null &&
+                      !text.contains('Bhd') &&
+                      !text.contains('Sdn'),
+                )
+                .cast<String>()
+                .take(5)
+                .toList();
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Google Places Airport Autocomplete Error: $e');
+    }
+    return [];
+  }
+
   /// Builds and returns the HTTP URL for retrieving a Place Photo.
   /// Note that this URL can be directly passed to Image.network().
   /// For the New Places API, `photoReference` is the `name` field from the photo object (e.g. `places/XYZ/photos/ABC`).

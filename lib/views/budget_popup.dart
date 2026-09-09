@@ -239,32 +239,6 @@ Widget _buildActionButton({
   );
 }
 
-Widget _buildTwoActionButtons({
-  required String primaryText,
-  required VoidCallback? onPrimaryPressed,
-  required String secondaryText,
-  required VoidCallback? onSecondaryPressed,
-}) {
-  return Row(
-    children: [
-      Expanded(
-        child: _buildActionButton(
-          text: secondaryText,
-          backgroundColor: appTheme.redButton,
-          onPressed: onSecondaryPressed,
-        ),
-      ),
-      const SizedBox(width: 12),
-      Expanded(
-        child: _buildActionButton(
-          text: primaryText,
-          onPressed: onPrimaryPressed,
-        ),
-      ),
-    ],
-  );
-}
-
 Widget _buildTopUpCard(TextEditingController controller) {
   return Container(
     width: double.infinity,
@@ -675,6 +649,7 @@ Future<void> showInitialTotalBudgetInsufficientDialog({
   required String shortageAmount,
   required double minTopUp,
   required int wishlistCovered,
+  String? warningText,
   VoidCallback? onCancel,
   required Future<bool> Function(double amount) onTopUpBudget,
 }) {
@@ -695,7 +670,7 @@ Future<void> showInitialTotalBudgetInsufficientDialog({
         ),
 
         // First warning
-        warningText:
+        warningText: warningText ??
             'Your budget is not sufficient to cover all wishlist items. '
             'Do you want to add more budget?',
 
