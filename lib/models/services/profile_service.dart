@@ -24,13 +24,13 @@ class ProfileService {
   final ImageCropper _imageCropper;
 
   ProfileService(
-      this._userRepository, {
-        CameraSource? cameraSource,
-        GallerySource? gallerySource,
-        ImageCropper? imageCropper,
-      })  : _cameraSource = cameraSource ?? CameraSource(),
-        _gallerySource = gallerySource ?? GallerySource(),
-        _imageCropper = imageCropper ?? ImageCropper();
+    this._userRepository, {
+    CameraSource? cameraSource,
+    GallerySource? gallerySource,
+    ImageCropper? imageCropper,
+  }) : _cameraSource = cameraSource ?? CameraSource(),
+       _gallerySource = gallerySource ?? GallerySource(),
+       _imageCropper = imageCropper ?? ImageCropper();
 
   static const int _maxImageBytes = 5 * 1024 * 1024;
   static const Set<String> _allowedExtensions = {'jpg', 'jpeg', 'png'};
@@ -104,8 +104,10 @@ class ProfileService {
     if (await imageFile.length() > _maxImageBytes) {
       throw const ImageTooLargeException();
     }
-    final header =
-    await imageFile.openRead(0, 8).expand((bytes) => bytes).toList();
+    final header = await imageFile
+        .openRead(0, 8)
+        .expand((bytes) => bytes)
+        .toList();
     if (!_allowedExtensions.contains(extension) || !_hasValidHeader(header)) {
       throw const InvalidImageFormatException();
     }
@@ -138,11 +140,13 @@ class ProfileService {
   }
 
   bool _hasValidHeader(List<int> bytes) {
-    final isJpeg = bytes.length >= 3 &&
+    final isJpeg =
+        bytes.length >= 3 &&
         bytes[0] == 0xFF &&
         bytes[1] == 0xD8 &&
         bytes[2] == 0xFF;
-    final isPng = bytes.length >= 8 &&
+    final isPng =
+        bytes.length >= 8 &&
         bytes[0] == 0x89 &&
         bytes[1] == 0x50 &&
         bytes[2] == 0x4E &&

@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
-import 'package:path/path.dart';
 
 import '../entities/activity.dart';
 import '../entities/expense.dart';
@@ -13,8 +12,7 @@ import '../repository/itinerary_repository.dart';
 import '../repository/i_itinerary_repository.dart';
 import 'budget_service.dart';
 import 'i_auth_service.dart';
-import 'i_budget_service.dart';
-import 'i_expense_tracking_service.dart';
+import 'i_itinerary_service.dart';
 
 class _ExtractedReceiptItem {
   final String name;
@@ -1108,7 +1106,6 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     final double remainingBudget = currentTrip.remainingBalance ?? 0.00;
 
     debugPrint("remaining budget: ${remainingBudget}");
-
 
     // Get current activity
     final currentActivity = await _itineraryRepository.getCurrentActivity(

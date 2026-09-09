@@ -185,7 +185,9 @@ class _WholeItineraryDetailScreenState
           },
         );
       } else if (viewModel.uiState.wishlist != null &&
-          viewModel.uiState.wishlist!.isNotEmpty) {
+          viewModel.uiState.wishlist!.isNotEmpty &&
+          viewModel.uiState.wishlistItemsCoveredCount <
+              viewModel.uiState.wishlist!.length) {
         await showInitialTotalBudgetInsufficientDialog(
           context: context,
           shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded

@@ -57,10 +57,10 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
   /// True while any time slot is still empty (deleted, or not yet filled),
   /// which blocks confirming the plan.
   bool get hasEmptyActivitySlots => _uiState.activities.any(
-        (a) =>
-            a.status == 'empty' ||
-            (a.destination.trim().isEmpty && a.description.trim().isEmpty),
-      );
+    (a) =>
+        a.status == 'empty' ||
+        (a.destination.trim().isEmpty && a.description.trim().isEmpty),
+  );
 
   /// Confirm is only allowed once every time slot has been filled and we are
   /// not busy generating.
@@ -120,7 +120,8 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         strictBudget: suppressWarning,
       );
 
-      final bool wishlistIncomplete = wishlist != null &&
+      final bool wishlistIncomplete =
+          wishlist != null &&
           wishlist.isNotEmpty &&
           fetchedResult.wishlistItemsCoveredCount < wishlist.length;
       final bool hasShortfall = fetchedResult.estimatedExtraBudgetNeeded > 0.0;

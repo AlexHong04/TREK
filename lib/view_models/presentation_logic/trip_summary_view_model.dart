@@ -6,7 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../models/services/financial_dashboard_service.dart';
 import '../../models/services/i_auth_service.dart';
-import '../../models/services/i_financial_dashboard_service.dart';
+import '../../models/services/i_itinerary_service.dart';
 import '../ui_state/trip_summary_ui_state.dart';
 
 export '../ui_state/trip_summary_ui_state.dart';
