@@ -134,51 +134,27 @@ class _WholeItineraryDetailScreenState
       debugPrint(
         "wishlist covered count: ${viewModel.uiState.wishlistItemsCoveredCount}",
       );
-      if ((viewModel.uiState.wishlist == null ||
-              viewModel.uiState.wishlist!.isEmpty) &&
-          viewModel.uiState.estimatedExtraBudgetNeeded > 0) {
-        await showEmptyWishlistInsufficientTotalBudgetDialog(
-          context: context,
-          shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded,
-          minTopUp: minTopUp,
-          onCancel: () async {
-            await showCancelTripWithoutWishlistDialog(
-              context: context,
-              onContinue: () {
-                Navigator.of(context).pop();
-              },
-            );
-          },
-
-          onTopUpBudget: (double amount) async {
-            final isSufficient = await viewModel.topUpBudget(amount);
-
-            if (!isSufficient) {
-              // Wait until the first dialog is completely removed.
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (!mounted) return;
-
-                showInsufficientTopUpTotalBudgetWithoutWishlistDialog(
-                  context: context,
-                  onContinue: () {
-                    // Trigger re-recommendation with the latest total budget
-                    viewModel.generateItinerary(suppressWarning: true);
-                  },
-                );
-              });
-            }
-
-            return true;
-          },
-        );
-      } else if (viewModel.uiState.wishlist != null &&
+      if (viewModel.uiState.wishlist != null &&
           viewModel.uiState.wishlist!.isNotEmpty &&
           viewModel.uiState.wishlistItemsCoveredCount == 0) {
-        await showInitialTotalBudgetTotallyInsufficientDialog(
+        await showInitialBudgetInsufficientDialog(
           context: context,
+
           shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded,
+
           minTopUp: minTopUp,
+
           wishlistCovered: viewModel.uiState.wishlistItemsCoveredCount,
+
+          warningText:
+              'Your budget is not sufficient to cover any wishlist items. '
+              'Do you want to add more budget?',
+
+          topUpWarningText:
+              'Top-up amount should be at least '
+              '${minTopUp.toStringAsFixed(2)}, insufficient top-up '
+              'amount will trigger alternative recommendation directly.',
+
           onCancel: () async {
             await showCancelTripDialog(
               context: context,
@@ -187,18 +163,17 @@ class _WholeItineraryDetailScreenState
               },
             );
           },
+
           onTopUpBudget: (double amount) async {
             final isSufficient = await viewModel.topUpBudget(amount);
 
             if (!isSufficient) {
-              // Wait until the first dialog is completely removed.
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (!mounted) return;
 
                 showInsufficientTopUpTotalBudgetDialog(
                   context: context,
                   onContinue: () {
-                    // Trigger re-recommendation with the latest total budget
                     viewModel.generateItinerary(suppressWarning: true);
                   },
                 );
@@ -211,13 +186,26 @@ class _WholeItineraryDetailScreenState
       } else if (viewModel.uiState.wishlist != null &&
           viewModel.uiState.wishlist!.isNotEmpty &&
           (viewModel.uiState.wishlistItemsCoveredCount <
-                  viewModel.uiState.wishlist!.length ||
-              viewModel.uiState.estimatedExtraBudgetNeeded > 0)) {
-        await showInitialTotalBudgetInsufficientDialog(
+                  viewModel.uiState.wishlist!.length) &&
+              viewModel.uiState.estimatedExtraBudgetNeeded > 0) {
+        await showInitialBudgetInsufficientDialog(
           context: context,
+
           shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded,
+
           minTopUp: minTopUp,
+
           wishlistCovered: viewModel.uiState.wishlistItemsCoveredCount,
+
+          warningText:
+              'Your budget is not sufficient to cover all wishlist items. '
+              'Do you want to add more budget?',
+
+          topUpWarningText:
+              'Top-up amount should be at least '
+              '${minTopUp.toStringAsFixed(2)}, insufficient top-up '
+              'amount will trigger alternative recommendation directly.',
+
           onCancel: () async {
             await showCancelTopUpDialog(
               context: context,
@@ -231,14 +219,55 @@ class _WholeItineraryDetailScreenState
             final isSufficient = await viewModel.topUpBudget(amount);
 
             if (!isSufficient) {
-              // Wait until the first dialog is completely removed.
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (!mounted) return;
 
                 showInsufficientTopUpTotalBudgetDialog(
                   context: context,
                   onContinue: () {
-                    // Trigger re-recommendation with the latest total budget
+                    viewModel.generateItinerary(suppressWarning: true);
+                  },
+                );
+              });
+            }
+
+            return true;
+          },
+        );
+      } else if (viewModel.uiState.estimatedExtraBudgetNeeded > 0) {
+        await showInitialBudgetInsufficientDialog(
+          context: context,
+          shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded,
+          minTopUp: minTopUp,
+
+          warningText:
+              'Your budget is not sufficient for the trip. '
+              'Do you want to add more budget?',
+
+          topUpWarningText:
+              'Top-up amount should be at least '
+              '${minTopUp.toStringAsFixed(2)}, insufficient top-up '
+              'amount will trigger alternative recommendation directly.',
+
+          onCancel: () async {
+            await showCancelTripWithoutWishlistDialog(
+              context: context,
+              onContinue: () {
+                Navigator.of(context).pop();
+              },
+            );
+          },
+
+          onTopUpBudget: (double amount) async {
+            final isSufficient = await viewModel.topUpBudget(amount);
+
+            if (!isSufficient) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) return;
+
+                showInsufficientTopUpTotalBudgetWithoutWishlistDialog(
+                  context: context,
+                  onContinue: () {
                     viewModel.generateItinerary(suppressWarning: true);
                   },
                 );
