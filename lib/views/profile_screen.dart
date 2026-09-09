@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../view_models/presentation_logic/profile_view_model.dart';
 import '../widgets/custom_app_bar.dart';
+import '../widgets/currency_picker_field.dart';
 import '../views/all_plans_screen.dart';
 import 'change_password_screen.dart';
 import 'edit_profile_screen.dart';
@@ -39,6 +40,7 @@ class ProfileScreen extends StatelessWidget {
     return Consumer<ProfileViewModel>(
       builder: (context, viewModel, _) {
         final state = viewModel.uiState;
+        final currencyCode = state.currency.trim().toUpperCase();
         final statusMessage = state.successMessage ?? state.errorMessage;
         if (statusMessage != null) {
           final isError = state.errorMessage != null;
@@ -158,12 +160,12 @@ class ProfileScreen extends StatelessWidget {
                     child: Row(
                       children: [
                         Text(
-                          _currencyFlag(state.currency),
+                          currencyFlag(currencyCode),
                           style: const TextStyle(fontSize: 24),
                         ),
                         const SizedBox(width: 10),
                         Text(
-                          state.currency,
+                          currencyCode,
                           style: TextStyle(
                             color: appTheme.gray_800,
                             fontWeight: FontWeight.w600,
@@ -257,17 +259,6 @@ class ProfileScreen extends StatelessWidget {
     if (changed == true) await profileViewModel.load();
   }
 
-  static String _currencyFlag(String code) {
-    return switch (code) {
-      'MYR' => '🇲🇾',
-      'USD' => '🇺🇸',
-      'SGD' => '🇸🇬',
-      'GBP' => '🇬🇧',
-      'JPY' => '🇯🇵',
-      'EUR' => '🇪🇺',
-      _ => '💱',
-    };
-  }
 }
 
 class _ProfilePicture extends StatelessWidget {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../theme/app_theme.dart';
 
 class CurrencyPickerField extends StatelessWidget {
@@ -314,8 +315,7 @@ bool _matchesCurrencySearch(String code, String query) {
 
   if (normalizedCode.toLowerCase().contains(normalizedQuery)) return true;
 
-  final aliases = (_currencySearchAliases[normalizedCode] ?? '')
-      .toLowerCase();
+  final aliases = (_currencySearchAliases[normalizedCode] ?? '').toLowerCase();
   if (normalizedQuery.contains(' ')) {
     return aliases.contains(normalizedQuery);
   }
