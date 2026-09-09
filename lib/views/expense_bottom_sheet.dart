@@ -44,30 +44,18 @@ class ExpenseBottomSheet extends StatefulWidget {
 }
 
 class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
-  final TextEditingController _itemNameController = TextEditingController();
-  final TextEditingController _descriptionController = TextEditingController();
-  final TextEditingController _merchantController = TextEditingController();
-  final TextEditingController _quantityController = TextEditingController();
-  final TextEditingController _unitPriceController = TextEditingController();
   final TextEditingController _taxController = TextEditingController();
-  DateTime _selectedDate = DateTime.now();
-  TimeOfDay _selectedTime = TimeOfDay.now();
   int? _editingItemIndex;
-  bool _isEditingItem = false;
   bool _showItemForm = false;
   bool _isRecordingNewExpense = false;
   bool _hasAppliedOcrValues = false;
+  bool _hasUnfinishedItemFormChanges = false;
   String? _topMessage;
   Timer? _topMessageTimer;
 
   @override
   void dispose() {
     _topMessageTimer?.cancel();
-    _itemNameController.dispose();
-    _descriptionController.dispose();
-    _merchantController.dispose();
-    _quantityController.dispose();
-    _unitPriceController.dispose();
     _taxController.dispose();
     super.dispose();
   }
@@ -90,21 +78,24 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     final canExpandSheet = isExpenseFormMode || hasMoreRecordedExpensesThanFit;
     final recordedExpensesHeight = hasOneRecordedExpense ? 0.65 : 0.74;
 
-    return DraggableScrollableSheet(
-      initialChildSize: isExpenseFormMode ? 0.78 : recordedExpensesHeight,
-      minChildSize: 0.10,
-      maxChildSize: canExpandSheet ? 0.90 : recordedExpensesHeight,
-      snap: true,
-      snapSizes: isExpenseFormMode
-          ? [0.50, 0.78, 0.90]
-          : hasMoreRecordedExpensesThanFit
-          ? [0.50, 0.74, 0.90]
-          : hasOneRecordedExpense
-          ? [0.50, 0.65]
-          : [0.50, 0.74],
-      shouldCloseOnMinExtent: true,
-      builder: (context, scrollController) => Stack(
-        children: [
+    return MediaQuery.removeViewInsets(
+      context: context,
+      removeBottom: true,
+      child: DraggableScrollableSheet(
+        initialChildSize: isExpenseFormMode ? 0.78 : recordedExpensesHeight,
+        minChildSize: 0.10,
+        maxChildSize: canExpandSheet ? 0.90 : recordedExpensesHeight,
+        snap: !isExpenseFormMode,
+        snapSizes: isExpenseFormMode
+            ? null
+            : hasMoreRecordedExpensesThanFit
+            ? [0.50, 0.74, 0.90]
+            : hasOneRecordedExpense
+            ? [0.50, 0.65]
+            : [0.50, 0.74],
+        shouldCloseOnMinExtent: true,
+        builder: (context, scrollController) => Stack(
+          children: [
           ClipRRect(
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
             child: Material(
@@ -172,7 +163,8 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                 onClose: _dismissTopMessage,
               ),
             ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -532,7 +524,20 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
               index,
               _activeExpenseCurrency(uiState),
             ),
-          if (_showItemForm) _buildItemForm(),
+          if (_showItemForm)
+            _ExpenseItemForm(
+              key: ValueKey(_editingItemIndex ?? 'new-item'),
+              currency: _activeExpenseCurrency(uiState),
+              initialItem: _editingItemIndex == null
+                  ? null
+                  : uiState.draftExpenseItems[_editingItemIndex!],
+              onChanged: (hasChanges) {
+                _hasUnfinishedItemFormChanges = hasChanges;
+              },
+              onSave: _saveItem,
+              onDiscard: _discardItem,
+              onValidationError: _showValidationMessage,
+            ),
           SizedBox(height: 14),
           InkWell(
             onTap: _startNewItem,
@@ -574,9 +579,10 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   }
 
   Widget _buildSavedItemCard(ExpenseItem item, int index, String currency) {
-    return Card(
-      margin: EdgeInsets.only(bottom: 12),
-      child: ListTile(
+    return RepaintBoundary(
+      child: Card(
+        margin: EdgeInsets.only(bottom: 12),
+        child: ListTile(
         onTap: () => _showExpenseItemDetails(item, currency),
         leading: CircleAvatar(
           backgroundColor: appTheme.teal_A700,
@@ -605,6 +611,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
             ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -685,263 +692,6 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     );
   }
 
-  Widget _buildItemForm() {
-    final uiState = context.watch<ActivityViewModel>().uiState;
-    final currency = _activeExpenseCurrency(uiState);
-    final quantity = int.tryParse(_quantityController.text) ?? 0;
-    final unitPrice = _parsePrice(_unitPriceController.text) ?? 0;
-    final subtotal = quantity * unitPrice;
-    final itemNameTextStyle = Theme.of(
-      context,
-    ).textTheme.bodyLarge!.copyWith(color: appTheme.gray_900);
-
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: appTheme.gray_200),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Color(0x08F9FAFB),
-              border: Border(bottom: BorderSide(color: appTheme.gray_100)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: appTheme.teal_A700,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    Icons.receipt_long_outlined,
-                    color: appTheme.white_A700,
-                  ),
-                ),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'ITEM ENTRY',
-                        style: _fieldLabelStyle,
-                      ),
-                      SizedBox(height: 6),
-                      if (_isEditingItem)
-                        TextField(
-                          controller: _itemNameController,
-                          autofocus: true,
-                          onChanged: (_) => setState(() {}),
-                          decoration: _fieldDecoration('Item'),
-                        )
-                      else
-                        Text(
-                          _itemNameController.text.trim().isEmpty
-                              ? 'Item'
-                              : _itemNameController.text.trim(),
-                          style: itemNameTextStyle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildTextField('Item Description', _descriptionController, ''),
-                SizedBox(height: 14),
-                _buildTextField(
-                  'Merchant Name (Optional)',
-                  _merchantController,
-                  '',
-                ),
-                SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildDatePicker(),
-                    ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: _buildTimePicker(),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildTextField(
-                        'Quantity',
-                        _quantityController,
-                        '1',
-                        TextInputType.number,
-                      ),
-                    ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: _buildTextField(
-                        'Unit Price ($currency)',
-                        _unitPriceController,
-                        '0.00',
-                        TextInputType.numberWithOptions(decimal: true),
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 16),
-                Container(
-                  padding: EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: appTheme.teal_50,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Subtotal',
-                        style: TextStyle(
-                          color: appTheme.blue_gray_300,
-                          fontFamily: 'Inter',
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            'AMOUNT',
-                            style: TextStyle(
-                              color: appTheme.blue_gray_300,
-                              fontFamily: 'Inter',
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 1,
-                            ),
-                          ),
-                          Text(
-                            formatCurrencyAmount(currency, subtotal),
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 20,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: 14),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    OutlinedButton(
-                      onPressed: _discardItem,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: appTheme.blue_gray_300,
-                        side: BorderSide(color: appTheme.gray_200),
-                        minimumSize: Size(100, 44),
-                      ),
-                      child: Text('Discard'),
-                    ),
-                    SizedBox(width: 12),
-                    ElevatedButton(
-                      onPressed: _isEditingItem ? _saveItem : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: appTheme.teal_A700,
-                        foregroundColor: appTheme.white_A700,
-                        minimumSize: Size(98, 44),
-                      ),
-                      child: Text(
-                        _editingItemIndex == null ? 'Save Item' : 'Update Item',
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTextField(
-    String label,
-    TextEditingController controller,
-    String? hint, [
-    TextInputType? keyboardType,
-  ]) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label.toUpperCase(), style: _fieldLabelStyle),
-        SizedBox(height: 6),
-        TextField(
-          controller: controller,
-          readOnly: !_isEditingItem,
-          keyboardType: keyboardType,
-          inputFormatters: _inputFormattersFor(controller),
-          onChanged: (_) => setState(() {}),
-          decoration: _fieldDecoration(hint),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDatePicker() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('DATE', style: _fieldLabelStyle),
-        SizedBox(height: 6),
-        SizedBox(
-          width: double.infinity,
-          height: 43,
-          child: OutlinedButton.icon(
-            onPressed: _isEditingItem ? _pickDate : null,
-            style: _dateTimeButtonStyle,
-            icon: Icon(Icons.calendar_today_outlined, size: 18),
-            label: Text(DateFormat('dd MMM yyyy').format(_selectedDate)),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTimePicker() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('TIME', style: _fieldLabelStyle),
-        SizedBox(height: 6),
-        SizedBox(
-          width: double.infinity,
-          height: 43,
-          child: OutlinedButton.icon(
-            onPressed: _isEditingItem ? _pickTime : null,
-            style: _dateTimeButtonStyle,
-            icon: Icon(Icons.access_time_outlined, size: 18),
-            label: Text(_selectedTime.format(context)),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildTaxSection(ActivityUiState uiState) {
     final currency = _activeExpenseCurrency(uiState);
     if (_taxController.text.isEmpty && uiState.draftTaxAmount > 0) {
@@ -982,10 +732,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                 RegExp(r'^\d{0,5}([.,]\d{0,2})?$'),
               ),
             ],
-            onChanged: (value) {
-              final parsedTax = _parsePrice(value) ?? 0.0;
-              context.read<ActivityViewModel>().setDraftTaxAmount(parsedTax);
-            },
+            onSubmitted: (_) => _confirmTaxAmount(),
             decoration: _fieldDecoration('0.00').copyWith(
               prefixText: '$currency ',
               prefixStyle: TextStyle(
@@ -1315,56 +1062,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     );
   }
 
-  Future<void> _pickDate() async {
-    final date = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
-    );
-    if (date != null && mounted) setState(() => _selectedDate = date);
-  }
-
-  Future<void> _pickTime() async {
-    final time = await showTimePicker(
-      context: context,
-      initialTime: _selectedTime,
-    );
-    if (time != null && mounted) setState(() => _selectedTime = time);
-  }
-
-  void _saveItem() {
-    final name = _itemNameController.text.trim();
-    final quantity = int.tryParse(_quantityController.text.trim());
-    final price = _parsePrice(_unitPriceController.text);
-    if (name.isEmpty) {
-      _showValidationMessage('Item name cannot be empty.');
-      return;
-    }
-    if (quantity == null || quantity <= 0) {
-      _showValidationMessage('Item quantity must be greater than zero.');
-      return;
-    }
-    if (price == null || price < 0) {
-      _showValidationMessage('Enter a valid unit price of zero or more.');
-      return;
-    }
-    final dateTime = DateTime(
-      _selectedDate.year,
-      _selectedDate.month,
-      _selectedDate.day,
-      _selectedTime.hour,
-      _selectedTime.minute,
-    );
-    final item = ExpenseItem(
-      itemName: name,
-      itemDescription: _nullIfEmpty(_descriptionController.text),
-      merchantName: _nullIfEmpty(_merchantController.text),
-      expenseDateTime: dateTime,
-      quantity: quantity,
-      unitPrice: price,
-      subtotal: quantity * price,
-    );
+  void _saveItem(ExpenseItem item) {
     final viewModel = context.read<ActivityViewModel>();
     final currentIndex = _editingItemIndex;
     if (currentIndex == null) {
@@ -1372,20 +1070,17 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
       viewModel.addExpenseItem(item);
       setState(() {
         _editingItemIndex = newItemIndex;
-        _isEditingItem = false;
         _showItemForm = false;
+        _hasUnfinishedItemFormChanges = false;
       });
     } else {
       viewModel.updateExpenseItem(currentIndex, item);
       setState(() {
-        _isEditingItem = false;
         _showItemForm = false;
+        _hasUnfinishedItemFormChanges = false;
       });
     }
   }
-
-  String? _nullIfEmpty(String value) =>
-      value.trim().isEmpty ? null : value.trim();
 
   void _confirmTaxAmount() {
     final tax = _parsePrice(_taxController.text) ?? 0.0;
@@ -1402,18 +1097,6 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     return double.tryParse(value.trim().replaceAll(',', '.'));
   }
 
-  List<TextInputFormatter>? _inputFormattersFor(
-    TextEditingController controller,
-  ) {
-    if (controller == _quantityController) {
-      return [FilteringTextInputFormatter.digitsOnly];
-    }
-    if (controller == _unitPriceController) {
-      return [FilteringTextInputFormatter.allow(RegExp(r'^\d*[.,]?\d{0,2}'))];
-    }
-    return null;
-  }
-
   void _showValidationMessage(String message) {
     _topMessageTimer?.cancel();
     setState(() => _topMessage = message);
@@ -1428,30 +1111,16 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   void _editItem(ExpenseItem item, int index) {
     setState(() {
       _editingItemIndex = index;
-      _isEditingItem = true;
       _showItemForm = true;
-      _itemNameController.text = item.itemName;
-      _descriptionController.text = item.itemDescription ?? '';
-      _merchantController.text = item.merchantName ?? '';
-      _quantityController.text = item.quantity.toString();
-      _unitPriceController.text = item.unitPrice.toStringAsFixed(2);
-      _selectedDate = item.expenseDateTime;
-      _selectedTime = TimeOfDay.fromDateTime(item.expenseDateTime);
+      _hasUnfinishedItemFormChanges = false;
     });
   }
 
   void _discardItem() {
     setState(() {
       _editingItemIndex = null;
-      _isEditingItem = false;
       _showItemForm = false;
-      _itemNameController.clear();
-      _descriptionController.clear();
-      _merchantController.clear();
-      _quantityController.clear();
-      _unitPriceController.clear();
-      _selectedDate = DateTime.now();
-      _selectedTime = TimeOfDay.now();
+      _hasUnfinishedItemFormChanges = false;
     });
   }
 
@@ -1462,19 +1131,15 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
       );
       return;
     }
-    _discardItem();
     setState(() {
-      _isEditingItem = true;
+      _editingItemIndex = null;
       _showItemForm = true;
+      _hasUnfinishedItemFormChanges = false;
     });
   }
 
   bool _hasUnfinishedItem() {
-    return _itemNameController.text.trim().isNotEmpty ||
-        _descriptionController.text.trim().isNotEmpty ||
-        _merchantController.text.trim().isNotEmpty ||
-        _quantityController.text.trim().isNotEmpty ||
-        _unitPriceController.text.trim().isNotEmpty;
+    return _hasUnfinishedItemFormChanges;
   }
 
   Future<void> _scanReceipt() async {
@@ -1517,14 +1182,9 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
       if (itemCount > 0) {
         setState(() {
           _editingItemIndex = null;
-          _isEditingItem = false;
           _showItemForm = false;
           _hasAppliedOcrValues = true;
-          _itemNameController.clear();
-          _descriptionController.clear();
-          _merchantController.clear();
-          _quantityController.clear();
-          _unitPriceController.clear();
+          _hasUnfinishedItemFormChanges = false;
         });
       } else {
         _showValidationMessage(
@@ -1635,15 +1295,8 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     setState(() {
       _isRecordingNewExpense = true;
       _editingItemIndex = null;
-      _isEditingItem = false;
       _showItemForm = false;
-      _itemNameController.clear();
-      _descriptionController.clear();
-      _merchantController.clear();
-      _quantityController.clear();
-      _unitPriceController.clear();
-      _selectedDate = DateTime.now();
-      _selectedTime = TimeOfDay.now();
+      _hasUnfinishedItemFormChanges = false;
     });
   }
 
@@ -1753,6 +1406,456 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   }
 }
 
+class _ExpenseItemForm extends StatefulWidget {
+  final String currency;
+  final ExpenseItem? initialItem;
+  final ValueChanged<bool> onChanged;
+  final ValueChanged<ExpenseItem> onSave;
+  final VoidCallback onDiscard;
+  final ValueChanged<String> onValidationError;
+
+  const _ExpenseItemForm({
+    super.key,
+    required this.currency,
+    required this.initialItem,
+    required this.onChanged,
+    required this.onSave,
+    required this.onDiscard,
+    required this.onValidationError,
+  });
+
+  @override
+  State<_ExpenseItemForm> createState() => _ExpenseItemFormState();
+}
+
+class _ExpenseItemFormState extends State<_ExpenseItemForm> {
+  final TextEditingController _itemNameController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _merchantController = TextEditingController();
+  final TextEditingController _quantityController = TextEditingController();
+  final TextEditingController _unitPriceController = TextEditingController();
+  final ValueNotifier<double> _subtotalNotifier = ValueNotifier(0.0);
+
+  late DateTime _selectedDate;
+  late TimeOfDay _selectedTime;
+
+  @override
+  void initState() {
+    super.initState();
+    final initialItem = widget.initialItem;
+    _selectedDate = initialItem?.expenseDateTime ?? DateTime.now();
+    _selectedTime = TimeOfDay.fromDateTime(
+      initialItem?.expenseDateTime ?? DateTime.now(),
+    );
+    _itemNameController.text = initialItem?.itemName ?? '';
+    _descriptionController.text = initialItem?.itemDescription ?? '';
+    _merchantController.text = initialItem?.merchantName ?? '';
+    _quantityController.text = initialItem?.quantity.toString() ?? '';
+    _unitPriceController.text = initialItem == null
+        ? ''
+        : initialItem.unitPrice.toStringAsFixed(2);
+
+    for (final controller in [
+      _itemNameController,
+      _descriptionController,
+      _merchantController,
+      _quantityController,
+      _unitPriceController,
+    ]) {
+      controller.addListener(_handleFieldChanged);
+    }
+    _refreshSubtotal();
+  }
+
+  @override
+  void dispose() {
+    _itemNameController.dispose();
+    _descriptionController.dispose();
+    _merchantController.dispose();
+    _quantityController.dispose();
+    _unitPriceController.dispose();
+    _subtotalNotifier.dispose();
+    super.dispose();
+  }
+
+  void _handleFieldChanged() {
+    _refreshSubtotal();
+    widget.onChanged(_hasUnfinishedItem());
+  }
+
+  void _refreshSubtotal() {
+    final quantity = int.tryParse(_quantityController.text) ?? 0;
+    final unitPrice = _parsePrice(_unitPriceController.text) ?? 0.0;
+    _subtotalNotifier.value = quantity * unitPrice;
+  }
+
+  bool _hasUnfinishedItem() {
+    return _itemNameController.text.trim().isNotEmpty ||
+        _descriptionController.text.trim().isNotEmpty ||
+        _merchantController.text.trim().isNotEmpty ||
+        _quantityController.text.trim().isNotEmpty ||
+        _unitPriceController.text.trim().isNotEmpty;
+  }
+
+  Future<void> _pickDate() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+    );
+    if (date != null && mounted) {
+      setState(() => _selectedDate = date);
+    }
+  }
+
+  Future<void> _pickTime() async {
+    final time = await showTimePicker(
+      context: context,
+      initialTime: _selectedTime,
+    );
+    if (time != null && mounted) {
+      setState(() => _selectedTime = time);
+    }
+  }
+
+  void _saveItem() {
+    final name = _itemNameController.text.trim();
+    final quantity = int.tryParse(_quantityController.text.trim());
+    final price = _parsePrice(_unitPriceController.text);
+    if (name.isEmpty) {
+      widget.onValidationError('Item name cannot be empty.');
+      return;
+    }
+    if (quantity == null || quantity <= 0) {
+      widget.onValidationError('Item quantity must be greater than zero.');
+      return;
+    }
+    if (price == null || price < 0) {
+      widget.onValidationError('Enter a valid unit price of zero or more.');
+      return;
+    }
+
+    final dateTime = DateTime(
+      _selectedDate.year,
+      _selectedDate.month,
+      _selectedDate.day,
+      _selectedTime.hour,
+      _selectedTime.minute,
+    );
+
+    widget.onSave(
+      ExpenseItem(
+        itemName: name,
+        itemDescription: _nullIfEmpty(_descriptionController.text),
+        merchantName: _nullIfEmpty(_merchantController.text),
+        expenseDateTime: dateTime,
+        quantity: quantity,
+        unitPrice: price,
+        subtotal: quantity * price,
+      ),
+    );
+  }
+
+  String? _nullIfEmpty(String value) {
+    return value.trim().isEmpty ? null : value.trim();
+  }
+
+  double? _parsePrice(String value) {
+    return double.tryParse(value.trim().replaceAll(',', '.'));
+  }
+
+  List<TextInputFormatter>? _inputFormattersFor(
+    TextEditingController controller,
+  ) {
+    if (controller == _quantityController) {
+      return [FilteringTextInputFormatter.digitsOnly];
+    }
+    if (controller == _unitPriceController) {
+      return [FilteringTextInputFormatter.allow(RegExp(r'^\d*[.,]?\d{0,2}'))];
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final itemNameTextStyle = Theme.of(
+      context,
+    ).textTheme.bodyLarge!.copyWith(color: appTheme.gray_900);
+
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: appTheme.gray_200),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Color(0x08F9FAFB),
+              border: Border(bottom: BorderSide(color: appTheme.gray_100)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: appTheme.teal_A700,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.receipt_long_outlined,
+                    color: appTheme.white_A700,
+                  ),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('ITEM ENTRY', style: _fieldLabelStyle),
+                      SizedBox(height: 6),
+                      TextField(
+                        controller: _itemNameController,
+                        decoration: _fieldDecoration('Item'),
+                        style: itemNameTextStyle,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildTextField('Item Description', _descriptionController, ''),
+                SizedBox(height: 14),
+                _buildTextField(
+                  'Merchant Name (Optional)',
+                  _merchantController,
+                  '',
+                ),
+                SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(child: _buildDatePicker()),
+                    SizedBox(width: 12),
+                    Expanded(child: _buildTimePicker()),
+                  ],
+                ),
+                SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildTextField(
+                        'Quantity',
+                        _quantityController,
+                        '1',
+                        TextInputType.number,
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: _buildTextField(
+                        'Unit Price (${widget.currency})',
+                        _unitPriceController,
+                        '0.00',
+                        TextInputType.numberWithOptions(decimal: true),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 16),
+                ValueListenableBuilder<double>(
+                  valueListenable: _subtotalNotifier,
+                  builder: (context, subtotal, _) {
+                    return Container(
+                      padding: EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: appTheme.teal_50,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Subtotal',
+                            style: TextStyle(
+                              color: appTheme.blue_gray_300,
+                              fontFamily: 'Inter',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                'AMOUNT',
+                                style: TextStyle(
+                                  color: appTheme.blue_gray_300,
+                                  fontFamily: 'Inter',
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                              Text(
+                                formatCurrencyAmount(
+                                  widget.currency,
+                                  subtotal,
+                                ),
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 20,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+                SizedBox(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    OutlinedButton(
+                      onPressed: widget.onDiscard,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: appTheme.blue_gray_300,
+                        side: BorderSide(color: appTheme.gray_200),
+                        minimumSize: Size(100, 44),
+                      ),
+                      child: Text('Discard'),
+                    ),
+                    SizedBox(width: 12),
+                    ElevatedButton(
+                      onPressed: _saveItem,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: appTheme.teal_A700,
+                        foregroundColor: appTheme.white_A700,
+                        minimumSize: Size(98, 44),
+                      ),
+                      child: Text(
+                        widget.initialItem == null
+                            ? 'Save Item'
+                            : 'Update Item',
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTextField(
+    String label,
+    TextEditingController controller,
+    String? hint, [
+    TextInputType? keyboardType,
+  ]) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label.toUpperCase(), style: _fieldLabelStyle),
+        SizedBox(height: 6),
+        TextField(
+          controller: controller,
+          keyboardType: keyboardType,
+          inputFormatters: _inputFormattersFor(controller),
+          decoration: _fieldDecoration(hint),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDatePicker() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('DATE', style: _fieldLabelStyle),
+        SizedBox(height: 6),
+        SizedBox(
+          width: double.infinity,
+          height: 43,
+          child: OutlinedButton.icon(
+            onPressed: _pickDate,
+            style: _dateTimeButtonStyle,
+            icon: Icon(Icons.calendar_today_outlined, size: 18),
+            label: Text(DateFormat('dd MMM yyyy').format(_selectedDate)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTimePicker() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('TIME', style: _fieldLabelStyle),
+        SizedBox(height: 6),
+        SizedBox(
+          width: double.infinity,
+          height: 43,
+          child: OutlinedButton.icon(
+            onPressed: _pickTime,
+            style: _dateTimeButtonStyle,
+            icon: Icon(Icons.access_time_outlined, size: 18),
+            label: Text(_selectedTime.format(context)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  static final _fieldLabelStyle = TextStyle(
+    color: appTheme.blue_gray_300,
+    fontFamily: 'Inter',
+    fontSize: 11,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0.3,
+  );
+
+  static final _dateTimeButtonStyle = OutlinedButton.styleFrom(
+    alignment: Alignment.centerLeft,
+    foregroundColor: appTheme.gray_900,
+    backgroundColor: appTheme.gray_50,
+    padding: EdgeInsets.symmetric(horizontal: 12),
+    side: BorderSide(color: appTheme.gray_100),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  );
+
+  InputDecoration _fieldDecoration(String? hint) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(color: Color(0xFFBFC4CC)),
+      filled: true,
+      fillColor: appTheme.gray_50,
+      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: appTheme.gray_100),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: appTheme.gray_100),
+      ),
+    );
+  }
+}
+
 class _TopMessageAlert extends StatelessWidget {
   final String message;
   final VoidCallback onClose;
@@ -1819,7 +1922,8 @@ class _ExpenseSectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return RepaintBoundary(
+      child: Container(
       width: double.infinity,
       padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1851,6 +1955,7 @@ class _ExpenseSectionCard extends StatelessWidget {
           child,
         ],
       ),
+      ),
     );
   }
 }
@@ -1866,7 +1971,8 @@ class _ExpenseActivitySummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return RepaintBoundary(
+      child: Container(
       padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
         border: Border.all(color: appTheme.gray_100),
@@ -1897,15 +2003,13 @@ class _ExpenseActivitySummary extends StatelessWidget {
                 SizedBox(height: 6),
                 _detail(
                   Icons.account_balance_wallet_outlined,
-                  formatCurrencyAmount(
-                    context.watch<ActivityViewModel>().preferredCurrency,
-                    activity.allocatedBudget,
-                  ),
+                  'RM ${activity.allocatedBudget.toStringAsFixed(2)}',
                 ),
               ],
             ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -1971,7 +2075,8 @@ class _ExpenseCategoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return RepaintBoundary(
+      child: Container(
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(16, 20, 16, 16),
       decoration: BoxDecoration(
@@ -2022,6 +2127,7 @@ class _ExpenseCategoryCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }
