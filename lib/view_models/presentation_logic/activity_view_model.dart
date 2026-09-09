@@ -20,6 +20,7 @@ import '../../models/local_data_source/location_source.dart';
 import '../ui_state/activity_ui_state.dart';
 
 class ActivityViewModel extends ChangeNotifier {
+  static const String _expenseCurrency = 'MYR';
   static const int _eveningExpenseReviewReminderId = 200000;
   static const int _eveningReviewHour = 20;
 
@@ -51,7 +52,7 @@ class ActivityViewModel extends ChangeNotifier {
        _authService = authService,
        _cachedActivity = cachedActivity ?? GetCachedActivities() {
     _uiState = _uiState.copyWith(
-      originalCurrency: _defaultExpenseCurrency(),
+      originalCurrency: _expenseCurrency,
       displayCurrency: _authService.preferredCurrency,
     );
     _loadAvailableCurrencies();
@@ -64,34 +65,6 @@ class ActivityViewModel extends ChangeNotifier {
 
   void _handleAuthChanged() {
     notifyListeners();
-  }
-
-  String _defaultExpenseCurrency([Activity? activity]) {
-    final destination = [
-      _uiState.tripDestination,
-      activity?.destination ?? '',
-    ].join(' ').toLowerCase();
-
-    if (destination.contains('malaysia') ||
-        destination.contains('kuala lumpur') ||
-        destination.contains('sarawak') ||
-        destination.contains('sabah') ||
-        destination.contains('selangor') ||
-        destination.contains('penang') ||
-        destination.contains('johor') ||
-        destination.contains('melaka') ||
-        destination.contains('perak') ||
-        destination.contains('kedah') ||
-        destination.contains('kelantan') ||
-        destination.contains('terengganu') ||
-        destination.contains('pahang') ||
-        destination.contains('negeri sembilan') ||
-        destination.contains('putrajaya') ||
-        destination.contains('labuan')) {
-      return 'MYR';
-    }
-
-    return _authService.preferredCurrency;
   }
 
   @override
@@ -107,7 +80,7 @@ class ActivityViewModel extends ChangeNotifier {
       draftExpenseItems: const [],
       draftTotalAmount: 0.0,
       paymentMethod: '',
-      originalCurrency: _defaultExpenseCurrency(activity),
+      originalCurrency: _expenseCurrency,
       receiptLocalPath: '',
       clearOcrData: true,
       errorMessage: '',
@@ -488,9 +461,6 @@ class ActivityViewModel extends ChangeNotifier {
       final extractedDateTime = _expenseTrackingService.extractReceiptDateTime(
         receiptText,
       );
-      final extractedCurrency = _expenseTrackingService.extractReceiptCurrency(
-        receiptText,
-      );
       String extractedTotalError = '';
 
       if (extractedTotal != null) {
@@ -509,7 +479,7 @@ class ActivityViewModel extends ChangeNotifier {
             _expenseTrackingService.extractMerchantName(receiptText) ?? '',
         ocrTransactionDateTime: extractedDateTime,
         clearOcrTransactionDateTime: extractedDateTime == null,
-        originalCurrency: extractedCurrency ?? _uiState.originalCurrency,
+        originalCurrency: _expenseCurrency,
         ocrExtractedTotal: extractedTotal,
         clearOcrExtractedTotal: extractedTotal == null,
         ocrExtractedTax: extractedTax,
@@ -741,6 +711,8 @@ class ActivityViewModel extends ChangeNotifier {
           tripId: result.trip.tripId,
           activities: result.activities,
           totalBudget: result.trip.totalBudget,
+          tripDestination: result.trip.destination,
+          originalCurrency: _expenseCurrency,
           sufficientDays: days,
         );
         await refreshSpentAmounts();
@@ -869,6 +841,7 @@ class ActivityViewModel extends ChangeNotifier {
         tripId: tripId,
         tripDestination:
             tripResult?.trip.destination ?? _uiState.tripDestination,
+        originalCurrency: _expenseCurrency,
       );
 
       // Save to cache

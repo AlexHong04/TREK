@@ -245,13 +245,13 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   String _activeExpenseCurrency(ActivityUiState uiState) {
     final originalCurrency = uiState.originalCurrency.trim().toUpperCase();
     if (originalCurrency.isNotEmpty) return originalCurrency;
-    return context.read<ActivityViewModel>().preferredCurrency.trim().toUpperCase();
+    return 'MYR';
   }
 
   String _savedExpenseCurrency(Expense expense) {
     final currency = expense.currency.trim().toUpperCase();
     if (currency.isNotEmpty) return currency;
-    return context.read<ActivityViewModel>().preferredCurrency.trim().toUpperCase();
+    return 'MYR';
   }
 
   TextStyle get _moneyTextStyle => TextStyle(
