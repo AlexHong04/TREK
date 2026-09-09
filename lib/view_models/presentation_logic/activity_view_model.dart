@@ -8,7 +8,7 @@ import '../../models/local_data_source/camera_source.dart';
 import '../../models/local_data_source/gallery_source.dart';
 import '../../models/local_data_source/notification_source.dart';
 import '../../models/repository/expense_repository.dart';
-import '../../models/repository/i_expense_repository.dart';
+import '../../models/repository/i_itinerary_repository.dart';
 import '../../models/services/budget_service.dart';
 import '../../models/services/i_auth_service.dart';
 import '../../models/services/expense_tracking_service.dart';

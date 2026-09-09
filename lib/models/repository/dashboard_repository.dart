@@ -9,11 +9,7 @@ import '../entities/expense_item.dart';
 import '../entities/future_suggestion.dart';
 import '../entities/whole_trip.dart';
 import '../../utils/id_generator.dart';
-import 'i_dashboard_repository.dart';
-
-class DashboardRecommendationRateLimitException implements Exception {
-  const DashboardRecommendationRateLimitException();
-}
+import 'i_itinerary_repository.dart';
 
 class DashboardRepository implements IDashboardRepository {
   static const _futureSuggestionsTable = 'future_suggestions';

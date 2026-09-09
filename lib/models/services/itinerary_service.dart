@@ -27,6 +27,13 @@ class ItineraryService implements IItineraryService {
     List<String>? constraints,
     List<FutureSuggestion>? futureSuggestions,
     bool strictBudget = false,
+    String? arrivalLocation,
+    String? arrivalTime,
+    String? departureLocation,
+    String? departureTime,
+    String? hotelLocation,
+    String? hotelCheckInTime,
+    String? hotelCheckOutTime,
   }) async {
     try {
       int retries = 3;
@@ -49,6 +56,13 @@ class ItineraryService implements IItineraryService {
           constraints: constraints,
           futureSuggestions: futureSuggestions,
           strictBudget: strictBudget,
+          arrivalLocation: arrivalLocation,
+          arrivalTime: arrivalTime,
+          departureLocation: departureLocation,
+          departureTime: departureTime,
+          hotelLocation: hotelLocation,
+          hotelCheckInTime: hotelCheckInTime,
+          hotelCheckOutTime: hotelCheckOutTime,
         );
 
         // Extract JSON object
@@ -642,8 +656,14 @@ class ItineraryService implements IItineraryService {
 
   // kokhong
   @override
-  Future<List<String>> getAutocompleteSuggestions(String query) async {
-    return await GooglePlacesApiConfig.getAutocompleteSuggestions(query);
+  Future<List<String>> getAutocompleteSuggestions(
+    String query, {
+    List<String>? destinations,
+  }) async {
+    return await GooglePlacesApiConfig.getAutocompleteSuggestions(
+      query,
+      destinations: destinations,
+    );
   }
 
   // weisong

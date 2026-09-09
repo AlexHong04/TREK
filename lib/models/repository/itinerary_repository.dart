@@ -655,9 +655,19 @@ class ItineraryRepository implements IItineraryRepository {
     try {
       final now = DateTime.now();
       // Use start and end of day in UTC/local to safely match today's date boundaries
-      final startOfTodayIso = DateTime(now.year, now.month, now.day).toUtc().toIso8601String();
-      final endOfTodayIso = DateTime(now.year, now.month, now.day, 23, 59, 59).toUtc().toIso8601String();
-      final nowIso = now.toUtc().toIso8601String();
+      final startOfTodayIso = DateTime(
+        now.year,
+        now.month,
+        now.day,
+      ).toUtc().toIso8601String();
+      final endOfTodayIso = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        23,
+        59,
+        59,
+      ).toUtc().toIso8601String();
 
       final user = SupabaseConfig.client.auth.currentUser;
       if (user == null) return null;
@@ -677,7 +687,9 @@ class ItineraryRepository implements IItineraryRepository {
           .select()
           .eq('user_id', userId)
           .neq('status', 'completed')
-          .or('status.eq.ongoing,and(start_date.lte.$endOfTodayIso,end_date.gte.$startOfTodayIso)')
+          .or(
+            'status.eq.ongoing,and(start_date.lte.$endOfTodayIso,end_date.gte.$startOfTodayIso)',
+          )
           .order('start_date', ascending: false)
           .limit(1)
           .maybeSingle();
@@ -713,7 +725,9 @@ class ItineraryRepository implements IItineraryRepository {
           .maybeSingle();
 
       if (completedData != null) {
-        debugPrint('--> Found Completed/Past Trip: ${completedData['trip_id']}');
+        debugPrint(
+          '--> Found Completed/Past Trip: ${completedData['trip_id']}',
+        );
         return WholeTrip.fromJson(completedData);
       }
 
@@ -747,13 +761,10 @@ class ItineraryRepository implements IItineraryRepository {
   // weisong
   @override
   Future<Map<String, dynamic>> fetchSpentSummaryByActivityIds(
-      List<String> activityIds,
-      ) async {
+    List<String> activityIds,
+  ) async {
     if (activityIds.isEmpty) {
-      return {
-        'totalSpent': 0.0,
-        'activitySpentMap': <String, double>{},
-      };
+      return {'totalSpent': 0.0, 'activitySpentMap': <String, double>{}};
     }
 
     // Fetch all expense rows for these activities
@@ -777,10 +788,7 @@ class ItineraryRepository implements IItineraryRepository {
       }
     }
 
-    return {
-      'totalSpent': totalSpent,
-      'activitySpentMap': activityMap,
-    };
+    return {'totalSpent': totalSpent, 'activitySpentMap': activityMap};
   }
 
   @override
@@ -793,18 +801,20 @@ class ItineraryRepository implements IItineraryRepository {
 }
 
 class ActivityLocalCache implements ISharedPreferencesRepo {
-
   final ActivityLocalDataSource _localDataSource;
   final IItineraryRepository _itineraryRepository;
 
   ActivityLocalCache({
     ActivityLocalDataSource? localDataSource,
     IItineraryRepository? itineraryRepository,
-  })  : _localDataSource = localDataSource ?? ActivityLocalDataSource(),
-        _itineraryRepository = itineraryRepository ?? ItineraryRepository();
+  }) : _localDataSource = localDataSource ?? ActivityLocalDataSource(),
+       _itineraryRepository = itineraryRepository ?? ItineraryRepository();
 
   @override
-  Future<List<Activity>> getActivities(String tripId, {bool forceRefresh = false}) async {
+  Future<List<Activity>> getActivities(
+    String tripId, {
+    bool forceRefresh = false,
+  }) async {
     // 1. Try reading from local cache
     if (!forceRefresh) {
       final cachedActivities = await _localDataSource.loadActivities(tripId);
@@ -815,7 +825,9 @@ class ActivityLocalCache implements ISharedPreferencesRepo {
 
     // 2. Fallback to network/service
     // this is used when the local does not have the data.
-    final freshActivities = await _itineraryRepository.fetchAllActivitiesByTrip(tripId);
+    final freshActivities = await _itineraryRepository.fetchAllActivitiesByTrip(
+      tripId,
+    );
 
     // 3. Update local cache
     await _localDataSource.saveActivities(tripId, freshActivities);
@@ -824,7 +836,10 @@ class ActivityLocalCache implements ISharedPreferencesRepo {
   }
 
   @override
-  Future<void> saveActivitiesLocally(String tripId, List<Activity> activities) async {
+  Future<void> saveActivitiesLocally(
+    String tripId,
+    List<Activity> activities,
+  ) async {
     await _localDataSource.saveActivities(tripId, activities);
   }
 

@@ -7,7 +7,6 @@ import '../entities/activity.dart';
 import '../entities/expense.dart';
 import '../entities/expense_item.dart';
 import '../repository/expense_repository.dart';
-import '../repository/i_expense_repository.dart';
 import '../repository/itinerary_repository.dart';
 import '../repository/i_itinerary_repository.dart';
 import 'budget_service.dart';

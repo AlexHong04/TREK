@@ -17,6 +17,13 @@ abstract interface class IItineraryService {
     List<String>? constraints,
     List<FutureSuggestion>? futureSuggestions,
     bool strictBudget = false,
+    String? arrivalLocation,
+    String? arrivalTime,
+    String? departureLocation,
+    String? departureTime,
+    String? hotelLocation,
+    String? hotelCheckInTime,
+    String? hotelCheckOutTime,
   });
 
   Future<Activity> generateAlternativeItinerary({
@@ -54,7 +61,10 @@ abstract interface class IItineraryService {
     DateTime currentDateTime,
   );
 
-  Future<List<String>> getAutocompleteSuggestions(String query);
+  Future<List<String>> getAutocompleteSuggestions(
+    String query, {
+    List<String>? destinations,
+  });
 
   Future<List<Activity>> generateBudgetRecoveryItinerary({
     required String tripId,

@@ -12,7 +12,6 @@ import 'models/repository/auth_repository.dart';
 import 'models/repository/user_repository.dart';
 import 'models/repository/i_itinerary_repository.dart';
 import 'models/repository/itinerary_repository.dart';
-import 'models/repository/i_expense_repository.dart';
 import 'models/repository/expense_repository.dart';
 
 import 'models/services/auth_service.dart';
