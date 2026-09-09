@@ -1334,7 +1334,7 @@ class ActivityViewModel extends ChangeNotifier {
 
       debugPrint(
         '[handleExpenseSubmission] Original allocated budget for '
-        '${currentActivity.activitiesId}: RM${originalAllocatedBudget.toStringAsFixed(2)}',
+            '${currentActivity.activitiesId}: RM${originalAllocatedBudget.toStringAsFixed(2)}',
       );
 
       final response = await _expenseTrackingService.processExpense(
@@ -1378,7 +1378,7 @@ class ActivityViewModel extends ChangeNotifier {
 
       debugPrint(
         '[handleExpenseSubmission] Exceeded = spent($activitySpent) - '
-        'originalBudget($originalAllocatedBudget) = $exceededAmount',
+            'originalBudget($originalAllocatedBudget) = $exceededAmount',
       );
 
       shortageAmount =
