@@ -65,10 +65,26 @@ class FinancialDashboardScreen extends StatelessWidget {
                       )
                     else ...[
                       _buildSummaryCard(uiState),
+                      if (uiState.isConvertingCurrency ||
+                          uiState.currencyConversionErrorMessage != null) ...[
+                        const SizedBox(height: 8),
+                        _FinancialCurrencyConversionStatus(
+                          isLoading: uiState.isConvertingCurrency,
+                          preferredCurrency: uiState.preferredCurrency,
+                          errorMessage: uiState.currencyConversionErrorMessage,
+                          onRetry: viewModel.retryCurrencyConversion,
+                        ),
+                      ],
+                      if (uiState.preferredCurrency != 'MYR') ...[
+                        const SizedBox(height: 10),
+                        _FinancialCurrencyViewBadge(
+                          preferredCurrency: uiState.preferredCurrency,
+                        ),
+                      ],
                       const SizedBox(height: 18),
                       _buildDateFilter(context, uiState),
                       const SizedBox(height: 34),
-                      _buildCategoryChart(uiState),
+                      _buildCategoryChart(viewModel, uiState),
                       const SizedBox(height: 26),
                       _buildExpenseChart(uiState),
                       const SizedBox(height: 24),
@@ -396,7 +412,10 @@ class FinancialDashboardScreen extends StatelessWidget {
     }
   }
 
-  Widget _buildCategoryChart(FinancialDashboardUiState uiState) {
+  Widget _buildCategoryChart(
+    FinancialDashboardViewModel viewModel,
+    FinancialDashboardUiState uiState,
+  ) {
     final categories = uiState.categories;
     return Column(
       children: [
@@ -419,7 +438,11 @@ class FinancialDashboardScreen extends StatelessWidget {
                   children: [
                     CustomPaint(
                       size: chartSize,
-                      painter: DashboardDonutChartPainter(categories),
+                      painter: DashboardDonutChartPainter(
+                        categories,
+                        amountLabelBuilder: (amount) =>
+                            viewModel.formatDisplayMoney(amount, compact: true),
+                      ),
                     ),
                     if (uiState.totalExpense <= 0)
                       Center(
@@ -651,6 +674,187 @@ class _DashboardFilterMenuItem extends StatelessWidget {
   }
 }
 
+class _FinancialCurrencyConversionStatus extends StatelessWidget {
+  final bool isLoading;
+  final String preferredCurrency;
+  final String? errorMessage;
+  final VoidCallback onRetry;
+
+  const _FinancialCurrencyConversionStatus({
+    required this.isLoading,
+    required this.preferredCurrency,
+    required this.errorMessage,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasError = errorMessage != null;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        if (isLoading) ...[
+          SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: appTheme.teal_A700,
+            ),
+          ),
+          const SizedBox(width: 8),
+        ] else if (hasError) ...[
+          Icon(Icons.currency_exchange, size: 16, color: appTheme.errorRed),
+          const SizedBox(width: 6),
+        ],
+        Flexible(
+          child: Text(
+            isLoading
+                ? 'Converting RM to $preferredCurrency...'
+                : errorMessage!,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: hasError ? appTheme.errorRed : appTheme.blue_gray_700,
+              fontSize: 11,
+            ),
+          ),
+        ),
+        if (hasError) ...[
+          const SizedBox(width: 4),
+          TextButton(onPressed: onRetry, child: const Text('Retry')),
+        ],
+      ],
+    );
+  }
+}
+
+class _FinancialCurrencyViewBadge extends StatelessWidget {
+  final String preferredCurrency;
+
+  const _FinancialCurrencyViewBadge({required this.preferredCurrency});
+
+  @override
+  Widget build(BuildContext context) {
+    final viewModel = context.watch<FinancialDashboardViewModel>();
+    final uiState = viewModel.uiState;
+    final canSelectPreferred =
+        !uiState.isConvertingCurrency &&
+        uiState.preferredCurrencyRates.containsKey('MYR');
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: appTheme.white_A700,
+        border: Border.all(color: appTheme.gray_200),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: appTheme.teal_50,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              Icons.currency_exchange,
+              color: appTheme.teal_800,
+              size: 17,
+            ),
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              'Display currency',
+              style: TextStyle(
+                color: appTheme.blue_gray_700,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          _CurrencyCodeChip(
+            label: 'RM',
+            isSelected: !uiState.isPreferredCurrencyPrimary,
+            onTap: () =>
+                viewModel.selectPrimaryCurrency(usePreferredCurrency: false),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Icon(
+              Icons.swap_horiz_rounded,
+              color: appTheme.blue_gray_300,
+              size: 15,
+            ),
+          ),
+          _CurrencyCodeChip(
+            label: preferredCurrency,
+            isSelected: uiState.isPreferredCurrencyPrimary,
+            isEnabled: canSelectPreferred,
+            onTap: () =>
+                viewModel.selectPrimaryCurrency(usePreferredCurrency: true),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CurrencyCodeChip extends StatelessWidget {
+  final String label;
+  final bool isSelected;
+  final bool isEnabled;
+  final VoidCallback onTap;
+
+  const _CurrencyCodeChip({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+    this.isEnabled = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      enabled: isEnabled,
+      label: 'Use $label as primary currency',
+      child: Material(
+        color: appTheme.transparentCustom,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          onTap: isEnabled ? onTap : null,
+          borderRadius: BorderRadius.circular(20),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+            decoration: BoxDecoration(
+              color: isEnabled && isSelected
+                  ? appTheme.teal_A700
+                  : appTheme.gray_100,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: !isEnabled
+                    ? appTheme.blue_gray_300
+                    : isSelected
+                    ? appTheme.white_A700
+                    : appTheme.blue_gray_700,
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _FinancialExpenseDetailView extends StatelessWidget {
   final DashboardCategoryUiState category;
   final DateTime date;
@@ -800,6 +1004,9 @@ class _DashboardExpenseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final amountText = context
+        .watch<FinancialDashboardViewModel>()
+        .formatMoneyPair(item.amount, originalCurrency: item.currency);
     return Material(
       color: appTheme.white_A700,
       borderRadius: BorderRadius.circular(16),
@@ -839,7 +1046,7 @@ class _DashboardExpenseCard extends StatelessWidget {
                     const SizedBox(height: 6),
                     _DashboardDetailLine(
                       icon: Icons.account_balance_wallet_outlined,
-                      text: 'RM ${item.amount.toStringAsFixed(2)}',
+                      text: amountText,
                     ),
                     const SizedBox(height: 7),
                     Container(
@@ -966,7 +1173,10 @@ class _DashboardExpenseItemsSheet extends StatelessWidget {
                     _ExpenseSheetInfoLine(
                       icon: Icons.payments_outlined,
                       label: 'Total Expense',
-                      value: 'RM ${expense.amount.toStringAsFixed(2)}',
+                      value: viewModel.formatMoneyPair(
+                        expense.amount,
+                        originalCurrency: expense.currency,
+                      ),
                     ),
                     _ExpenseSheetInfoLine(
                       icon: Icons.credit_card_outlined,
@@ -1033,6 +1243,7 @@ class _DashboardExpenseItemsSheet extends StatelessWidget {
                   _DashboardExpenseItemCard(
                     item: uiState.selectedExpenseItems[index],
                     itemNumber: index + 1,
+                    currency: expense.currency,
                   ),
                   if (index != uiState.selectedExpenseItems.length - 1)
                     const SizedBox(height: 12),
@@ -1094,14 +1305,17 @@ class _ExpenseSheetInfoLine extends StatelessWidget {
 class _DashboardExpenseItemCard extends StatelessWidget {
   final DashboardExpenseItemUiState item;
   final int itemNumber;
+  final String currency;
 
   const _DashboardExpenseItemCard({
     required this.item,
     required this.itemNumber,
+    required this.currency,
   });
 
   @override
   Widget build(BuildContext context) {
+    final viewModel = context.watch<FinancialDashboardViewModel>();
     final description = item.itemDescription?.trim() ?? '';
     final merchant = item.merchantName?.trim() ?? '';
 
@@ -1148,7 +1362,11 @@ class _DashboardExpenseItemCard extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               Text(
-                'RM ${item.subtotal.toStringAsFixed(2)}',
+                viewModel.formatMoneyPair(
+                  item.subtotal,
+                  originalCurrency: currency,
+                ),
+                textAlign: TextAlign.right,
                 style: TextStyle(
                   color: appTheme.teal_800,
                   fontSize: 15,
@@ -1178,7 +1396,8 @@ class _DashboardExpenseItemCard extends StatelessWidget {
           ),
           _ExpenseItemMetadata(
             icon: Icons.calculate_outlined,
-            text: '${item.quantity} × RM ${item.unitPrice.toStringAsFixed(2)}',
+            text:
+                '${item.quantity} × ${viewModel.formatMoneyPair(item.unitPrice, originalCurrency: currency)}',
             isLast: true,
           ),
         ],
@@ -1265,6 +1484,7 @@ class _DashboardDetailLine extends StatelessWidget {
         Expanded(
           child: Text(
             text,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(color: appTheme.blue_gray_300, fontSize: 14),
           ),
@@ -1329,8 +1549,11 @@ class _SummaryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final viewModel = context.watch<FinancialDashboardViewModel>();
+    final primaryAmountText = viewModel.formatPrimaryMoney(amount);
+    final secondaryAmountText = viewModel.formatSecondaryMoney(amount);
     return SizedBox(
-      height: 42,
+      height: secondaryAmountText == null ? 42 : 56,
       child: Row(
         children: [
           Container(
@@ -1344,27 +1567,47 @@ class _SummaryRow extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                color: appTheme.white_A700,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
+            child: Padding(
+              padding: const EdgeInsets.only(right: 10),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  style: TextStyle(
+                    color: appTheme.white_A700,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ),
           ),
           SizedBox(
-            width: 112,
-            child: Row(
+            width: 126,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                SizedBox(width: 28, child: Text('RM', style: _amountStyle)),
-                Expanded(
-                  child: Text(
-                    amount.toStringAsFixed(2),
-                    textAlign: TextAlign.right,
-                    style: _amountStyle,
-                  ),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(primaryAmountText, style: _amountStyle),
                 ),
+                if (secondaryAmountText != null) ...[
+                  const SizedBox(height: 2),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      '≈ $secondaryAmountText',
+                      style: TextStyle(
+                        color: appTheme.white_A700.withValues(alpha: 0.78),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -1467,11 +1710,15 @@ class _AmountBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final amountText = context
+        .watch<FinancialDashboardViewModel>()
+        .formatDisplayMoney(amount, compact: true);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          'RM${amount.toStringAsFixed(0)}',
+          amountText,
+          textAlign: TextAlign.center,
           style: TextStyle(
             color: amount == 0 ? appTheme.gray_400 : color,
             fontSize: 9,
@@ -1637,12 +1884,15 @@ class _MoneyCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sign = amount < 0 ? '-' : '';
+    final amountText = context
+        .watch<FinancialDashboardViewModel>()
+        .formatDisplayMoney(amount, compact: true);
     return Expanded(
       child: Column(
         children: [
           Text(
-            'RM $sign${amount.abs().toStringAsFixed(0)}',
+            amountText,
+            textAlign: TextAlign.center,
             style: TextStyle(
               color: color,
               fontWeight: FontWeight.w700,
@@ -1750,6 +2000,9 @@ class _CompletedTripCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final budgetText = context
+        .watch<FinancialDashboardViewModel>()
+        .formatDisplayMoney(trip.totalBudget);
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
@@ -1826,7 +2079,8 @@ class _CompletedTripCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 10),
                     Text(
-                      'RM ${trip.totalBudget.toStringAsFixed(2)}',
+                      budgetText,
+                      textAlign: TextAlign.right,
                       style: TextStyle(
                         color: appTheme.blueGray900,
                         fontSize: 15,

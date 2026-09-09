@@ -62,6 +62,9 @@ class FinancialDashboardService implements IFinancialDashboardService {
           activityImageUrl: activity.activityImgUrl,
           activityStartTime: activity.startTime,
           amount: expense.totalAmount,
+          currency: expense.currency.trim().isEmpty
+              ? 'MYR'
+              : expense.currency.trim().toUpperCase(),
           paymentMethod: expense.paymentMethod,
           receiptImageUrl: expense.receiptImageUrl,
           recordedAt: expense.createdAt,

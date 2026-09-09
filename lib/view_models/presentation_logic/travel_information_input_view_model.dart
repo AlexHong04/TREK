@@ -29,10 +29,7 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     }
   }
 
-  final TextEditingController destinationController = TextEditingController();
-  final TextEditingController dateController = TextEditingController();
-  final TextEditingController budgetController = TextEditingController();
-  final TextEditingController wishlistController = TextEditingController();
+  String _currentWishlistQuery = '';
 
   TravelInformationUiState _uiState = const TravelInformationUiState();
   TravelInformationUiState get uiState => _uiState;
@@ -69,10 +66,8 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     return null;
   }
 
-  void updateDateRange(DateTime start, DateTime end) {
-    dateController.text =
-        '${start.toLocal().toString().split(' ')[0]} - ${end.toLocal().toString().split(' ')[0]}';
-    notifyListeners();
+  String formatDateRange(DateTime start, DateTime end) {
+    return '${start.toLocal().toString().split(' ')[0]} - ${end.toLocal().toString().split(' ')[0]}';
   }
 
   void selectPreference(String label) {
@@ -89,7 +84,6 @@ class TravelInformationInputViewModel extends ChangeNotifier {
         wishlistItems: [..._uiState.wishlistItems, trimmed],
       );
     }
-    wishlistController.clear();
     clearSuggestions();
   }
 
@@ -99,12 +93,14 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  String? generateItinerary() {
-    final String? destinationError = validateDestination(
-      destinationController.text,
-    );
-    final String? dateError = validateDate(dateController.text);
-    final String? budgetError = validateBudget(budgetController.text);
+  String? generateItinerary({
+    String? destination,
+    String? date,
+    String? budget,
+  }) {
+    final String? destinationError = validateDestination(destination);
+    final String? dateError = validateDate(date);
+    final String? budgetError = validateBudget(budget);
 
     if (destinationError != null || dateError != null || budgetError != null) {
       return destinationError ??
@@ -117,6 +113,7 @@ class TravelInformationInputViewModel extends ChangeNotifier {
   }
 
   void clearSuggestions() {
+    _currentWishlistQuery = '';
     _debounce?.cancel();
     _uiState = _uiState.copyWith(
       suggestions: const [],
@@ -126,6 +123,7 @@ class TravelInformationInputViewModel extends ChangeNotifier {
   }
 
   void onWishlistChanged(String value) {
+    _currentWishlistQuery = value;
     if (_debounce?.isActive ?? false) _debounce!.cancel();
 
     final trimmed = value.trim();
@@ -143,8 +141,8 @@ class TravelInformationInputViewModel extends ChangeNotifier {
           trimmed,
         );
 
-        // If the text was cleared while request was in-flight, ignore results
-        if (wishlistController.text.trim().isEmpty) {
+        // If the query was cleared while request was in-flight, ignore results
+        if (_currentWishlistQuery.trim().isEmpty) {
           return;
         }
 
@@ -164,10 +162,6 @@ class TravelInformationInputViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _debounce?.cancel();
-    destinationController.dispose();
-    dateController.dispose();
-    budgetController.dispose();
-    wishlistController.dispose();
     super.dispose();
   }
 }

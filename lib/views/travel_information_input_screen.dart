@@ -26,6 +26,28 @@ class TravelInformationInputScreen extends StatefulWidget {
 class _TravelInformationInputScreenState
     extends State<TravelInformationInputScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  late final TextEditingController _destinationController;
+  late final TextEditingController _dateController;
+  late final TextEditingController _budgetController;
+  late final TextEditingController _wishlistController;
+
+  @override
+  void initState() {
+    super.initState();
+    _destinationController = TextEditingController();
+    _dateController = TextEditingController();
+    _budgetController = TextEditingController();
+    _wishlistController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _destinationController.dispose();
+    _dateController.dispose();
+    _budgetController.dispose();
+    _wishlistController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +69,7 @@ class _TravelInformationInputScreenState
                       sectionTitle: 'DESTINATION',
                       hintText: 'City',
                       prefixIcon: Icons.location_on_outlined,
-                      controller: viewModel.destinationController,
+                      controller: _destinationController,
                       validator: viewModel.validateDestination,
                     ),
                     const SizedBox(height: 22.0),
@@ -55,7 +77,7 @@ class _TravelInformationInputScreenState
                       sectionTitle: 'WISHLIST',
                       hintText: 'Search wishlist...',
                       prefixIcon: Icons.favorite,
-                      controller: viewModel.wishlistController,
+                      controller: _wishlistController,
                       // Wishlist items can only be added by tapping a
                       // suggestion, so submitting the field dismisses the keyboard.
                       textInputAction: TextInputAction.search,
@@ -114,6 +136,7 @@ class _TravelInformationInputScreenState
                                     ),
                                     dense: true,
                                     onTap: () {
+                                      _wishlistController.clear();
                                       viewModel.addWishlistItem(suggestion);
                                       viewModel.clearSuggestions();
                                     },
@@ -145,7 +168,7 @@ class _TravelInformationInputScreenState
                       sectionTitle: 'WHEN?',
                       hintText: 'Select dates',
                       prefixIcon: Icons.calendar_today_outlined,
-                      controller: viewModel.dateController,
+                      controller: _dateController,
                       readOnly: true,
                       onTap: () async {
                         final picked = await showDateRangePicker(
@@ -174,7 +197,10 @@ class _TravelInformationInputScreenState
                               },
                         );
                         if (picked != null) {
-                          viewModel.updateDateRange(picked.start, picked.end);
+                          _dateController.text = viewModel.formatDateRange(
+                            picked.start,
+                            picked.end,
+                          );
                         }
                       },
                       validator: viewModel.validateDate,
@@ -184,7 +210,7 @@ class _TravelInformationInputScreenState
                       sectionTitle: 'TRIP BUDGET',
                       hintText: 'Total Trip Budget (\$)',
                       prefixIcon: Icons.account_balance_wallet_outlined,
-                      controller: viewModel.budgetController,
+                      controller: _budgetController,
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
@@ -321,7 +347,11 @@ class _TravelInformationInputScreenState
           child: InkWell(
             onTap: () {
               if (_formKey.currentState?.validate() ?? false) {
-                final error = viewModel.generateItinerary();
+                final error = viewModel.generateItinerary(
+                  destination: _destinationController.text,
+                  date: _dateController.text,
+                  budget: _budgetController.text,
+                );
                 if (error != null) {
                   ScaffoldMessenger.of(
                     context,
@@ -331,9 +361,9 @@ class _TravelInformationInputScreenState
                     context,
                     AppRoutes.wholeItineraryDetailScreen,
                     arguments: {
-                      'destination': viewModel.destinationController.text,
-                      'dates': viewModel.dateController.text,
-                      'budget': viewModel.budgetController.text,
+                      'destination': _destinationController.text,
+                      'dates': _dateController.text,
+                      'budget': _budgetController.text,
                       'preference': viewModel.uiState.selectedPreference,
                       'wishlist': viewModel.uiState.wishlistItems,
                     },

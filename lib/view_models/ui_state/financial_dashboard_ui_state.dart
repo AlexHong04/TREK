@@ -6,6 +6,7 @@ class DashboardExpenseDetailUiState {
   final String activityImageUrl;
   final String timeText;
   final double amount;
+  final String currency;
   final String paymentMethod;
   final String recordedAtText;
   final String? receiptImageUrl;
@@ -16,6 +17,7 @@ class DashboardExpenseDetailUiState {
     required this.activityImageUrl,
     required this.timeText,
     required this.amount,
+    this.currency = 'MYR',
     required this.paymentMethod,
     required this.recordedAtText,
     this.receiptImageUrl,
@@ -94,6 +96,11 @@ class FinancialDashboardUiState {
   final String? availableDatesErrorMessage;
   final String? completedTripsErrorMessage;
   final String? expenseItemsErrorMessage;
+  final bool isConvertingCurrency;
+  final String preferredCurrency;
+  final bool isPreferredCurrencyPrimary;
+  final Map<String, double> preferredCurrencyRates;
+  final String? currencyConversionErrorMessage;
   final bool hasCurrentTrip;
   final DateTime selectedDate;
   final DateTime displayedCalendarMonth;
@@ -118,6 +125,11 @@ class FinancialDashboardUiState {
     this.availableDatesErrorMessage,
     this.completedTripsErrorMessage,
     this.expenseItemsErrorMessage,
+    this.isConvertingCurrency = false,
+    this.preferredCurrency = 'MYR',
+    this.isPreferredCurrencyPrimary = true,
+    this.preferredCurrencyRates = const {},
+    this.currencyConversionErrorMessage,
     this.hasCurrentTrip = false,
     required this.selectedDate,
     required this.displayedCalendarMonth,
@@ -157,6 +169,12 @@ class FinancialDashboardUiState {
     bool clearCompletedTripsError = false,
     String? expenseItemsErrorMessage,
     bool clearExpenseItemsError = false,
+    bool? isConvertingCurrency,
+    String? preferredCurrency,
+    bool? isPreferredCurrencyPrimary,
+    Map<String, double>? preferredCurrencyRates,
+    String? currencyConversionErrorMessage,
+    bool clearCurrencyConversionError = false,
     bool? hasCurrentTrip,
     DateTime? selectedDate,
     DateTime? displayedCalendarMonth,
@@ -191,6 +209,16 @@ class FinancialDashboardUiState {
       expenseItemsErrorMessage: clearExpenseItemsError
           ? null
           : expenseItemsErrorMessage ?? this.expenseItemsErrorMessage,
+      isConvertingCurrency: isConvertingCurrency ?? this.isConvertingCurrency,
+      preferredCurrency: preferredCurrency ?? this.preferredCurrency,
+      isPreferredCurrencyPrimary:
+          isPreferredCurrencyPrimary ?? this.isPreferredCurrencyPrimary,
+      preferredCurrencyRates:
+          preferredCurrencyRates ?? this.preferredCurrencyRates,
+      currencyConversionErrorMessage: clearCurrencyConversionError
+          ? null
+          : currencyConversionErrorMessage ??
+                this.currencyConversionErrorMessage,
       hasCurrentTrip: hasCurrentTrip ?? this.hasCurrentTrip,
       selectedDate: selectedDate ?? this.selectedDate,
       displayedCalendarMonth:

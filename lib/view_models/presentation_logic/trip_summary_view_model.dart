@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../models/services/financial_dashboard_service.dart';
+import '../../models/services/i_auth_service.dart';
 import '../../models/services/i_financial_dashboard_service.dart';
 import '../ui_state/trip_summary_ui_state.dart';
 
@@ -15,15 +16,37 @@ class TripSummaryViewModel extends ChangeNotifier {
 
   final String tripId;
   final IFinancialDashboardService _service;
+  final IAuthService _authService;
+  int _currencyConversionRequest = 0;
+  bool _isDisposed = false;
 
   TripSummaryUiState _uiState = const TripSummaryUiState();
 
   TripSummaryViewModel({
     required this.tripId,
+    required IAuthService authService,
     IFinancialDashboardService? service,
-  }) : _service = service ?? FinancialDashboardService();
+  }) : _service = service ?? FinancialDashboardService(),
+       _authService = authService {
+    _authService.addListener(_handleAuthUserChanged);
+    _uiState = _uiState.copyWith(
+      preferredCurrency: _normalizeCurrency(_authService.preferredCurrency),
+    );
+  }
 
   TripSummaryUiState get uiState => _uiState;
+
+  void _handleAuthUserChanged() {
+    unawaited(_refreshCurrencyConversion());
+  }
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    _currencyConversionRequest++;
+    _authService.removeListener(_handleAuthUserChanged);
+    super.dispose();
+  }
 
   Future<void> loadTripSummary() async {
     _uiState = _uiState.copyWith(
@@ -94,6 +117,7 @@ class TripSummaryViewModel extends ChangeNotifier {
               .toList(),
         );
         notifyListeners();
+        unawaited(_refreshCurrencyConversion());
         unawaited(loadCostSavingTips());
         return;
       }
@@ -362,6 +386,141 @@ class TripSummaryViewModel extends ChangeNotifier {
   String _formatMoney(double amount) {
     final absolute = NumberFormat('#,##0.00').format(amount.abs());
     return amount < 0 ? 'RM -$absolute' : 'RM $absolute';
+  }
+
+  String formatMoney(double amount, {bool compact = false}) {
+    return _formatCurrencyAmount(amount, 'MYR', compact: compact);
+  }
+
+  String? formatPreferredMoney(double amount, {bool compact = false}) {
+    final preferredCurrency = _uiState.preferredCurrency;
+    if (preferredCurrency == 'MYR') return null;
+    final rate = _uiState.preferredCurrencyRates['MYR'];
+    if (rate == null && amount != 0) return null;
+    return _formatCurrencyAmount(
+      amount == 0 ? 0 : amount * rate!,
+      preferredCurrency,
+      compact: compact,
+    );
+  }
+
+  String formatMoneyPair(double amount, {bool compact = false}) {
+    final primary = formatPrimaryMoney(amount, compact: compact);
+    final secondary = formatSecondaryMoney(amount, compact: compact);
+    return secondary == null ? primary : '$primary\n≈ $secondary';
+  }
+
+  String formatPrimaryMoney(double amount, {bool compact = false}) {
+    final preferred = formatPreferredMoney(amount, compact: compact);
+    if (_uiState.isPreferredCurrencyPrimary && preferred != null) {
+      return preferred;
+    }
+    return formatMoney(amount, compact: compact);
+  }
+
+  String? formatSecondaryMoney(double amount, {bool compact = false}) {
+    final preferred = formatPreferredMoney(amount, compact: compact);
+    if (preferred == null) return null;
+    if (!_uiState.isPreferredCurrencyPrimary) return preferred;
+    return formatMoney(amount, compact: compact);
+  }
+
+  String formatDisplayMoney(double amount, {bool compact = false}) {
+    return formatPrimaryMoney(amount, compact: compact);
+  }
+
+  void selectPrimaryCurrency({required bool usePreferredCurrency}) {
+    if (usePreferredCurrency) {
+      if (_uiState.preferredCurrency == 'MYR' ||
+          !_uiState.preferredCurrencyRates.containsKey('MYR')) {
+        return;
+      }
+    }
+    if (_uiState.isPreferredCurrencyPrimary == usePreferredCurrency) return;
+    _uiState = _uiState.copyWith(
+      isPreferredCurrencyPrimary: usePreferredCurrency,
+    );
+    notifyListeners();
+  }
+
+  Future<void> retryCurrencyConversion() => _refreshCurrencyConversion();
+
+  Future<void> _refreshCurrencyConversion() async {
+    final request = ++_currencyConversionRequest;
+    final preferredCurrency = _normalizeCurrency(
+      _authService.preferredCurrency,
+    );
+    final didChangeCurrency = _uiState.preferredCurrency != preferredCurrency;
+    if (preferredCurrency == 'MYR') {
+      _uiState = _uiState.copyWith(
+        isConvertingCurrency: false,
+        preferredCurrency: preferredCurrency,
+        preferredCurrencyRates: const {},
+        clearCurrencyConversionError: true,
+      );
+      if (!_isDisposed) notifyListeners();
+      return;
+    }
+
+    _uiState = _uiState.copyWith(
+      isConvertingCurrency: true,
+      preferredCurrency: preferredCurrency,
+      isPreferredCurrencyPrimary: didChangeCurrency
+          ? true
+          : _uiState.isPreferredCurrencyPrimary,
+      preferredCurrencyRates: const {},
+      clearCurrencyConversionError: true,
+    );
+    if (!_isDisposed) notifyListeners();
+
+    try {
+      final rate = await _authService.convertToPreferredCurrency(
+        amount: 1,
+        fromCurrency: 'MYR',
+      );
+      if (_isDisposed || request != _currencyConversionRequest) return;
+      _uiState = _uiState.copyWith(
+        isConvertingCurrency: false,
+        preferredCurrencyRates: rate == null
+            ? const {}
+            : Map.unmodifiable({'MYR': rate}),
+        isPreferredCurrencyPrimary: rate == null
+            ? false
+            : _uiState.isPreferredCurrencyPrimary,
+        currencyConversionErrorMessage: rate == null
+            ? 'The exchange rate for $preferredCurrency is unavailable.'
+            : null,
+        clearCurrencyConversionError: rate != null,
+      );
+    } catch (_) {
+      if (_isDisposed || request != _currencyConversionRequest) return;
+      _uiState = _uiState.copyWith(
+        isConvertingCurrency: false,
+        preferredCurrencyRates: const {},
+        isPreferredCurrencyPrimary: false,
+        currencyConversionErrorMessage:
+            'Unable to convert amounts to $preferredCurrency.',
+      );
+    }
+    notifyListeners();
+  }
+
+  String _formatCurrencyAmount(
+    double amount,
+    String currency, {
+    required bool compact,
+  }) {
+    final pattern = compact ? '#,##0' : '#,##0.00';
+    final absolute = NumberFormat(pattern).format(amount.abs());
+    final currencyLabel = currency == 'MYR' ? 'RM' : currency;
+    return amount < 0
+        ? '$currencyLabel -$absolute'
+        : '$currencyLabel $absolute';
+  }
+
+  String _normalizeCurrency(String currency) {
+    final normalized = currency.trim().toUpperCase();
+    return normalized.isEmpty || normalized == 'RM' ? 'MYR' : normalized;
   }
 }
 
