@@ -829,6 +829,8 @@ class ActivityViewModel extends ChangeNotifier {
     String tripId, {
     DateTime? filterDate,
     bool forceRefresh = false,
+    double? knownTotalBudget,
+    String? knownDestination,
   }) async {
     final now = DateTime.now();
     final targetDate = filterDate != null
@@ -893,15 +895,6 @@ class ActivityViewModel extends ChangeNotifier {
         totalSpent += actSpent;
       }
 
-      // 2. Calculate initial sufficient days
-      int initialSufficientDays = 0;
-      if (allActivities.isNotEmpty) {
-        initialSufficientDays = await _budgetService.calculateSufficientDays(
-          tripId,
-          allActivities.first.activitiesId,
-        );
-      }
-
       final currentDateActivities = allActivities.where((act) {
         return _isSameDate(act.date, targetDate);
       }).toList();
@@ -915,21 +908,31 @@ class ActivityViewModel extends ChangeNotifier {
       }
       final sortedDates = dateSet.values.toList()..sort();
 
+      // Use the known budget/destination from navigation args when available,
+      // otherwise fall back to fetchLatestTrip (which only returns the latest
+      // ongoing trip — wrong for completed/terminated/pending trips).
+      final double effectiveBudget = knownTotalBudget
+          ?? tripResult?.trip.totalBudget
+          ?? _uiState.totalBudget;
+      final String effectiveDestination = knownDestination
+          ?? tripResult?.trip.destination
+          ?? _uiState.tripDestination;
+
+      // *** SET CRITICAL STATE FIRST — before any non-essential calls ***
       _uiState = _uiState.copyWith(
         isLoading: false,
         activities: currentDateActivities,
         allActivities: allActivities,
         availableDates: sortedDates,
-        totalBudget: tripResult?.trip.totalBudget ?? _uiState.totalBudget,
+        totalBudget: effectiveBudget,
         activitySpentMap: spentMap,
         spentBudget: totalSpent,
-        sufficientDays: initialSufficientDays,
         filterDate: targetDate,
         tripId: tripId,
-        tripDestination:
-            tripResult?.trip.destination ?? _uiState.tripDestination,
+        tripDestination: effectiveDestination,
         originalCurrency: _expenseCurrency,
       );
+      notifyListeners();
 
       // Save to cache
       await _cachedActivity.saveActivitiesLocally(tripId, allActivities);
@@ -937,6 +940,21 @@ class ActivityViewModel extends ChangeNotifier {
         'latest_ongoing_trip',
         allActivities,
       );
+
+      // 2. Calculate initial sufficient days (non-critical — wrapped in its
+      //    own try-catch so a failure here cannot wipe the state above).
+      try {
+        int initialSufficientDays = 0;
+        if (allActivities.isNotEmpty) {
+          initialSufficientDays = await _budgetService.calculateSufficientDays(
+            tripId,
+            allActivities.first.activitiesId,
+          );
+        }
+        _uiState = _uiState.copyWith(sufficientDays: initialSufficientDays);
+      } catch (e) {
+        debugPrint('Error calculating sufficient days (non-fatal): $e');
+      }
 
       await refreshSpentAmounts();
 
@@ -1143,9 +1161,11 @@ class ActivityViewModel extends ChangeNotifier {
   }
 
   bool _isSameDate(DateTime first, DateTime second) {
-    return first.year == second.year &&
-        first.month == second.month &&
-        first.day == second.day;
+    final f = first.toLocal();
+    final s = second.toLocal();
+    return f.year == s.year &&
+        f.month == s.month &&
+        f.day == s.day;
   }
 
   /// Produces a stable device notification ID from the team's AC#### ID.

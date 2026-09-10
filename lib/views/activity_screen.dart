@@ -35,6 +35,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
   String _destination = 'Trip Itinerary';
   DateTime? _filterDate;
   String _tripComputedStatus = 'ongoing';
+  bool _forceViewOnly = false;
+  double? _knownTotalBudget;
 
   @override
   void didChangeDependencies() {
@@ -44,11 +46,12 @@ class _ActivityScreenState extends State<ActivityScreen> {
       String? extractedTripId;
 
       if (args is Map<String, dynamic>) {
+        if (args['forceViewOnly'] == true) {
+          _forceViewOnly = true;
+        }
+
         if (args['filterDate'] is DateTime) {
           _filterDate = args['filterDate'] as DateTime;
-        } else {
-          final now = DateTime.now();
-          _filterDate = DateTime(now.year, now.month, now.day);
         }
 
         if (args['trip'] != null) {
@@ -62,6 +65,16 @@ class _ActivityScreenState extends State<ActivityScreen> {
             if (innerTrip['destination'] != null) {
               _destination = innerTrip['destination'].toString();
             }
+            if (innerTrip['total_budget'] != null) {
+              _knownTotalBudget = (innerTrip['total_budget'] as num?)?.toDouble();
+            }
+            // Use trip start date when no filterDate and viewing read-only
+            if (_filterDate == null && _forceViewOnly && innerTrip['start_date'] != null) {
+              try {
+                final sd = DateTime.parse(innerTrip['start_date'].toString());
+                _filterDate = DateTime(sd.year, sd.month, sd.day);
+              } catch (_) {}
+            }
           } else {
             extractedTripId =
                 (innerTrip as dynamic).tripId ??
@@ -72,6 +85,14 @@ class _ActivityScreenState extends State<ActivityScreen> {
               }
               if ((innerTrip as dynamic).computedStatus != null) {
                 _tripComputedStatus = (innerTrip as dynamic).computedStatus.toString().toLowerCase();
+              }
+              _knownTotalBudget = (innerTrip as dynamic).totalBudget as double?;
+              // Use trip start date when no filterDate and viewing read-only
+              if (_filterDate == null && _forceViewOnly) {
+                final sd = (innerTrip as dynamic).startDate;
+                if (sd is DateTime) {
+                  _filterDate = DateTime(sd.year, sd.month, sd.day);
+                }
               }
             } catch (_) {}
           }
@@ -90,7 +111,10 @@ class _ActivityScreenState extends State<ActivityScreen> {
         } catch (_) {
           extractedTripId = null;
         }
-      } else {
+      }
+
+      // Fallback to today if no filterDate was resolved
+      if (_filterDate == null) {
         final now = DateTime.now();
         _filterDate = DateTime(now.year, now.month, now.day);
       }
@@ -101,6 +125,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
             context.read<ActivityViewModel>().loadTripItinerary(
               extractedTripId!,
               filterDate: _filterDate,
+              knownTotalBudget: _knownTotalBudget,
+              knownDestination: _destination != 'Trip Itinerary' ? _destination : null,
             );
           }
         });
@@ -1026,6 +1052,18 @@ class _ActivityScreenState extends State<ActivityScreen> {
                     activity,
                     uiState,
                     onTap: () async {
+                      // If accessed from View All Plans, always view-only
+                      if (_forceViewOnly) {
+                        viewModel.selectActivityForExpense(activity);
+                        await showExpenseBottomSheet(
+                          context: context,
+                          activity: activity,
+                          viewModel: viewModel,
+                          viewOnly: true,
+                        );
+                        return;
+                      }
+
                       final bool isTripOngoing = _tripComputedStatus == 'ongoing';
 
                       // If trip is not ongoing, open expense sheet in view-only mode

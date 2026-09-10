@@ -102,6 +102,7 @@ class _AllPlansScreenState extends State<AllPlansScreen> {
                   DropdownMenuItem(value: 'Pending', child: Text('Pending')),
                   DropdownMenuItem(value: 'Ongoing', child: Text('Ongoing')),
                   DropdownMenuItem(value: 'Completed', child: Text('Completed')),
+                  DropdownMenuItem(value: 'Terminated', child: Text('Terminated')),
                 ],
                 onChanged: (value) {
                   if (value != null) {
@@ -162,6 +163,7 @@ class _AllPlansScreenState extends State<AllPlansScreen> {
     final bool isOngoing = status == 'ongoing';
     final bool isCompleted = status == 'completed';
     final bool isPending = status == 'pending';
+    final bool isTerminated = status == 'terminated';
 
     final String? activeImageUrl =
     (trip.imgUrl != null && trip.imgUrl!.trim().isNotEmpty)
@@ -188,8 +190,8 @@ class _AllPlansScreenState extends State<AllPlansScreen> {
           borderRadius: BorderRadius.circular(24),
           onTap: () {
             Navigator.of(context).pushNamed(
-              AppRoutes.wholeItineraryDetailScreen,
-              arguments: {'tripID': trip.tripId, 'trip': trip, 'isReadOnly': true},
+              '/activityScreen',
+              arguments: {'trip': trip, 'forceViewOnly': true},
             );
           },
           child: Column(
@@ -238,7 +240,9 @@ class _AllPlansScreenState extends State<AllPlansScreen> {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: isOngoing
+                          color: isTerminated
+                              ? const Color(0xFFFEE2E2)
+                              : isOngoing
                               ? appTheme.amber_200
                               : isCompleted
                               ? appTheme.gray_200
@@ -249,11 +253,15 @@ class _AllPlansScreenState extends State<AllPlansScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              isOngoing
+                              isTerminated
+                                  ? Icons.cancel_outlined
+                                  : isOngoing
                                   ? Icons.play_circle_outline
                                   : Icons.check_circle_outline,
                               size: 14,
-                              color: isOngoing
+                              color: isTerminated
+                                  ? appTheme.errorRed
+                                  : isOngoing
                                   ? appTheme.lime_900
                                   : isCompleted
                                   ? appTheme.gray_800
@@ -268,7 +276,9 @@ class _AllPlansScreenState extends State<AllPlansScreen> {
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
                                 fontFamily: 'Inter',
-                                color: isOngoing
+                                color: isTerminated
+                                    ? appTheme.errorRed
+                                    : isOngoing
                                     ? appTheme.lime_900
                                     : isCompleted
                                     ? appTheme.gray_800
