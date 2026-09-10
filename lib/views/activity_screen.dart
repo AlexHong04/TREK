@@ -177,9 +177,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
       allocatedBudget: state.selectedActivity!.allocatedBudget,
       remainingBudget: state.remainingBudget,
       exceededAmount: state.exceededAmount,
+      totalOverspent: state.overspentBudget,
       warningText1:
-          'You have overspent RM ${state.overspentBudget.toStringAsFixed(2)} so far for entire trip.',
-      warningText2:
           'The budget allocated for remaining restaurants have been modified.',
     );
   }
@@ -217,10 +216,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
       allocatedBudget: state.selectedActivity!.allocatedBudget,
       remainingBudget: state.remainingBudget,
       exceededAmount: state.exceededAmount,
-      warningText1:
-          'You have overspent RM ${state.overspentBudget.toStringAsFixed(2)} so far on this trip.',
+      totalOverspent: state.overspentBudget,
       estimatedDays: state.sufficientDays.toString(),
-      warningText3: 'Plan will be modified automatically.',
+      warningText1: 'Plan will be modified automatically.',
       onContinue: () async {
         // 1. Show a labelled, non-dismissible loading dialog while the plan is
         // being re-optimized (instead of the bare screen-wide spinner).

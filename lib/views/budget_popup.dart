@@ -42,7 +42,7 @@ class BaseBudgetDialog extends StatelessWidget {
                   fontFamily: 'Inter',
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: titleColor ?? appTheme.warningPopupHeader,
+                  color: appTheme.black,
                 ),
               ),
 
@@ -171,7 +171,7 @@ Widget _buildSummaryRow(String label, double value, {Color? valueColor}) {
   );
 }
 
-Widget _buildWishlistSummaryRow(
+Widget _buildIntSummaryRow(
   String label,
   String value, {
   Color? valueColor,
@@ -211,8 +211,11 @@ Widget _buildSummaryCard({
   double? secondaryValue,
   String? thirdLabel,
   double? thirdValue,
+  String? fourthLabel,
+  double? fourthValue,
+  String? fifthLabel,
+  String? fifthValue,
   Color? primaryValueColor,
-  Color? thirdValueColor,
 }) {
   return Container(
     width: double.infinity,
@@ -273,7 +276,17 @@ Widget _buildSummaryCard({
 
         if (thirdLabel != null && thirdValue != null) ...[
           const SizedBox(height: 12),
-          _buildSummaryRow(thirdLabel, thirdValue, valueColor: thirdValueColor),
+          _buildSummaryRow(thirdLabel, thirdValue),
+        ],
+
+        if (fourthLabel != null && fourthValue != null) ...[
+          const SizedBox(height: 12),
+          _buildSummaryRow(fourthLabel, fourthValue),
+        ],
+
+        if (fifthLabel != null && fifthValue != null) ...[
+          const SizedBox(height: 12),
+          _buildIntSummaryRow(fifthLabel, fifthValue),
         ],
       ],
     ),
@@ -344,7 +357,7 @@ Widget _buildWishlistSummaryCard({
           const SizedBox(height: 12),
           Divider(color: appTheme.popupCreamStroke, height: 1),
           const SizedBox(height: 12),
-          _buildWishlistSummaryRow(secondaryLabel, secondaryValue),
+          _buildIntSummaryRow(secondaryLabel, secondaryValue),
         ],
 
         if (thirdLabel != null && thirdValue != null) ...[
@@ -525,29 +538,29 @@ Future<void> showBudgetExceededDialog({
   required double allocatedBudget,
   required double remainingBudget,
   required double exceededAmount,
+  required double totalOverspent,
   required String warningText1,
-  required String warningText2,
   VoidCallback? onContinue,
 }) {
   return showDialog(
     context: context,
+    barrierDismissible: false,
     builder: (dialogContext) {
       return BaseBudgetDialog(
         title: 'Budget Exceeded',
-
         summaryCard: _buildSummaryCard(
-          primaryLabel: 'Allocated Budget:',
-          primaryValue: allocatedBudget,
+          primaryLabel: 'Exceeded Amount',
+          primaryValue: exceededAmount,
+          primaryValueColor: appTheme.errorRed,
           secondaryLabel: 'Remaining Budget:',
           secondaryValue: remainingBudget,
-          thirdLabel: 'Exceeded Amount',
-          thirdValue: exceededAmount,
-          thirdValueColor: appTheme.errorRed,
+          thirdLabel: 'Allocated Budget:',
+          thirdValue: allocatedBudget,
+          fourthLabel: 'Overspent So Far:',
+          fourthValue: totalOverspent,
         ),
 
         warningText: warningText1,
-
-        contentCard: BaseBudgetDialog._buildWarningRow(warningText2),
 
         actions: _buildActionButton(
           text: 'Continue',
@@ -567,74 +580,79 @@ Future<void> showBudgetExceededThresholdDialog({
   required double allocatedBudget,
   required double remainingBudget,
   required double exceededAmount,
-  required String warningText1,
+  required double totalOverspent,
   required String estimatedDays,
-  required String warningText3,
+  required String warningText1,
   VoidCallback? onContinue,
 }) {
   return showDialog(
     context: context,
+    barrierDismissible: false,
     builder: (dialogContext) {
       return BaseBudgetDialog(
         title: 'Budget Exceeded',
 
         summaryCard: _buildSummaryCard(
-          primaryLabel: 'Allocated Budget:',
-          primaryValue: allocatedBudget,
+          primaryLabel: 'Exceeded Amount',
+          primaryValue: exceededAmount,
+          primaryValueColor: appTheme.errorRed,
           secondaryLabel: 'Remaining Budget:',
           secondaryValue: remainingBudget,
-          thirdLabel: 'Exceeded Amount',
-          thirdValue: exceededAmount,
-          thirdValueColor: appTheme.warningPopupHeader,
+          thirdLabel: 'Allocated Budget:',
+          thirdValue: allocatedBudget,
+          fourthLabel: 'Overspent So Far:',
+          fourthValue: totalOverspent,
+          fifthLabel: 'Estimated Sufficient:',
+          fifthValue: estimatedDays,
         ),
 
         warningText: warningText1,
 
-        contentCard: Column(
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.warning_amber_rounded,
-                  color: appTheme.popupWarningMsg,
-                  size: 22,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: RichText(
-                    text: TextSpan(
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 14,
-                        color: appTheme.popupWarningMsg,
-                        height: 1.4,
-                      ),
-                      children: [
-                        const TextSpan(
-                          text:
-                              'Based on your current spending rate, '
-                              'your remaining budget is estimated to last ',
-                        ),
-                        TextSpan(
-                          text: '$estimatedDays more day(s)',
-                          style: const TextStyle(
-                            fontFamily: 'Inter',
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 16),
-
-            BaseBudgetDialog._buildWarningRow(warningText3),
-          ],
-        ),
+        // contentCard: Column(
+        //   children: [
+        //     Row(
+        //       crossAxisAlignment: CrossAxisAlignment.start,
+        //       children: [
+        //         Icon(
+        //           Icons.warning_amber_rounded,
+        //           color: appTheme.popupWarningMsg,
+        //           size: 22,
+        //         ),
+        //         const SizedBox(width: 8),
+        //         Expanded(
+        //           child: RichText(
+        //             text: TextSpan(
+        //               style: TextStyle(
+        //                 fontFamily: 'Inter',
+        //                 fontSize: 14,
+        //                 color: appTheme.popupWarningMsg,
+        //                 height: 1.4,
+        //               ),
+        //               children: [
+        //                 const TextSpan(
+        //                   text:
+        //                       'Based on your current spending rate, '
+        //                       'your remaining budget is estimated to last ',
+        //                 ),
+        //                 TextSpan(
+        //                   text: '$estimatedDays more day(s)',
+        //                   style: const TextStyle(
+        //                     fontFamily: 'Inter',
+        //                     fontWeight: FontWeight.bold,
+        //                   ),
+        //                 ),
+        //               ],
+        //             ),
+        //           ),
+        //         ),
+        //       ],
+        //     ),
+        //
+        //     const SizedBox(height: 16),
+        //
+        //     BaseBudgetDialog._buildWarningRow(warningText3),
+        //   ],
+        // ),
 
         actions: _buildActionButton(
           text: 'Continue',
@@ -822,17 +840,12 @@ Future<void> showBudgetReallocationFailureDialog({
 
 Future<void> showInitialBudgetInsufficientDialog({
   required BuildContext context,
-
   required double shortageAmount,
   required double minTopUp,
-
   int? wishlistCovered,
-
   required String warningText,
   required String topUpWarningText,
-
   VoidCallback? onCancel,
-
   required Future<bool> Function(double amount) onTopUpBudget,
 }) {
   final controller = TextEditingController();
@@ -1291,7 +1304,6 @@ Future<void> _showSimpleBudgetDialog({
     builder: (dialogContext) {
       return BaseBudgetDialog(
         title: title,
-
         contentCard: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
