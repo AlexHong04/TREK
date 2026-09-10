@@ -59,7 +59,6 @@ class TripSummaryUiState {
   final String? costSavingTipsErrorMessage;
   final bool isConvertingCurrency;
   final String preferredCurrency;
-  final bool isPreferredCurrencyPrimary;
   final Map<String, double> preferredCurrencyRates;
   final String? currencyConversionErrorMessage;
   final bool hasTrip;
@@ -96,7 +95,6 @@ class TripSummaryUiState {
     this.costSavingTipsErrorMessage,
     this.isConvertingCurrency = false,
     this.preferredCurrency = 'MYR',
-    this.isPreferredCurrencyPrimary = true,
     this.preferredCurrencyRates = const {},
     this.currencyConversionErrorMessage,
     this.hasTrip = false,
@@ -152,7 +150,6 @@ class TripSummaryUiState {
     bool clearCostSavingTipsError = false,
     bool? isConvertingCurrency,
     String? preferredCurrency,
-    bool? isPreferredCurrencyPrimary,
     Map<String, double>? preferredCurrencyRates,
     String? currencyConversionErrorMessage,
     bool clearCurrencyConversionError = false,
@@ -194,8 +191,6 @@ class TripSummaryUiState {
           : costSavingTipsErrorMessage ?? this.costSavingTipsErrorMessage,
       isConvertingCurrency: isConvertingCurrency ?? this.isConvertingCurrency,
       preferredCurrency: preferredCurrency ?? this.preferredCurrency,
-      isPreferredCurrencyPrimary:
-          isPreferredCurrencyPrimary ?? this.isPreferredCurrencyPrimary,
       preferredCurrencyRates:
           preferredCurrencyRates ?? this.preferredCurrencyRates,
       currencyConversionErrorMessage: clearCurrencyConversionError

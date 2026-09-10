@@ -75,12 +75,6 @@ class FinancialDashboardScreen extends StatelessWidget {
                           onRetry: viewModel.retryCurrencyConversion,
                         ),
                       ],
-                      if (uiState.preferredCurrency != 'MYR') ...[
-                        const SizedBox(height: 10),
-                        _FinancialCurrencyViewBadge(
-                          preferredCurrency: uiState.preferredCurrency,
-                        ),
-                      ],
                       const SizedBox(height: 18),
                       _buildDateFilter(context, uiState),
                       const SizedBox(height: 34),
@@ -547,7 +541,7 @@ class FinancialDashboardScreen extends StatelessWidget {
             children: [
               Expanded(
                 child: _ColumnHeading(
-                  color: appTheme.expenseBg,
+                  color: appTheme.gray_800,
                   label: 'Budget',
                 ),
               ),
@@ -561,6 +555,12 @@ class FinancialDashboardScreen extends StatelessWidget {
                 child: _ColumnHeading(
                   color: appTheme.teal_A700,
                   label: 'Remaining',
+                ),
+              ),
+              Expanded(
+                child: _ColumnHeading(
+                  color: appTheme.expenseOverspendText,
+                  label: 'Over Budget',
                 ),
               ),
             ],
@@ -622,6 +622,7 @@ class FinancialDashboardScreen extends StatelessWidget {
       final sweep = math.pi * 2 * chartCategory.expense / totalExpense;
       if (tapAngle >= accumulatedAngle && tapAngle < accumulatedAngle + sweep) {
         final viewModel = context.read<FinancialDashboardViewModel>();
+        viewModel.clearExpenseSearch();
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -728,133 +729,6 @@ class _FinancialCurrencyConversionStatus extends StatelessWidget {
   }
 }
 
-class _FinancialCurrencyViewBadge extends StatelessWidget {
-  final String preferredCurrency;
-
-  const _FinancialCurrencyViewBadge({required this.preferredCurrency});
-
-  @override
-  Widget build(BuildContext context) {
-    final viewModel = context.watch<FinancialDashboardViewModel>();
-    final uiState = viewModel.uiState;
-    final canSelectPreferred =
-        !uiState.isConvertingCurrency &&
-        uiState.preferredCurrencyRates.containsKey('MYR');
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-      decoration: BoxDecoration(
-        color: appTheme.white_A700,
-        border: Border.all(color: appTheme.gray_200),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              color: appTheme.teal_50,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              Icons.currency_exchange,
-              color: appTheme.teal_800,
-              size: 17,
-            ),
-          ),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Text(
-              'Display currency',
-              style: TextStyle(
-                color: appTheme.blue_gray_700,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          _CurrencyCodeChip(
-            label: 'RM',
-            isSelected: !uiState.isPreferredCurrencyPrimary,
-            onTap: () =>
-                viewModel.selectPrimaryCurrency(usePreferredCurrency: false),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: Icon(
-              Icons.swap_horiz_rounded,
-              color: appTheme.blue_gray_300,
-              size: 15,
-            ),
-          ),
-          _CurrencyCodeChip(
-            label: preferredCurrency,
-            isSelected: uiState.isPreferredCurrencyPrimary,
-            isEnabled: canSelectPreferred,
-            onTap: () =>
-                viewModel.selectPrimaryCurrency(usePreferredCurrency: true),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CurrencyCodeChip extends StatelessWidget {
-  final String label;
-  final bool isSelected;
-  final bool isEnabled;
-  final VoidCallback onTap;
-
-  const _CurrencyCodeChip({
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-    this.isEnabled = true,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      selected: isSelected,
-      enabled: isEnabled,
-      label: 'Use $label as primary currency',
-      child: Material(
-        color: appTheme.transparentCustom,
-        borderRadius: BorderRadius.circular(20),
-        child: InkWell(
-          onTap: isEnabled ? onTap : null,
-          borderRadius: BorderRadius.circular(20),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-            decoration: BoxDecoration(
-              color: isEnabled && isSelected
-                  ? appTheme.teal_A700
-                  : appTheme.gray_100,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              label,
-              style: TextStyle(
-                color: !isEnabled
-                    ? appTheme.blue_gray_300
-                    : isSelected
-                    ? appTheme.white_A700
-                    : appTheme.blue_gray_700,
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _FinancialExpenseDetailView extends StatelessWidget {
   final DashboardCategoryUiState category;
   final DateTime date;
@@ -866,6 +740,10 @@ class _FinancialExpenseDetailView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final viewModel = context.watch<FinancialDashboardViewModel>();
+    final searchQuery = viewModel.uiState.expenseSearchQuery;
+    final allExpenseDetails = category.expenseDetails;
+    final expenseDetails = viewModel.sortedExpenseDetails(allExpenseDetails);
     return Scaffold(
       backgroundColor: appTheme.gray_50_02,
       appBar: AppBar(
@@ -902,17 +780,27 @@ class _FinancialExpenseDetailView extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               _DashboardDetailSummary(category: category),
-              const SizedBox(height: 24),
-              if (category.expenseDetails.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 48),
-                  child: Text(
-                    'No expense records for ${category.name}.',
-                    style: TextStyle(color: appTheme.gray_400),
-                  ),
+              const SizedBox(height: 18),
+              _DashboardExpenseSearchField(
+                query: searchQuery,
+                onChanged: viewModel.setExpenseSearchQuery,
+                onClear: viewModel.clearExpenseSearch,
+              ),
+              const SizedBox(height: 12),
+              _DashboardExpenseSortBar(
+                visibleExpenseCount: expenseDetails.length,
+                totalExpenseCount: allExpenseDetails.length,
+                isSearching: searchQuery.trim().isNotEmpty,
+              ),
+              const SizedBox(height: 12),
+              if (expenseDetails.isEmpty)
+                _DashboardExpenseEmptyState(
+                  categoryName: category.name,
+                  searchQuery: searchQuery,
+                  onClearSearch: viewModel.clearExpenseSearch,
                 )
               else
-                ...category.expenseDetails.map(
+                ...expenseDetails.map(
                   (item) => Padding(
                     padding: const EdgeInsets.only(bottom: 14),
                     child: _DashboardExpenseCard(
@@ -949,6 +837,294 @@ class _FinancialExpenseDetailView extends StatelessWidget {
 
     await loadFuture;
     viewModel.clearExpenseItems();
+  }
+}
+
+class _DashboardExpenseSearchField extends StatefulWidget {
+  final String query;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  const _DashboardExpenseSearchField({
+    required this.query,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  @override
+  State<_DashboardExpenseSearchField> createState() =>
+      _DashboardExpenseSearchFieldState();
+}
+
+class _DashboardExpenseSearchFieldState
+    extends State<_DashboardExpenseSearchField> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.query);
+  }
+
+  @override
+  void didUpdateWidget(covariant _DashboardExpenseSearchField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.query == _controller.text) return;
+    _controller.value = TextEditingValue(
+      text: widget.query,
+      selection: TextSelection.collapsed(offset: widget.query.length),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _handleChanged(String value) {
+    setState(() {});
+    widget.onChanged(value);
+  }
+
+  void _clear() {
+    _controller.clear();
+    setState(() {});
+    widget.onClear();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasQuery = _controller.text.trim().isNotEmpty;
+    return TextField(
+      controller: _controller,
+      onChanged: _handleChanged,
+      textInputAction: TextInputAction.search,
+      style: TextStyle(
+        color: appTheme.gray_900,
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
+      ),
+      decoration: InputDecoration(
+        hintText: 'Search activity, payment, date or amount',
+        hintStyle: TextStyle(color: appTheme.gray_400, fontSize: 12),
+        prefixIcon: Icon(
+          Icons.search_rounded,
+          color: hasQuery ? appTheme.teal_A700 : appTheme.blue_gray_300,
+          size: 20,
+        ),
+        suffixIcon: hasQuery
+            ? IconButton(
+                tooltip: 'Clear search',
+                onPressed: _clear,
+                icon: Icon(
+                  Icons.close_rounded,
+                  color: appTheme.blue_gray_300,
+                  size: 18,
+                ),
+              )
+            : null,
+        filled: true,
+        fillColor: appTheme.white_A700,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 13,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: appTheme.gray_200),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: appTheme.teal_A700, width: 1.4),
+        ),
+      ),
+    );
+  }
+}
+
+class _DashboardExpenseSortBar extends StatelessWidget {
+  final int visibleExpenseCount;
+  final int totalExpenseCount;
+  final bool isSearching;
+
+  const _DashboardExpenseSortBar({
+    required this.visibleExpenseCount,
+    required this.totalExpenseCount,
+    required this.isSearching,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final viewModel = context.watch<FinancialDashboardViewModel>();
+    final selectedSort = viewModel.uiState.expenseSort;
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            isSearching
+                ? '$visibleExpenseCount of $totalExpenseCount records'
+                : '$totalExpenseCount expense '
+                      '${totalExpenseCount == 1 ? 'record' : 'records'}',
+            style: TextStyle(
+              color: appTheme.blue_gray_700,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        PopupMenuButton<DashboardExpenseSort>(
+          tooltip: 'Sort expense records',
+          initialValue: selectedSort,
+          onSelected: viewModel.setExpenseSort,
+          color: appTheme.white_A700,
+          surfaceTintColor: appTheme.white_A700,
+          elevation: 8,
+          position: PopupMenuPosition.under,
+          offset: const Offset(0, 6),
+          constraints: const BoxConstraints(minWidth: 210, maxWidth: 230),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: appTheme.gray_200),
+          ),
+          itemBuilder: (context) => DashboardExpenseSort.values
+              .map(
+                (sort) => PopupMenuItem<DashboardExpenseSort>(
+                  value: sort,
+                  height: 44,
+                  child: Row(
+                    children: [
+                      Icon(
+                        sort == DashboardExpenseSort.timeEarliest ||
+                                sort == DashboardExpenseSort.timeLatest
+                            ? Icons.schedule_outlined
+                            : Icons.payments_outlined,
+                        size: 17,
+                        color: sort == selectedSort
+                            ? appTheme.teal_A700
+                            : appTheme.blue_gray_300,
+                      ),
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: Text(
+                          viewModel.expenseSortLabel(sort),
+                          style: TextStyle(
+                            color: appTheme.gray_900,
+                            fontSize: 12,
+                            fontWeight: sort == selectedSort
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      if (sort == selectedSort)
+                        Icon(
+                          Icons.check_rounded,
+                          size: 17,
+                          color: appTheme.teal_A700,
+                        ),
+                    ],
+                  ),
+                ),
+              )
+              .toList(),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+            decoration: BoxDecoration(
+              color: appTheme.white_A700,
+              border: Border.all(color: appTheme.gray_200),
+              borderRadius: BorderRadius.circular(9),
+              boxShadow: [
+                BoxShadow(
+                  color: appTheme.black_900_0c,
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.sort_rounded, size: 17, color: appTheme.teal_A700),
+                const SizedBox(width: 6),
+                Text(
+                  viewModel.expenseSortLabel(selectedSort),
+                  style: TextStyle(
+                    color: appTheme.teal_800,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 3),
+                Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  size: 16,
+                  color: appTheme.teal_A700,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DashboardExpenseEmptyState extends StatelessWidget {
+  final String categoryName;
+  final String searchQuery;
+  final VoidCallback onClearSearch;
+
+  const _DashboardExpenseEmptyState({
+    required this.categoryName,
+    required this.searchQuery,
+    required this.onClearSearch,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final query = searchQuery.trim();
+    final hasSearchQuery = query.isNotEmpty;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 42),
+      child: Column(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: appTheme.gray_100,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              hasSearchQuery
+                  ? Icons.search_off_rounded
+                  : Icons.receipt_long_outlined,
+              color: appTheme.blue_gray_300,
+              size: 23,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            hasSearchQuery
+                ? 'No expenses match "$query".'
+                : 'No expense records for $categoryName.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: appTheme.blue_gray_700, fontSize: 13),
+          ),
+          if (hasSearchQuery) ...[
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: onClearSearch,
+              icon: const Icon(Icons.close_rounded, size: 16),
+              label: const Text('Clear search'),
+              style: TextButton.styleFrom(foregroundColor: appTheme.teal_A700),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }
 
@@ -1848,7 +2024,7 @@ class _BreakdownRow extends StatelessWidget {
             _MoneyCell(
               amount: category.budget,
               percentage: category.budget == 0 ? 0 : 100,
-              color: appTheme.gray_400,
+              color: appTheme.blue_gray_700,
             ),
             _MoneyCell(
               amount: category.expense,

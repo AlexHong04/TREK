@@ -45,15 +45,11 @@ class FinancialDashboardViewModel extends ChangeNotifier {
     final preferredCurrency = _normalizeCurrency(
       _authService.preferredCurrency,
     );
-    final didChangeCurrency = _uiState.preferredCurrency != preferredCurrency;
     _uiState = _uiState.copyWith(
       profileName: user?.fullName ?? '',
       profilePictureUrl: pictureUrl,
       clearProfilePictureUrl: pictureUrl == null || pictureUrl.isEmpty,
       preferredCurrency: preferredCurrency,
-      isPreferredCurrencyPrimary: didChangeCurrency
-          ? preferredCurrency != 'MYR'
-          : _uiState.isPreferredCurrencyPrimary,
     );
     if (notify) notifyListeners();
   }
@@ -118,6 +114,10 @@ class FinancialDashboardViewModel extends ChangeNotifier {
                           activityName: detail.activityName,
                           activityImageUrl: detail.activityImageUrl,
                           timeText: _formatTime(detail.activityStartTime, date),
+                          activityDateTime: _parseActivityDateTime(
+                            detail.activityStartTime,
+                            date,
+                          ),
                           amount: detail.amount,
                           currency: detail.currency,
                           paymentMethod:
@@ -308,24 +308,147 @@ class FinancialDashboardViewModel extends ChangeNotifier {
   String _formatTime(String? value, DateTime date) {
     final time = value?.trim() ?? '';
     if (time.isEmpty) return 'Scheduled';
-    if (time.toUpperCase().contains('AM') ||
-        time.toUpperCase().contains('PM')) {
-      return time;
-    }
+    final parsed = _parseActivityDateTime(time, date);
+    return parsed == null ? time : DateFormat('hh:mm a').format(parsed);
+  }
 
+  DateTime? _parseActivityDateTime(String? value, DateTime date) {
+    final time = value?.trim() ?? '';
+    if (time.isEmpty) return null;
     try {
+      if (time.toUpperCase().contains('AM') ||
+          time.toUpperCase().contains('PM')) {
+        final parsed = DateFormat('h:mm a').parse(time.toUpperCase());
+        return DateTime(
+          date.year,
+          date.month,
+          date.day,
+          parsed.hour,
+          parsed.minute,
+        );
+      }
       final parts = time.split(':');
-      final parsed = DateTime(
+      return DateTime(
         date.year,
         date.month,
         date.day,
         int.parse(parts[0]),
         int.parse(parts[1]),
       );
-      return DateFormat('hh:mm a').format(parsed);
     } catch (_) {
-      return time;
+      return null;
     }
+  }
+
+  void setExpenseSort(DashboardExpenseSort sort) {
+    if (_uiState.expenseSort == sort) return;
+    _uiState = _uiState.copyWith(expenseSort: sort);
+    notifyListeners();
+  }
+
+  void setExpenseSearchQuery(String query) {
+    if (_uiState.expenseSearchQuery == query) return;
+    _uiState = _uiState.copyWith(expenseSearchQuery: query);
+    notifyListeners();
+  }
+
+  void clearExpenseSearch() {
+    if (_uiState.expenseSearchQuery.isEmpty) return;
+    _uiState = _uiState.copyWith(expenseSearchQuery: '');
+    notifyListeners();
+  }
+
+  String expenseSortLabel(DashboardExpenseSort sort) {
+    return switch (sort) {
+      DashboardExpenseSort.timeEarliest => 'Time: Earliest first',
+      DashboardExpenseSort.timeLatest => 'Time: Latest first',
+      DashboardExpenseSort.amountHighest => 'Amount: High to low',
+      DashboardExpenseSort.amountLowest => 'Amount: Low to high',
+    };
+  }
+
+  List<DashboardExpenseDetailUiState> sortedExpenseDetails(
+    Iterable<DashboardExpenseDetailUiState> expenses,
+  ) {
+    final query = _uiState.expenseSearchQuery.trim().toLowerCase();
+    final sorted = expenses
+        .where((expense) => _matchesExpenseSearch(expense, query))
+        .toList();
+    sorted.sort((first, second) {
+      final comparison = switch (_uiState.expenseSort) {
+        DashboardExpenseSort.timeEarliest => _compareActivityTime(
+          first,
+          second,
+          latestFirst: false,
+        ),
+        DashboardExpenseSort.timeLatest => _compareActivityTime(
+          first,
+          second,
+          latestFirst: true,
+        ),
+        DashboardExpenseSort.amountHighest => _expenseSortAmount(
+          second,
+        ).compareTo(_expenseSortAmount(first)),
+        DashboardExpenseSort.amountLowest => _expenseSortAmount(
+          first,
+        ).compareTo(_expenseSortAmount(second)),
+      };
+      return comparison != 0
+          ? comparison
+          : first.activityName.compareTo(second.activityName);
+    });
+    return sorted;
+  }
+
+  bool _matchesExpenseSearch(
+    DashboardExpenseDetailUiState expense,
+    String query,
+  ) {
+    if (query.isEmpty) return true;
+
+    final searchableValues = <String>[
+      expense.expenseId,
+      expense.activityName,
+      expense.paymentMethod,
+      expense.timeText,
+      expense.recordedAtText,
+      expense.currency,
+      expense.amount.toString(),
+      expense.amount.toStringAsFixed(2),
+      formatMoney(expense.amount, originalCurrency: expense.currency),
+      formatPrimaryMoney(expense.amount, originalCurrency: expense.currency),
+    ];
+    final secondaryAmount = formatSecondaryMoney(
+      expense.amount,
+      originalCurrency: expense.currency,
+    );
+    if (secondaryAmount != null) searchableValues.add(secondaryAmount);
+
+    final searchableText = searchableValues.join(' ').toLowerCase();
+
+    return searchableText.contains(query);
+  }
+
+  int _compareActivityTime(
+    DashboardExpenseDetailUiState first,
+    DashboardExpenseDetailUiState second, {
+    required bool latestFirst,
+  }) {
+    final firstTime = first.activityDateTime;
+    final secondTime = second.activityDateTime;
+    if (firstTime == null && secondTime == null) return 0;
+    if (firstTime == null) return 1;
+    if (secondTime == null) return -1;
+    return latestFirst
+        ? secondTime.compareTo(firstTime)
+        : firstTime.compareTo(secondTime);
+  }
+
+  double _expenseSortAmount(DashboardExpenseDetailUiState expense) {
+    final sourceCurrency = _normalizeCurrency(expense.currency);
+    if (sourceCurrency == _uiState.preferredCurrency) return expense.amount;
+    final rate = _uiState.preferredCurrencyRates[sourceCurrency];
+    return rate == null ? expense.amount : expense.amount * rate;
   }
 
   String formatMoney(
@@ -386,14 +509,12 @@ class FinancialDashboardViewModel extends ChangeNotifier {
       originalCurrency: originalCurrency,
       compact: compact,
     );
-    if (_uiState.isPreferredCurrencyPrimary && preferred != null) {
-      return preferred;
-    }
-    return formatMoney(
-      amount,
-      originalCurrency: originalCurrency,
-      compact: compact,
-    );
+    return preferred ??
+        formatMoney(
+          amount,
+          originalCurrency: originalCurrency,
+          compact: compact,
+        );
   }
 
   String? formatSecondaryMoney(
@@ -407,7 +528,6 @@ class FinancialDashboardViewModel extends ChangeNotifier {
       compact: compact,
     );
     if (preferred == null) return null;
-    if (!_uiState.isPreferredCurrencyPrimary) return preferred;
     return formatMoney(
       amount,
       originalCurrency: originalCurrency,
@@ -425,20 +545,6 @@ class FinancialDashboardViewModel extends ChangeNotifier {
       originalCurrency: originalCurrency,
       compact: compact,
     );
-  }
-
-  void selectPrimaryCurrency({required bool usePreferredCurrency}) {
-    if (usePreferredCurrency) {
-      if (_uiState.preferredCurrency == 'MYR' ||
-          !_uiState.preferredCurrencyRates.containsKey('MYR')) {
-        return;
-      }
-    }
-    if (_uiState.isPreferredCurrencyPrimary == usePreferredCurrency) return;
-    _uiState = _uiState.copyWith(
-      isPreferredCurrencyPrimary: usePreferredCurrency,
-    );
-    notifyListeners();
   }
 
   Future<void> retryCurrencyConversion() => _refreshCurrencyConversions();
@@ -494,10 +600,6 @@ class FinancialDashboardViewModel extends ChangeNotifier {
           ? 'Some amounts could not be converted to $preferredCurrency.'
           : null,
       clearCurrencyConversionError: !hasUnavailableRate,
-      isPreferredCurrencyPrimary:
-          !rates.containsKey('MYR') && preferredCurrency != 'MYR'
-          ? false
-          : _uiState.isPreferredCurrencyPrimary,
     );
     notifyListeners();
   }
@@ -567,18 +669,36 @@ class DashboardDonutChartPainter extends CustomPainter {
       );
 
       final middleAngle = startAngle + sweep / 2;
-      final labelPosition =
-          center + Offset(math.cos(middleAngle), math.sin(middleAngle)) * 100;
+      final direction = Offset(math.cos(middleAngle), math.sin(middleAngle));
+      const ringOuterRadius = radius + strokeWidth / 2;
+      final leaderStart = center + direction * (ringOuterRadius + 3);
+      final labelAnchor = center + direction * (ringOuterRadius + 15);
       final textPainter = TextPainter(
         text: TextSpan(
           text: amountLabelBuilder(category.expense),
-          style: TextStyle(color: appTheme.gray_900, fontSize: 14),
+          style: TextStyle(
+            color: appTheme.gray_900,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
         ),
         textAlign: TextAlign.center,
         textDirection: ui.TextDirection.ltr,
       )..layout();
-      final desiredOffset =
-          labelPosition - Offset(textPainter.width / 2, textPainter.height / 2);
+
+      canvas.drawLine(
+        leaderStart,
+        labelAnchor,
+        Paint()
+          ..color = appTheme.blue_gray_300.withValues(alpha: 0.7)
+          ..strokeWidth = 1,
+      );
+
+      final desiredOffset = _labelOffset(
+        anchor: labelAnchor,
+        direction: direction,
+        textSize: textPainter.size,
+      );
       textPainter.paint(
         canvas,
         Offset(
@@ -592,6 +712,30 @@ class DashboardDonutChartPainter extends CustomPainter {
       );
       startAngle += sweep;
     }
+  }
+
+  Offset _labelOffset({
+    required Offset anchor,
+    required Offset direction,
+    required Size textSize,
+  }) {
+    const gap = 5.0;
+    if (direction.dx > 0.25) {
+      return Offset(anchor.dx + gap, anchor.dy - textSize.height / 2);
+    }
+    if (direction.dx < -0.25) {
+      return Offset(
+        anchor.dx - textSize.width - gap,
+        anchor.dy - textSize.height / 2,
+      );
+    }
+    if (direction.dy < 0) {
+      return Offset(
+        anchor.dx - textSize.width / 2,
+        anchor.dy - textSize.height - gap,
+      );
+    }
+    return Offset(anchor.dx - textSize.width / 2, anchor.dy + gap);
   }
 
   @override

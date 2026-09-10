@@ -412,35 +412,17 @@ class TripSummaryViewModel extends ChangeNotifier {
 
   String formatPrimaryMoney(double amount, {bool compact = false}) {
     final preferred = formatPreferredMoney(amount, compact: compact);
-    if (_uiState.isPreferredCurrencyPrimary && preferred != null) {
-      return preferred;
-    }
-    return formatMoney(amount, compact: compact);
+    return preferred ?? formatMoney(amount, compact: compact);
   }
 
   String? formatSecondaryMoney(double amount, {bool compact = false}) {
     final preferred = formatPreferredMoney(amount, compact: compact);
     if (preferred == null) return null;
-    if (!_uiState.isPreferredCurrencyPrimary) return preferred;
     return formatMoney(amount, compact: compact);
   }
 
   String formatDisplayMoney(double amount, {bool compact = false}) {
     return formatPrimaryMoney(amount, compact: compact);
-  }
-
-  void selectPrimaryCurrency({required bool usePreferredCurrency}) {
-    if (usePreferredCurrency) {
-      if (_uiState.preferredCurrency == 'MYR' ||
-          !_uiState.preferredCurrencyRates.containsKey('MYR')) {
-        return;
-      }
-    }
-    if (_uiState.isPreferredCurrencyPrimary == usePreferredCurrency) return;
-    _uiState = _uiState.copyWith(
-      isPreferredCurrencyPrimary: usePreferredCurrency,
-    );
-    notifyListeners();
   }
 
   Future<void> retryCurrencyConversion() => _refreshCurrencyConversion();
@@ -450,7 +432,6 @@ class TripSummaryViewModel extends ChangeNotifier {
     final preferredCurrency = _normalizeCurrency(
       _authService.preferredCurrency,
     );
-    final didChangeCurrency = _uiState.preferredCurrency != preferredCurrency;
     if (preferredCurrency == 'MYR') {
       _uiState = _uiState.copyWith(
         isConvertingCurrency: false,
@@ -465,9 +446,6 @@ class TripSummaryViewModel extends ChangeNotifier {
     _uiState = _uiState.copyWith(
       isConvertingCurrency: true,
       preferredCurrency: preferredCurrency,
-      isPreferredCurrencyPrimary: didChangeCurrency
-          ? true
-          : _uiState.isPreferredCurrencyPrimary,
       preferredCurrencyRates: const {},
       clearCurrencyConversionError: true,
     );
@@ -484,9 +462,6 @@ class TripSummaryViewModel extends ChangeNotifier {
         preferredCurrencyRates: rate == null
             ? const {}
             : Map.unmodifiable({'MYR': rate}),
-        isPreferredCurrencyPrimary: rate == null
-            ? false
-            : _uiState.isPreferredCurrencyPrimary,
         currencyConversionErrorMessage: rate == null
             ? 'The exchange rate for $preferredCurrency is unavailable.'
             : null,
@@ -497,7 +472,6 @@ class TripSummaryViewModel extends ChangeNotifier {
       _uiState = _uiState.copyWith(
         isConvertingCurrency: false,
         preferredCurrencyRates: const {},
-        isPreferredCurrencyPrimary: false,
         currencyConversionErrorMessage:
             'Unable to convert amounts to $preferredCurrency.',
       );

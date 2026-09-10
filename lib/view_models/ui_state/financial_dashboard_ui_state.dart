@@ -1,10 +1,18 @@
 enum DashboardFilter { byDate, byTrip }
 
+enum DashboardExpenseSort {
+  timeEarliest,
+  timeLatest,
+  amountHighest,
+  amountLowest,
+}
+
 class DashboardExpenseDetailUiState {
   final String expenseId;
   final String activityName;
   final String activityImageUrl;
   final String timeText;
+  final DateTime? activityDateTime;
   final double amount;
   final String currency;
   final String paymentMethod;
@@ -16,6 +24,7 @@ class DashboardExpenseDetailUiState {
     required this.activityName,
     required this.activityImageUrl,
     required this.timeText,
+    this.activityDateTime,
     required this.amount,
     this.currency = 'MYR',
     required this.paymentMethod,
@@ -98,9 +107,10 @@ class FinancialDashboardUiState {
   final String? expenseItemsErrorMessage;
   final bool isConvertingCurrency;
   final String preferredCurrency;
-  final bool isPreferredCurrencyPrimary;
   final Map<String, double> preferredCurrencyRates;
   final String? currencyConversionErrorMessage;
+  final DashboardExpenseSort expenseSort;
+  final String expenseSearchQuery;
   final bool hasCurrentTrip;
   final DateTime selectedDate;
   final DateTime displayedCalendarMonth;
@@ -127,9 +137,10 @@ class FinancialDashboardUiState {
     this.expenseItemsErrorMessage,
     this.isConvertingCurrency = false,
     this.preferredCurrency = 'MYR',
-    this.isPreferredCurrencyPrimary = true,
     this.preferredCurrencyRates = const {},
     this.currencyConversionErrorMessage,
+    this.expenseSort = DashboardExpenseSort.timeEarliest,
+    this.expenseSearchQuery = '',
     this.hasCurrentTrip = false,
     required this.selectedDate,
     required this.displayedCalendarMonth,
@@ -171,10 +182,11 @@ class FinancialDashboardUiState {
     bool clearExpenseItemsError = false,
     bool? isConvertingCurrency,
     String? preferredCurrency,
-    bool? isPreferredCurrencyPrimary,
     Map<String, double>? preferredCurrencyRates,
     String? currencyConversionErrorMessage,
     bool clearCurrencyConversionError = false,
+    DashboardExpenseSort? expenseSort,
+    String? expenseSearchQuery,
     bool? hasCurrentTrip,
     DateTime? selectedDate,
     DateTime? displayedCalendarMonth,
@@ -211,14 +223,14 @@ class FinancialDashboardUiState {
           : expenseItemsErrorMessage ?? this.expenseItemsErrorMessage,
       isConvertingCurrency: isConvertingCurrency ?? this.isConvertingCurrency,
       preferredCurrency: preferredCurrency ?? this.preferredCurrency,
-      isPreferredCurrencyPrimary:
-          isPreferredCurrencyPrimary ?? this.isPreferredCurrencyPrimary,
       preferredCurrencyRates:
           preferredCurrencyRates ?? this.preferredCurrencyRates,
       currencyConversionErrorMessage: clearCurrencyConversionError
           ? null
           : currencyConversionErrorMessage ??
                 this.currencyConversionErrorMessage,
+      expenseSort: expenseSort ?? this.expenseSort,
+      expenseSearchQuery: expenseSearchQuery ?? this.expenseSearchQuery,
       hasCurrentTrip: hasCurrentTrip ?? this.hasCurrentTrip,
       selectedDate: selectedDate ?? this.selectedDate,
       displayedCalendarMonth:
