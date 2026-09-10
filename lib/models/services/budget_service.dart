@@ -60,15 +60,9 @@ class BudgetService implements IBudgetService {
     final oldTotal = currentTrip.totalBudget;
     final oldTopup = currentDay.topUpBudget ?? 0.00;
 
-    double topUpAmountConverted =
-        await _authService.convertToPreferredCurrency(
-          amount: topupAmount,
-          fromCurrency: 'MYR',
-        ) ??
-        topupAmount;
-    double newRemaining = oldRemaining + topUpAmountConverted;
-    double newTotal = oldTotal + topUpAmountConverted;
-    double newTopUp = oldTopup + topUpAmountConverted;
+    double newRemaining = oldRemaining + topupAmount;
+    double newTotal = oldTotal + topupAmount;
+    double newTopUp = oldTopup + topupAmount;
 
     final updatedTrip = currentTrip.copyWith(
       remainingBalance: newRemaining,
