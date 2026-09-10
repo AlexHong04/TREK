@@ -1,13 +1,10 @@
 import 'dart:io';
 
-import 'package:image_cropper/image_cropper.dart';
-
 import '../entities/personal_constraint.dart';
 import '../local_data_source/camera_source.dart';
 import '../local_data_source/gallery_source.dart';
 import '../repository/i_user_repository.dart';
-
-enum ProfilePictureSource { gallery, camera }
+import 'i_auth_service.dart';
 
 class InvalidImageFormatException implements Exception {
   const InvalidImageFormatException();
@@ -17,24 +14,22 @@ class ImageTooLargeException implements Exception {
   const ImageTooLargeException();
 }
 
-class ProfileService {
+class ProfileService implements IProfileService {
   final IUserRepository _userRepository;
   final CameraSource _cameraSource;
   final GallerySource _gallerySource;
-  final ImageCropper _imageCropper;
 
   ProfileService(
       this._userRepository, {
         CameraSource? cameraSource,
         GallerySource? gallerySource,
-        ImageCropper? imageCropper,
       })  : _cameraSource = cameraSource ?? CameraSource(),
-        _gallerySource = gallerySource ?? GallerySource(),
-        _imageCropper = imageCropper ?? ImageCropper();
+        _gallerySource = gallerySource ?? GallerySource();
 
   static const int _maxImageBytes = 5 * 1024 * 1024;
   static const Set<String> _allowedExtensions = {'jpg', 'jpeg', 'png'};
 
+  @override
   Future<void> updateProfile({
     required String userId,
     required String fullName,
@@ -50,49 +45,18 @@ class ProfileService {
     );
   }
 
+  @override
   Future<String?> pickAndSaveProfilePicture({
     required String userId,
-    required ProfilePictureSource source,
+    required ProfileImageSource source,
   }) async {
-    final selectedPath = source == ProfilePictureSource.gallery
+    final selectedPath = source == ProfileImageSource.gallery
         ? await _gallerySource.pickPhoto()
         : await _cameraSource.takePhoto();
     if (selectedPath == null) return null;
-
-    final croppedImage = await _cropProfilePicture(selectedPath);
-    if (croppedImage == null) return null;
-
     return saveProfilePicture(
       userId: userId,
-      imageFile: File(croppedImage.path),
-    );
-  }
-
-  Future<CroppedFile?> _cropProfilePicture(String sourcePath) {
-    return _imageCropper.cropImage(
-      sourcePath: sourcePath,
-      aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
-      maxWidth: 1024,
-      maxHeight: 1024,
-      compressFormat: ImageCompressFormat.jpg,
-      compressQuality: 88,
-      uiSettings: [
-        AndroidUiSettings(
-          toolbarTitle: 'Crop profile picture',
-          cropStyle: CropStyle.circle,
-          lockAspectRatio: true,
-          hideBottomControls: false,
-        ),
-        IOSUiSettings(
-          title: 'Crop profile picture',
-          cropStyle: CropStyle.circle,
-          aspectRatioLockEnabled: true,
-          resetAspectRatioEnabled: false,
-          aspectRatioPickerButtonHidden: true,
-          doneButtonTitle: 'Use',
-          cancelButtonTitle: 'Cancel',
-        ),
-      ],
+      imageFile: File(selectedPath),
     );
   }
 
@@ -104,8 +68,7 @@ class ProfileService {
     if (await imageFile.length() > _maxImageBytes) {
       throw const ImageTooLargeException();
     }
-    final header =
-    await imageFile.openRead(0, 8).expand((bytes) => bytes).toList();
+    final header = await imageFile.openRead(0, 8).expand((bytes) => bytes).toList();
     if (!_allowedExtensions.contains(extension) || !_hasValidHeader(header)) {
       throw const InvalidImageFormatException();
     }
@@ -115,18 +78,22 @@ class ProfileService {
     );
   }
 
+  @override
   Future<void> removeProfilePicture({required String userId}) {
     return _userRepository.removeProfilePicture(userId: userId);
   }
 
+  @override
   Future<List<PersonalConstraint>> getAllConstraints() {
     return _userRepository.getAllPersonalConstraints();
   }
 
+  @override
   Future<List<PersonalConstraint>> getUserConstraints(String userId) {
     return _userRepository.getUserConstraints(userId);
   }
 
+  @override
   Future<void> saveUserConstraints({
     required String userId,
     required List<String> constraintIds,

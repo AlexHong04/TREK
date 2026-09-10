@@ -5,7 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'i_user_repository.dart';
 
 /// Supabase Auth adapter used internally by UserRepository.
-class AuthRepository {
+class AuthRepository implements IAuthRepository {
   final supabase.SupabaseClient _client;
   final String authCallbackUrl;
   final String passwordResetCallbackUrl;
@@ -16,8 +16,10 @@ class AuthRepository {
         required this.passwordResetCallbackUrl,
       });
 
+  @override
   AuthUserData? get currentUser => _mapUser(_client.auth.currentUser);
 
+  @override
   Stream<AuthSessionSnapshot> get authStateChanges {
     return _client.auth.onAuthStateChange.map(
           (state) => AuthSessionSnapshot(
@@ -29,6 +31,7 @@ class AuthRepository {
     );
   }
 
+  @override
   Future<AuthRegistrationData> signUpWithEmail({
     required String email,
     required String password,
@@ -61,6 +64,7 @@ class AuthRepository {
     }
   }
 
+  @override
   Future<AuthUserData> signInWithEmail({
     required String email,
     required String password,
@@ -85,6 +89,7 @@ class AuthRepository {
     }
   }
 
+  @override
   Future<void> signInWithGoogle() async {
     final started = await _client.auth.signInWithOAuth(
       supabase.OAuthProvider.google,
@@ -99,6 +104,7 @@ class AuthRepository {
     }
   }
 
+  @override
   Future<void> sendMagicLink({required String email}) async {
     await _client.auth.signInWithOtp(
       email: email.trim().toLowerCase(),
@@ -107,6 +113,7 @@ class AuthRepository {
     );
   }
 
+  @override
   Future<void> sendPasswordResetEmail({required String email}) async {
     await _client.auth.resetPasswordForEmail(
       email.trim().toLowerCase(),
@@ -114,6 +121,7 @@ class AuthRepository {
     );
   }
 
+  @override
   Future<void> updatePassword({
     required String newPassword,
     String? currentPassword,
@@ -140,6 +148,7 @@ class AuthRepository {
     }
   }
 
+  @override
   Future<void> signOut({bool allSessions = false}) async {
     await _client.auth.signOut(
       scope: allSessions

@@ -66,11 +66,42 @@ class RepositorySamePasswordException implements Exception {
   const RepositorySamePasswordException();
 }
 
+/// Supabase authentication contract implemented by AuthRepository.
+abstract interface class IAuthRepository {
+  AuthUserData? get currentUser;
+
+  Stream<AuthSessionSnapshot> get authStateChanges;
+
+  Future<AuthRegistrationData> signUpWithEmail({
+    required String email,
+    required String password,
+    required String currency,
+  });
+
+  Future<AuthUserData> signInWithEmail({
+    required String email,
+    required String password,
+  });
+
+  Future<void> signInWithGoogle();
+
+  Future<void> sendMagicLink({required String email});
+
+  Future<void> sendPasswordResetEmail({required String email});
+
+  Future<void> updatePassword({
+    required String newPassword,
+    String? currentPassword,
+  });
+
+  Future<void> signOut({bool allSessions = false});
+}
+
 /// Complete data-access contract used by the User Management services.
 ///
 /// UserRepository implements this contract and delegates Supabase Auth work to
-/// AuthRepository internally. Services therefore never depend on a concrete
-/// repository or on a second repository interface.
+/// IAuthRepository internally. Services therefore never depend on a concrete
+/// repository.
 abstract interface class IUserRepository {
   AuthUserData? get currentAuthUser;
 

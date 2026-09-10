@@ -1,13 +1,15 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+
 import '../entities/user.dart';
 import '../repository/i_user_repository.dart';
 import 'i_auth_service.dart';
 import 'profile_service.dart';
 
-class AuthService extends IAuthService {
+class AuthService extends ChangeNotifier implements IAuthService {
   final IUserRepository _userRepository;
-  final ProfileService _profileService;
+  final IProfileService _profileService;
 
   User? _currentUser;
   bool _isPasswordRecovery = false;
@@ -224,9 +226,7 @@ class AuthService extends IAuthService {
     try {
       final url = await _profileService.pickAndSaveProfilePicture(
         userId: userId,
-        source: source == ProfileImageSource.gallery
-            ? ProfilePictureSource.gallery
-            : ProfilePictureSource.camera,
+        source: source,
       );
       if (url != null) await refreshCurrentUser();
       return url;

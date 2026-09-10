@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../entities/personal_constraint.dart';
 import '../entities/user.dart';
 
 class RegistrationResult {
@@ -9,6 +10,34 @@ class RegistrationResult {
 }
 
 enum ProfileImageSource { gallery, camera }
+
+/// Internal profile contract used by AuthService.
+///
+/// It remains in the existing service-interface file so the architecture does
+/// not gain another interface file.
+abstract interface class IProfileService {
+  Future<void> updateProfile({
+    required String userId,
+    required String fullName,
+    required String currency,
+  });
+
+  Future<String?> pickAndSaveProfilePicture({
+    required String userId,
+    required ProfileImageSource source,
+  });
+
+  Future<void> removeProfilePicture({required String userId});
+
+  Future<List<PersonalConstraint>> getAllConstraints();
+
+  Future<List<PersonalConstraint>> getUserConstraints(String userId);
+
+  Future<void> saveUserConstraints({
+    required String userId,
+    required List<String> constraintIds,
+  });
+}
 
 class PersonalConstraintOptionData {
   final String id;

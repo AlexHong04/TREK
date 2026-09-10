@@ -6,12 +6,11 @@ import '../../utils/id_generator.dart';
 import '../configurations/frankfurter_api_config.dart';
 import '../entities/personal_constraint.dart';
 import '../entities/user.dart';
-import 'auth_repository.dart';
 import 'i_user_repository.dart';
 
 class UserRepository implements IUserRepository {
   final supabase.SupabaseClient _client;
-  final AuthRepository _authRepository;
+  final IAuthRepository _authRepository;
 
   UserRepository(this._client, this._authRepository);
 
