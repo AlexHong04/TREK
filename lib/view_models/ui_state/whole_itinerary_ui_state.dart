@@ -8,6 +8,7 @@ import '../../models/entities/future_suggestion.dart';
 
 class WholeItineraryUiState {
   final bool isLoading;
+  final bool isRegeneratingPlan;
   final String? regeneratingSlotId;
   final List<Activity> activities;
   final List<Activity> stashedActivities;
@@ -44,6 +45,7 @@ class WholeItineraryUiState {
 
   const WholeItineraryUiState({
     this.isLoading = false,
+    this.isRegeneratingPlan = false,
     this.regeneratingSlotId,
     this.activities = const [],
     this.stashedActivities = const [],
@@ -81,6 +83,7 @@ class WholeItineraryUiState {
 
   WholeItineraryUiState copyWith({
     bool? isLoading,
+    bool? isRegeneratingPlan,
     String? regeneratingSlotId,
     bool clearRegeneratingSlot = false,
     List<Activity>? activities,
@@ -163,6 +166,7 @@ class WholeItineraryUiState {
 
     return WholeItineraryUiState(
       isLoading: isLoading ?? this.isLoading,
+      isRegeneratingPlan: isRegeneratingPlan ?? this.isRegeneratingPlan,
       regeneratingSlotId: clearRegeneratingSlot
           ? null
           : (regeneratingSlotId ?? this.regeneratingSlotId),

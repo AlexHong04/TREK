@@ -397,7 +397,7 @@ Widget _buildTopUpCard(TextEditingController controller) {
     width: double.infinity,
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: appTheme.white_A700,
       borderRadius: BorderRadius.circular(16),
       border: Border.all(color: appTheme.grey200),
       boxShadow: [
@@ -432,9 +432,9 @@ Widget _buildTopUpCard(TextEditingController controller) {
             color: appTheme.black,
           ),
           decoration: InputDecoration(
-            prefixIcon: const Icon(
+            prefixIcon: Icon(
               Icons.account_balance_wallet_outlined,
-              color: Colors.grey,
+              color: appTheme.blue_gray_300,
             ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,

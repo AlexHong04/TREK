@@ -575,6 +575,181 @@ class ItineraryService implements IItineraryService {
     );
   }
 
+  @override
+  Future<List<Activity>> regenerateEmptySlotsFromRemainingPlan({
+    required String destination,
+    required double remainingBudget,
+    required List<Activity> remainingActivities,
+    required List<Activity> emptySlots,
+    required List<String> excludedPlaces,
+    List<String>? uncoveredWishlist,
+    String? preference,
+    List<String>? constraints,
+  }) async {
+    if (emptySlots.isEmpty) return [];
+
+    // Map remaining activities to lightweight maps for route/schedule context
+    final mappedRemaining = remainingActivities.map((a) {
+      return {
+        'date': a.date.toIso8601String().split('T').first,
+        'startTime': a.startTime ?? '',
+        'endTime': a.endTime ?? '',
+        'destination': a.destination,
+        'activityCategory': a.activityCategory,
+        'allocatedBudget': a.allocatedBudget,
+      };
+    }).toList();
+
+    // Map empty slots to lightweight maps
+    final mappedEmpty = emptySlots.map((s) {
+      return {
+        'activitiesId': s.activitiesId,
+        'date': s.date.toIso8601String().split('T').first,
+        'startTime': s.startTime ?? '',
+        'endTime': s.endTime ?? '',
+        'category': s.activityCategory,
+      };
+    }).toList();
+
+    final rawJson = await GeminiApiConfig.askGeminiToRegenerateEmptySlots(
+      destinationCity: destination,
+      remainingBudget: remainingBudget,
+      remainingActivities: mappedRemaining,
+      emptySlots: mappedEmpty,
+      excludedPlaces: excludedPlaces,
+      uncoveredWishlist: uncoveredWishlist,
+      preference: preference,
+      constraints: constraints,
+    );
+
+    List<dynamic> parsedList = [];
+    try {
+      final decoded = jsonDecode(rawJson);
+      if (decoded is List) {
+        parsedList = decoded;
+      }
+    } catch (e) {
+      developer.log('Error decoding regenerated empty slots: $e');
+    }
+
+    // Create a map of regenerated data by activitiesId
+    final Map<String, Map<String, dynamic>> itemsBySlotId = {};
+    for (int i = 0; i < parsedList.length; i++) {
+      final item = parsedList[i];
+      if (item is Map<String, dynamic>) {
+        final id = item['activitiesId']?.toString();
+        if (id != null && id.isNotEmpty) {
+          itemsBySlotId[id] = item;
+        } else if (i < emptySlots.length) {
+          itemsBySlotId[emptySlots[i].activitiesId] = item;
+        }
+      }
+    }
+
+    final List<Activity> resultActivities = [];
+
+    for (final slot in emptySlots) {
+      final item = itemsBySlotId[slot.activitiesId];
+      final destTitle = item?['destination'] as String? ?? '';
+
+      if (destTitle.isEmpty) {
+        // If Gemini failed for this slot, fallback to single alternative generator
+        try {
+          final singleFallback = await generateAlternativeItinerary(
+            destination: destination,
+            slotDate: slot.date,
+            startTime: slot.startTime ?? '09:00',
+            endTime: slot.endTime ?? '11:00',
+            category: slot.activityCategory.isNotEmpty
+                ? slot.activityCategory
+                : 'Attraction',
+            excludedActivity: excludedPlaces,
+            existingActivityId: slot.activitiesId,
+            dayTripId: slot.dayTripId,
+            budgetLimit: remainingBudget > 0
+                ? (remainingBudget / emptySlots.length)
+                : 30.0,
+          );
+          resultActivities.add(singleFallback);
+          continue;
+        } catch (_) {
+          resultActivities.add(slot);
+          continue;
+        }
+      }
+
+      String finalTitle = destTitle;
+      String imgUrl = '';
+      bool resolvedByGooglePlaces = false;
+
+      if (GooglePlacesApiConfig.isConfigured) {
+        try {
+          final place = await GooglePlacesApiConfig.searchPlace(destTitle);
+          if (place != null) {
+            resolvedByGooglePlaces = true;
+            if (place['name'] != null && place['name'].toString().isNotEmpty) {
+              finalTitle = place['name'];
+            }
+            final photos = place['photos'] as List?;
+            if (photos != null && photos.isNotEmpty) {
+              final firstPhoto = photos.first as Map<String, dynamic>;
+              final photoRef = firstPhoto['photo_reference'] as String?;
+              if (photoRef != null && photoRef.isNotEmpty) {
+                imgUrl = GooglePlacesApiConfig.getPhotoUrl(photoRef);
+              }
+            }
+          }
+        } catch (e) {
+          developer.log('Google Places search error for "$destTitle": $e');
+        }
+      }
+
+      if (imgUrl.isEmpty && !resolvedByGooglePlaces) {
+        final imageKeyword =
+            (item?['imageKeyword'] ?? item?['image_keyword'] ?? destTitle)
+                as String;
+        try {
+          final resolved = await ImageResolverConfig.resolveImage(
+            keyword: imageKeyword,
+            fallbackTitle: finalTitle,
+            lockIndex: 0,
+          );
+          imgUrl = resolved.imageUrl;
+          finalTitle = resolved.correctedTitle;
+        } catch (_) {}
+      }
+
+      final double allocatedBudget =
+          (item?['allocatedBudget'] as num?)?.toDouble() ?? 0.0;
+      final category = (item?['activityCategory'] as String?) ??
+          (slot.activityCategory.isNotEmpty
+              ? slot.activityCategory
+              : 'Attraction');
+
+      resultActivities.add(
+        Activity(
+          activitiesId: slot.activitiesId,
+          dayTripId: slot.dayTripId,
+          destination: finalTitle,
+          description: (item?['description'] as String?) ?? '',
+          activityImgUrl: imgUrl,
+          date: slot.date,
+          allocatedBudget: allocatedBudget,
+          overspendAmount: allocatedBudget > 0 ? 0 : null,
+          status: 'pending',
+          startTime:
+              (item?['startTime'] as String?) ?? slot.startTime ?? '09:00',
+          endTime: (item?['endTime'] as String?) ?? slot.endTime ?? '11:00',
+          duration: (item?['duration'] as String?) ?? slot.duration ?? '60 min',
+          activityCategory: category,
+          isOverspend: false,
+        ),
+      );
+    }
+
+    return resultActivities;
+  }
+
   // kokhong
   @override
   Future<bool> saveItinerary(

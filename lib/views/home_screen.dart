@@ -368,7 +368,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         decoration: BoxDecoration(
                           color: isTerminated
-                              ? const Color(0xFFFEE2E2)
+                              ? appTheme.wholeAlertBudgetBg
                               : isOngoing
                               ? appTheme.amber_200
                               : isCompleted

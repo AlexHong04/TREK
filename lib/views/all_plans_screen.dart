@@ -1,4 +1,3 @@
-import 'package:Trek/main.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -6,6 +5,7 @@ import '../theme/app_theme.dart';
 import '../view_models/presentation_logic/whole_itinerary_detail_view_model.dart';
 import '../view_models/ui_state/whole_itinerary_ui_state.dart';
 import '../widgets/custom_app_bar.dart';
+import '../widgets/dual_currency_amount.dart';
 
 class AllPlansScreen extends StatefulWidget {
   const AllPlansScreen({super.key});
@@ -148,7 +148,7 @@ class _AllPlansScreenState extends State<AllPlansScreen> {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: trips.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 16.0),
+      separatorBuilder: (context, index) => const SizedBox(height: 16.0),
       itemBuilder: (context, index) {
         return _buildPlanCard(context, trips[index]);
       },
@@ -212,7 +212,7 @@ class _AllPlansScreenState extends State<AllPlansScreen> {
                         top: 12,
                         right: 12,
                         child: Material(
-                          color: Colors.transparent,
+                          color: appTheme.transparentCustom,
                           child: InkWell(
                             borderRadius: BorderRadius.circular(20),
                             onTap: () => _confirmDelete(context, trip),
@@ -222,10 +222,10 @@ class _AllPlansScreenState extends State<AllPlansScreen> {
                                 color: appTheme.blueGray900,
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(
+                              child: Icon(
                                 Icons.delete_outline,
                                 size: 20,
-                                color: Colors.red,
+                                color: appTheme.redButton,
                               ),
                             ),
                           ),
@@ -241,7 +241,7 @@ class _AllPlansScreenState extends State<AllPlansScreen> {
                         ),
                         decoration: BoxDecoration(
                           color: isTerminated
-                              ? const Color(0xFFFEE2E2)
+                              ? appTheme.wholeAlertBudgetBg
                               : isOngoing
                               ? appTheme.amber_200
                               : isCompleted
@@ -341,14 +341,24 @@ class _AllPlansScreenState extends State<AllPlansScreen> {
                             ],
                           ),
                         ),
-                        Text(
-                          'RM${trip.totalBudget.toStringAsFixed(0)}',
-                          style: TextStyle(
-                            fontSize: 16,
+                        DualCurrencyAmount(
+                          amount: trip.totalBudget.toDouble(),
+                          baseCurrency: 'MYR',
+                          baseLabel: 'RM',
+                          primaryStyle: TextStyle(
+                            fontSize: 15,
                             fontWeight: FontWeight.bold,
                             fontFamily: 'Inter',
                             color: appTheme.gray_900,
                           ),
+                          secondaryStyle: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            fontFamily: 'Inter',
+                            color: appTheme.blue_gray_700,
+                          ),
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          textAlign: TextAlign.end,
                         ),
                       ],
                     ),
@@ -369,7 +379,8 @@ class _AllPlansScreenState extends State<AllPlansScreen> {
         height: 180,
         width: double.infinity,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _buildFallbackBanner(destination),
+        errorBuilder: (context, error, stackTrace) =>
+            _buildFallbackBanner(destination),
       );
     }
     return _buildFallbackBanner(destination);
@@ -401,7 +412,7 @@ class _AllPlansScreenState extends State<AllPlansScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(foregroundColor: appTheme.redButton),
             child: const Text('Delete'),
           ),
         ],

@@ -143,6 +143,13 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
       * If the Budget (\$$budget) can cover basic meals and transport plus SOME of the wishlist items (e.g. 1, 2, or more, but not all), return the exact count of wishlist items that fit in "wishlistItemsCoveredCount".
       * Only if the Budget (\$$budget) is fully sufficient to cover all activities and all wishlist items without any shortfall, return the total count of all wishlist items in "wishlistItemsCoveredCount".
     ''') : '- Wishlist Items: None\n    CRITICAL RULE FOR NO WISHLIST:\n    - The user did NOT provide any wishlist items.\n    - "wishlistItemsCoveredCount" MUST BE EXACTLY 0. Do NOT count general attractions, restaurants, or itinerary activities as wishlist items!'}
+    // ${(wishlist != null && wishlist.isNotEmpty) ? '- Wishlist Items: ' + wishlist.join(', ') + '''
+    // RULE FOR WISHLIST:
+    // - Include as many of these wishlist items as can realistically fit into the user's schedule and Budget (\$$budget).
+    // - If the budget or schedule cannot accommodate all wishlist items, include the ones that fit best and omit the rest. Wishlist items do NOT all need to be covered.
+    // - Set "wishlistItemsCoveredCount" to the number of wishlist items actually included in the schedule.
+    // - If none fit within the budget, "wishlistItemsCoveredCount" is 0.
+    // ''' : '- Wishlist Items: None\n    CRITICAL RULE FOR NO WISHLIST:\n    - The user did NOT provide any wishlist items.\n    - "wishlistItemsCoveredCount" MUST BE EXACTLY 0. Do NOT count general attractions, restaurants, or itinerary activities as wishlist items!'}
 
     Please provide a structured day-by-day itinerary with estimated costs and durations for each activity.
     ${strictBudget ? '''
@@ -581,6 +588,120 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
     } catch (e) {
       debugPrint('Gemini API Alternative Error: $e');
       throw Exception('Failed to generate alternative activity: $e');
+    }
+  }
+
+  // kokhong
+  // Regenerates activities for empty slots using the remaining plan as route context.
+  static Future<String> askGeminiToRegenerateEmptySlots({
+    required String destinationCity,
+    required double remainingBudget,
+    required List<Map<String, dynamic>> remainingActivities,
+    required List<Map<String, dynamic>> emptySlots,
+    required List<String> excludedPlaces,
+    List<String>? uncoveredWishlist,
+    String? preference,
+    List<String>? constraints,
+  }) async {
+    final excludedListText = excludedPlaces.isNotEmpty
+        ? excludedPlaces.map((e) => '- "$e"').join('\n')
+        : 'None';
+
+    final prompt =
+        '''
+    You are an expert travel planner in Malaysia.
+    The user has removed some activities from their itinerary in $destinationCity and needs to regenerate replacement activities for the EMPTY SLOTS.
+    You MUST use the user's REMAINING ACTIVE ACTIVITIES as your route and schedule context.
+
+    Parameters:
+    - Destination City: $destinationCity
+    - Remaining Budget Available for Empty Slots: RM ${remainingBudget.toStringAsFixed(2)}
+    ${preference != null && preference.isNotEmpty ? '- Trip Preference / Theme: $preference' : ''}
+    ${constraints != null && constraints.isNotEmpty ? '- Personal Constraints: ${constraints.join(', ')}' : ''}
+    ${uncoveredWishlist != null && uncoveredWishlist.isNotEmpty ? '- Uncovered Wishlist Items (Optionally place these into suitable empty slots if they fit): ${uncoveredWishlist.join(', ')}' : ''}
+
+    REMAINING ACTIVE ACTIVITIES (KEPT BY USER - DO NOT MODIFY, USE AS ROUTE/TIMING CONTEXT):
+    ${jsonEncode(remainingActivities)}
+
+    EMPTY TIME SLOTS TO FILL (GENERATE EXACTLY ONE ACTIVITY FOR EACH):
+    ${jsonEncode(emptySlots)}
+
+    CRITICAL EXCLUSION LIST (DUPLICATES STRICTLY PROHIBITED):
+    The user already has or has explicitly deleted these places. You MUST NOT suggest any of these:
+    $excludedListText
+
+    CRITICAL RULES:
+    1. Exact 1-to-1 Mapping:
+       - You MUST return a JSON array with EXACTLY ${emptySlots.length} items.
+       - For every item, preserve the exact "activitiesId" provided in the corresponding empty slot!
+    2. Geographic & Time Coherence:
+       - New activities must be logically close in distance and route to the remaining activities on that day.
+       - If a slot falls around lunch (12:00-14:00) or dinner (18:00-20:30), prefer suggesting a "Restaurant".
+    3. Realistic Places & Budget:
+       - Every destination MUST be an EXACT, FULL official business name or landmark on Google Maps in $destinationCity.
+       - The total allocatedBudget across all returned slots should fit within RM ${remainingBudget.toStringAsFixed(2)}.
+       - Public parks, walking tours, and free landmarks MUST have an allocatedBudget of 0.0.
+       - "activityCategory" MUST strictly be one of: "Attraction", "Restaurant", "Transportation".
+
+    Format your response as a valid JSON array of objects:
+    [
+      {
+        "activitiesId": "exact activitiesId from empty slot input",
+        "destination": "Exact Business Name or Landmark",
+        "imageKeyword": "Landmark or food name",
+        "description": "Short 1-2 sentence description",
+        "allocatedBudget": 0.0,
+        "duration": "60-90 min",
+        "activityCategory": "Attraction",
+        "startTime": "HH:mm",
+        "endTime": "HH:mm"
+      }
+    ]
+
+    Return ONLY the raw JSON array with no markdown fences, no backticks, and no extra commentary.
+    ''';
+
+    final url = Uri.parse(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=$_apiKey',
+    );
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          "contents": [
+            {
+              "parts": [
+                {"text": prompt},
+              ],
+            },
+          ],
+          "generationConfig": {"responseMimeType": "application/json"},
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = jsonDecode(response.body);
+        final candidates = data['candidates'] as List?;
+        if (candidates != null && candidates.isNotEmpty) {
+          final content = candidates[0]['content'];
+          final parts = content['parts'] as List?;
+          if (parts != null && parts.isNotEmpty) {
+            return parts[0]['text'] ?? '[]';
+          }
+        }
+        return '[]';
+      } else {
+        throw Exception(
+          'Gemini Error: ${response.statusCode} - ${response.body}',
+        );
+      }
+    } catch (e) {
+      debugPrint('Gemini API Regenerate Empty Slots Error: $e');
+      throw Exception(
+        'Failed to regenerate activities from remaining plan: $e',
+      );
     }
   }
 

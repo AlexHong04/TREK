@@ -7,6 +7,7 @@ import '../view_models/presentation_logic/travel_information_input_view_model.da
 import '../main.dart';
 import '../widgets/custom_app_bar.dart';
 import '../widgets/custom_text_field.dart';
+import '../widgets/dual_currency_amount.dart';
 import '../utils/malaysia_states.dart';
 import '../view_models/ui_state/travel_information_ui_state.dart';
 
@@ -283,16 +284,91 @@ class _TravelInformationInputScreenState
                     const SizedBox(height: 22.0),
                     _buildHotelSection(context, viewModel),
                     const SizedBox(height: 22.0),
-                    CustomTextField(
-                      sectionTitle: 'TRIP BUDGET',
-                      hintText: 'Total Trip Budget (\$)',
-                      prefixIcon: Icons.account_balance_wallet_outlined,
-                      prefixIconColor: appTheme.teal_A700,
-                      controller: _budgetController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      validator: viewModel.validateBudget,
+                    ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: _budgetController,
+                      builder: (context, value, _) {
+                        final double? enteredAmount =
+                            double.tryParse(value.text.trim());
+                        return CustomTextField(
+                          sectionTitle: 'TRIP BUDGET (RM)',
+                          hintText: 'Total Trip Budget (RM)',
+                          prefixIcon: Icons.account_balance_wallet_outlined,
+                          prefixIconColor: appTheme.teal_A700,
+                          controller: _budgetController,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          validator: viewModel.validateBudget,
+                          bottomWidget:
+                              (enteredAmount != null && enteredAmount > 0)
+                                  ? Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14.0,
+                                        vertical: 10.0,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: appTheme.teal_50.withValues(
+                                          alpha: 0.45,
+                                        ),
+                                        borderRadius: BorderRadius.circular(
+                                          12.0,
+                                        ),
+                                        border: Border.all(
+                                          color: appTheme.teal_A700.withValues(
+                                            alpha: 0.2,
+                                          ),
+                                          width: 1.0,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Icon(
+                                                Icons.currency_exchange_rounded,
+                                                size: 16,
+                                                color: appTheme.teal_700,
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                'Equivalent Value:',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w600,
+                                                  fontFamily: 'Inter',
+                                                  color: appTheme.blue_gray_700,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          DualCurrencyAmount(
+                                            amount: enteredAmount,
+                                            baseCurrency: 'MYR',
+                                            baseLabel: 'RM',
+                                            primaryStyle: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w800,
+                                              fontFamily: 'Inter',
+                                              color: appTheme.teal_800,
+                                            ),
+                                            secondaryStyle: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                              fontFamily: 'Inter',
+                                              color: appTheme.blue_gray_700,
+                                            ),
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.end,
+                                            textAlign: TextAlign.end,
+                                          ),
+                                        ],
+                                      ),
+                                    )
+                                  : null,
+                        );
+                      },
                     ),
                     const SizedBox(height: 22.0),
                     _buildTravelPreferencesSection(viewModel),

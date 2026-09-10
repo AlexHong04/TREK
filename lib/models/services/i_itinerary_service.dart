@@ -43,6 +43,17 @@ abstract interface class IItineraryService {
     int dayNumber = 1,
   });
 
+  Future<List<Activity>> regenerateEmptySlotsFromRemainingPlan({
+    required String destination,
+    required double remainingBudget,
+    required List<Activity> remainingActivities,
+    required List<Activity> emptySlots,
+    required List<String> excludedPlaces,
+    List<String>? uncoveredWishlist,
+    String? preference,
+    List<String>? constraints,
+  });
+
   Future<bool> saveItinerary(
     List<dynamic> activities, {
     required String destination,

@@ -109,11 +109,11 @@ class _WholeItineraryDetailScreenState
           right: 16.0,
         ),
         elevation: 6,
-        backgroundColor: const Color(0xFF1E293B),
+        backgroundColor: appTheme.blueGray900,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(
-            color: Colors.white.withValues(alpha: 0.12),
+            color: appTheme.white_A700.withValues(alpha: 0.12),
             width: 1,
           ),
         ),
@@ -125,12 +125,12 @@ class _WholeItineraryDetailScreenState
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: const Color(0xFFEF4444).withValues(alpha: 0.15),
+                color: appTheme.errorRed.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.delete_outline_rounded,
-                color: Color(0xFFF87171),
+                color: appTheme.errorRed,
                 size: 20,
               ),
             ),
@@ -140,10 +140,10 @@ class _WholeItineraryDetailScreenState
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Activity removed',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: appTheme.white_A700,
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                       fontFamily: 'Inter',
@@ -157,7 +157,7 @@ class _WholeItineraryDetailScreenState
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.65),
+                        color: appTheme.white_A700.withValues(alpha: 0.65),
                         fontSize: 12,
                         fontWeight: FontWeight.w400,
                         fontFamily: 'Inter',
@@ -188,11 +188,11 @@ class _WholeItineraryDetailScreenState
           right: 16.0,
         ),
         elevation: 6,
-        backgroundColor: const Color(0xFF1E293B),
+        backgroundColor: appTheme.blueGray900,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(
-            color: Colors.white.withValues(alpha: 0.12),
+            color: appTheme.white_A700.withValues(alpha: 0.12),
             width: 1,
           ),
         ),
@@ -204,12 +204,12 @@ class _WholeItineraryDetailScreenState
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: const Color(0xFFEF4444).withValues(alpha: 0.15),
+                color: appTheme.errorRed.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.playlist_remove_rounded,
-                color: Color(0xFFF87171),
+                color: appTheme.errorRed,
                 size: 20,
               ),
             ),
@@ -219,10 +219,10 @@ class _WholeItineraryDetailScreenState
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Wishlist item removed',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: appTheme.white_A700,
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                       fontFamily: 'Inter',
@@ -234,7 +234,7 @@ class _WholeItineraryDetailScreenState
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.65),
+                      color: appTheme.white_A700.withValues(alpha: 0.65),
                       fontSize: 12,
                       fontWeight: FontWeight.w400,
                       fontFamily: 'Inter',

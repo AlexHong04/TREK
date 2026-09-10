@@ -62,12 +62,65 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         (a.destination.trim().isEmpty && a.description.trim().isEmpty),
   );
 
-  /// Confirm is only allowed once every time slot has been filled and we are
-  /// not busy generating.
+  /// True if extra budget is needed.
+  bool get hasExtraBudgetNeeded =>
+      _uiState.estimatedExtraBudgetNeeded > 0.0 ||
+      (totalBudget > 0 && spentBudget > totalBudget);
+
+  /// Confirm is only allowed once every time slot has been filled, we are
+  /// not busy generating, and no extra budget is needed.
   bool get canConfirmItinerary =>
       !_uiState.isLoading &&
       _uiState.activities.isNotEmpty &&
-      !hasEmptyActivitySlots;
+      !hasEmptyActivitySlots &&
+      !hasExtraBudgetNeeded;
+
+  /// Wishlist items that are matched by any active activity in the itinerary.
+  List<String> get coveredWishlistItems {
+    final wishlist = _uiState.wishlist;
+    if (wishlist == null || wishlist.isEmpty) return [];
+
+    final activeDestinations = _uiState.activities
+        .where((a) => a.status != 'empty' && a.destination.trim().isNotEmpty)
+        .map((a) => a.destination.toLowerCase().trim())
+        .toSet();
+
+    final activeDescriptions = _uiState.activities
+        .where((a) => a.status != 'empty')
+        .map((a) => a.description.toLowerCase().trim())
+        .toList();
+
+    return wishlist.where((item) {
+      final lowerItem = item.toLowerCase().trim();
+      return activeDestinations.any(
+            (dest) => dest.contains(lowerItem) || lowerItem.contains(dest),
+          ) ||
+          activeDescriptions.any((desc) => desc.contains(lowerItem));
+    }).toList();
+  }
+
+  /// Wishlist items that are NOT covered in the itinerary activities.
+  List<String> get uncoveredWishlistItems {
+    final wishlist = _uiState.wishlist;
+    if (wishlist == null || wishlist.isEmpty) return [];
+
+    // If marked as fully covered (e.g. after budget top-up or 100% matched)
+    if (_uiState.wishlistItemsCoveredCount >= wishlist.length) {
+      return [];
+    }
+
+    if (_uiState.wishlistItemsCoveredCount == 0) {
+      return List.unmodifiable(wishlist);
+    }
+
+    final covered = coveredWishlistItems.toSet();
+    final unmatched =
+        wishlist.where((item) => !covered.contains(item)).toList();
+
+    return List.unmodifiable(unmatched);
+  }
+
+  int get uncoveredWishlistCount => uncoveredWishlistItems.length;
 
   Future<void> initialize({
     required String destination,
@@ -150,13 +203,8 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         hotelCheckOutTime: hotelCheckOutTime ?? _uiState.hotelCheckOutTime,
       );
 
-      final bool wishlistIncomplete =
-          wishlist != null &&
-          wishlist.isNotEmpty &&
-          fetchedResult.wishlistItemsCoveredCount < wishlist.length;
       final bool hasShortfall = fetchedResult.estimatedExtraBudgetNeeded > 0.0;
-      final bool shouldWarn =
-          !suppressWarning && (hasShortfall || wishlistIncomplete);
+      final bool shouldWarn = !suppressWarning && hasShortfall;
 
       _uiState = _uiState.copyWith(
         isLoading: false,
@@ -273,6 +321,90 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Remove multiple activities from the trip, retaining card placeholders
+  void removeMultipleActivities(Set<String> activityIds) {
+    if (activityIds.isEmpty) return;
+
+    final updatedStash = List<Activity>.from(_uiState.stashedActivities);
+
+    final updatedActivities = _uiState.activities.map((activity) {
+      if (activityIds.contains(activity.activitiesId)) {
+        if (activity.destination.isNotEmpty) {
+          updatedStash.add(activity);
+        }
+        return Activity(
+          activitiesId: activity.activitiesId,
+          dayTripId: activity.dayTripId,
+          date: activity.date,
+          destination: '',
+          description: '',
+          activityImgUrl: '',
+          allocatedBudget: 0.0,
+          overspendAmount: null,
+          status: 'empty',
+          startTime: activity.startTime,
+          endTime: activity.endTime,
+          duration: '',
+          activityCategory: '',
+          isOverspend: false,
+        );
+      }
+      return activity;
+    }).toList();
+
+    _uiState = _uiState.copyWith(
+      activities: updatedActivities,
+      stashedActivities: updatedStash,
+    );
+
+    notifyListeners();
+  }
+
+  // Remove an item from the wishlist and recalculate coverage and shortfall
+  void deleteWishlistItem(String item) {
+    final currentWishlist = _uiState.wishlist;
+    if (currentWishlist == null || !currentWishlist.contains(item)) return;
+
+    final updatedWishlist = List<String>.from(currentWishlist)..remove(item);
+
+    final activeDestinations = _uiState.activities
+        .where((a) => a.status != 'empty' && a.destination.trim().isNotEmpty)
+        .map((a) => a.destination.toLowerCase().trim())
+        .toSet();
+
+    final activeDescriptions = _uiState.activities
+        .where((a) => a.status != 'empty')
+        .map((a) => a.description.toLowerCase().trim())
+        .toList();
+
+    int coveredCount = 0;
+    for (final w in updatedWishlist) {
+      final lowerItem = w.toLowerCase().trim();
+      final isCovered = activeDestinations.any(
+            (dest) => dest.contains(lowerItem) || lowerItem.contains(dest),
+          ) ||
+          activeDescriptions.any((desc) => desc.contains(lowerItem));
+      if (isCovered) {
+        coveredCount++;
+      }
+    }
+
+    final double parsedBudget = double.tryParse(_uiState.budgetText) ?? 0.0;
+    final double mathShortfall =
+        (_uiState.totalAllocatedBudget - parsedBudget).clamp(0.0, double.infinity);
+
+    final double newExtraBudget = mathShortfall;
+
+    _uiState = _uiState.copyWith(
+      wishlist: updatedWishlist,
+      wishlistItemsCoveredCount: coveredCount,
+      estimatedExtraBudgetNeeded: newExtraBudget,
+      showWishlistWarning: newExtraBudget > 0,
+    );
+
+    notifyListeners();
+  }
+
   // Generate a replacement activity excluding previously visited or generated places
   Future<void> generateAlternativeActivity({
     required String slotActivityId,
@@ -314,7 +446,8 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
       final budgetLimit = stashedMatch?.allocatedBudget ?? 50.0;
 
       final newActivity = await _itineraryService.generateAlternativeItinerary(
-        destination: destination,
+        destination:
+            destination.isNotEmpty ? destination : _uiState.destinationTitle,
         slotDate: targetSlot.date,
         startTime: targetSlot.startTime ?? '09:00',
         endTime: targetSlot.endTime ?? '11:00',
@@ -343,7 +476,119 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Regenerates all empty slots using the remaining activities as route/timing context.
+  Future<void> regeneratePlanFromRemaining() async {
+    final emptySlots = _uiState.activities
+        .where(
+          (a) =>
+              a.status == 'empty' ||
+              (a.destination.trim().isEmpty && a.description.trim().isEmpty),
+        )
+        .toList();
+    if (emptySlots.isEmpty) return;
+
+    final activeActivities = _uiState.activities
+        .where((a) => a.status != 'empty' && a.destination.trim().isNotEmpty)
+        .toList();
+
+    // If all activities were deleted, generate from scratch
+    if (activeActivities.isEmpty) {
+      await generateItinerary();
+      return;
+    }
+
+    _uiState = _uiState.copyWith(
+      isRegeneratingPlan: true,
+      errorMessage: null,
+    );
+    notifyListeners();
+
+    try {
+      final excludedPlaces = <String>{
+        ..._uiState.stashedActivities
+            .where((a) => a.destination.trim().isNotEmpty)
+            .map((a) => a.destination.trim()),
+        ...activeActivities.map((a) => a.destination.trim()),
+      }.toList();
+
+      final double effectiveRemainingBudget =
+          (totalBudget - spentBudget).clamp(0.0, double.infinity);
+
+      final newFilledActivities =
+          await _itineraryService.regenerateEmptySlotsFromRemainingPlan(
+        destination: _uiState.destinationTitle,
+        remainingBudget: effectiveRemainingBudget,
+        remainingActivities: activeActivities,
+        emptySlots: emptySlots,
+        excludedPlaces: excludedPlaces,
+        uncoveredWishlist: uncoveredWishlistItems,
+        preference: _uiState.preference,
+        constraints: _uiState.constraints,
+      );
+
+      final Map<String, Activity> filledMap = {
+        for (final act in newFilledActivities) act.activitiesId: act,
+      };
+
+      final updatedList = _uiState.activities.map((act) {
+        if (filledMap.containsKey(act.activitiesId)) {
+          return filledMap[act.activitiesId]!;
+        }
+        return act;
+      }).toList();
+
+      final newTotalAllocated = updatedList.fold(
+        0.0,
+        (sum, a) => sum + a.allocatedBudget,
+      );
+      final mathShortfall =
+          (newTotalAllocated - totalBudget).clamp(0.0, double.infinity);
+
+      // Recalculate covered wishlist
+      final wishlist = _uiState.wishlist ?? [];
+      int coveredCount = 0;
+      if (wishlist.isNotEmpty) {
+        final activeDestinations = updatedList
+            .where((a) => a.status != 'empty' && a.destination.trim().isNotEmpty)
+            .map((a) => a.destination.toLowerCase().trim())
+            .toSet();
+        final activeDescriptions = updatedList
+            .where((a) => a.status != 'empty')
+            .map((a) => a.description.toLowerCase().trim())
+            .toList();
+        for (final w in wishlist) {
+          final lower = w.toLowerCase().trim();
+          if (activeDestinations.any((d) => d.contains(lower) || lower.contains(d)) ||
+              activeDescriptions.any((d) => d.contains(lower))) {
+            coveredCount++;
+          }
+        }
+      }
+
+      _uiState = _uiState.copyWith(
+        isRegeneratingPlan: false,
+        activities: updatedList,
+        totalAllocatedBudget: newTotalAllocated,
+        wishlistItemsCoveredCount: coveredCount,
+        estimatedExtraBudgetNeeded: mathShortfall,
+        showWishlistWarning: false,
+      );
+    } catch (e) {
+      _uiState = _uiState.copyWith(
+        isRegeneratingPlan: false,
+        errorMessage: e.toString(),
+      );
+    }
+    notifyListeners();
+  }
+
   Future<String?> confirmItinerary() async {
+    if (!canConfirmItinerary) {
+      if (hasExtraBudgetNeeded) {
+        return 'Cannot confirm itinerary while extra budget is needed. Please top up your budget first.';
+      }
+      return 'Cannot confirm itinerary while some slots are empty or generation is in progress.';
+    }
     try {
       final success = await _itineraryService.saveItinerary(
         _uiState.activities,
