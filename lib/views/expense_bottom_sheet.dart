@@ -19,6 +19,7 @@ Future<void> showExpenseBottomSheet({
   required BuildContext context,
   required Activity activity,
   required ActivityViewModel viewModel,
+  bool viewOnly = false,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -29,15 +30,16 @@ Future<void> showExpenseBottomSheet({
     backgroundColor: appTheme.transparentCustom,
     builder: (_) => ChangeNotifierProvider.value(
       value: viewModel,
-      child: ExpenseBottomSheet(activity: activity),
+      child: ExpenseBottomSheet(activity: activity, viewOnly: viewOnly),
     ),
   );
 }
 
 class ExpenseBottomSheet extends StatefulWidget {
   final Activity activity;
+  final bool viewOnly;
 
-  ExpenseBottomSheet({required this.activity});
+  ExpenseBottomSheet({required this.activity, this.viewOnly = false});
 
   @override
   State<ExpenseBottomSheet> createState() => _ExpenseBottomSheetState();
@@ -120,7 +122,9 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                       ),
                       SizedBox(height: 20),
                       Text(
-                        showRecordedExpenses
+                        widget.viewOnly
+                            ? 'Expense History'
+                            : showRecordedExpenses
                             ? 'Recorded Expenses'
                             : 'Add Expense',
                         style: TextStyle(
@@ -145,6 +149,27 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                         )
                       else if (showRecordedExpenses)
                         _buildRecordedExpensesSection(uiState)
+                      else if (widget.viewOnly)
+                        Padding(
+                          padding: EdgeInsets.symmetric(vertical: 48),
+                          child: Center(
+                            child: Column(
+                              children: [
+                                Icon(Icons.receipt_long_outlined, size: 48, color: appTheme.blue_gray_300),
+                                SizedBox(height: 12),
+                                Text(
+                                  'No expenses recorded for this activity.',
+                                  style: TextStyle(
+                                    fontFamily: 'Inter',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: appTheme.blue_gray_300,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
                       else
                         _buildNewExpenseForm(uiState),
                     ],
@@ -278,29 +303,31 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
             padding: EdgeInsets.only(bottom: 10),
             child: Center(child: CircularProgressIndicator()),
           ),
-        SizedBox(height: 8),
-        SizedBox(
-          width: double.infinity,
-          height: 56,
-          child: ElevatedButton.icon(
-            onPressed: () => setState(() => _isRecordingNewExpense = true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: appTheme.teal_A700,
-              foregroundColor: appTheme.white_A700,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+        if (!widget.viewOnly) ...[
+          SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: ElevatedButton.icon(
+              onPressed: () => setState(() => _isRecordingNewExpense = true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: appTheme.teal_A700,
+                foregroundColor: appTheme.white_A700,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
-            ),
-            icon: Icon(Icons.add),
-            label: Text(
-              'Record New Expense',
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontWeight: FontWeight.w700,
+              icon: Icon(Icons.add),
+              label: Text(
+                'Record New Expense',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ),
-        ),
+        ],
       ],
     );
   }

@@ -310,6 +310,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final status = trip.computedStatus.toLowerCase();
     final bool isOngoing = status == 'ongoing';
     final bool isCompleted = status == 'completed';
+    final bool isTerminated = status == 'terminated';
 
     // Prioritize resolved banner from state, falling back to trip.imgUrl
     final String? activeImageUrl = (state.bannerImgUrl?.trim().isNotEmpty == true)
@@ -366,7 +367,9 @@ class _HomeScreenState extends State<HomeScreen> {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: isOngoing
+                          color: isTerminated
+                              ? const Color(0xFFFEE2E2)
+                              : isOngoing
                               ? appTheme.amber_200
                               : isCompleted
                               ? appTheme.gray_200
@@ -377,11 +380,15 @@ class _HomeScreenState extends State<HomeScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              isOngoing
+                              isTerminated
+                                  ? Icons.cancel_outlined
+                                  : isOngoing
                                   ? Icons.play_circle_outline
                                   : Icons.check_circle_outline,
                               size: 14,
-                              color: isOngoing
+                              color: isTerminated
+                                  ? appTheme.errorRed
+                                  : isOngoing
                                   ? appTheme.lime_900
                                   : isCompleted
                                   ? appTheme.gray_800
@@ -397,7 +404,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
                                 fontFamily: 'Inter',
-                                color: isOngoing
+                                color: isTerminated
+                                    ? appTheme.errorRed
+                                    : isOngoing
                                     ? appTheme.lime_900
                                     : isCompleted
                                     ? appTheme.gray_800

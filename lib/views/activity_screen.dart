@@ -34,6 +34,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
   bool _isInit = false;
   String _destination = 'Trip Itinerary';
   DateTime? _filterDate;
+  String _tripComputedStatus = 'ongoing';
 
   @override
   void didChangeDependencies() {
@@ -68,6 +69,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
             try {
               if ((innerTrip as dynamic).destination != null) {
                 _destination = (innerTrip as dynamic).destination.toString();
+              }
+              if ((innerTrip as dynamic).computedStatus != null) {
+                _tripComputedStatus = (innerTrip as dynamic).computedStatus.toString().toLowerCase();
               }
             } catch (_) {}
           }
@@ -1022,6 +1026,74 @@ class _ActivityScreenState extends State<ActivityScreen> {
                     activity,
                     uiState,
                     onTap: () async {
+                      final bool isTripOngoing = _tripComputedStatus == 'ongoing';
+
+                      // If trip is not ongoing, open expense sheet in view-only mode
+                      if (!isTripOngoing) {
+                        viewModel.selectActivityForExpense(activity);
+                        await showExpenseBottomSheet(
+                          context: context,
+                          activity: activity,
+                          viewModel: viewModel,
+                          viewOnly: true,
+                        );
+                        return;
+                      }
+
+                      // If viewing a future day, open expense sheet in view-only mode
+                      final todayNow = DateTime.now();
+                      final todayDateOnly = DateTime(todayNow.year, todayNow.month, todayNow.day);
+                      final activityDateOnly = DateTime(activity.date.year, activity.date.month, activity.date.day);
+                      if (activityDateOnly.isAfter(todayDateOnly)) {
+                        viewModel.selectActivityForExpense(activity);
+                        await showExpenseBottomSheet(
+                          context: context,
+                          activity: activity,
+                          viewModel: viewModel,
+                          viewOnly: true,
+                        );
+                        return;
+                      }
+
+                      // Block expense recording if activity hasn't started yet
+                      final now = DateTime.now();
+                      DateTime activityStart = activity.date;
+                      final st = activity.startTime;
+                      if (st != null && st.trim().isNotEmpty) {
+                        try {
+                          String timeToParse = st.trim();
+                          // Handle "hh:mm AM/PM" format
+                          if (timeToParse.contains('AM') || timeToParse.contains('PM')) {
+                            final parsed = DateFormat('hh:mm a').parse(timeToParse);
+                            activityStart = DateTime(
+                              activity.date.year, activity.date.month, activity.date.day,
+                              parsed.hour, parsed.minute,
+                            );
+                          } else {
+                            // Handle "HH:mm" 24-hour format
+                            final parts = timeToParse.split(':');
+                            if (parts.length >= 2) {
+                              activityStart = DateTime(
+                                activity.date.year, activity.date.month, activity.date.day,
+                                int.parse(parts[0]), int.parse(parts[1]),
+                              );
+                            }
+                          }
+                        } catch (_) {
+                          // If parsing fails, fall back to date-only comparison
+                        }
+                      }
+
+                      if (now.isBefore(activityStart)) {
+                        if (mounted) {
+                          showThreeSecondMessage(
+                            context,
+                            'This activity hasn\'t started yet. You can record expenses once it begins.',
+                          );
+                        }
+                        return;
+                      }
+
                       final spentBefore = viewModel.uiState.spentBudget;
 
                       viewModel.selectActivityForExpense(activity);

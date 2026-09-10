@@ -127,14 +127,7 @@ class ActivityUiState {
   bool get canGoToPreviousDay => currentDayIndex > 0;
 
   bool get canGoToNextDay {
-    if (currentDayIndex < 0 || currentDayIndex >= availableDates.length - 1) {
-      return false;
-    }
-    // Only allow navigating to days that are today or earlier (already went through).
-    final nextDate = availableDates[currentDayIndex + 1];
-    final today = DateTime.now();
-    final todayDate = DateTime(today.year, today.month, today.day);
-    return !nextDate.isAfter(todayDate);
+    return currentDayIndex >= 0 && currentDayIndex < availableDates.length - 1;
   }
 
   String get dayLabel {
