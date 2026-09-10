@@ -547,6 +547,11 @@ class BudgetService implements IBudgetService {
       return 0;
     }
 
+    if (remainingCost <= 0) {
+      debugPrint('No remaining activities with budget — returning 0 sufficient days.');
+      return 0;
+    }
+
     final double sufficientDays = remainingBalance / remainingCost;
 
     debugPrint('Remaining cost: RM $remainingCost');
