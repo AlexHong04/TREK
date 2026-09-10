@@ -10,6 +10,7 @@ import '../view_models/presentation_logic/whole_itinerary_detail_view_model.dart
 import '../models/services/i_auth_service.dart';
 import '../main.dart';
 import '../widgets/custom_app_bar.dart';
+import '../widgets/dual_currency_amount.dart';
 import 'budget_popup.dart';
 
 class WholeItineraryDetailScreen extends StatefulWidget {
@@ -91,19 +92,161 @@ class WholeItineraryDetailScreen extends StatefulWidget {
 class _WholeItineraryDetailScreenState
     extends State<WholeItineraryDetailScreen> {
   bool _wishlistWarningShowing = false;
+  bool _isUncoveredWishlistExpanded = false;
 
-  void _checkWishlistWarning(WholeItineraryDetailViewModel viewModel) {
-    if (!viewModel.uiState.showWishlistWarning || _wishlistWarningShowing) {
-      return;
-    }
+  void _showActivityRemovedSnackBar(
+    BuildContext context,
+    String activityName, {
+    required bool isReadOnly,
+  }) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.only(
+          bottom: isReadOnly ? 20.0 : 135.0,
+          left: 16.0,
+          right: 16.0,
+        ),
+        elevation: 6,
+        backgroundColor: const Color(0xFF1E293B),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: Colors.white.withValues(alpha: 0.12),
+            width: 1,
+          ),
+        ),
+        duration: const Duration(seconds: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),
+        content: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: const Color(0xFFEF4444).withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.delete_outline_rounded,
+                color: Color(0xFFF87171),
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Activity removed',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      fontFamily: 'Inter',
+                    ),
+                  ),
+                  if (activityName.isNotEmpty &&
+                      activityName != 'Activity') ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      activityName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.65),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w400,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-    _wishlistWarningShowing = true;
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      viewModel.dismissWishlistWarning();
-      _showWishlistWarningDialog(viewModel);
-    });
+  void _showWishlistItemRemovedSnackBar(
+    BuildContext context,
+    String item, {
+    required bool isReadOnly,
+  }) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.only(
+          bottom: isReadOnly ? 20.0 : 135.0,
+          left: 16.0,
+          right: 16.0,
+        ),
+        elevation: 6,
+        backgroundColor: const Color(0xFF1E293B),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: Colors.white.withValues(alpha: 0.12),
+            width: 1,
+          ),
+        ),
+        duration: const Duration(seconds: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),
+        content: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: const Color(0xFFEF4444).withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.playlist_remove_rounded,
+                color: Color(0xFFF87171),
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Wishlist item removed',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      fontFamily: 'Inter',
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    item,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.65),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w400,
+                      fontFamily: 'Inter',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   String _formatDisplayTime(dynamic activity) {
@@ -122,6 +265,8 @@ class _WholeItineraryDetailScreenState
   Future<void> _showWishlistWarningDialog(
     WholeItineraryDetailViewModel viewModel,
   ) async {
+    if (_wishlistWarningShowing) return;
+    _wishlistWarningShowing = true;
     try {
       double minTopUp = viewModel.uiState.estimatedExtraBudgetNeeded * 0.50;
       if (minTopUp <= 0.0) {
@@ -132,21 +277,15 @@ class _WholeItineraryDetailScreenState
           viewModel.uiState.wishlistItemsCoveredCount == 0) {
         await showInitialBudgetInsufficientDialog(
           context: context,
-
           shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded,
-
           minTopUp: minTopUp,
-
           wishlistCovered: viewModel.uiState.wishlistItemsCoveredCount,
-
           warningText:
               'Insufficient top-up amount will trigger'
               'alternative recommendation directly.',
-
           onCancel: () async {
             await showCancelTripDialog(context: context, onContinue: () {});
           },
-
           onTopUpBudget: (double amount) async {
             final isSufficient = await viewModel.topUpBudget(amount);
 
@@ -173,21 +312,15 @@ class _WholeItineraryDetailScreenState
           viewModel.uiState.estimatedExtraBudgetNeeded > 0) {
         await showInitialBudgetInsufficientDialog(
           context: context,
-
           shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded,
-
           minTopUp: minTopUp,
-
           wishlistCovered: viewModel.uiState.wishlistItemsCoveredCount,
-
           warningText:
               'Insufficient top-up amount will trigger'
               'alternative recommendation directly.',
-
           onCancel: () async {
             await showCancelTopUpDialog(context: context, onContinue: () {});
           },
-
           onTopUpBudget: (double amount) async {
             final isSufficient = await viewModel.topUpBudget(amount);
 
@@ -212,18 +345,15 @@ class _WholeItineraryDetailScreenState
           context: context,
           shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded,
           minTopUp: minTopUp,
-
           warningText:
               'Insufficient top-up amount will trigger'
               'alternative recommendation directly.',
-
           onCancel: () async {
             await showCancelTripWithoutWishlistDialog(
               context: context,
               onContinue: () {},
             );
           },
-
           onTopUpBudget: (double amount) async {
             final isSufficient = await viewModel.topUpBudget(amount);
 
@@ -271,16 +401,20 @@ class _WholeItineraryDetailScreenState
           Expanded(
             child: SingleChildScrollView(
               child: Padding(
-                padding: EdgeInsets.only(top: 24.0, left: 16.0, right: 16.0),
+                padding: const EdgeInsets.only(
+                  top: 24.0,
+                  left: 16.0,
+                  right: 16.0,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildOverviewCard(viewModel),
-                    SizedBox(height: 24.0),
-                    _buildLocationHeader(viewModel),
-                    SizedBox(height: 16.0),
+                    _buildOverviewCard(viewModel, isReadOnly: isReadOnly),
+                    const SizedBox(height: 24.0),
+                    _buildLocationHeader(viewModel, isReadOnly: isReadOnly),
+                    const SizedBox(height: 16.0),
                     _buildTimeline(context, viewModel, isReadOnly: isReadOnly),
-                    SizedBox(height: 10.0),
+                    const SizedBox(height: 10.0),
                   ],
                 ),
               ),
@@ -292,7 +426,10 @@ class _WholeItineraryDetailScreenState
     );
   }
 
-  Widget _buildOverviewCard(WholeItineraryDetailViewModel viewModel) {
+  Widget _buildOverviewCard(
+    WholeItineraryDetailViewModel viewModel, {
+    required bool isReadOnly,
+  }) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16.0),
@@ -387,14 +524,24 @@ class _WholeItineraryDetailScreenState
                   ),
                 ),
               ),
-              Text(
-                'RM${viewModel.uiState.budgetText}',
-                style: TextStyle(
-                  fontSize: 24,
+              DualCurrencyAmount(
+                amount: double.tryParse(viewModel.uiState.budgetText) ?? 0.0,
+                baseCurrency: 'MYR',
+                baseLabel: 'RM',
+                primaryStyle: TextStyle(
+                  fontSize: 22,
                   fontWeight: FontWeight.w800,
                   fontFamily: 'Inter',
                   color: appTheme.teal_A700, // Teal A700
                 ),
+                secondaryStyle: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Inter',
+                  color: appTheme.blue_gray_700,
+                ),
+                crossAxisAlignment: CrossAxisAlignment.end,
+                textAlign: TextAlign.end,
               ),
             ],
           ),
@@ -413,17 +560,65 @@ class _WholeItineraryDetailScreenState
                   color: appTheme.blue_gray_700,
                 ),
               ),
-              Text(
-                'RM${viewModel.uiState.totalAllocatedBudget.toStringAsFixed(2)}',
-                style: TextStyle(
+              DualCurrencyAmount(
+                amount: viewModel.uiState.totalAllocatedBudget,
+                baseCurrency: 'MYR',
+                baseLabel: 'RM',
+                primaryStyle: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
                   fontFamily: 'Inter',
                   color: appTheme.teal_800,
                 ),
+                secondaryStyle: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Inter',
+                  color: appTheme.blue_gray_700,
+                ),
+                crossAxisAlignment: CrossAxisAlignment.end,
+                textAlign: TextAlign.end,
               ),
             ],
           ),
+          if ((viewModel.uiState.wishlist == null ||
+                  viewModel.uiState.wishlist!.isEmpty) &&
+              (viewModel.spentBudget > viewModel.totalBudget ||
+                  viewModel.uiState.estimatedExtraBudgetNeeded > 0)) ...[
+            const SizedBox(height: 8.0),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: appTheme.redButton.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: appTheme.errorRed.withValues(alpha: 0.25),
+                  width: 1.0,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 14,
+                    color: appTheme.errorRed,
+                  ),
+                  const SizedBox(width: 6.0),
+                  Expanded(
+                    child: Text(
+                      'Your budget is not sufficient for the trip.',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Inter',
+                        color: appTheme.errorRed,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           if (viewModel.uiState.wishlist != null &&
               viewModel.uiState.wishlist!.isNotEmpty) ...[
             const SizedBox(height: 6.0),
@@ -450,6 +645,187 @@ class _WholeItineraryDetailScreenState
                 ),
               ],
             ),
+            if (viewModel.uncoveredWishlistItems.isNotEmpty) ...[
+              const SizedBox(height: 6.0),
+              InkWell(
+                onTap: () {
+                  setState(() {
+                    _isUncoveredWishlistExpanded =
+                        !_isUncoveredWishlistExpanded;
+                  });
+                },
+                borderRadius: BorderRadius.circular(6.0),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Wishlist Uncovered',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              fontFamily: 'Inter',
+                              color: appTheme.blue_gray_700,
+                            ),
+                          ),
+                          const SizedBox(width: 4.0),
+                          AnimatedRotation(
+                            turns: _isUncoveredWishlistExpanded ? 0.5 : 0.0,
+                            duration: const Duration(milliseconds: 200),
+                            child: Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              size: 18,
+                              color: appTheme.blue_gray_700,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8.0,
+                          vertical: 2.0,
+                        ),
+                        decoration: BoxDecoration(
+                          color: appTheme.gray_100,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '${viewModel.uncoveredWishlistItems.length} Items',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            fontFamily: 'Inter',
+                            color: appTheme.errorRed,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              AnimatedCrossFade(
+                firstChild: const SizedBox.shrink(),
+                secondChild: Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(top: 8.0, bottom: 4.0),
+                  padding: const EdgeInsets.all(12.0),
+                  decoration: BoxDecoration(
+                    color: appTheme.gray_50_03,
+                    borderRadius: BorderRadius.circular(12.0),
+                    border: Border.all(
+                      color: appTheme.blue_gray_50,
+                      width: 1.0,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline_rounded,
+                            size: 14,
+                            color: appTheme.blue_gray_300,
+                          ),
+                          const SizedBox(width: 6.0),
+                          Expanded(
+                            child: Text(
+                              viewModel.uiState.wishlistItemsCoveredCount == 0
+                                  ? 'Your budget is not sufficient to cover any wishlist items.'
+                                  : 'Your budget is not sufficient to cover all wishlist items.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                fontFamily: 'Inter',
+                                color: appTheme.blue_gray_700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8.0),
+                      Wrap(
+                        spacing: 6.0,
+                        runSpacing: 6.0,
+                        children: viewModel.uncoveredWishlistItems.map((item) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10.0,
+                              vertical: 5.0,
+                            ),
+                            decoration: BoxDecoration(
+                              color: appTheme.white_A700,
+                              borderRadius: BorderRadius.circular(8.0),
+                              border: Border.all(
+                                color: appTheme.gray_200,
+                                width: 1.0,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.remove_circle_outline_rounded,
+                                  size: 13,
+                                  color: appTheme.errorRed,
+                                ),
+                                const SizedBox(width: 5.0),
+                                ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 240,
+                                  ),
+                                  child: Text(
+                                    item,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      fontFamily: 'Inter',
+                                      color: appTheme.gray_800,
+                                    ),
+                                  ),
+                                ),
+                                if (!isReadOnly) ...[
+                                  const SizedBox(width: 6.0),
+                                  InkWell(
+                                    onTap: () {
+                                      viewModel.deleteWishlistItem(item);
+                                      _showWishlistItemRemovedSnackBar(
+                                        context,
+                                        item,
+                                        isReadOnly: isReadOnly,
+                                      );
+                                    },
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(2.0),
+                                      child: Icon(
+                                        Icons.close_rounded,
+                                        size: 14,
+                                        color: appTheme.blue_gray_300,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ),
+                ),
+                crossFadeState: _isUncoveredWishlistExpanded
+                    ? CrossFadeState.showSecond
+                    : CrossFadeState.showFirst,
+                duration: const Duration(milliseconds: 250),
+              ),
+            ],
           ],
           if (viewModel.uiState.estimatedExtraBudgetNeeded > 0.0) ...[
             const SizedBox(height: 6.0),
@@ -465,14 +841,24 @@ class _WholeItineraryDetailScreenState
                     color: appTheme.errorRed,
                   ),
                 ),
-                Text(
-                  'RM${viewModel.uiState.estimatedExtraBudgetNeeded.toStringAsFixed(2)}',
-                  style: TextStyle(
+                DualCurrencyAmount(
+                  amount: viewModel.uiState.estimatedExtraBudgetNeeded,
+                  baseCurrency: 'MYR',
+                  baseLabel: 'RM',
+                  primaryStyle: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
                     fontFamily: 'Inter',
                     color: appTheme.errorRed,
                   ),
+                  secondaryStyle: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Inter',
+                    color: appTheme.blue_gray_700,
+                  ),
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  textAlign: TextAlign.end,
                 ),
               ],
             ),
@@ -482,23 +868,128 @@ class _WholeItineraryDetailScreenState
     );
   }
 
-  Widget _buildLocationHeader(WholeItineraryDetailViewModel viewModel) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 8.0),
-          child: Text(
-            viewModel.uiState.destinationTitle.toUpperCase(),
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              fontFamily: 'Inter',
-              color: appTheme.teal_800,
-            ),
+  Widget _buildLocationHeader(
+    WholeItineraryDetailViewModel viewModel, {
+    required bool isReadOnly,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+      child: Text(
+        viewModel.uiState.destinationTitle.toUpperCase(),
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w800,
+          fontFamily: 'Inter',
+          color: appTheme.teal_800,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRegenerateInfoMessage(WholeItineraryDetailViewModel viewModel) {
+    final emptyCount = viewModel.uiState.activities
+        .where(
+          (a) =>
+              a.status == 'empty' ||
+              (a.destination.trim().isEmpty && a.description.trim().isEmpty),
+        )
+        .length;
+
+    if (viewModel.uiState.isRegeneratingPlan) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
+        decoration: BoxDecoration(
+          color: appTheme.teal_50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: appTheme.teal_A700.withValues(alpha: 0.35),
+            width: 1.2,
           ),
         ),
-      ],
+        child: Row(
+          children: [
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.2,
+                color: appTheme.teal_A700,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'AI is crafting new activities based on your remaining plan...',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Inter',
+                  color: appTheme.teal_800,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
+      decoration: BoxDecoration(
+        color: appTheme.teal_50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: appTheme.teal_A700.withValues(alpha: 0.35),
+          width: 1.2,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: appTheme.white_A700,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.auto_awesome_rounded,
+              color: appTheme.teal_A700,
+              size: 16,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Plan Incomplete ($emptyCount empty slot${emptyCount > 1 ? 's' : ''})',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: 'Inter',
+                    color: appTheme.teal_800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Auto-fill using your remaining itinerary as context',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    fontFamily: 'Inter',
+                    color: appTheme.blue_gray_700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -585,7 +1076,18 @@ class _WholeItineraryDetailScreenState
           activity: activity,
           isLast: isLast,
           isReadOnly: isReadOnly,
-          onRemove: () => viewModel.removeActivity(activity.activitiesId),
+          onRemove: () {
+            final activityName =
+                (activity.destination as String?)?.isNotEmpty == true
+                ? activity.destination as String
+                : 'Activity';
+            viewModel.removeActivity(activity.activitiesId);
+            _showActivityRemovedSnackBar(
+              context,
+              activityName,
+              isReadOnly: isReadOnly,
+            );
+          },
         ),
       );
     }
@@ -604,11 +1106,14 @@ class _WholeItineraryDetailScreenState
     required VoidCallback onRemove,
     required bool isReadOnly,
   }) {
+    final bool isActivityNonEmpty =
+        activity.status != 'empty' && activity.destination.isNotEmpty;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildTimelineIndicatorColumn(isLast: isLast),
-        SizedBox(width: 24.0),
+        const SizedBox(width: 24.0),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -625,7 +1130,7 @@ class _WholeItineraryDetailScreenState
                       color: appTheme.gray_800,
                     ).copyWith(height: 1.2),
                   ),
-                  if (!isReadOnly)
+                  if (!isReadOnly && isActivityNonEmpty)
                     GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: onRemove,
@@ -637,9 +1142,9 @@ class _WholeItineraryDetailScreenState
                     ),
                 ],
               ),
-              SizedBox(height: 12.0),
+              const SizedBox(height: 12.0),
               _buildActivityCard(context, viewModel, activity),
-              if (!isLast) SizedBox(height: 24.0),
+              if (!isLast) const SizedBox(height: 24.0),
             ],
           ),
         ),
@@ -676,112 +1181,266 @@ class _WholeItineraryDetailScreenState
     BuildContext context,
     WholeItineraryDetailViewModel viewModel,
   ) {
-    // Confirm is only allowed once EVERY time slot is filled (no deleted /
-    // empty activities) and the plan is not still being generated.
-    final bool canConfirm = viewModel.canConfirmItinerary;
+    final bool hasEmptySlots = viewModel.hasEmptyActivitySlots;
+    final bool isRegenerating = viewModel.uiState.isRegeneratingPlan;
 
     return Container(
       color: appTheme.gray_50_03,
-      padding: EdgeInsets.symmetric(horizontal: 16.0),
-      child: Container(
-        width: double.infinity,
-        margin: const EdgeInsets.only(bottom: 12),
-        // Disabled state uses a clearly grey button (not tappable) when an
-        // activity was deleted or an empty slot is still present.
-        decoration: BoxDecoration(
-          color: canConfirm ? appTheme.teal_A700 : appTheme.gray_400,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: appTheme.teal_50,
-              offset: const Offset(0, 4),
-              blurRadius: 6,
-            ),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (hasEmptySlots) ...[
+            _buildRegenerateInfoMessage(viewModel),
+            const SizedBox(height: 10),
           ],
-        ),
-        child: Material(
-          color: appTheme.transparentCustom,
-          borderRadius: BorderRadius.circular(16),
-          child: InkWell(
-            onTap: canConfirm
-                ? () async {
-                    if (viewModel.uiState.estimatedExtraBudgetNeeded > 0) {
-                      await _showWishlistWarningDialog(viewModel);
-                      return;
-                    }
-
-                    showDialog(
-                      context: context,
-                      barrierDismissible: false,
-                      builder: (BuildContext context) {
-                        return const Center(child: CircularProgressIndicator());
-                      },
-                    );
-
-                    final errorMsg = await viewModel.confirmItinerary();
-
-                    if (context.mounted) {
-                      Navigator.of(context).pop(); // dismiss loading
-                    }
-
-                    if (errorMsg == null && context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Itinerary saved to database successfully!',
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              children: [
+                // Left: Top-up Button
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: appTheme.white_A700,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: appTheme.teal_A700, width: 1.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: appTheme.teal_50,
+                          offset: const Offset(0, 4),
+                          blurRadius: 6,
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: appTheme.transparentCustom,
+                      borderRadius: BorderRadius.circular(16),
+                      child: InkWell(
+                        onTap: () async {
+                          // zhiqin - To do
+                        },
+                        borderRadius: BorderRadius.circular(16),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.add_card_rounded,
+                                size: 20,
+                                color: appTheme.teal_A700,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Top-up',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  fontFamily: 'Inter',
+                                  color: appTheme.teal_A700,
+                                ).copyWith(height: 22 / 18),
+                              ),
+                            ],
                           ),
                         ),
-                      );
-                      // Return to home page, clearing all previous routes
-                      Navigator.pushNamedAndRemoveUntil(
-                        context,
-                        AppRoutes.homeScreen,
-                        (route) => false,
-                      );
-                    } else if (errorMsg != null && context.mounted) {
-                      // Show extreme specific error message so we can solve Supabase DB issue!
-                      showDialog(
-                        context: context,
-                        builder: (_) => AlertDialog(
-                          title: const Text('Save Failed'),
-                          content: Text(errorMsg),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: Text('OK'),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Right: Regenerate Plan Button (if empty slots exist) OR Confirm Button (if all filled)
+                Expanded(
+                  child: hasEmptySlots
+                      ? Container(
+                          decoration: BoxDecoration(
+                            color: isRegenerating
+                                ? appTheme.gray_400
+                                : appTheme.teal_A700,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: appTheme.teal_50,
+                                offset: const Offset(0, 4),
+                                blurRadius: 6,
+                              ),
+                            ],
+                          ),
+                          child: Material(
+                            color: appTheme.transparentCustom,
+                            borderRadius: BorderRadius.circular(16),
+                            child: InkWell(
+                              onTap: isRegenerating
+                                  ? null
+                                  : () =>
+                                        viewModel.regeneratePlanFromRemaining(),
+                              borderRadius: BorderRadius.circular(16),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    if (isRegenerating) ...[
+                                      SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: appTheme.white_A700,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Regenerating...',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                          fontFamily: 'Inter',
+                                          color: appTheme.white_A700,
+                                        ).copyWith(height: 22 / 16),
+                                      ),
+                                    ] else ...[
+                                      Icon(
+                                        Icons.auto_awesome_rounded,
+                                        size: 20,
+                                        color: appTheme.white_A700,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Regenerate Plan',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                          fontFamily: 'Inter',
+                                          color: appTheme.white_A700,
+                                        ).copyWith(height: 22 / 16),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
                             ),
-                          ],
+                          ),
+                        )
+                      : Container(
+                          decoration: BoxDecoration(
+                            color: viewModel.canConfirmItinerary
+                                ? appTheme.teal_A700
+                                : appTheme.gray_400,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: viewModel.canConfirmItinerary
+                                ? [
+                                    BoxShadow(
+                                      color: appTheme.teal_50,
+                                      offset: const Offset(0, 4),
+                                      blurRadius: 6,
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          child: Material(
+                            color: appTheme.transparentCustom,
+                            borderRadius: BorderRadius.circular(16),
+                            child: InkWell(
+                              onTap: viewModel.canConfirmItinerary
+                                  ? () async {
+                                      // Wishlist does NOT block confirm; only check if actually overspent
+                                      if (viewModel.spentBudget >
+                                          viewModel.totalBudget) {
+                                        await _showWishlistWarningDialog(
+                                          viewModel,
+                                        );
+                                        return;
+                                      }
+
+                                      showDialog(
+                                        context: context,
+                                        barrierDismissible: false,
+                                        builder: (BuildContext context) {
+                                          return const Center(
+                                            child: CircularProgressIndicator(),
+                                          );
+                                        },
+                                      );
+
+                                      final errorMsg = await viewModel
+                                          .confirmItinerary();
+
+                                      if (context.mounted) {
+                                        Navigator.of(context).pop();
+                                      }
+
+                                      if (errorMsg == null && context.mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Itinerary saved to database successfully!',
+                                            ),
+                                          ),
+                                        );
+                                        Navigator.pushNamedAndRemoveUntil(
+                                          context,
+                                          AppRoutes.homeScreen,
+                                          (route) => false,
+                                        );
+                                      } else if (errorMsg != null &&
+                                          context.mounted) {
+                                        showDialog(
+                                          context: context,
+                                          builder: (_) => AlertDialog(
+                                            title: const Text('Save Failed'),
+                                            content: Text(errorMsg),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () =>
+                                                    Navigator.pop(context),
+                                                child: const Text('OK'),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  : null,
+                              borderRadius: BorderRadius.circular(16),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.description_outlined,
+                                      size: 20,
+                                      color: appTheme.white_A700,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Confirm',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w700,
+                                        fontFamily: 'Inter',
+                                        color: appTheme.white_A700,
+                                      ).copyWith(height: 22 / 18),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
-                      );
-                    }
-                  }
-                : null,
-            borderRadius: BorderRadius.circular(16),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.description_outlined,
-                    size: 20,
-                    color: appTheme.white_A700,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Confirm',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      fontFamily: 'Inter',
-                      color: appTheme.white_A700,
-                    ).copyWith(height: 22 / 18),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -794,6 +1453,10 @@ class _WholeItineraryDetailScreenState
     // Check if the activity has been cleared (empty slot state)
     if (activity.status == 'empty' ||
         (activity.destination.isEmpty && activity.description.isEmpty)) {
+      final isSlotRegenerating =
+          viewModel.uiState.regeneratingSlotId == activity.activitiesId ||
+          viewModel.uiState.isRegeneratingPlan;
+
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(24.0),
@@ -802,20 +1465,16 @@ class _WholeItineraryDetailScreenState
           color: appTheme.gray_100,
           border: Border.all(color: appTheme.blue_gray_50, width: 1),
           borderRadius: BorderRadius.circular(12),
-          // Optional dashed border effect simulation via background or style
         ),
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // While this specific slot is being regenerated, show an inline
-              // spinner ONLY here instead of blocking the whole screen.
-              if (viewModel.uiState.regeneratingSlotId ==
-                  activity.activitiesId) ...[
+              if (isSlotRegenerating) ...[
                 CircularProgressIndicator(color: appTheme.teal_A700),
                 const SizedBox(height: 12),
                 Text(
-                  'Generating alternative activity...',
+                  'Generating activity...',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -833,7 +1492,9 @@ class _WholeItineraryDetailScreenState
                   onPressed: () async {
                     await viewModel.generateAlternativeActivity(
                       slotActivityId: activity.activitiesId,
-                      destination: activity.destination,
+                      destination: activity.destination.isNotEmpty
+                          ? activity.destination
+                          : viewModel.uiState.destinationTitle,
                     );
                     final error = viewModel.uiState.errorMessage;
                     if (error != null && error.isNotEmpty && context.mounted) {
@@ -946,17 +1607,77 @@ class _WholeItineraryDetailScreenState
                     textColor: appTheme.teal_700,
                   ),
                 _buildChip(
-                  label:
-                      'RM${activity.allocatedBudget.toStringAsFixed(0)}${activity.activityCategory.toLowerCase() == 'restaurant' ? ' / pax' : ''}',
                   backgroundColor: appTheme.amber_200,
                   textColor: appTheme.lime_900,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      DualCurrencyAmount(
+                        amount: (activity.allocatedBudget as num).toDouble(),
+                        baseCurrency: 'MYR',
+                        baseLabel: 'RM',
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        textAlign: TextAlign.start,
+                        primaryStyle: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          fontFamily: 'Inter',
+                          color: appTheme.lime_900,
+                          height: 1.2,
+                        ),
+                        secondaryStyle: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Inter',
+                          color: appTheme.lime_900.withValues(alpha: 0.75),
+                          height: 1.2,
+                        ),
+                      ),
+                      if (activity.activityCategory.toLowerCase() ==
+                          'restaurant') ...[
+                        const SizedBox(width: 3),
+                        Text(
+                          '/ pax',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            fontFamily: 'Inter',
+                            color: appTheme.lime_900,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
                 if (activity.isOverspend == true &&
                     activity.overspendAmount != null)
                   _buildChip(
-                    label: 'RM${activity.overspendAmount!.toStringAsFixed(0)}',
                     backgroundColor: appTheme.wholeAlertBudgetBg,
                     textColor: appTheme.wholeAlertBudgetText,
+                    child: DualCurrencyAmount(
+                      amount: (activity.overspendAmount as num).toDouble(),
+                      baseCurrency: 'MYR',
+                      baseLabel: 'RM',
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      textAlign: TextAlign.start,
+                      primaryStyle: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        fontFamily: 'Inter',
+                        color: appTheme.wholeAlertBudgetText,
+                        height: 1.2,
+                      ),
+                      secondaryStyle: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Inter',
+                        color: appTheme.wholeAlertBudgetText.withValues(
+                          alpha: 0.75,
+                        ),
+                        height: 1.2,
+                      ),
+                    ),
                   ),
               ],
             ),
@@ -967,7 +1688,8 @@ class _WholeItineraryDetailScreenState
   }
 
   Widget _buildChip({
-    required String label,
+    String? label,
+    Widget? child,
     required Color backgroundColor,
     required Color textColor,
   }) {
@@ -977,15 +1699,17 @@ class _WholeItineraryDetailScreenState
         color: backgroundColor,
         borderRadius: BorderRadius.circular(14),
       ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          fontFamily: 'Inter',
-          color: textColor,
-        ).copyWith(height: 15 / 12),
-      ),
+      child:
+          child ??
+          Text(
+            label ?? '',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              fontFamily: 'Inter',
+              color: textColor,
+            ).copyWith(height: 15 / 12),
+          ),
     );
   }
 }
