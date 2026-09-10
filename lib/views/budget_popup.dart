@@ -171,11 +171,7 @@ Widget _buildSummaryRow(String label, double value, {Color? valueColor}) {
   );
 }
 
-Widget _buildIntSummaryRow(
-  String label,
-  String value, {
-  Color? valueColor,
-}) {
+Widget _buildIntSummaryRow(String label, String value, {Color? valueColor}) {
   return Row(
     mainAxisAlignment: MainAxisAlignment.spaceBetween,
     children: [
@@ -297,11 +293,10 @@ Widget _buildWishlistSummaryCard({
   required String primaryLabel,
   required double primaryValue,
   String? secondaryLabel,
-  String? secondaryValue,
+  double? secondaryValue,
   String? thirdLabel,
-  double? thirdValue,
+  String? thirdValue,
   Color? primaryValueColor,
-  Color? thirdValueColor,
 }) {
   return Container(
     width: double.infinity,
@@ -357,12 +352,12 @@ Widget _buildWishlistSummaryCard({
           const SizedBox(height: 12),
           Divider(color: appTheme.popupCreamStroke, height: 1),
           const SizedBox(height: 12),
-          _buildIntSummaryRow(secondaryLabel, secondaryValue),
+          _buildSummaryRow(secondaryLabel, secondaryValue),
         ],
 
         if (thirdLabel != null && thirdValue != null) ...[
           const SizedBox(height: 12),
-          _buildSummaryRow(thirdLabel, thirdValue, valueColor: thirdValueColor),
+          _buildIntSummaryRow(thirdLabel, thirdValue),
         ],
       ],
     ),
@@ -653,7 +648,6 @@ Future<void> showBudgetExceededThresholdDialog({
         //     BaseBudgetDialog._buildWarningRow(warningText3),
         //   ],
         // ),
-
         actions: _buildActionButton(
           text: 'Continue',
           onPressed: () {
@@ -670,7 +664,7 @@ Future<void> showBudgetExceededThresholdDialog({
 Future<void> showBudgetRecoveryDialog({
   required BuildContext context,
   required double shortageAmount,
-  required String minTopUp,
+  required double minTopUp,
   required double remainingBudget,
   required String warningText,
   VoidCallback? onEndTrip,
@@ -692,6 +686,8 @@ Future<void> showBudgetRecoveryDialog({
             primaryValue: shortageAmount,
             secondaryLabel: 'Remaining Budget:',
             secondaryValue: remainingBudget,
+            thirdLabel: 'Minimum Top-up Amount:',
+            thirdValue: minTopUp,
           ),
 
           warningText: warningText,
@@ -723,9 +719,8 @@ Future<void> showBudgetRecoveryDialog({
                   valueListenable: controller,
                   builder: (context, value, child) {
                     final amount = double.tryParse(value.text.trim());
-                    final min = double.tryParse(minTopUp.trim()) ?? 0.00;
 
-                    final isValid = amount != null && amount > min;
+                    final isValid = amount != null && amount > minTopUp;
 
                     return _buildActionButton(
                       text: 'Top-up Budget',
@@ -783,9 +778,7 @@ Future<void> showEndTripConfirmationDialog({
       return BaseBudgetDialog(
         title: 'End Trip',
 
-        warningText:
-        warningText ??
-            'Are you sure you want to end this trip?',
+        warningText: warningText ?? 'Are you sure you want to end this trip?',
 
         actions: Row(
           children: [
@@ -844,7 +837,6 @@ Future<void> showInitialBudgetInsufficientDialog({
   required double minTopUp,
   int? wishlistCovered,
   required String warningText,
-  required String topUpWarningText,
   VoidCallback? onCancel,
   required Future<bool> Function(double amount) onTopUpBudget,
 }) {
@@ -859,15 +851,19 @@ Future<void> showInitialBudgetInsufficientDialog({
 
         summaryCard: wishlistCovered != null
             ? _buildWishlistSummaryCard(
-          primaryLabel: 'Estimated Budget Shortage Amount',
-          primaryValue: shortageAmount,
-          secondaryLabel: 'Wishlist Covered',
-          secondaryValue: wishlistCovered.toString(),
-        )
+                primaryLabel: 'Estimated Budget Shortage Amount',
+                primaryValue: shortageAmount,
+                secondaryLabel: 'Minimum Top Up Amount',
+                secondaryValue: minTopUp,
+                thirdLabel: 'Wishlist Covered',
+                thirdValue: '${wishlistCovered.toString()} item(s)',
+              )
             : _buildSummaryCard(
-          primaryLabel: 'Estimated Budget Shortage Amount',
-          primaryValue: shortageAmount,
-        ),
+                primaryLabel: 'Estimated Budget Shortage Amount',
+                primaryValue: shortageAmount,
+                secondaryLabel: 'Minimum Top Up Amount',
+                secondaryValue: minTopUp,
+              ),
 
         warningText: warningText,
 
@@ -875,12 +871,6 @@ Future<void> showInitialBudgetInsufficientDialog({
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildTopUpCard(controller),
-
-            const SizedBox(height: 16),
-
-            BaseBudgetDialog._buildWarningRow(
-              topUpWarningText,
-            ),
           ],
         ),
 
@@ -903,27 +893,22 @@ Future<void> showInitialBudgetInsufficientDialog({
               child: ValueListenableBuilder<TextEditingValue>(
                 valueListenable: controller,
                 builder: (context, value, child) {
-                  final amount =
-                  double.tryParse(value.text.trim());
+                  final amount = double.tryParse(value.text.trim());
 
-                  final isValid =
-                      amount != null && amount >= minTopUp;
+                  final isValid = amount != null && amount >= minTopUp;
 
                   return _buildActionButton(
                     text: 'Top-up Budget',
                     onPressed: isValid
                         ? () async {
-                      final amount =
-                      double.parse(value.text.trim());
+                            final amount = double.parse(value.text.trim());
 
-                      final success =
-                      await onTopUpBudget(amount);
+                            final success = await onTopUpBudget(amount);
 
-                      if (success &&
-                          dialogContext.mounted) {
-                        Navigator.of(dialogContext).pop();
-                      }
-                    }
+                            if (success && dialogContext.mounted) {
+                              Navigator.of(dialogContext).pop();
+                            }
+                          }
                         : null,
                   );
                 },
@@ -1267,30 +1252,30 @@ Future<void> showInsufficientTopUpTotalBudgetDialog({
     context: context,
     title: 'Insufficient Top-up',
     messages: const [
-      'Your top-up amount is still not sufficient to cover '
-          'all wishlist items. The system will adjust the plan '
-          'based on the latest amount.',
+      'Your top-up amount is still not sufficient,'
+          'the system will adjust the plan based on'
+          'the latest amount.',
     ],
     onContinue: onContinue,
   );
 }
 
 // Initial Total Budget Top-up Insufficient
-Future<void> showInsufficientTopUpTotalBudgetWithoutWishlistDialog({
-  required BuildContext context,
-  VoidCallback? onContinue,
-}) {
-  return _showSimpleBudgetDialog(
-    context: context,
-    title: 'Insufficient Top-up',
-    messages: const [
-      'Your top-up amount is still not sufficient to cover '
-          'all the planned activities. The system will adjust the plan '
-          'based on the latest amount.',
-    ],
-    onContinue: onContinue,
-  );
-}
+// Future<void> showInsufficientTopUpTotalBudgetWithoutWishlistDialog({
+//   required BuildContext context,
+//   VoidCallback? onContinue,
+// }) {
+//   return _showSimpleBudgetDialog(
+//     context: context,
+//     title: 'Insufficient Top-up',
+//     messages: const [
+//       'Your top-up amount is still not sufficient to cover '
+//           'all the planned activities. The system will adjust the plan '
+//           'based on the latest amount.',
+//     ],
+//     onContinue: onContinue,
+//   );
+// }
 
 Future<void> _showSimpleBudgetDialog({
   required BuildContext context,

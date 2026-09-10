@@ -350,10 +350,10 @@ class _ActivityScreenState extends State<ActivityScreen> {
     showBudgetRecoveryDialog(
       context: context,
       shortageAmount: uiState.shortageAmount,
-      minTopUp: 'RM ${minTopUp.toStringAsFixed(2)}',
+      minTopUp: minTopUp,
       remainingBudget: uiState.remainingBudget,
       warningText:
-          'Top-up amount should at least RM ${minTopUp.toStringAsFixed(2)}, insufficient top-up amount will trigger alternative recommendation directly.',
+          'Insufficient top-up amount will trigger alternative recommendation directly.',
       onEndTrip: () {
         _showEndTripConfirmationDialog(uiState);
       },
