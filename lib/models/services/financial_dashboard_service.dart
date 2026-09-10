@@ -5,8 +5,8 @@ import '../entities/expense_item.dart';
 import '../entities/future_suggestion.dart';
 import '../entities/whole_trip.dart';
 import '../repository/dashboard_repository.dart';
-import '../repository/i_dashboard_repository.dart';
-import 'i_financial_dashboard_service.dart';
+import '../repository/i_itinerary_repository.dart';
+import 'i_itinerary_service.dart';
 
 class FinancialDashboardService implements IFinancialDashboardService {
   static const _dashboardCategories = ['Restaurant', 'Transport', 'Attraction'];

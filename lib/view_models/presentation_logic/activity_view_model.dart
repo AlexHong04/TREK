@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../../models/entities/expense_item.dart';
@@ -8,12 +9,10 @@ import '../../models/local_data_source/camera_source.dart';
 import '../../models/local_data_source/gallery_source.dart';
 import '../../models/local_data_source/notification_source.dart';
 import '../../models/repository/expense_repository.dart';
-import '../../models/repository/i_expense_repository.dart';
+import '../../models/repository/i_itinerary_repository.dart';
 import '../../models/services/budget_service.dart';
-import '../../models/services/i_budget_service.dart';
 import '../../models/services/i_auth_service.dart';
 import '../../models/services/expense_tracking_service.dart';
-import '../../models/services/i_expense_tracking_service.dart';
 import '../../models/services/itinerary_service.dart';
 import '../../models/services/i_itinerary_service.dart';
 import '../../models/local_data_source/location_source.dart';
@@ -602,12 +601,89 @@ class ActivityViewModel extends ChangeNotifier {
 
       // detect overspend
       await handleExpenseSubmission();
+
+      // Dedicated near/overspent alert: store a message in the state and
+      // vibrate, so the tourist is alerted on EVERY such expense record.
+      await _alertIfNearOrOverBudget(selectedActivity);
     } catch (error) {
       _uiState = _uiState.copyWith(
         isSavingExpense: false,
         errorMessage: _readableError(error),
       );
     }
+    notifyListeners();
+  }
+
+  /// Builds the dedicated budget-alert message when the activity is nearly /
+  /// already overspent (mirrors the red card rule). Returns null otherwise.
+  String? _budgetAlertMessageFor({
+    required double spent,
+    required double allocated,
+  }) {
+    if (spent > allocated) {
+      return 'Budget exceeded for this activity (over its allocation).';
+    }
+    if (allocated > 0 && spent >= allocated * 0.80) {
+      return 'Nearing your budget for this activity '
+          '(${((spent / allocated) * 100).round()}% of allocation used).';
+    }
+    return null;
+  }
+
+  /// Publishes the budget-alert message (if any) and vibrates (double pulse).
+  /// Best-effort: vibration failures are ignored so recording is never blocked.
+  Future<void> _alertIfNearOrOverBudget(Activity? activity) async {
+    if (activity == null) {
+      _uiState = _uiState.copyWith(budgetAlertMessage: '');
+      notifyListeners();
+      return;
+    }
+
+    final spent = _uiState.activitySpentMap[activity.activitiesId] ?? 0.0;
+    final message = _budgetAlertMessageFor(
+      spent: spent,
+      allocated: activity.allocatedBudget,
+    );
+    _uiState = _uiState.copyWith(budgetAlertMessage: message ?? '');
+    notifyListeners();
+
+    // Vibrate + play a notice sound on every near/over record so the tourist
+    // is alerted without any in-app popup. The sound is delivered through the
+    // same flutter_local_notifications channel used by the expense-reminder
+    // notifications (which is why SystemSound alone was inaudible on Android).
+    // Best-effort: failures are ignored.
+    if (message == null) return;
+    try {
+      await HapticFeedback.heavyImpact();
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+      await HapticFeedback.heavyImpact();
+
+      final alertId = _budgetAlertId(activity.activitiesId);
+      await _notificationSource.showBudgetAlert(
+        id: alertId,
+        title: 'Budget alert',
+        body: message,
+      );
+
+      // Let the sound play, then remove the alert from the shade so repeated
+      // records never leave a pile of notifications behind.
+      unawaited(() async {
+        await Future<void>.delayed(const Duration(seconds: 4));
+        try {
+          await _notificationSource.dismissBudgetAlert(alertId);
+        } catch (_) {
+          // ignore dismiss failures
+        }
+      }());
+    } catch (_) {
+      // ignore notification / vibration / sound failures
+    }
+  }
+
+  /// Clears the one-off budget alert after it has been shown to the tourist.
+  void clearBudgetAlert() {
+    if (_uiState.budgetAlertMessage.isEmpty) return;
+    _uiState = _uiState.copyWith(budgetAlertMessage: '');
     notifyListeners();
   }
 
@@ -830,9 +906,20 @@ class ActivityViewModel extends ChangeNotifier {
         return _isSameDate(act.date, targetDate);
       }).toList();
 
+      // Derive sorted unique day dates from all activities for day navigation
+      final dateSet = <String, DateTime>{};
+      for (final act in allActivities) {
+        final d = act.date.toLocal();
+        final key = '${d.year}-${d.month}-${d.day}';
+        dateSet.putIfAbsent(key, () => DateTime(d.year, d.month, d.day));
+      }
+      final sortedDates = dateSet.values.toList()..sort();
+
       _uiState = _uiState.copyWith(
         isLoading: false,
         activities: currentDateActivities,
+        allActivities: allActivities,
+        availableDates: sortedDates,
         totalBudget: tripResult?.trip.totalBudget ?? _uiState.totalBudget,
         activitySpentMap: spentMap,
         spentBudget: totalSpent,
@@ -1068,6 +1155,15 @@ class ActivityViewModel extends ChangeNotifier {
     return 100000 + activityNumber;
   }
 
+  /// Stable notification ID for the instant near/over-budget alert. Uses a
+  /// separate ID space (300000+) so it never collides with the scheduled
+  /// activity reminders (100000+) or the evening review reminder (200000).
+  int _budgetAlertId(String activityId) {
+    final numericPart = activityId.replaceAll(RegExp(r'[^0-9]'), '');
+    final activityNumber = int.tryParse(numericPart) ?? 0;
+    return 300000 + activityNumber;
+  }
+
   void setDateFilter(DateTime? filterDate) {
     _uiState = _uiState.copyWith(
       filterDate: filterDate,
@@ -1076,12 +1172,33 @@ class ActivityViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  void goToPreviousDay() {
+    if (!_uiState.canGoToPreviousDay) return;
+    final prevDate = _uiState.availableDates[_uiState.currentDayIndex - 1];
+    _switchToDay(prevDate);
+  }
+
+  void goToNextDay() {
+    if (!_uiState.canGoToNextDay) return;
+    final nextDate = _uiState.availableDates[_uiState.currentDayIndex + 1];
+    _switchToDay(nextDate);
+  }
+
+  void _switchToDay(DateTime date) {
+    final dayActivities = _uiState.allActivities.where((act) {
+      return _isSameDate(act.date, date);
+    }).toList();
+
+    _uiState = _uiState.copyWith(filterDate: date, activities: dayActivities);
+    notifyListeners();
+  }
+
   void clearDateFilter() {
     _uiState = _uiState.copyWith(clearFilterDate: true);
     notifyListeners();
   }
 
-  Future<void> endTrip() async {
+  Future<bool> endTrip() async {
     final id = _uiState.tripId;
 
     _uiState = _uiState.copyWith(isLoading: true);
@@ -1092,12 +1209,18 @@ class ActivityViewModel extends ChangeNotifier {
 
       if (update) {
         _uiState = _uiState.copyWith(isLoading: false, tripId: '');
+        notifyListeners();
+        return true;
       }
+
+      _uiState = _uiState.copyWith(isLoading: false);
+      notifyListeners();
+      return false;
     } catch (e) {
       _uiState = _uiState.copyWith(isLoading: false);
+      notifyListeners();
+      return false;
     }
-
-    notifyListeners();
   }
 
   Future<bool> topUpBudget(double additionalAmount) async {
@@ -1204,6 +1327,19 @@ class ActivityViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // Snapshot the original allocated budget BEFORE processExpense() runs
+      // the reallocation, which modifies allocatedBudget in the DB.
+      final currentActivity = _uiState.activities.firstWhere(
+        (a) => a.activitiesId == _uiState.currentActivityId,
+        orElse: () => _uiState.selectedActivity ?? _uiState.activities.first,
+      );
+      final double originalAllocatedBudget = currentActivity.allocatedBudget;
+
+      debugPrint(
+        '[handleExpenseSubmission] Original allocated budget for '
+        '${currentActivity.activitiesId}: RM${originalAllocatedBudget.toStringAsFixed(2)}',
+      );
+
       final response = await _expenseTrackingService.processExpense(
         tripId: _uiState.tripId,
         currentActivityId: _uiState.currentActivityId,
@@ -1212,11 +1348,6 @@ class ActivityViewModel extends ChangeNotifier {
       debugPrint("result: ${response}");
 
       await refreshSpentAmounts();
-
-      final currentActivity = _uiState.activities.firstWhere(
-        (a) => a.activitiesId == _uiState.currentActivityId,
-        orElse: () => _uiState.selectedActivity ?? _uiState.activities.first,
-      );
 
       // Reconciles the current day's budget in the DB and updates the
       // trip-level overspentBudget from the reconciled data (authoritative).
@@ -1240,29 +1371,32 @@ class ActivityViewModel extends ChangeNotifier {
         _uiState.currentActivityId,
       );
 
-      var exceededAmount = await _expenseTrackingService.getExceededAmount(
-        _uiState.tripId,
-        _uiState.currentActivityId,
-      );
+      // Compute exceeded amount using the ORIGINAL allocated budget
+      // (before reallocation modified it in the DB), so the figure
+      // matches what the user saw on screen.
+      final double activitySpent =
+          _uiState.activitySpentMap[_uiState.currentActivityId] ?? 0.0;
+      var exceededAmount = activitySpent - originalAllocatedBudget;
+      if (exceededAmount < 0) exceededAmount = 0.0;
 
-      shortageAmount =
-          await _authService.convertToPreferredCurrency(
-            amount: shortageAmount,
-            fromCurrency: 'MYR',
-          ) ??
-          shortageAmount;
-      exceededAmount =
-          await _authService.convertToPreferredCurrency(
-            amount: exceededAmount,
-            fromCurrency: 'MYR',
-          ) ??
-          exceededAmount;
+      debugPrint(
+        '[handleExpenseSubmission] Exceeded = spent($activitySpent) - '
+        'originalBudget($originalAllocatedBudget) = $exceededAmount',
+      );
+      // final days = await _itineraryService.getDaysByTripId(_uiState.tripId);
+      //
+      // double overspend = 0.00;
+      //
+      // for (var day in days) {
+      //   overspend += day.overspendAmount!;
+      // }
 
       _uiState = _uiState.copyWith(
         // NOTE: overspentBudget is intentionally left untouched here - it was
         // already set by evaluateDayOverspend() from the reconciled DB days.
         // Re-writing it with a stale/pre-reconcile value caused the OVERSPENT
         // card to jump to an incorrect figure after expense submission.
+        // overspentBudget: overspend,
         shortageAmount: shortageAmount,
         sufficientDays: sufficientDays,
         exceededAmount: exceededAmount,

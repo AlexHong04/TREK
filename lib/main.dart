@@ -12,16 +12,13 @@ import 'models/repository/auth_repository.dart';
 import 'models/repository/user_repository.dart';
 import 'models/repository/i_itinerary_repository.dart';
 import 'models/repository/itinerary_repository.dart';
-import 'models/repository/i_expense_repository.dart';
 import 'models/repository/expense_repository.dart';
 
 import 'models/services/auth_service.dart';
 import 'models/services/i_auth_service.dart';
 import 'models/services/i_itinerary_service.dart';
 import 'models/services/itinerary_service.dart';
-import 'models/services/i_budget_service.dart';
 import 'models/services/budget_service.dart';
-import 'models/services/i_expense_tracking_service.dart';
 import 'models/services/expense_tracking_service.dart';
 import 'models/services/profile_service.dart';
 
@@ -87,25 +84,20 @@ Future<void> main() async {
     passwordResetCallbackUrl: SupabaseConfig.passwordResetCallbackUrl,
   );
 
-  final userRepository = UserRepository(
-      SupabaseConfig.client,
-    authRepository
-  );
+  final userRepository = UserRepository(SupabaseConfig.client, authRepository);
 
   final profileService = ProfileService(userRepository);
 
-  final authService = AuthService(
-    userRepository,
-    profileService,
-  );
+  final authService = AuthService(userRepository, profileService);
 
   await authService.restoreSession();
   final IItineraryRepository itineraryRepository = ItineraryRepository();
   final IExpenseRepository expenseRepository = ExpenseRepository();
   final IItineraryService itineraryService = ItineraryService();
   final IBudgetService budgetService = BudgetService(authService: authService);
-  final IExpenseTrackingService expenseTrackingService =
-      ExpenseTrackingService(authService: authService);
+  final IExpenseTrackingService expenseTrackingService = ExpenseTrackingService(
+    authService: authService,
+  );
 
   runApp(
     MultiProvider(
@@ -117,7 +109,7 @@ Future<void> main() async {
         Provider<IExpenseTrackingService>.value(value: expenseTrackingService),
         ChangeNotifierProvider<IAuthService>.value(value: authService),
       ],
-        child: MyApp(authService: authService)
+      child: MyApp(authService: authService),
     ),
   );
 }
@@ -189,20 +181,22 @@ class _MyAppState extends State<MyApp> {
       initialRoute: initialRoute,
       builder: (context, child) {
         return MediaQuery(
-          data: MediaQuery.of(context).copyWith(
-            textScaler: TextScaler.linear(1.0),
-          ),
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(1.0)),
           child: child!,
         );
       },
       routes: {
         AppRoutes.loginScreen: (context) => LoginScreen.builder(context),
-        AppRoutes.registrationScreen: (context) => RegistrationScreen.builder(context),
+        AppRoutes.registrationScreen: (context) =>
+            RegistrationScreen.builder(context),
         AppRoutes.forgotPasswordScreen: (context) =>
             EmailSubmissionScreen.builder(context),
         AppRoutes.resetPasswordScreen: (context) =>
             PasswordResetScreen.builder(context),
-        AppRoutes.editProfileScreen: (context) => EditProfileScreen.builder(context),
+        AppRoutes.editProfileScreen: (context) =>
+            EditProfileScreen.builder(context),
 
         AppRoutes.homeScreen: (context) => HomeScreen.builder(context),
 

@@ -1,4 +1,5 @@
 import 'package:Trek/models/entities/whole_trip.dart';
+import '../view_models/ui_state/travel_information_ui_state.dart';
 
 import '../theme/app_theme.dart';
 import 'package:flutter/material.dart';
@@ -31,6 +32,21 @@ class WholeItineraryDetailScreen extends StatefulWidget {
             .toList() ??
         [];
 
+    final rawArrivals = args?['arrivals'] as List?;
+    final arrivals = rawArrivals
+        ?.map((e) => TransitPoint.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+
+    final rawDepartures = args?['departures'] as List?;
+    final departures = rawDepartures
+        ?.map((e) => TransitPoint.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+
+    final rawHotels = args?['hotels'] as List?;
+    final hotels = rawHotels
+        ?.map((e) => HotelStay.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+
     return ChangeNotifierProvider<WholeItineraryDetailViewModel>(
       create: (context) {
         final vm = WholeItineraryDetailViewModel();
@@ -48,6 +64,16 @@ class WholeItineraryDetailScreen extends StatefulWidget {
                 ?.map((e) => e.toString())
                 .toList(),
             constraints: constraints,
+            arrivals: arrivals,
+            departures: departures,
+            hotels: hotels,
+            arrivalLocation: args?['arrivalLocation'] as String?,
+            arrivalTime: args?['arrivalTime'] as String?,
+            departureLocation: args?['departureLocation'] as String?,
+            departureTime: args?['departureTime'] as String?,
+            hotelLocation: args?['hotelLocation'] as String?,
+            hotelCheckInTime: args?['hotelCheckInTime'] as String?,
+            hotelCheckOutTime: args?['hotelCheckOutTime'] as String?,
           );
         }
 
@@ -108,16 +134,29 @@ class _WholeItineraryDetailScreenState
       debugPrint(
         "wishlist covered count: ${viewModel.uiState.wishlistItemsCoveredCount}",
       );
-      if ((viewModel.uiState.wishlist == null ||
-              viewModel.uiState.wishlist!.isEmpty) &&
-          viewModel.uiState.estimatedExtraBudgetNeeded > 0) {
-        await showEmptyWishlistInsufficientTotalBudgetDialog(
+      if (viewModel.uiState.wishlist != null &&
+          viewModel.uiState.wishlist!.isNotEmpty &&
+          viewModel.uiState.wishlistItemsCoveredCount == 0) {
+        await showInitialBudgetInsufficientDialog(
           context: context,
-          shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded
-              .toStringAsFixed(2),
+
+          shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded,
+
           minTopUp: minTopUp,
+
+          wishlistCovered: viewModel.uiState.wishlistItemsCoveredCount,
+
+          warningText:
+              'Your budget is not sufficient to cover any wishlist items. '
+              'Do you want to add more budget?',
+
+          topUpWarningText:
+              'Top-up amount should be at least '
+              '${minTopUp.toStringAsFixed(2)}, insufficient top-up '
+              'amount will trigger alternative recommendation directly.',
+
           onCancel: () async {
-            await showCancelTripWithoutWishlistDialog(
+            await showCancelTripDialog(
               context: context,
               onContinue: () {
                 Navigator.of(context).pop();
@@ -129,14 +168,12 @@ class _WholeItineraryDetailScreenState
             final isSufficient = await viewModel.topUpBudget(amount);
 
             if (!isSufficient) {
-              // Wait until the first dialog is completely removed.
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (!mounted) return;
 
-                showInsufficientTopUpTotalBudgetWithoutWishlistDialog(
+                showInsufficientTopUpTotalBudgetDialog(
                   context: context,
                   onContinue: () {
-                    // Trigger re-recommendation with the latest total budget
                     viewModel.generateItinerary(suppressWarning: true);
                   },
                 );
@@ -148,50 +185,27 @@ class _WholeItineraryDetailScreenState
         );
       } else if (viewModel.uiState.wishlist != null &&
           viewModel.uiState.wishlist!.isNotEmpty &&
-          viewModel.uiState.wishlistItemsCoveredCount == 0) {
-        await showInitialTotalBudgetTotallyInsufficientDialog(
+          (viewModel.uiState.wishlistItemsCoveredCount <
+                  viewModel.uiState.wishlist!.length) &&
+              viewModel.uiState.estimatedExtraBudgetNeeded > 0) {
+        await showInitialBudgetInsufficientDialog(
           context: context,
-          shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded
-              .toStringAsFixed(2),
+
+          shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded,
+
           minTopUp: minTopUp,
+
           wishlistCovered: viewModel.uiState.wishlistItemsCoveredCount,
-          onCancel: () async {
-            await showCancelTripDialog(
-              context: context,
-              onContinue: () {
-                Navigator.of(context).pop();
-              },
-            );
-          },
-          onTopUpBudget: (double amount) async {
-            final isSufficient = await viewModel.topUpBudget(amount);
 
-            if (!isSufficient) {
-              // Wait until the first dialog is completely removed.
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (!mounted) return;
+          warningText:
+              'Your budget is not sufficient to cover all wishlist items. '
+              'Do you want to add more budget?',
 
-                showInsufficientTopUpTotalBudgetDialog(
-                  context: context,
-                  onContinue: () {
-                    // Trigger re-recommendation with the latest total budget
-                    viewModel.generateItinerary(suppressWarning: true);
-                  },
-                );
-              });
-            }
+          topUpWarningText:
+              'Top-up amount should be at least '
+              '${minTopUp.toStringAsFixed(2)}, insufficient top-up '
+              'amount will trigger alternative recommendation directly.',
 
-            return true;
-          },
-        );
-      } else if (viewModel.uiState.wishlist != null &&
-          viewModel.uiState.wishlist!.isNotEmpty) {
-        await showInitialTotalBudgetInsufficientDialog(
-          context: context,
-          shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded
-              .toStringAsFixed(2),
-          minTopUp: minTopUp,
-          wishlistCovered: viewModel.uiState.wishlistItemsCoveredCount,
           onCancel: () async {
             await showCancelTopUpDialog(
               context: context,
@@ -205,14 +219,55 @@ class _WholeItineraryDetailScreenState
             final isSufficient = await viewModel.topUpBudget(amount);
 
             if (!isSufficient) {
-              // Wait until the first dialog is completely removed.
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (!mounted) return;
 
                 showInsufficientTopUpTotalBudgetDialog(
                   context: context,
                   onContinue: () {
-                    // Trigger re-recommendation with the latest total budget
+                    viewModel.generateItinerary(suppressWarning: true);
+                  },
+                );
+              });
+            }
+
+            return true;
+          },
+        );
+      } else if (viewModel.uiState.estimatedExtraBudgetNeeded > 0) {
+        await showInitialBudgetInsufficientDialog(
+          context: context,
+          shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded,
+          minTopUp: minTopUp,
+
+          warningText:
+              'Your budget is not sufficient for the trip. '
+              'Do you want to add more budget?',
+
+          topUpWarningText:
+              'Top-up amount should be at least '
+              '${minTopUp.toStringAsFixed(2)}, insufficient top-up '
+              'amount will trigger alternative recommendation directly.',
+
+          onCancel: () async {
+            await showCancelTripWithoutWishlistDialog(
+              context: context,
+              onContinue: () {
+                Navigator.of(context).pop();
+              },
+            );
+          },
+
+          onTopUpBudget: (double amount) async {
+            final isSufficient = await viewModel.topUpBudget(amount);
+
+            if (!isSufficient) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) return;
+
+                showInsufficientTopUpTotalBudgetWithoutWishlistDialog(
+                  context: context,
+                  onContinue: () {
                     viewModel.generateItinerary(suppressWarning: true);
                   },
                 );
@@ -684,6 +739,11 @@ class _WholeItineraryDetailScreenState
           child: InkWell(
             onTap: canConfirm
                 ? () async {
+                    if (viewModel.uiState.estimatedExtraBudgetNeeded > 0) {
+                      await _showWishlistWarningDialog(viewModel);
+                      return;
+                    }
+
                     showDialog(
                       context: context,
                       barrierDismissible: false,

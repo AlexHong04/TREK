@@ -5,6 +5,7 @@ import 'package:Trek/models/entities/day_trip.dart';
 import '../entities/activity.dart';
 import '../entities/whole_trip.dart';
 import '../entities/future_suggestion.dart';
+import '../../view_models/ui_state/travel_information_ui_state.dart';
 import '../configurations/gemini_api_config.dart';
 import '../configurations/google_places_api_config.dart';
 import '../configurations/image_resolver_config.dart';
@@ -27,12 +28,24 @@ class ItineraryService implements IItineraryService {
     List<String>? constraints,
     List<FutureSuggestion>? futureSuggestions,
     bool strictBudget = false,
+    List<TransitPoint>? arrivals,
+    List<TransitPoint>? departures,
+    List<HotelStay>? hotels,
+    String? arrivalLocation,
+    String? arrivalTime,
+    String? departureLocation,
+    String? departureTime,
+    String? hotelLocation,
+    String? hotelCheckInTime,
+    String? hotelCheckOutTime,
   }) async {
     try {
       int retries = 3;
       List<String> failedDestinations = [];
       List<dynamic> validatedList = [];
       Map<String, Map<String, dynamic>?> searchCache = {};
+      List<dynamic> lastJsonList = [];
+      Map<String, dynamic>? lastParsedObj;
 
       double responseTotalAllocatedBudget = 0.0;
       int responseWishlistItemsCoveredCount = 0;
@@ -49,6 +62,16 @@ class ItineraryService implements IItineraryService {
           constraints: constraints,
           futureSuggestions: futureSuggestions,
           strictBudget: strictBudget,
+          arrivals: arrivals,
+          departures: departures,
+          hotels: hotels,
+          arrivalLocation: arrivalLocation,
+          arrivalTime: arrivalTime,
+          departureLocation: departureLocation,
+          departureTime: departureTime,
+          hotelLocation: hotelLocation,
+          hotelCheckInTime: hotelCheckInTime,
+          hotelCheckOutTime: hotelCheckOutTime,
         );
 
         // Extract JSON object
@@ -80,13 +103,15 @@ class ItineraryService implements IItineraryService {
         }
 
         final jsonList = parsedObj['activities'] as List? ?? [];
+        lastJsonList = jsonList;
+        lastParsedObj = parsedObj;
 
         if (!GooglePlacesApiConfig.isConfigured) {
           validatedList = jsonList;
           responseTotalAllocatedBudget =
               (parsedObj['totalAllocatedBudget'] as num?)?.toDouble() ?? 0.0;
           responseWishlistItemsCoveredCount =
-              parsedObj['wishlistItemsCoveredCount'] as int? ?? 0;
+              (parsedObj['wishlistItemsCoveredCount'] as num?)?.toInt() ?? 0;
           responseEstimatedExtraBudgetNeeded =
               (parsedObj['estimatedExtraBudgetNeeded'] as num?)?.toDouble() ??
               0.0;
@@ -148,22 +173,27 @@ class ItineraryService implements IItineraryService {
           responseTotalAllocatedBudget =
               (parsedObj['totalAllocatedBudget'] as num?)?.toDouble() ?? 0.0;
           responseWishlistItemsCoveredCount =
-              parsedObj['wishlistItemsCoveredCount'] as int? ?? 0;
+              (parsedObj['wishlistItemsCoveredCount'] as num?)?.toInt() ?? 0;
           responseEstimatedExtraBudgetNeeded =
               (parsedObj['estimatedExtraBudgetNeeded'] as num?)?.toDouble() ??
               0.0;
           break;
         }
 
-        if (allValid && strictBudget && wishlist != null && wishlist.isNotEmpty) {
+        if (allValid &&
+            strictBudget &&
+            wishlist != null &&
+            wishlist.isNotEmpty) {
           final destNames = jsonList
-              .map((item) =>
-                  (item['destination'] as String? ?? '').toLowerCase())
+              .map(
+                (item) => (item['destination'] as String? ?? '').toLowerCase(),
+              )
               .toList();
           final allWishlistIncluded = wishlist.every((w) {
             final lowerW = w.toLowerCase().trim();
-            return destNames
-                .any((d) => d.contains(lowerW) || lowerW.contains(d));
+            return destNames.any(
+              (d) => d.contains(lowerW) || lowerW.contains(d),
+            );
           });
           if (!allWishlistIncluded && retries > 1) {
             developer.log(
@@ -178,7 +208,7 @@ class ItineraryService implements IItineraryService {
           responseTotalAllocatedBudget =
               (parsedObj['totalAllocatedBudget'] as num?)?.toDouble() ?? 0.0;
           responseWishlistItemsCoveredCount =
-              parsedObj['wishlistItemsCoveredCount'] as int? ?? 0;
+              (parsedObj['wishlistItemsCoveredCount'] as num?)?.toInt() ?? 0;
           responseEstimatedExtraBudgetNeeded =
               (parsedObj['estimatedExtraBudgetNeeded'] as num?)?.toDouble() ??
               0.0;
@@ -195,9 +225,28 @@ class ItineraryService implements IItineraryService {
       }
 
       if (validatedList.isEmpty) {
-        throw Exception(
-          'Failed to generate a valid itinerary with searchable Google Places locations.',
-        );
+        if (lastJsonList.isNotEmpty) {
+          developer.log(
+            'Google Places validation could not resolve all places; falling back to Gemini generated plan.',
+          );
+          validatedList = lastJsonList;
+          if (lastParsedObj != null) {
+            responseTotalAllocatedBudget =
+                (lastParsedObj['totalAllocatedBudget'] as num?)?.toDouble() ??
+                0.0;
+            responseWishlistItemsCoveredCount =
+                (lastParsedObj['wishlistItemsCoveredCount'] as num?)?.toInt() ??
+                0;
+            responseEstimatedExtraBudgetNeeded =
+                (lastParsedObj['estimatedExtraBudgetNeeded'] as num?)
+                    ?.toDouble() ??
+                0.0;
+          }
+        } else {
+          throw Exception(
+            'Failed to generate a valid itinerary with searchable Google Places locations.',
+          );
+        }
       }
 
       List<Activity> newActivities = [];
@@ -255,7 +304,7 @@ class ItineraryService implements IItineraryService {
           finalDestinationTitle = resolved.correctedTitle;
         }
 
-        int dayNumber = item['dayNumber'] as int? ?? 1;
+        int dayNumber = (item['dayNumber'] as num?)?.toInt() ?? 1;
         String startTimeStr = item['startTime'] as String? ?? '09:00';
 
         DateTime tripStartDate = DateTime.now();
@@ -402,6 +451,7 @@ class ItineraryService implements IItineraryService {
   }
 
   // weisong
+  @override
   Future<Activity> generateAlternativeItinerary({
     required String destination,
     required DateTime slotDate,
@@ -526,6 +576,7 @@ class ItineraryService implements IItineraryService {
   }
 
   // kokhong
+  @override
   Future<bool> saveItinerary(
     List<dynamic> activities, {
     required String destination,
@@ -574,6 +625,7 @@ class ItineraryService implements IItineraryService {
   }
 
   // zhiqin
+  @override
   Future<bool> endTrip(String id) async {
     try {
       await _itineraryRepository.terminateTrip(id, 'terminated');
@@ -584,6 +636,7 @@ class ItineraryService implements IItineraryService {
   }
 
   // zhiqin
+  @override
   Future<List<DayTrip>> getDaysByTripId(String id) async {
     try {
       return await _itineraryRepository.fetchDaysByTripId(id);
@@ -592,6 +645,7 @@ class ItineraryService implements IItineraryService {
     }
   }
 
+  @override
   Future<List<Activity>> getRemainingActivities(
     String tripId,
     DateTime currentDateTime,
@@ -614,7 +668,7 @@ class ItineraryService implements IItineraryService {
         return activityStart.isAfter(currentDateTime);
       }).toList();
     } catch (e) {
-      print('Calculating Remaining Activities Error: $e');
+      debugPrint('Calculating Remaining Activities Error: $e');
       rethrow;
     }
   }
@@ -630,6 +684,7 @@ class ItineraryService implements IItineraryService {
     return DateTime(date.year, date.month, date.day, hour, minute);
   }
 
+  @override
   Future<void> updateTripStatus(String tripId, String newStatus) async {
     final allowedStatus = ['Pending', 'Ongoing', 'Completed'];
     if (!allowedStatus.contains(newStatus)) {
@@ -642,8 +697,36 @@ class ItineraryService implements IItineraryService {
 
   // kokhong
   @override
-  Future<List<String>> getAutocompleteSuggestions(String query) async {
-    return await GooglePlacesApiConfig.getAutocompleteSuggestions(query);
+  Future<List<String>> getAutocompleteSuggestions(
+    String query, {
+    List<String>? destinations,
+  }) async {
+    return await GooglePlacesApiConfig.getAutocompleteSuggestions(
+      query,
+      destinations: destinations,
+    );
+  }
+
+  @override
+  Future<List<String>> getAirportAutocompleteSuggestions(
+    String query, {
+    List<String>? destinations,
+  }) async {
+    return await GooglePlacesApiConfig.getAirportAutocompleteSuggestions(
+      query,
+      destinations: destinations,
+    );
+  }
+
+  @override
+  Future<List<String>> getHotelAutocompleteSuggestions(
+    String query, {
+    List<String>? destinations,
+  }) async {
+    return await GooglePlacesApiConfig.getHotelAutocompleteSuggestions(
+      query,
+      destinations: destinations,
+    );
   }
 
   // weisong

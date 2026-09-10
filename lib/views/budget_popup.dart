@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import '../widgets/dual_currency_amount.dart';
 
 // Base
 class BaseBudgetDialog extends StatelessWidget {
@@ -55,7 +56,8 @@ class BaseBudgetDialog extends StatelessWidget {
                 _buildWarningRow(warningText!),
               ],
 
-              if (warningTextColor != null && warningTextColor != appTheme.popupWarningMsg) ...[
+              if (warningTextColor != null &&
+                  warningTextColor != appTheme.popupWarningMsg) ...[
                 const SizedBox(height: 16),
                 _buildWarningRow(warningText!, color: warningTextColor),
               ],
@@ -80,11 +82,7 @@ class BaseBudgetDialog extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(
-          Icons.warning_amber_rounded,
-          color: effectiveColor,
-          size: 22,
-        ),
+        Icon(Icons.warning_amber_rounded, color: effectiveColor, size: 22),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
@@ -125,7 +123,59 @@ class BaseBudgetDialog extends StatelessWidget {
   }
 }
 
-Widget _buildSummaryRow(String label, String value, {Color? valueColor}) {
+Widget _buildSummaryRow(String label, double value, {Color? valueColor}) {
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Expanded(
+        child: Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: appTheme.popupBrownBudget,
+          ),
+        ),
+      ),
+      const SizedBox(width: 12),
+      DualCurrencyAmount(
+        amount: value,
+        baseCurrency: 'MYR',
+        baseLabel: 'RM',
+        primaryStyle: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          fontFamily: 'Inter',
+          color: valueColor ?? appTheme.black,
+        ),
+        secondaryStyle: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          fontFamily: 'Inter',
+          color: appTheme.blue_gray_700,
+        ),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        textAlign: TextAlign.start,
+      ),
+      // Text(
+      //   value,
+      //   style: TextStyle(
+      //     fontFamily: 'Inter',
+      //     fontSize: 16,
+      //     fontWeight: FontWeight.bold,
+      //     color: valueColor ?? appTheme.black,
+      //   ),
+      // ),
+    ],
+  );
+}
+
+Widget _buildWishlistSummaryRow(
+  String label,
+  String value, {
+  Color? valueColor,
+}) {
   return Row(
     mainAxisAlignment: MainAxisAlignment.spaceBetween,
     children: [
@@ -156,11 +206,11 @@ Widget _buildSummaryRow(String label, String value, {Color? valueColor}) {
 
 Widget _buildSummaryCard({
   required String primaryLabel,
-  required String primaryValue,
+  required double primaryValue,
   String? secondaryLabel,
-  String? secondaryValue,
+  double? secondaryValue,
   String? thirdLabel,
-  String? thirdValue,
+  double? thirdValue,
   Color? primaryValueColor,
   Color? thirdValueColor,
 }) {
@@ -185,14 +235,33 @@ Widget _buildSummaryCard({
           ),
         ),
         const SizedBox(height: 8),
-        Text(
-          primaryValue,
-          style: TextStyle(
-            fontFamily: 'Inter',
+        // Text(
+        //   primaryValue,
+        //   style: TextStyle(
+        //     fontFamily: 'Inter',
+        //     fontSize: 24,
+        //     fontWeight: FontWeight.bold,
+        //     color: primaryValueColor ?? appTheme.errorRed,
+        //   ),
+        // ),
+        DualCurrencyAmount(
+          amount: primaryValue,
+          baseCurrency: 'MYR',
+          baseLabel: 'RM',
+          primaryStyle: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
+            fontFamily: 'Inter',
             color: primaryValueColor ?? appTheme.errorRed,
           ),
+          secondaryStyle: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            fontFamily: 'Inter',
+            color: appTheme.blue_gray_700,
+          ),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          textAlign: TextAlign.start,
         ),
 
         if (secondaryLabel != null && secondaryValue != null) ...[
@@ -200,6 +269,82 @@ Widget _buildSummaryCard({
           Divider(color: appTheme.popupCreamStroke, height: 1),
           const SizedBox(height: 12),
           _buildSummaryRow(secondaryLabel, secondaryValue),
+        ],
+
+        if (thirdLabel != null && thirdValue != null) ...[
+          const SizedBox(height: 12),
+          _buildSummaryRow(thirdLabel, thirdValue, valueColor: thirdValueColor),
+        ],
+      ],
+    ),
+  );
+}
+
+Widget _buildWishlistSummaryCard({
+  required String primaryLabel,
+  required double primaryValue,
+  String? secondaryLabel,
+  String? secondaryValue,
+  String? thirdLabel,
+  double? thirdValue,
+  Color? primaryValueColor,
+  Color? thirdValueColor,
+}) {
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: appTheme.popupCreamBg,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: appTheme.popupCreamStroke),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          primaryLabel,
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: appTheme.popupBrownBudget,
+          ),
+        ),
+        const SizedBox(height: 8),
+        // Text(
+        //   primaryValue,
+        //   style: TextStyle(
+        //     fontFamily: 'Inter',
+        //     fontSize: 24,
+        //     fontWeight: FontWeight.bold,
+        //     color: primaryValueColor ?? appTheme.errorRed,
+        //   ),
+        // ),
+        DualCurrencyAmount(
+          amount: primaryValue,
+          baseCurrency: 'MYR',
+          baseLabel: 'RM',
+          primaryStyle: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            fontFamily: 'Inter',
+            color: primaryValueColor ?? appTheme.errorRed,
+          ),
+          secondaryStyle: TextStyle(
+            fontSize: 9,
+            fontWeight: FontWeight.w600,
+            fontFamily: 'Inter',
+            color: appTheme.blue_gray_700,
+          ),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          textAlign: TextAlign.start,
+        ),
+
+        if (secondaryLabel != null && secondaryValue != null) ...[
+          const SizedBox(height: 12),
+          Divider(color: appTheme.popupCreamStroke, height: 1),
+          const SizedBox(height: 12),
+          _buildWishlistSummaryRow(secondaryLabel, secondaryValue),
         ],
 
         if (thirdLabel != null && thirdValue != null) ...[
@@ -236,32 +381,6 @@ Widget _buildActionButton({
         ),
       ),
     ),
-  );
-}
-
-Widget _buildTwoActionButtons({
-  required String primaryText,
-  required VoidCallback? onPrimaryPressed,
-  required String secondaryText,
-  required VoidCallback? onSecondaryPressed,
-}) {
-  return Row(
-    children: [
-      Expanded(
-        child: _buildActionButton(
-          text: secondaryText,
-          backgroundColor: appTheme.redButton,
-          onPressed: onSecondaryPressed,
-        ),
-      ),
-      const SizedBox(width: 12),
-      Expanded(
-        child: _buildActionButton(
-          text: primaryText,
-          onPressed: onPrimaryPressed,
-        ),
-      ),
-    ],
   );
 }
 
@@ -325,66 +444,87 @@ Widget _buildTopUpCard(TextEditingController controller) {
             ),
           ),
         ),
+        // Text(
+        //   'Converted Amount',
+        //   style: TextStyle(
+        //     fontFamily: 'Inter',
+        //     fontSize: 12,
+        //     fontWeight: FontWeight.bold,
+        //     color: appTheme.blue_gray_300,
+        //     letterSpacing: 0.8,
+        //   ),
+        // ),
+        // const SizedBox(height: 10),
+        // Text(
+        //   convertedAmount,
+        //   style: TextStyle(
+        //     fontFamily: 'Inter',
+        //     fontSize: 12,
+        //     fontWeight: FontWeight.bold,
+        //     color: appTheme.blue_gray_300,
+        //     letterSpacing: 0.8,
+        //   ),
+        // ),
       ],
     ),
   );
 }
 
-Future<void> showNearLimitWarningDialog({
-  required BuildContext context,
-  required String activityTitle,
-  required String allocatedBudget,
-  required String currentSpent,
-  required String remainingInActivity,
-  required String warningText1,
-  String? warningText2,
-  VoidCallback? onContinue,
-}) {
-  return showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (dialogContext) {
-      return BaseBudgetDialog(
-        title: 'Budget Alert',
-        titleColor: appTheme.warningPopupHeader,
-
-        summaryCard: _buildSummaryCard(
-          primaryLabel: 'Activity Budget:',
-          primaryValue: allocatedBudget,
-          secondaryLabel: 'Current Spent:',
-          secondaryValue: currentSpent,
-          thirdLabel: 'Remaining Allowance:',
-          thirdValue: remainingInActivity,
-          thirdValueColor: appTheme.popupBrownBudget,
-        ),
-
-        warningText: warningText1,
-
-        warningTextColor: appTheme.popupWarningMsg,
-
-        contentCard: (warningText2 != null && warningText2.isNotEmpty)
-            ? BaseBudgetDialog._buildWarningRow(warningText2, color: appTheme.popupWarningMsg)
-            : null,
-
-        actions: _buildActionButton(
-          text: 'Understood',
-          backgroundColor: appTheme.teal_A700,
-          onPressed: () {
-            Navigator.of(dialogContext).pop();
-            onContinue?.call();
-          },
-        ),
-      );
-    },
-  );
-}
+// Future<void> showNearLimitWarningDialog({
+//   required BuildContext context,
+//   required String activityTitle,
+//   required String allocatedBudget,
+//   required String currentSpent,
+//   required String remainingInActivity,
+//   required String warningText1,
+//   String? warningText2,
+//   VoidCallback? onContinue,
+// }) {
+//   return showDialog(
+//     context: context,
+//     barrierDismissible: false,
+//     builder: (dialogContext) {
+//       return BaseBudgetDialog(
+//         title: 'Budget Alert',
+//         titleColor: appTheme.warningPopupHeader,
+//
+//         summaryCard: _buildSummaryCard(
+//           primaryLabel: 'Activity Budget:',
+//           primaryValue: allocatedBudget,
+//           secondaryLabel: 'Current Spent:',
+//           secondaryValue: currentSpent,
+//           thirdLabel: 'Remaining Allowance:',
+//           thirdValue: remainingInActivity,
+//           thirdValueColor: appTheme.popupBrownBudget,
+//         ),
+//
+//         warningText: warningText1,
+//
+//         warningTextColor: appTheme.popupWarningMsg,
+//
+//         contentCard: (warningText2 != null && warningText2.isNotEmpty)
+//             ? BaseBudgetDialog._buildWarningRow(warningText2, color: appTheme.popupWarningMsg)
+//             : null,
+//
+//         actions: _buildActionButton(
+//           text: 'Understood',
+//           backgroundColor: appTheme.teal_A700,
+//           onPressed: () {
+//             Navigator.of(dialogContext).pop();
+//             onContinue?.call();
+//           },
+//         ),
+//       );
+//     },
+//   );
+// }
 
 // Budget Exceeded - within threshold
 Future<void> showBudgetExceededDialog({
   required BuildContext context,
-  required String allocatedBudget,
-  required String remainingBudget,
-  required String exceededAmount,
+  required double allocatedBudget,
+  required double remainingBudget,
+  required double exceededAmount,
   required String warningText1,
   required String warningText2,
   VoidCallback? onContinue,
@@ -424,9 +564,9 @@ Future<void> showBudgetExceededDialog({
 // Budget Exceeded - above threshold
 Future<void> showBudgetExceededThresholdDialog({
   required BuildContext context,
-  required String allocatedBudget,
-  required String remainingBudget,
-  required String exceededAmount,
+  required double allocatedBudget,
+  required double remainingBudget,
+  required double exceededAmount,
   required String warningText1,
   required String estimatedDays,
   required String warningText3,
@@ -511,9 +651,9 @@ Future<void> showBudgetExceededThresholdDialog({
 // Budget Recovery
 Future<void> showBudgetRecoveryDialog({
   required BuildContext context,
-  required String shortageAmount,
+  required double shortageAmount,
   required String minTopUp,
-  required String remainingBudget,
+  required double remainingBudget,
   required String warningText,
   VoidCallback? onEndTrip,
   required Future<bool> Function(double amount) onTopUpBudget,
@@ -547,8 +687,13 @@ Future<void> showBudgetRecoveryDialog({
                   text: 'End Trip',
                   backgroundColor: appTheme.redButton,
                   onPressed: () {
+                    // First close Budget Recovery.
                     Navigator.of(dialogContext).pop();
-                    onEndTrip?.call();
+
+                    // Then show End Trip confirmation.
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      onEndTrip?.call();
+                    });
                   },
                 ),
               ),
@@ -606,6 +751,59 @@ Future<void> showInsufficientTopUpBudgetRecoveryDialog({
   );
 }
 
+// Show Budget Recovery End Trip Confirmation
+Future<void> showEndTripConfirmationDialog({
+  required BuildContext context,
+  String? warningText,
+  VoidCallback? onCancel,
+  required Future<bool> Function() onEndTrip,
+}) {
+  return showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) {
+      return BaseBudgetDialog(
+        title: 'End Trip',
+
+        warningText:
+        warningText ??
+            'Are you sure you want to end this trip?',
+
+        actions: Row(
+          children: [
+            Expanded(
+              child: _buildActionButton(
+                text: 'Cancel',
+                backgroundColor: appTheme.redButton,
+                onPressed: () {
+                  // Close confirmation.
+                  Navigator.of(dialogContext).pop();
+
+                  // Reopen Budget Recovery after it closes.
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    onCancel?.call();
+                  });
+                },
+              ),
+            ),
+
+            const SizedBox(width: 12),
+
+            Expanded(
+              child: _buildActionButton(
+                text: 'End Trip',
+                onPressed: () async {
+                  await onEndTrip();
+                },
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
 // Budget Reallocation Failure
 Future<void> showBudgetReallocationFailureDialog({
   required BuildContext context,
@@ -619,6 +817,109 @@ Future<void> showBudgetReallocationFailureDialog({
           'overspent amount. The plan will be modified automatically.',
     ],
     onContinue: onContinue,
+  );
+}
+
+Future<void> showInitialBudgetInsufficientDialog({
+  required BuildContext context,
+
+  required double shortageAmount,
+  required double minTopUp,
+
+  int? wishlistCovered,
+
+  required String warningText,
+  required String topUpWarningText,
+
+  VoidCallback? onCancel,
+
+  required Future<bool> Function(double amount) onTopUpBudget,
+}) {
+  final controller = TextEditingController();
+
+  return showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) {
+      return BaseBudgetDialog(
+        title: 'Budget Insufficient',
+
+        summaryCard: wishlistCovered != null
+            ? _buildWishlistSummaryCard(
+          primaryLabel: 'Estimated Budget Shortage Amount',
+          primaryValue: shortageAmount,
+          secondaryLabel: 'Wishlist Covered',
+          secondaryValue: wishlistCovered.toString(),
+        )
+            : _buildSummaryCard(
+          primaryLabel: 'Estimated Budget Shortage Amount',
+          primaryValue: shortageAmount,
+        ),
+
+        warningText: warningText,
+
+        contentCard: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildTopUpCard(controller),
+
+            const SizedBox(height: 16),
+
+            BaseBudgetDialog._buildWarningRow(
+              topUpWarningText,
+            ),
+          ],
+        ),
+
+        actions: Row(
+          children: [
+            Expanded(
+              child: _buildActionButton(
+                text: 'Cancel',
+                backgroundColor: appTheme.redButton,
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
+                  onCancel?.call();
+                },
+              ),
+            ),
+
+            const SizedBox(width: 12),
+
+            Expanded(
+              child: ValueListenableBuilder<TextEditingValue>(
+                valueListenable: controller,
+                builder: (context, value, child) {
+                  final amount =
+                  double.tryParse(value.text.trim());
+
+                  final isValid =
+                      amount != null && amount >= minTopUp;
+
+                  return _buildActionButton(
+                    text: 'Top-up Budget',
+                    onPressed: isValid
+                        ? () async {
+                      final amount =
+                      double.parse(value.text.trim());
+
+                      final success =
+                      await onTopUpBudget(amount);
+
+                      if (success &&
+                          dialogContext.mounted) {
+                        Navigator.of(dialogContext).pop();
+                      }
+                    }
+                        : null,
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      );
+    },
   );
 }
 
@@ -669,278 +970,281 @@ Future<void> showCancelTripWithoutWishlistDialog({
   );
 }
 
-// Initial Total Budget Insufficient (Limited Wishlist Coverage)
-Future<void> showInitialTotalBudgetInsufficientDialog({
-  required BuildContext context,
-  required String shortageAmount,
-  required double minTopUp,
-  required int wishlistCovered,
-  VoidCallback? onCancel,
-  required Future<bool> Function(double amount) onTopUpBudget,
-}) {
-  final controller = TextEditingController();
+// // Initial Total Budget Insufficient (Limited Wishlist Coverage)
+// Future<void> showInitialTotalBudgetInsufficientDialog({
+//   required BuildContext context,
+//   required double shortageAmount,
+//   required double minTopUp,
+//   required int wishlistCovered,
+//   String? warningText,
+//   VoidCallback? onCancel,
+//   required Future<bool> Function(double amount) onTopUpBudget,
+// }) {
+//   final controller = TextEditingController();
+//
+//   return showDialog(
+//     context: context,
+//     barrierDismissible: false,
+//     builder: (dialogContext) {
+//       return BaseBudgetDialog(
+//         title: 'Budget Insufficient',
+//
+//         summaryCard: _buildWishlistSummaryCard(
+//           primaryLabel: 'Estimated Budget Shortage Amount',
+//           primaryValue: shortageAmount,
+//           secondaryLabel: 'Wishlist Covered',
+//           secondaryValue: wishlistCovered.toString(),
+//         ),
+//
+//         // First warning
+//         warningText:
+//             warningText ??
+//             'Your budget is not sufficient to cover all wishlist items. '
+//                 'Do you want to add more budget?',
+//
+//         // Top-up field + second warning
+//         contentCard: Column(
+//           crossAxisAlignment: CrossAxisAlignment.start,
+//           children: [
+//             _buildTopUpCard(controller),
+//
+//             const SizedBox(height: 16),
+//
+//             BaseBudgetDialog._buildWarningRow(
+//               'Top-up amount should at least ${minTopUp.toStringAsFixed(2)}, insufficient top-up amount will trigger alternative '
+//               'recommendation directly.',
+//             ),
+//           ],
+//         ),
+//
+//         actions: Row(
+//           children: [
+//             Expanded(
+//               child: _buildActionButton(
+//                 text: 'Cancel',
+//                 backgroundColor: appTheme.redButton,
+//                 onPressed: () {
+//                   Navigator.of(dialogContext).pop();
+//                   onCancel?.call();
+//                 },
+//               ),
+//             ),
+//
+//             const SizedBox(width: 12),
+//
+//             Expanded(
+//               child: ValueListenableBuilder<TextEditingValue>(
+//                 valueListenable: controller,
+//                 builder: (context, value, child) {
+//                   final amount = double.tryParse(value.text.trim());
+//
+//                   final isValid = amount != null && amount >= minTopUp;
+//
+//                   return _buildActionButton(
+//                     text: 'Top-up Budget',
+//                     onPressed: isValid
+//                         ? () async {
+//                             final amount = double.parse(value.text.trim());
+//
+//                             final success = await onTopUpBudget(amount);
+//
+//                             if (success && dialogContext.mounted) {
+//                               Navigator.of(dialogContext).pop();
+//                             }
+//                           }
+//                         : null,
+//                   );
+//                 },
+//               ),
+//             ),
+//           ],
+//         ),
+//       );
+//     },
+//   );
+// }
+//
+// // Initial Total Budget Insufficient (Zero Wishlist Coverage)
+// Future<void> showInitialTotalBudgetTotallyInsufficientDialog({
+//   required BuildContext context,
+//   required double shortageAmount,
+//   required double minTopUp,
+//   required int wishlistCovered,
+//   VoidCallback? onCancel,
+//   required Future<bool> Function(double amount) onTopUpBudget,
+// }) {
+//   final controller = TextEditingController();
+//
+//   return showDialog(
+//     context: context,
+//     barrierDismissible: false,
+//     builder: (dialogContext) {
+//       return BaseBudgetDialog(
+//         title: 'Budget Insufficient',
+//
+//         summaryCard: _buildWishlistSummaryCard(
+//           primaryLabel: 'Estimated Budget Shortage Amount',
+//           primaryValue: shortageAmount,
+//           secondaryLabel: 'Wishlist Covered',
+//           secondaryValue: wishlistCovered.toString(),
+//         ),
+//
+//         // First warning
+//         warningText:
+//             'Your budget is not sufficient to cover any wishlist items. '
+//             'Do you want to add more budget?',
+//
+//         // Top-up field + second warning
+//         contentCard: Column(
+//           crossAxisAlignment: CrossAxisAlignment.start,
+//           children: [
+//             _buildTopUpCard(controller),
+//
+//             const SizedBox(height: 16),
+//
+//             BaseBudgetDialog._buildWarningRow(
+//               'Top-up amount should be at least ${minTopUp.toStringAsFixed(2)}, insufficient top-up amount will trigger alternative '
+//               'recommendation directly.',
+//             ),
+//           ],
+//         ),
+//
+//         actions: Row(
+//           children: [
+//             Expanded(
+//               child: _buildActionButton(
+//                 text: 'Cancel',
+//                 backgroundColor: appTheme.redButton,
+//                 onPressed: () {
+//                   Navigator.of(dialogContext).pop();
+//                   onCancel?.call();
+//                 },
+//               ),
+//             ),
+//
+//             const SizedBox(width: 12),
+//
+//             Expanded(
+//               child: ValueListenableBuilder<TextEditingValue>(
+//                 valueListenable: controller,
+//                 builder: (context, value, child) {
+//                   final amount = double.tryParse(value.text.trim());
+//
+//                   final isValid = amount != null && amount >= minTopUp;
+//
+//                   return _buildActionButton(
+//                     text: 'Top-up Budget',
+//                     onPressed: isValid
+//                         ? () async {
+//                             final amount = double.parse(value.text.trim());
+//
+//                             final success = await onTopUpBudget(amount);
+//
+//                             if (success && dialogContext.mounted) {
+//                               Navigator.of(dialogContext).pop();
+//                             }
+//                           }
+//                         : null,
+//                   );
+//                 },
+//               ),
+//             ),
+//           ],
+//         ),
+//       );
+//     },
+//   );
+// }
+//
+// // Initial Total Budget Insufficient (Wishlist is Empty)
+// Future<void> showEmptyWishlistInsufficientTotalBudgetDialog({
+//   required BuildContext context,
+//   required double shortageAmount,
+//   required double minTopUp,
+//   VoidCallback? onCancel,
+//   required Future<bool> Function(double amount) onTopUpBudget,
+// }) {
+//   final controller = TextEditingController();
+//
+//   return showDialog(
+//     context: context,
+//     barrierDismissible: false,
+//     builder: (dialogContext) {
+//       return BaseBudgetDialog(
+//         title: 'Budget Insufficient',
+//
+//         summaryCard: _buildSummaryCard(
+//           primaryLabel: 'Estimated Budget Shortage Amount',
+//           primaryValue: shortageAmount,
+//         ),
+//
+//         // First warning
+//         warningText:
+//             'Your budget is not sufficient for the trip. '
+//             'Do you want to add more budget?',
+//
+//         // Top-up field + second warning
+//         contentCard: Column(
+//           crossAxisAlignment: CrossAxisAlignment.start,
+//           children: [
+//             _buildTopUpCard(controller),
+//
+//             const SizedBox(height: 16),
+//
+//             BaseBudgetDialog._buildWarningRow(
+//               'Top-up amount should be at least ${minTopUp.toStringAsFixed(2)}, insufficient top-up amount will trigger alternative '
+//               'recommendation directly.',
+//             ),
+//           ],
+//         ),
+//
+//         actions: Row(
+//           children: [
+//             Expanded(
+//               child: _buildActionButton(
+//                 text: 'Cancel',
+//                 backgroundColor: appTheme.redButton,
+//                 onPressed: () {
+//                   Navigator.of(dialogContext).pop();
+//                   onCancel?.call();
+//                 },
+//               ),
+//             ),
+//
+//             const SizedBox(width: 12),
+//
+//             Expanded(
+//               child: ValueListenableBuilder<TextEditingValue>(
+//                 valueListenable: controller,
+//                 builder: (context, value, child) {
+//                   final amount = double.tryParse(value.text.trim());
+//
+//                   final isValid = amount != null && amount >= minTopUp;
+//
+//                   return _buildActionButton(
+//                     text: 'Top-up Budget',
+//                     onPressed: isValid
+//                         ? () async {
+//                             final amount = double.parse(value.text.trim());
+//
+//                             final success = await onTopUpBudget(amount);
+//
+//                             if (success && dialogContext.mounted) {
+//                               Navigator.of(dialogContext).pop();
+//                             }
+//                           }
+//                         : null,
+//                   );
+//                 },
+//               ),
+//             ),
+//           ],
+//         ),
+//       );
+//     },
+//   );
+// }
 
-  return showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (dialogContext) {
-      return BaseBudgetDialog(
-        title: 'Budget Insufficient',
-
-        summaryCard: _buildSummaryCard(
-          primaryLabel: 'Estimated Budget Shortage Amount',
-          primaryValue: shortageAmount,
-          secondaryLabel: 'Wishlist Covered',
-          secondaryValue: wishlistCovered.toString(),
-        ),
-
-        // First warning
-        warningText:
-            'Your budget is not sufficient to cover all wishlist items. '
-            'Do you want to add more budget?',
-
-        // Top-up field + second warning
-        contentCard: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildTopUpCard(controller),
-
-            const SizedBox(height: 16),
-
-            BaseBudgetDialog._buildWarningRow(
-              'Top-up amount should at least ${minTopUp.toStringAsFixed(2)}, insufficient top-up amount will trigger alternative '
-              'recommendation directly.',
-            ),
-          ],
-        ),
-
-        actions: Row(
-          children: [
-            Expanded(
-              child: _buildActionButton(
-                text: 'Cancel',
-                backgroundColor: appTheme.redButton,
-                onPressed: () {
-                  Navigator.of(dialogContext).pop();
-                  onCancel?.call();
-                },
-              ),
-            ),
-
-            const SizedBox(width: 12),
-
-            Expanded(
-              child: ValueListenableBuilder<TextEditingValue>(
-                valueListenable: controller,
-                builder: (context, value, child) {
-                  final amount = double.tryParse(value.text.trim());
-
-                  final isValid = amount != null && amount >= minTopUp;
-
-                  return _buildActionButton(
-                    text: 'Top-up Budget',
-                    onPressed: isValid
-                        ? () async {
-                            final amount = double.parse(value.text.trim());
-
-                            final success = await onTopUpBudget(amount);
-
-                            if (success && dialogContext.mounted) {
-                              Navigator.of(dialogContext).pop();
-                            }
-                          }
-                        : null,
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      );
-    },
-  );
-}
-
-// Initial Total Budget Insufficient (Zero Wishlist Coverage)
-Future<void> showInitialTotalBudgetTotallyInsufficientDialog({
-  required BuildContext context,
-  required String shortageAmount,
-  required double minTopUp,
-  required int wishlistCovered,
-  VoidCallback? onCancel,
-  required Future<bool> Function(double amount) onTopUpBudget,
-}) {
-  final controller = TextEditingController();
-
-  return showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (dialogContext) {
-      return BaseBudgetDialog(
-        title: 'Budget Insufficient',
-
-        summaryCard: _buildSummaryCard(
-          primaryLabel: 'Estimated Budget Shortage Amount',
-          primaryValue: shortageAmount,
-          secondaryLabel: 'Wishlist Covered',
-          secondaryValue: wishlistCovered.toString(),
-        ),
-
-        // First warning
-        warningText:
-            'Your budget is not sufficient to cover any wishlist items. '
-            'Do you want to add more budget?',
-
-        // Top-up field + second warning
-        contentCard: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildTopUpCard(controller),
-
-            const SizedBox(height: 16),
-
-            BaseBudgetDialog._buildWarningRow(
-              'Top-up amount should be at least ${minTopUp.toStringAsFixed(2)}, insufficient top-up amount will trigger alternative '
-              'recommendation directly.',
-            ),
-          ],
-        ),
-
-        actions: Row(
-          children: [
-            Expanded(
-              child: _buildActionButton(
-                text: 'Cancel',
-                backgroundColor: appTheme.redButton,
-                onPressed: () {
-                  Navigator.of(dialogContext).pop();
-                  onCancel?.call();
-                },
-              ),
-            ),
-
-            const SizedBox(width: 12),
-
-            Expanded(
-              child: ValueListenableBuilder<TextEditingValue>(
-                valueListenable: controller,
-                builder: (context, value, child) {
-                  final amount = double.tryParse(value.text.trim());
-
-                  final isValid = amount != null && amount >= minTopUp;
-
-                  return _buildActionButton(
-                    text: 'Top-up Budget',
-                    onPressed: isValid
-                        ? () async {
-                            final amount = double.parse(value.text.trim());
-
-                            final success = await onTopUpBudget(amount);
-
-                            if (success && dialogContext.mounted) {
-                              Navigator.of(dialogContext).pop();
-                            }
-                          }
-                        : null,
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      );
-    },
-  );
-}
-
-// Initial Total Budget Insufficient (Wishlist is Empty)
-Future<void> showEmptyWishlistInsufficientTotalBudgetDialog({
-  required BuildContext context,
-  required String shortageAmount,
-  required double minTopUp,
-  VoidCallback? onCancel,
-  required Future<bool> Function(double amount) onTopUpBudget,
-}) {
-  final controller = TextEditingController();
-
-  return showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (dialogContext) {
-      return BaseBudgetDialog(
-        title: 'Budget Insufficient',
-
-        summaryCard: _buildSummaryCard(
-          primaryLabel: 'Estimated Budget Shortage Amount',
-          primaryValue: shortageAmount,
-        ),
-
-        // First warning
-        warningText:
-        'Your budget is not sufficient for the trip. '
-            'Do you want to add more budget?',
-
-        // Top-up field + second warning
-        contentCard: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildTopUpCard(controller),
-
-            const SizedBox(height: 16),
-
-            BaseBudgetDialog._buildWarningRow(
-              'Top-up amount should be at least ${minTopUp.toStringAsFixed(2)}, insufficient top-up amount will trigger alternative '
-                  'recommendation directly.',
-            ),
-          ],
-        ),
-
-        actions: Row(
-          children: [
-            Expanded(
-              child: _buildActionButton(
-                text: 'Cancel',
-                backgroundColor: appTheme.redButton,
-                onPressed: () {
-                  Navigator.of(dialogContext).pop();
-                  onCancel?.call();
-                },
-              ),
-            ),
-
-            const SizedBox(width: 12),
-
-            Expanded(
-              child: ValueListenableBuilder<TextEditingValue>(
-                valueListenable: controller,
-                builder: (context, value, child) {
-                  final amount = double.tryParse(value.text.trim());
-
-                  final isValid = amount != null && amount >= minTopUp;
-
-                  return _buildActionButton(
-                    text: 'Top-up Budget',
-                    onPressed: isValid
-                        ? () async {
-                      final amount = double.parse(value.text.trim());
-
-                      final success = await onTopUpBudget(amount);
-
-                      if (success && dialogContext.mounted) {
-                        Navigator.of(dialogContext).pop();
-                      }
-                    }
-                        : null,
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      );
-    },
-  );
-}
 // Initial Total Budget Top-up Insufficient
 Future<void> showInsufficientTopUpTotalBudgetDialog({
   required BuildContext context,

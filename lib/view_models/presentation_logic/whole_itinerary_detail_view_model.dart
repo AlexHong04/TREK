@@ -57,10 +57,10 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
   /// True while any time slot is still empty (deleted, or not yet filled),
   /// which blocks confirming the plan.
   bool get hasEmptyActivitySlots => _uiState.activities.any(
-        (a) =>
-            a.status == 'empty' ||
-            (a.destination.trim().isEmpty && a.description.trim().isEmpty),
-      );
+    (a) =>
+        a.status == 'empty' ||
+        (a.destination.trim().isEmpty && a.description.trim().isEmpty),
+  );
 
   /// Confirm is only allowed once every time slot has been filled and we are
   /// not busy generating.
@@ -78,6 +78,16 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     List<String>? constraints,
     List<FutureSuggestion>? futureSuggestions,
     bool suppressWarning = false,
+    List<TransitPoint>? arrivals,
+    List<TransitPoint>? departures,
+    List<HotelStay>? hotels,
+    String? arrivalLocation,
+    String? arrivalTime,
+    String? departureLocation,
+    String? departureTime,
+    String? hotelLocation,
+    String? hotelCheckInTime,
+    String? hotelCheckOutTime,
   }) async {
     _uiState = _uiState.copyWith(
       isLoading: true,
@@ -87,6 +97,16 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
       preference: preference,
       wishlist: wishlist,
       constraints: constraints,
+      arrivals: arrivals ?? _uiState.arrivals,
+      departures: departures ?? _uiState.departures,
+      hotels: hotels ?? _uiState.hotels,
+      arrivalLocation: arrivalLocation,
+      arrivalTime: arrivalTime,
+      departureLocation: departureLocation,
+      departureTime: departureTime,
+      hotelLocation: hotelLocation ?? _uiState.hotelLocation,
+      hotelCheckInTime: hotelCheckInTime ?? _uiState.hotelCheckInTime,
+      hotelCheckOutTime: hotelCheckOutTime ?? _uiState.hotelCheckOutTime,
       errorMessage: null,
     );
     notifyListeners();
@@ -118,9 +138,20 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         constraints: constraints,
         futureSuggestions: resolvedSuggestions,
         strictBudget: suppressWarning,
+        arrivals: _uiState.arrivals,
+        departures: _uiState.departures,
+        hotels: _uiState.hotels,
+        arrivalLocation: arrivalLocation ?? _uiState.arrivalLocation,
+        arrivalTime: arrivalTime ?? _uiState.arrivalTime,
+        departureLocation: departureLocation ?? _uiState.departureLocation,
+        departureTime: departureTime ?? _uiState.departureTime,
+        hotelLocation: hotelLocation ?? _uiState.hotelLocation,
+        hotelCheckInTime: hotelCheckInTime ?? _uiState.hotelCheckInTime,
+        hotelCheckOutTime: hotelCheckOutTime ?? _uiState.hotelCheckOutTime,
       );
 
-      final bool wishlistIncomplete = wishlist != null &&
+      final bool wishlistIncomplete =
+          wishlist != null &&
           wishlist.isNotEmpty &&
           fetchedResult.wishlistItemsCoveredCount < wishlist.length;
       final bool hasShortfall = fetchedResult.estimatedExtraBudgetNeeded > 0.0;
@@ -155,6 +186,16 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
       constraints: _uiState.constraints,
       futureSuggestions: _uiState.futureSuggestions,
       suppressWarning: suppressWarning,
+      arrivals: _uiState.arrivals,
+      departures: _uiState.departures,
+      hotels: _uiState.hotels,
+      arrivalLocation: _uiState.arrivalLocation,
+      arrivalTime: _uiState.arrivalTime,
+      departureLocation: _uiState.departureLocation,
+      departureTime: _uiState.departureTime,
+      hotelLocation: _uiState.hotelLocation,
+      hotelCheckInTime: _uiState.hotelCheckInTime,
+      hotelCheckOutTime: _uiState.hotelCheckOutTime,
     );
   }
 

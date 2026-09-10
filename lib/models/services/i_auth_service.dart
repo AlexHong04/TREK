@@ -106,8 +106,7 @@ abstract class IAuthService extends ChangeNotifier {
 
   Future<void> removeProfilePicture();
 
-  Future<List<PersonalConstraintOptionData>>
-  loadPersonalConstraintOptions();
+  Future<List<PersonalConstraintOptionData>> loadPersonalConstraintOptions();
 
   Future<void> savePersonalConstraints(List<String> constraintIds);
 

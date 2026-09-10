@@ -7,7 +7,7 @@ import '../configurations/supabase_config.dart';
 import '../entities/expense.dart';
 import '../entities/expense_item.dart';
 
-import 'i_expense_repository.dart';
+import 'i_itinerary_repository.dart';
 
 class ExpenseRepository implements IExpenseRepository {
   static const String _expensesTable = 'expenses';

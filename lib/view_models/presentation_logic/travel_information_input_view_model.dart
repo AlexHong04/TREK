@@ -6,6 +6,9 @@ import '../ui_state/travel_information_ui_state.dart';
 
 class TravelInformationInputViewModel extends ChangeNotifier {
   final IItineraryService _itineraryService;
+  Timer? _hotelDebounce;
+  String _currentHotelQuery = '';
+  String? _activeHotelField;
 
   TravelInformationInputViewModel({IItineraryService? itineraryService})
     : _itineraryService = itineraryService ?? ItineraryService() {
@@ -46,10 +49,69 @@ class TravelInformationInputViewModel extends ChangeNotifier {
   ];
 
   String? validateDestination(String? value) {
-    if ((value ?? '').trim().isEmpty) {
-      return 'Please enter a destination';
+    if (_uiState.selectedDestinations.isEmpty && (value ?? '').trim().isEmpty) {
+      return 'Please select at least one destination state';
     }
     return null;
+  }
+
+  String? validateDestinations() {
+    if (_uiState.selectedDestinations.isEmpty) {
+      return 'Please select at least one destination state';
+    }
+    return null;
+  }
+
+  void toggleDestination(String stateName) {
+    final current = List<String>.from(_uiState.selectedDestinations);
+    if (current.contains(stateName)) {
+      current.remove(stateName);
+    } else {
+      current.add(stateName);
+    }
+    _uiState = _uiState.copyWith(selectedDestinations: current);
+    notifyListeners();
+
+    if (_currentWishlistQuery.trim().isNotEmpty) {
+      onWishlistChanged(_currentWishlistQuery);
+    }
+    if (_activeHotelField != null) {
+      _loadHotelSuggestions(_currentHotelQuery);
+    }
+  }
+
+  void removeDestination(String stateName) {
+    final current = List<String>.from(_uiState.selectedDestinations)
+      ..remove(stateName);
+    _uiState = _uiState.copyWith(selectedDestinations: current);
+    notifyListeners();
+
+    if (_currentWishlistQuery.trim().isNotEmpty) {
+      onWishlistChanged(_currentWishlistQuery);
+    }
+    if (_activeHotelField != null) {
+      _loadHotelSuggestions(_currentHotelQuery);
+    }
+  }
+
+  void clearDestinations() {
+    _uiState = _uiState.copyWith(selectedDestinations: const []);
+    notifyListeners();
+    if (_activeHotelField != null) {
+      _loadHotelSuggestions(_currentHotelQuery);
+    }
+  }
+
+  void setSelectedDestinations(List<String> states) {
+    _uiState = _uiState.copyWith(selectedDestinations: states);
+    notifyListeners();
+
+    if (_currentWishlistQuery.trim().isNotEmpty) {
+      onWishlistChanged(_currentWishlistQuery);
+    }
+    if (_activeHotelField != null) {
+      _loadHotelSuggestions(_currentHotelQuery);
+    }
   }
 
   String? validateDate(String? value) {
@@ -75,6 +137,148 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  void addArrival() {
+    final newId = 'arr_${DateTime.now().millisecondsSinceEpoch}';
+    final updated = List<TransitPoint>.from(_uiState.arrivals)
+      ..add(TransitPoint(id: newId, location: '', time: '09:00 AM'));
+    _uiState = _uiState.copyWith(arrivals: updated);
+    notifyListeners();
+  }
+
+  void removeArrival(int index) {
+    if (index >= 0 &&
+        index < _uiState.arrivals.length &&
+        _uiState.arrivals.length > 1) {
+      final updated = List<TransitPoint>.from(_uiState.arrivals)
+        ..removeAt(index);
+      _uiState = _uiState.copyWith(arrivals: updated);
+      notifyListeners();
+    }
+  }
+
+  void updateArrivalLocation(int index, String location) {
+    if (index >= 0 && index < _uiState.arrivals.length) {
+      final updated = List<TransitPoint>.from(_uiState.arrivals);
+      updated[index] = updated[index].copyWith(location: location);
+      _uiState = _uiState.copyWith(arrivals: updated);
+      notifyListeners();
+    }
+  }
+
+  void updateArrivalTime(int index, String time) {
+    if (index >= 0 && index < _uiState.arrivals.length) {
+      final updated = List<TransitPoint>.from(_uiState.arrivals);
+      updated[index] = updated[index].copyWith(time: time);
+      _uiState = _uiState.copyWith(arrivals: updated);
+      notifyListeners();
+    }
+  }
+
+  void addDeparture() {
+    final newId = 'dep_${DateTime.now().millisecondsSinceEpoch}';
+    final updated = List<TransitPoint>.from(_uiState.departures)
+      ..add(TransitPoint(id: newId, location: '', time: '06:00 PM'));
+    _uiState = _uiState.copyWith(departures: updated);
+    notifyListeners();
+  }
+
+  void removeDeparture(int index) {
+    if (index >= 0 &&
+        index < _uiState.departures.length &&
+        _uiState.departures.length > 1) {
+      final updated = List<TransitPoint>.from(_uiState.departures)
+        ..removeAt(index);
+      _uiState = _uiState.copyWith(departures: updated);
+      notifyListeners();
+    }
+  }
+
+  void updateDepartureLocation(int index, String location) {
+    if (index >= 0 && index < _uiState.departures.length) {
+      final updated = List<TransitPoint>.from(_uiState.departures);
+      updated[index] = updated[index].copyWith(location: location);
+      _uiState = _uiState.copyWith(departures: updated);
+      notifyListeners();
+    }
+  }
+
+  void updateDepartureTime(int index, String time) {
+    if (index >= 0 && index < _uiState.departures.length) {
+      final updated = List<TransitPoint>.from(_uiState.departures);
+      updated[index] = updated[index].copyWith(time: time);
+      _uiState = _uiState.copyWith(departures: updated);
+      notifyListeners();
+    }
+  }
+
+  void setArrivalTime(String time) => updateArrivalTime(0, time);
+
+  void setDepartureTime(String time) => updateDepartureTime(0, time);
+
+  void setArrivalLocation(String location) =>
+      updateArrivalLocation(0, location);
+
+  void setDepartureLocation(String location) =>
+      updateDepartureLocation(0, location);
+
+  void addHotel() {
+    final newId = 'hotel_${DateTime.now().millisecondsSinceEpoch}';
+    final updated = List<HotelStay>.from(_uiState.hotels)
+      ..add(
+        HotelStay(
+          id: newId,
+          location: '',
+          checkInTime: '03:00 PM',
+          checkOutTime: '12:00 PM',
+        ),
+      );
+    _uiState = _uiState.copyWith(hotels: updated);
+    notifyListeners();
+  }
+
+  void removeHotel(int index) {
+    if (index >= 0 &&
+        index < _uiState.hotels.length &&
+        _uiState.hotels.length > 1) {
+      final updated = List<HotelStay>.from(_uiState.hotels)..removeAt(index);
+      _uiState = _uiState.copyWith(hotels: updated);
+      notifyListeners();
+    }
+  }
+
+  void updateHotelLocation(int index, String location) {
+    if (index >= 0 && index < _uiState.hotels.length) {
+      final updated = List<HotelStay>.from(_uiState.hotels);
+      updated[index] = updated[index].copyWith(location: location);
+      _uiState = _uiState.copyWith(hotels: updated);
+      notifyListeners();
+    }
+  }
+
+  void updateHotelCheckInTime(int index, String time) {
+    if (index >= 0 && index < _uiState.hotels.length) {
+      final updated = List<HotelStay>.from(_uiState.hotels);
+      updated[index] = updated[index].copyWith(checkInTime: time);
+      _uiState = _uiState.copyWith(hotels: updated);
+      notifyListeners();
+    }
+  }
+
+  void updateHotelCheckOutTime(int index, String time) {
+    if (index >= 0 && index < _uiState.hotels.length) {
+      final updated = List<HotelStay>.from(_uiState.hotels);
+      updated[index] = updated[index].copyWith(checkOutTime: time);
+      _uiState = _uiState.copyWith(hotels: updated);
+      notifyListeners();
+    }
+  }
+
+  void setHotelCheckInTime(String time) => updateHotelCheckInTime(0, time);
+
+  void setHotelCheckOutTime(String time) => updateHotelCheckOutTime(0, time);
+
+  void setHotelLocation(String location) => updateHotelLocation(0, location);
+
   void addWishlistItem(String item) {
     final trimmed = item.trim();
     if (trimmed.isEmpty) return;
@@ -98,7 +302,7 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     String? date,
     String? budget,
   }) {
-    final String? destinationError = validateDestination(destination);
+    final String? destinationError = validateDestinations();
     final String? dateError = validateDate(date);
     final String? budgetError = validateBudget(budget);
 
@@ -132,13 +336,14 @@ class TravelInformationInputViewModel extends ChangeNotifier {
       return;
     }
 
-    _debounce = Timer(const Duration(milliseconds: 600), () async {
+    _debounce = Timer(const Duration(milliseconds: 500), () async {
       _uiState = _uiState.copyWith(isSearchingSuggestions: true);
       notifyListeners();
 
       try {
         final results = await _itineraryService.getAutocompleteSuggestions(
           trimmed,
+          destinations: _uiState.selectedDestinations,
         );
 
         // If the query was cleared while request was in-flight, ignore results
@@ -159,9 +364,96 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     });
   }
 
+  void onHotelFocused(int index) {
+    _activeHotelField = 'hotel_$index';
+    _hotelDebounce?.cancel();
+    final currentText = index < _uiState.hotels.length
+        ? _uiState.hotels[index].location
+        : '';
+    _loadHotelSuggestions(currentText);
+  }
+
+  void onHotelLocationChanged(int index, String value) {
+    updateHotelLocation(index, value);
+    _activeHotelField = 'hotel_$index';
+    _debounceHotelSearch(value);
+  }
+
+  void selectHotelSuggestion(int index, String suggestion) {
+    updateHotelLocation(index, suggestion);
+    clearHotelSuggestions();
+  }
+
+  void clearHotelSuggestions() {
+    _currentHotelQuery = '';
+    _activeHotelField = null;
+    _hotelDebounce?.cancel();
+    _uiState = _uiState.copyWith(
+      clearActiveHotelField: true,
+      hotelSuggestions: const [],
+      isSearchingHotelSuggestions: false,
+    );
+    notifyListeners();
+  }
+
+  void _loadHotelSuggestions(String currentText) {
+    _currentHotelQuery = currentText;
+    final trimmed = currentText.trim();
+
+    _uiState = _uiState.copyWith(
+      activeHotelField: _activeHotelField,
+      isSearchingHotelSuggestions: true,
+    );
+    notifyListeners();
+
+    _fetchHotels(trimmed);
+  }
+
+  void _debounceHotelSearch(String value) {
+    _currentHotelQuery = value;
+    if (_hotelDebounce?.isActive ?? false) _hotelDebounce!.cancel();
+
+    final trimmed = value.trim();
+
+    _uiState = _uiState.copyWith(
+      activeHotelField: _activeHotelField,
+      isSearchingHotelSuggestions: true,
+    );
+    notifyListeners();
+
+    _hotelDebounce = Timer(const Duration(milliseconds: 500), () async {
+      await _fetchHotels(trimmed);
+    });
+  }
+
+  Future<void> _fetchHotels(String query) async {
+    final capturedField = _activeHotelField;
+    try {
+      final results = await _itineraryService.getHotelAutocompleteSuggestions(
+        query,
+        destinations: _uiState.selectedDestinations,
+      );
+
+      if (_activeHotelField != capturedField) return;
+
+      _uiState = _uiState.copyWith(
+        hotelSuggestions: results,
+        isSearchingHotelSuggestions: false,
+      );
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Hotel autocomplete search error: $e');
+      if (_activeHotelField == capturedField) {
+        _uiState = _uiState.copyWith(isSearchingHotelSuggestions: false);
+        notifyListeners();
+      }
+    }
+  }
+
   @override
   void dispose() {
     _debounce?.cancel();
+    _hotelDebounce?.cancel();
     super.dispose();
   }
 }
