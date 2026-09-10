@@ -14,69 +14,108 @@ class HomeViewModel extends ChangeNotifier {
   HomeUiState _uiState = const HomeUiState(email: 'User');
   HomeUiState get uiState => _uiState;
 
+  /// Monotonic id for trip loads. Only the newest in-flight request may write
+  /// to the UI state, so a slow older response can never overwrite a newer one.
+  int _tripRequestId = 0;
+
+  /// The user id the currently displayed trip belongs to. Lets us tell a real
+  /// sign-in/sign-out apart from an auth notification that changed nothing.
+  String? _lastUserId;
+
   HomeViewModel(this._authService) {
+    _lastUserId = _authService.currentUserId;
+    _applyUserFields(notify: false);
     _authService.addListener(_handleAuthUserChanged);
-    _syncAuthUser(notify: false);
     fetchLatestTripWithCurrentUserId();
   }
 
   void _handleAuthUserChanged() {
-    _syncAuthUser(notify: true);
-    fetchLatestTripWithCurrentUserId();
+    final user = _authService.currentUser;
+    final userId = user?.userId;
+    final userChanged = userId != _lastUserId;
+    _lastUserId = userId;
+
+    if (user == null) {
+      // Signed out: invalidate any in-flight fetch and clear everything.
+      _tripRequestId++;
+      _uiState = const HomeUiState(email: 'User');
+      notifyListeners();
+      return;
+    }
+
+    // Same user, new auth event (token refresh, app resume, profile reload).
+    // Refresh ONLY the profile fields and keep the trip that is on screen.
+    // Nulling latestTrip/hasPlan here is what made the card flash "No plans
+    // yet" and momentarily drop the trip on every auth notification.
+    _applyUserFields(notify: true);
+
+    // Only reload the trip when a different user just signed in.
+    if (userChanged) {
+      fetchLatestTripWithCurrentUserId();
+    }
+  }
+
+  void _applyUserFields({bool notify = true}) {
+    final user = _authService.currentUser;
+    if (user == null) {
+      _uiState = const HomeUiState(email: 'User');
+    } else {
+      _uiState = _uiState.copyWith(
+        email: user.email,
+        userName: user.fullName,
+        profilePictureUrl: user.profilePicture,
+        clearProfilePicture: (user.profilePicture ?? '').isEmpty,
+      );
+    }
+    if (notify) notifyListeners();
   }
 
   Future<void> refreshProfile() async {
     await _authService.refreshCurrentUser();
   }
 
-  void _syncAuthUser({bool notify = true}) {
-    final user = _authService.currentUser;
-    _uiState = HomeUiState(
-      email: user?.email ?? 'User',
-      userName: user?.fullName,
-      profilePictureUrl: user?.profilePicture,
-      latestTrip: null,
-      hasPlan: false,
-      bannerImgUrl: null,
-      errorMessage: null,
-    );
-    if (notify) notifyListeners();
-  }
-
   // kokhong
   Future<void> fetchLatestTrip() async {
-    _uiState = _uiState.copyWith(isLoading: true);
-    notifyListeners();
+    final requestId = ++_tripRequestId;
+
+    // Keep the current card visible while refreshing; only block with the
+    // spinner when there is nothing on screen yet.
+    if (_uiState.latestTrip == null) {
+      _uiState = _uiState.copyWith(isLoading: true);
+      notifyListeners();
+    }
 
     try {
-
       final result = await _itineraryService.fetchLatestTrip();
 
+      if (requestId != _tripRequestId) return; // stale response, ignore
+
       if (result != null) {
-        var trip = result.trip;
+        final trip = result.trip;
         final activity = result.activities;
-        final activityImgUrl = activity.first.activityImgUrl.trim();
+        final activityImgUrl =
+            activity.isNotEmpty ? activity.first.activityImgUrl.trim() : '';
 
         debugPrint('>>> [VM] Result received for tripId: ${trip.tripId}');
         debugPrint('>>> [VM] Trip direct imgUrl: "$activityImgUrl"');
-        trip = trip.copyWith(
-          imgUrl: activityImgUrl,
-        );
 
         _uiState = _uiState.copyWith(
           isLoading: false,
           hasPlan: true,
-          latestTrip: trip,
+          latestTrip: trip.copyWith(imgUrl: activityImgUrl),
           bannerImgUrl: activityImgUrl,
+          clearErrorMessage: true,
         );
       } else {
         _uiState = _uiState.copyWith(
           isLoading: false,
           hasPlan: false,
-          bannerImgUrl: null,
+          clearLatestTrip: true,
+          clearBannerImgUrl: true,
         );
       }
     } catch (e) {
+      if (requestId != _tripRequestId) return;
       _uiState = _uiState.copyWith(
         isLoading: false,
         errorMessage: e.toString(),
@@ -116,33 +155,44 @@ class HomeViewModel extends ChangeNotifier {
 
   // weisong
   Future<void> fetchLatestTripWithCurrentUserId() async {
-    _uiState = _uiState.copyWith(isLoading: true);
-    notifyListeners();
+    final requestId = ++_tripRequestId;
+
+    // Only block with a spinner on the very first load (no trip on screen).
+    if (_uiState.latestTrip == null) {
+      _uiState = _uiState.copyWith(isLoading: true);
+      notifyListeners();
+    }
 
     try {
       // Calls the user-scoped fetch method
       final result = await _itineraryService.fetchLatestTripWithCurrentUserId();
 
+      if (requestId != _tripRequestId) return; // stale response, ignore
+
       if (result != null) {
-        final trip = result;
         final tripImg = result.imgUrl;
 
         _uiState = _uiState.copyWith(
           isLoading: false,
           hasPlan: true,
-          latestTrip: trip.copyWith(imgUrl: tripImg),
+          latestTrip: result.copyWith(imgUrl: tripImg),
           bannerImgUrl: tripImg,
+          clearErrorMessage: true,
         );
       } else {
         _uiState = _uiState.copyWith(
           isLoading: false,
           hasPlan: false,
-          latestTrip: null,
-          bannerImgUrl: null,
+          clearLatestTrip: true,
+          clearBannerImgUrl: true,
         );
       }
     } catch (e) {
-      _uiState = _uiState.copyWith(isLoading: false, errorMessage: e.toString());
+      if (requestId != _tripRequestId) return;
+      _uiState = _uiState.copyWith(
+        isLoading: false,
+        errorMessage: e.toString(),
+      );
     }
     notifyListeners();
   }

@@ -34,15 +34,22 @@ class HomeUiState {
     String? bannerImgUrl,
     String? profilePictureUrl,
     bool clearProfilePicture = false,
+    bool clearLatestTrip = false,
+    bool clearBannerImgUrl = false,
+    bool clearErrorMessage = false,
   }) {
     return HomeUiState(
       isLoading: isLoading ?? this.isLoading,
       userName: userName ?? this.userName,
       email: email ?? this.email,
       hasPlan: hasPlan ?? this.hasPlan,
-      errorMessage: errorMessage ?? this.errorMessage,
-      latestTrip: latestTrip ?? this.latestTrip,
-      bannerImgUrl: bannerImgUrl ?? this.bannerImgUrl,
+      errorMessage: clearErrorMessage
+          ? null
+          : (errorMessage ?? this.errorMessage),
+      latestTrip: clearLatestTrip ? null : (latestTrip ?? this.latestTrip),
+      bannerImgUrl: clearBannerImgUrl
+          ? null
+          : (bannerImgUrl ?? this.bannerImgUrl),
       profilePictureUrl: clearProfilePicture
           ? null
           : (profilePictureUrl ?? this.profilePictureUrl),
