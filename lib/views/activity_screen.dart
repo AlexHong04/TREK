@@ -247,8 +247,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
       remainingBudget: state.remainingBudget,
       exceededAmount: state.exceededAmount,
       totalOverspent: state.overspentBudget,
-      estimatedDays: state.sufficientDays.toString(),
-      warningText1: 'Plan will be modified automatically.',
+      estimatedDays: '${state.sufficientDays.toString()} day(s)',
+      warningText1: 'Your itinerary will be adjusted automatically to stay within your budget',
       onContinue: () async {
         // 1. Show a labelled, non-dismissible loading dialog while the plan is
         // being re-optimized (instead of the bare screen-wide spinner).

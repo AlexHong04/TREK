@@ -144,13 +144,13 @@ Widget _buildSummaryRow(String label, double value, {Color? valueColor}) {
         baseCurrency: 'MYR',
         baseLabel: 'RM',
         primaryStyle: TextStyle(
-          fontSize: 16,
+          fontSize: 14,
           fontWeight: FontWeight.bold,
           fontFamily: 'Inter',
           color: valueColor ?? appTheme.black,
         ),
         secondaryStyle: TextStyle(
-          fontSize: 12,
+          fontSize: 10,
           fontWeight: FontWeight.w600,
           fontFamily: 'Inter',
           color: appTheme.blue_gray_700,
@@ -258,7 +258,7 @@ Widget _buildSummaryCard({
             color: primaryValueColor ?? appTheme.errorRed,
           ),
           secondaryStyle: TextStyle(
-            fontSize: 16,
+            fontSize: 14,
             fontWeight: FontWeight.w600,
             fontFamily: 'Inter',
             color: appTheme.blue_gray_700,
@@ -344,7 +344,7 @@ Widget _buildWishlistSummaryCard({
             color: primaryValueColor ?? appTheme.errorRed,
           ),
           secondaryStyle: TextStyle(
-            fontSize: 9,
+            fontSize: 14,
             fontWeight: FontWeight.w600,
             fontFamily: 'Inter',
             color: appTheme.blue_gray_700,
@@ -556,7 +556,7 @@ Future<void> showBudgetExceededDialog({
           secondaryValue: remainingBudget,
           thirdLabel: 'Allocated Budget:',
           thirdValue: allocatedBudget,
-          fourthLabel: 'Overspent So Far:',
+          fourthLabel: 'Total Overspent So Far:',
           fourthValue: totalOverspent,
         ),
 
@@ -600,7 +600,7 @@ Future<void> showBudgetExceededThresholdDialog({
           secondaryValue: remainingBudget,
           thirdLabel: 'Allocated Budget:',
           thirdValue: allocatedBudget,
-          fourthLabel: 'Overspent So Far:',
+          fourthLabel: 'Total Overspent So Far:',
           fourthValue: totalOverspent,
           fifthLabel: 'Estimated Sufficient:',
           fifthValue: estimatedDays,
