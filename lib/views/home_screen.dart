@@ -334,11 +334,15 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(24),
         child: InkWell(
           borderRadius: BorderRadius.circular(24),
-          onTap: () {
-            Navigator.of(context).pushNamed(
+          onTap: () async {
+            await Navigator.of(context).pushNamed(
               '/activityScreen',
               arguments: {'trip': trip, 'isReadOnly': false},
             );
+            // Refresh trip status when returning (e.g. trip was ended).
+            if (context.mounted) {
+              context.read<HomeViewModel>().fetchLatestTripWithCurrentUserId();
+            }
           },
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

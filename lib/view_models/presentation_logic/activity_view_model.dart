@@ -1208,6 +1208,11 @@ class ActivityViewModel extends ChangeNotifier {
       final update = await _itineraryService.endTrip(id);
 
       if (update) {
+        // Clear cached trip data so the home screen doesn't show a
+        // stale "ongoing" status when it re-reads the local cache.
+        await _cachedActivity.clearLocalActivities('latest_ongoing_trip');
+        await _cachedActivity.clearLocalActivities(id);
+
         _uiState = _uiState.copyWith(isLoading: false, tripId: '');
         notifyListeners();
         return true;
@@ -1348,6 +1353,11 @@ class ActivityViewModel extends ChangeNotifier {
       debugPrint("result: ${response}");
 
       await refreshSpentAmounts();
+
+      // Re-fetch activities from the DB so the UI picks up the reallocated
+      // allocatedBudget values that processExpense() / reallocateBudget()
+      // just wrote.
+      await refreshActivitiesFromDb();
 
       // Reconciles the current day's budget in the DB and updates the
       // trip-level overspentBudget from the reconciled data (authoritative).
@@ -1639,6 +1649,38 @@ class ActivityViewModel extends ChangeNotifier {
     } catch (e, stack) {
       debugPrint('Error refreshing spent amounts: $e');
       debugPrint('Stack trace: $stack');
+    }
+  }
+
+  /// Re-fetches all activities from the DB and updates both `allActivities`
+  /// and the day-filtered `activities` in the UI state. Call this after any
+  /// operation that modifies activity fields in the DB (e.g. budget
+  /// reallocation) so the UI reflects the latest values.
+  Future<void> refreshActivitiesFromDb() async {
+    if (_uiState.tripId.isEmpty) return;
+    try {
+      final freshAll = await _itineraryService.fetchAllActivitiesByTrip(
+        _uiState.tripId,
+      );
+
+      // Re-derive the day-filtered list using the current filter date
+      final filterDate = _uiState.filterDate ?? DateTime.now();
+      final freshDay = freshAll.where((act) {
+        return _isSameDate(act.date, filterDate);
+      }).toList();
+
+      _uiState = _uiState.copyWith(
+        allActivities: freshAll,
+        activities: freshDay,
+      );
+
+      debugPrint(
+        '[refreshActivitiesFromDb] Refreshed ${freshAll.length} activities '
+        '(${freshDay.length} for current day).',
+      );
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error refreshing activities from DB: $e');
     }
   }
 
