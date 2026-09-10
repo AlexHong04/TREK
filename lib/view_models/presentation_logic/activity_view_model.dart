@@ -1570,25 +1570,26 @@ class ActivityViewModel extends ChangeNotifier {
   // weisong
   Future<void> refreshSpentAmounts() async {
     debugPrint(
-      'DEBUG: [refreshSpentAmounts] invoked. Current activityId: "${_uiState.currentActivityId}", Activities count: ${_uiState.activities.length}',
+      'DEBUG: [refreshSpentAmounts] invoked. Current activityId: "${_uiState.currentActivityId}", All activities count: ${_uiState.allActivities.length}, Day activities count: ${_uiState.activities.length}',
     );
 
-    // 1. Guard against empty activities list instead of currentActivityId
-    final activityIds = _uiState.activities
+    // 1. Use ALL trip activities (not just the day-filtered list) so that
+    //    spentBudget in the top budget card reflects the whole-trip spending.
+    final activityIds = _uiState.allActivities
         .map((a) => a.activitiesId)
         .where((id) => id.isNotEmpty)
         .toList();
 
     if (activityIds.isEmpty) {
       debugPrint(
-        'DEBUG: [refreshSpentAmounts] Aborted: No activity IDs found in _uiState.activities.',
+        'DEBUG: [refreshSpentAmounts] Aborted: No activity IDs found in _uiState.allActivities.',
       );
       return;
     }
 
     try {
       debugPrint(
-        'DEBUG: Calling _itineraryService.getTripSpentSummary for ${activityIds.length} activities...',
+        'DEBUG: Calling _itineraryService.getTripSpentSummary for ${activityIds.length} activities (whole trip)...',
       );
       final summary = await _itineraryService.getTripSpentSummary(activityIds);
 
@@ -1620,10 +1621,9 @@ class ActivityViewModel extends ChangeNotifier {
         );
       }
 
-      // NOTE: overspentBudget is intentionally NOT set here. This method only
-      // knows the filtered (_uiState.activities) date, so computing a "trip"
-      // overspent here produced different figures depending on the filter.
+      // NOTE: overspentBudget is intentionally NOT set here.
       // The authoritative whole-trip value comes from reconcileTripOverspend().
+      // spentBudget now reflects the whole trip (all activities, not just today).
       _uiState = _uiState.copyWith(
         spentBudget: freshSpent,
         activitySpentMap: freshActivityMap,
