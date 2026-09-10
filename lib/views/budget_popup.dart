@@ -620,7 +620,7 @@ Future<void> showBudgetRecoveryDialog({
                   builder: (context, value, child) {
                     final amount = double.tryParse(value.text.trim());
 
-                    final isValid = amount != null && amount > minTopUp;
+                    final isValid = amount != null && amount >= minTopUp;
 
                     return _buildActionButton(
                       text: 'Top-up Budget',
@@ -895,6 +895,7 @@ Future<void> _showSimpleBudgetDialog({
   required BuildContext context,
   required String title,
   required List<String> messages,
+  Color? color,
   VoidCallback? onContinue,
 }) {
   return showDialog(
@@ -908,7 +909,7 @@ Future<void> _showSimpleBudgetDialog({
           children: [
             for (int i = 0; i < messages.length; i++) ...[
               if (i > 0) const SizedBox(height: 16),
-              BaseBudgetDialog._buildWarningRow(messages[i]),
+              BaseBudgetDialog._buildWarningRow(messages[i], color: color),
             ],
           ],
         ),
@@ -929,6 +930,7 @@ Future<void> _showTwoButtonsBudgetDialog({
   required BuildContext context,
   required String title,
   required List<String> messages,
+  Color? color,
   VoidCallback? onCancel,
   VoidCallback? onConfirm,
 }) {
@@ -949,7 +951,7 @@ Future<void> _showTwoButtonsBudgetDialog({
             children: [
               for (int i = 0; i < messages.length; i++) ...[
                 if (i > 0) const SizedBox(height: 16),
-                BaseBudgetDialog._buildWarningRow(messages[i]),
+                BaseBudgetDialog._buildWarningRow(messages[i], color: color),
               ],
             ],
           ),
@@ -984,5 +986,25 @@ Future<void> _showTwoButtonsBudgetDialog({
         ),
       );
     },
+  );
+}
+
+Future<void> showTopUpConfirmation({
+  required BuildContext context,
+  required double topUpAmount,
+  required String symbol,
+  required double convertedAmt,
+  required VoidCallback onCancel,
+  required VoidCallback onConfirm,
+}) {
+  return _showTwoButtonsBudgetDialog(
+    context: context,
+    title: 'Top-up Budget',
+    messages: [
+      'Are you sure you want to top-up MYR ${topUpAmount.toStringAsFixed(2)} ($symbol ${convertedAmt.toStringAsFixed(2)})?',
+    ],
+    color: appTheme.black,
+    onCancel: onCancel,
+    onConfirm: onConfirm
   );
 }

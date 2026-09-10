@@ -366,28 +366,76 @@ class _ActivityScreenState extends State<ActivityScreen> {
         _showEndTripConfirmationDialog(uiState);
       },
       onTopUpBudget: (amount) async {
+        final viewModel = context.read<ActivityViewModel>();
+        String symbol = viewModel.preferredCurrency;
+        double? convertedAmt = await viewModel.convertAmountToCurrency(amount: amount);
+
+        if (context.mounted) {
+          Navigator.of(context).pop();
+        }
+
+        // Wait until the first dialog is removed.
+        await Future.delayed(const Duration(milliseconds: 100));
+
+        if (!context.mounted) return false;
+
+        bool confirmed = false;
+
+        await showTopUpConfirmation(
+          context: context,
+          topUpAmount: amount,
+          symbol: symbol,
+          convertedAmt: convertedAmt??amount,
+          onCancel: () {
+            confirmed = false;
+          },
+          onConfirm: () {
+            confirmed = true;
+          },
+        );
+
+        if (!confirmed) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+
+            _showBudgetRecoveryDialog(
+              viewModel.uiState,
+              onEndTrip: () {
+                _showEndTripConfirmationDialog(viewModel.uiState);
+              },
+              onTopUpBudget: onTopUpBudget,
+            );
+          });
+
+          return false;
+        }
+
         final success = await onTopUpBudget(amount);
 
         if (!context.mounted) return false;
 
         if (!success) {
-          showThreeSecondMessage(context, 'Failed to top up budget', isError: true);
+          showThreeSecondMessage(
+            context,
+            'Failed to top up budget',
+            isError: true,
+          );
           return false;
         }
 
-        // Get the latest state AFTER topUpBudget()
-        final viewModel = context.read<ActivityViewModel>();
         final latestState = viewModel.uiState;
 
-        // Top-up succeeded, but shortage still remains.
         if (latestState.shortageAmount > 0) {
-          // Wait until the first dialog is completely removed.
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!mounted) return;
 
-            _showInsufficientTopUpDialog(latestState, topUpAmount: amount);
+            _showInsufficientTopUpDialog(
+              latestState,
+              topUpAmount: amount,
+            );
           });
         }
+
         showThreeSecondMessage(
           context,
           'Budget top up successfully',

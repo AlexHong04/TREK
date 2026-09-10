@@ -235,6 +235,18 @@ class ActivityViewModel extends ChangeNotifier {
 
   String get preferredCurrency => _authService.preferredCurrency;
 
+  Future<double?> convertAmountToCurrency({required double amount}) async {
+    try {
+      final result = await _authService.convertToPreferredCurrency(
+        amount: amount,
+        fromCurrency: 'MYR',
+      );
+      return result;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> convertAmount({
     required double amount,
     required String originalCurrency,
@@ -911,12 +923,14 @@ class ActivityViewModel extends ChangeNotifier {
       // Use the known budget/destination from navigation args when available,
       // otherwise fall back to fetchLatestTrip (which only returns the latest
       // ongoing trip — wrong for completed/terminated/pending trips).
-      final double effectiveBudget = knownTotalBudget
-          ?? tripResult?.trip.totalBudget
-          ?? _uiState.totalBudget;
-      final String effectiveDestination = knownDestination
-          ?? tripResult?.trip.destination
-          ?? _uiState.tripDestination;
+      final double effectiveBudget =
+          knownTotalBudget ??
+          tripResult?.trip.totalBudget ??
+          _uiState.totalBudget;
+      final String effectiveDestination =
+          knownDestination ??
+          tripResult?.trip.destination ??
+          _uiState.tripDestination;
 
       // *** SET CRITICAL STATE FIRST — before any non-essential calls ***
       _uiState = _uiState.copyWith(
@@ -1163,9 +1177,7 @@ class ActivityViewModel extends ChangeNotifier {
   bool _isSameDate(DateTime first, DateTime second) {
     final f = first.toLocal();
     final s = second.toLocal();
-    return f.year == s.year &&
-        f.month == s.month &&
-        f.day == s.day;
+    return f.year == s.year && f.month == s.month && f.day == s.day;
   }
 
   /// Produces a stable device notification ID from the team's AC#### ID.
