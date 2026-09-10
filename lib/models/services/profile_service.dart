@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:image_cropper/image_cropper.dart';
+
 import '../entities/personal_constraint.dart';
 import '../local_data_source/camera_source.dart';
 import '../local_data_source/gallery_source.dart';
@@ -18,13 +20,16 @@ class ProfileService implements IProfileService {
   final IUserRepository _userRepository;
   final CameraSource _cameraSource;
   final GallerySource _gallerySource;
+  final ImageCropper _imageCropper;
 
   ProfileService(
       this._userRepository, {
         CameraSource? cameraSource,
         GallerySource? gallerySource,
-      })  : _cameraSource = cameraSource ?? CameraSource(),
-        _gallerySource = gallerySource ?? GallerySource();
+        ImageCropper? imageCropper,
+      }) : _cameraSource = cameraSource ?? CameraSource(),
+        _gallerySource = gallerySource ?? GallerySource(),
+        _imageCropper = imageCropper ?? ImageCropper();
 
   static const int _maxImageBytes = 5 * 1024 * 1024;
   static const Set<String> _allowedExtensions = {'jpg', 'jpeg', 'png'};
@@ -54,9 +59,41 @@ class ProfileService implements IProfileService {
         ? await _gallerySource.pickPhoto()
         : await _cameraSource.takePhoto();
     if (selectedPath == null) return null;
+
+    final croppedImage = await _cropProfilePicture(selectedPath);
+    if (croppedImage == null) return null;
+
     return saveProfilePicture(
       userId: userId,
-      imageFile: File(selectedPath),
+      imageFile: File(croppedImage.path),
+    );
+  }
+
+  Future<CroppedFile?> _cropProfilePicture(String sourcePath) {
+    return _imageCropper.cropImage(
+      sourcePath: sourcePath,
+      aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+      maxWidth: 1024,
+      maxHeight: 1024,
+      compressFormat: ImageCompressFormat.jpg,
+      compressQuality: 88,
+      uiSettings: [
+        AndroidUiSettings(
+          toolbarTitle: 'Crop profile picture',
+          cropStyle: CropStyle.circle,
+          lockAspectRatio: true,
+          hideBottomControls: false,
+        ),
+        IOSUiSettings(
+          title: 'Crop profile picture',
+          cropStyle: CropStyle.circle,
+          aspectRatioLockEnabled: true,
+          resetAspectRatioEnabled: false,
+          aspectRatioPickerButtonHidden: true,
+          doneButtonTitle: 'Use',
+          cancelButtonTitle: 'Cancel',
+        ),
+      ],
     );
   }
 
@@ -68,7 +105,10 @@ class ProfileService implements IProfileService {
     if (await imageFile.length() > _maxImageBytes) {
       throw const ImageTooLargeException();
     }
-    final header = await imageFile.openRead(0, 8).expand((bytes) => bytes).toList();
+    final header = await imageFile
+        .openRead(0, 8)
+        .expand((bytes) => bytes)
+        .toList();
     if (!_allowedExtensions.contains(extension) || !_hasValidHeader(header)) {
       throw const InvalidImageFormatException();
     }
