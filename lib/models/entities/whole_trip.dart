@@ -34,7 +34,8 @@ class WholeTrip {
     final tripStart = DateTime(startDate.year, startDate.month, startDate.day);
     final tripEnd = DateTime(endDate.year, endDate.month, endDate.day);
 
-    if(status.toLowerCase() == 'completed' || today.isAfter(tripEnd)) {
+    final s = status.toLowerCase();
+    if(s == 'completed' || s == 'terminated' || today.isAfter(tripEnd)) {
       return 'completed';
     } else if(today.isBefore(tripStart)) {
       return 'pending';

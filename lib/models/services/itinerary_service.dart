@@ -628,7 +628,7 @@ class ItineraryService implements IItineraryService {
   @override
   Future<bool> endTrip(String id) async {
     try {
-      await _itineraryRepository.terminateTrip(id, 'terminated');
+      await _itineraryRepository.terminateTrip(id, 'completed');
       return true;
     } catch (e) {
       rethrow;
