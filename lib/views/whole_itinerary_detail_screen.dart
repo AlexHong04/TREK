@@ -94,6 +94,30 @@ class _WholeItineraryDetailScreenState
   bool _wishlistWarningShowing = false;
   bool _isUncoveredWishlistExpanded = false;
 
+  Future<void> _checkWishlistWarning(
+    WholeItineraryDetailViewModel viewModel,
+  ) async {
+    final wishlist = viewModel.uiState.wishlist;
+
+    final hasWishlist = wishlist != null && wishlist.isNotEmpty;
+
+    final hasUncoveredWishlist =
+        hasWishlist &&
+        viewModel.uiState.wishlistItemsCoveredCount < wishlist.length;
+
+    final hasExtraBudgetNeeded =
+        viewModel.uiState.estimatedExtraBudgetNeeded > 0;
+
+    final isOverBudget = viewModel.spentBudget > viewModel.totalBudget;
+
+    // nothing to warn
+    if (!hasUncoveredWishlist && !hasExtraBudgetNeeded && !isOverBudget) {
+      return;
+    }
+
+    await _showWishlistWarningDialog(viewModel);
+  }
+
   void _showActivityRemovedSnackBar(
     BuildContext context,
     String activityName, {
@@ -281,10 +305,22 @@ class _WholeItineraryDetailScreenState
           minTopUp: minTopUp,
           wishlistCovered: viewModel.uiState.wishlistItemsCoveredCount,
           warningText:
-              'Insufficient top-up amount will trigger'
+              'Insufficient top-up amount will trigger '
               'alternative recommendation directly.',
-          onCancel: () async {
-            await showCancelTripDialog(context: context, onContinue: () {});
+          onCancel: () {
+            WidgetsBinding.instance.addPostFrameCallback((_) async {
+              if (!mounted) return;
+
+              await showCancelTripDialog(
+                context: context,
+                onCancel: () {
+                  _showWishlistWarningDialog(viewModel);
+                },
+                onConfirm: () {
+                  Navigator.of(context).pop();
+                },
+              );
+            });
           },
           onTopUpBudget: (double amount) async {
             final isSufficient = await viewModel.topUpBudget(amount);
@@ -316,10 +352,22 @@ class _WholeItineraryDetailScreenState
           minTopUp: minTopUp,
           wishlistCovered: viewModel.uiState.wishlistItemsCoveredCount,
           warningText:
-              'Insufficient top-up amount will trigger'
+              'Insufficient top-up amount will trigger '
               'alternative recommendation directly.',
-          onCancel: () async {
-            await showCancelTopUpDialog(context: context, onContinue: () {});
+          onCancel: () {
+            WidgetsBinding.instance.addPostFrameCallback((_) async {
+              if (!mounted) return;
+
+              await showCancelTopUpDialog(
+                context: context,
+                onCancel: () {
+                  _showWishlistWarningDialog(viewModel);
+                },
+                onConfirm: () {
+                  Navigator.of(context).pop();
+                },
+              );
+            });
           },
           onTopUpBudget: (double amount) async {
             final isSufficient = await viewModel.topUpBudget(amount);
@@ -346,13 +394,22 @@ class _WholeItineraryDetailScreenState
           shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded,
           minTopUp: minTopUp,
           warningText:
-              'Insufficient top-up amount will trigger'
+              'Insufficient top-up amount will trigger '
               'alternative recommendation directly.',
-          onCancel: () async {
-            await showCancelTripWithoutWishlistDialog(
-              context: context,
-              onContinue: () {},
-            );
+          onCancel: () {
+            WidgetsBinding.instance.addPostFrameCallback((_) async {
+              if (!mounted) return;
+
+              await showCancelTripWithoutWishlistDialog(
+                context: context,
+                onCancel: () {
+                  _showWishlistWarningDialog(viewModel);
+                },
+                onConfirm: () {
+                  Navigator.of(context).pop();
+                },
+              );
+            });
           },
           onTopUpBudget: (double amount) async {
             final isSufficient = await viewModel.topUpBudget(amount);
@@ -387,11 +444,6 @@ class _WholeItineraryDetailScreenState
     final args =
         ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     final isReadOnly = args?['isReadOnly'] as bool? ?? false;
-
-    // hide the confirm button when it only read the generated itinerary plan
-    // if (!isReadOnly) {
-    //   _checkWishlistWarning(viewModel);
-    // }
 
     return Scaffold(
       backgroundColor: appTheme.gray_50_03,
@@ -1219,7 +1271,7 @@ class _WholeItineraryDetailScreenState
                       borderRadius: BorderRadius.circular(16),
                       child: InkWell(
                         onTap: () async {
-                          // zhiqin - To do
+                          await _checkWishlistWarning(viewModel);
                         },
                         borderRadius: BorderRadius.circular(16),
                         child: Padding(

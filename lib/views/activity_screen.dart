@@ -66,10 +66,13 @@ class _ActivityScreenState extends State<ActivityScreen> {
               _destination = innerTrip['destination'].toString();
             }
             if (innerTrip['total_budget'] != null) {
-              _knownTotalBudget = (innerTrip['total_budget'] as num?)?.toDouble();
+              _knownTotalBudget = (innerTrip['total_budget'] as num?)
+                  ?.toDouble();
             }
             // Use trip start date when no filterDate and viewing read-only
-            if (_filterDate == null && _forceViewOnly && innerTrip['start_date'] != null) {
+            if (_filterDate == null &&
+                _forceViewOnly &&
+                innerTrip['start_date'] != null) {
               try {
                 final sd = DateTime.parse(innerTrip['start_date'].toString());
                 _filterDate = DateTime(sd.year, sd.month, sd.day);
@@ -84,7 +87,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
                 _destination = (innerTrip as dynamic).destination.toString();
               }
               if ((innerTrip as dynamic).computedStatus != null) {
-                _tripComputedStatus = (innerTrip as dynamic).computedStatus.toString().toLowerCase();
+                _tripComputedStatus = (innerTrip as dynamic).computedStatus
+                    .toString()
+                    .toLowerCase();
               }
               _knownTotalBudget = (innerTrip as dynamic).totalBudget as double?;
               // Use trip start date when no filterDate and viewing read-only
@@ -126,7 +131,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
               extractedTripId!,
               filterDate: _filterDate,
               knownTotalBudget: _knownTotalBudget,
-              knownDestination: _destination != 'Trip Itinerary' ? _destination : null,
+              knownDestination: _destination != 'Trip Itinerary'
+                  ? _destination
+                  : null,
             );
           }
         });
@@ -248,7 +255,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
       exceededAmount: state.exceededAmount,
       totalOverspent: state.overspentBudget,
       estimatedDays: '${state.sufficientDays.toString()} day(s)',
-      warningText1: 'Your itinerary will be adjusted automatically to stay within your budget',
+      warningText1:
+          'Your itinerary will be adjusted automatically to stay within your budget',
       onContinue: () async {
         // 1. Show a labelled, non-dismissible loading dialog while the plan is
         // being re-optimized (instead of the bare screen-wide spinner).
@@ -363,10 +371,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
         if (!context.mounted) return false;
 
         if (!success) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to top up budget.')),
-          );
-
+          showThreeSecondMessage(context, 'Failed to top up budget', isError: true);
           return false;
         }
 
@@ -383,6 +388,11 @@ class _ActivityScreenState extends State<ActivityScreen> {
             _showInsufficientTopUpDialog(latestState, topUpAmount: amount);
           });
         }
+        showThreeSecondMessage(
+          context,
+          'Budget top up successfully',
+          isError: false,
+        );
 
         return true;
       },
@@ -403,8 +413,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
           onEndTrip: () {
             _showEndTripConfirmationDialog(uiState);
           },
-          onTopUpBudget: (amount) =>
-              viewModel.topUpBudget(amount),
+          onTopUpBudget: (amount) => viewModel.topUpBudget(amount),
         );
       },
 
@@ -415,12 +424,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
         if (!mounted) return false;
 
         if (!success) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to end trip.'),
-            ),
-          );
-
+          showThreeSecondMessage(context, 'Failed to end trip', isError: true);
           return false;
         }
 
@@ -432,6 +436,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
         // Then leave ActivityScreen and return to Home.
         Navigator.of(context, rootNavigator: true).pop();
+        showThreeSecondMessage(context, 'Trip ended successfully', isError: false);
 
         return true;
       },
@@ -1064,7 +1069,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
                         return;
                       }
 
-                      final bool isTripOngoing = _tripComputedStatus == 'ongoing';
+                      final bool isTripOngoing =
+                          _tripComputedStatus == 'ongoing';
 
                       // If trip is not ongoing, open expense sheet in view-only mode
                       if (!isTripOngoing) {
@@ -1080,8 +1086,16 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
                       // If viewing a future day, open expense sheet in view-only mode
                       final todayNow = DateTime.now();
-                      final todayDateOnly = DateTime(todayNow.year, todayNow.month, todayNow.day);
-                      final activityDateOnly = DateTime(activity.date.year, activity.date.month, activity.date.day);
+                      final todayDateOnly = DateTime(
+                        todayNow.year,
+                        todayNow.month,
+                        todayNow.day,
+                      );
+                      final activityDateOnly = DateTime(
+                        activity.date.year,
+                        activity.date.month,
+                        activity.date.day,
+                      );
                       if (activityDateOnly.isAfter(todayDateOnly)) {
                         viewModel.selectActivityForExpense(activity);
                         await showExpenseBottomSheet(
@@ -1101,19 +1115,28 @@ class _ActivityScreenState extends State<ActivityScreen> {
                         try {
                           String timeToParse = st.trim();
                           // Handle "hh:mm AM/PM" format
-                          if (timeToParse.contains('AM') || timeToParse.contains('PM')) {
-                            final parsed = DateFormat('hh:mm a').parse(timeToParse);
+                          if (timeToParse.contains('AM') ||
+                              timeToParse.contains('PM')) {
+                            final parsed = DateFormat(
+                              'hh:mm a',
+                            ).parse(timeToParse);
                             activityStart = DateTime(
-                              activity.date.year, activity.date.month, activity.date.day,
-                              parsed.hour, parsed.minute,
+                              activity.date.year,
+                              activity.date.month,
+                              activity.date.day,
+                              parsed.hour,
+                              parsed.minute,
                             );
                           } else {
                             // Handle "HH:mm" 24-hour format
                             final parts = timeToParse.split(':');
                             if (parts.length >= 2) {
                               activityStart = DateTime(
-                                activity.date.year, activity.date.month, activity.date.day,
-                                int.parse(parts[0]), int.parse(parts[1]),
+                                activity.date.year,
+                                activity.date.month,
+                                activity.date.day,
+                                int.parse(parts[0]),
+                                int.parse(parts[1]),
                               );
                             }
                           }
