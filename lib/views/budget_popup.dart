@@ -54,7 +54,7 @@ class BaseBudgetDialog extends StatelessWidget {
 
               if (warningText != null && warningText!.isNotEmpty) ...[
                 const SizedBox(height: 16),
-                _buildWarningRow(warningText!),
+                _buildWarningRow(warningText!, icon: true),
               ],
 
               if (warningTextColor != null &&
@@ -78,12 +78,13 @@ class BaseBudgetDialog extends StatelessWidget {
     );
   }
 
-  static Widget _buildWarningRow(String text, {Color? color}) {
+  static Widget _buildWarningRow(String text, {Color? color, bool? icon}) {
     final effectiveColor = color ?? appTheme.popupWarningMsg;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(Icons.warning_amber_rounded, color: effectiveColor, size: 22),
+        if (icon != false)
+          Icon(Icons.warning_amber_rounded, color: effectiveColor, size: 22),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
@@ -375,15 +376,11 @@ Widget _buildActionButton({
   );
 }
 
-Widget _buildTopUpCard(
-    TextEditingController controller,
-    ) {
+Widget _buildTopUpCard(TextEditingController controller) {
   return ValueListenableBuilder<TextEditingValue>(
     valueListenable: controller,
     builder: (context, value, child) {
-      final enteredAmount = double.tryParse(
-        value.text.trim(),
-      );
+      final enteredAmount = double.tryParse(value.text.trim());
 
       return CustomTextField(
         sectionTitle: 'TOP-UP AMOUNT (MYR)',
@@ -391,81 +388,68 @@ Widget _buildTopUpCard(
         prefixIcon: Icons.account_balance_wallet_outlined,
         prefixIconColor: appTheme.teal_A700,
         controller: controller,
-        keyboardType: const TextInputType.numberWithOptions(
-          decimal: true,
-        ),
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
         margin: EdgeInsets.zero,
-        bottomWidget:
-        (enteredAmount != null && enteredAmount > 0)
+        bottomWidget: (enteredAmount != null && enteredAmount > 0)
             ? Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(
-            horizontal: 14.0,
-            vertical: 10.0,
-          ),
-          decoration: BoxDecoration(
-            color: appTheme.teal_50.withValues(
-              alpha: 0.45,
-            ),
-            borderRadius: BorderRadius.circular(
-              12.0,
-            ),
-            border: Border.all(
-              color: appTheme.teal_A700.withValues(
-                alpha: 0.2,
-              ),
-              width: 1.0,
-            ),
-          ),
-          child: Row(
-            mainAxisAlignment:
-            MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.currency_exchange_rounded,
-                    size: 16,
-                    color: appTheme.teal_700,
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14.0,
+                  vertical: 10.0,
+                ),
+                decoration: BoxDecoration(
+                  color: appTheme.teal_50.withValues(alpha: 0.45),
+                  borderRadius: BorderRadius.circular(12.0),
+                  border: Border.all(
+                    color: appTheme.teal_A700.withValues(alpha: 0.2),
+                    width: 1.0,
                   ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Equivalent Value:',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      fontFamily: 'Inter',
-                      color:
-                      appTheme.blue_gray_700,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.currency_exchange_rounded,
+                          size: 16,
+                          color: appTheme.teal_700,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Equivalent Value:',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Inter',
+                            color: appTheme.blue_gray_700,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
-              ),
 
-              DualCurrencyAmount(
-                amount: enteredAmount,
-                baseCurrency: 'MYR',
-                baseLabel: 'RM',
-                primaryStyle: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  fontFamily: 'Inter',
-                  color: appTheme.teal_800,
+                    DualCurrencyAmount(
+                      amount: enteredAmount,
+                      baseCurrency: 'MYR',
+                      baseLabel: 'RM',
+                      primaryStyle: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        fontFamily: 'Inter',
+                        color: appTheme.teal_800,
+                      ),
+                      secondaryStyle: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Inter',
+                        color: appTheme.blue_gray_700,
+                      ),
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      textAlign: TextAlign.end,
+                    ),
+                  ],
                 ),
-                secondaryStyle: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'Inter',
-                  color:
-                  appTheme.blue_gray_700,
-                ),
-                crossAxisAlignment:
-                CrossAxisAlignment.end,
-                textAlign: TextAlign.end,
-              ),
-            ],
-          ),
-        )
+              )
             : null,
       );
     },
@@ -769,9 +753,7 @@ Future<void> showInitialBudgetInsufficientDialog({
 
         contentCard: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildTopUpCard(controller),
-          ],
+          children: [_buildTopUpCard(controller)],
         ),
 
         actions: Row(
@@ -821,59 +803,6 @@ Future<void> showInitialBudgetInsufficientDialog({
   );
 }
 
-// Cancel Top-up Initial Total Budget (Wishlist Covered > 0)
-Future<void> showCancelTopUpDialog({
-  required BuildContext context,
-  VoidCallback? onCancel,
-  VoidCallback? onConfirm,
-}) {
-  return _showTwoButtonsBudgetDialog(
-    context: context,
-    title: 'Cancel Top-up',
-    messages: const [
-      'Your wishlist item could not be fully covered based on '
-          'the limited budget. The system will proceed with '
-          'removing those wishlist items.',
-    ],
-    onCancel: onCancel,
-    onConfirm: onConfirm,
-  );
-}
-
-// Cancel Top-up Initial Total Budget (Wishlist Covered == 0)
-Future<void> showCancelTripDialog({
-  required BuildContext context,
-  VoidCallback? onCancel,
-  VoidCallback? onConfirm,
-}) {
-  return _showTwoButtonsBudgetDialog(
-    context: context,
-    title: 'Cancel Top-up',
-    messages: const [
-      'Your budget is insufficient to fully cover at least one wishlist item. The system will proceed with cancelling this trip.',
-    ],
-    onCancel: onCancel,
-    onConfirm: onConfirm
-  );
-}
-
-// Cancel Top-up Initial Total Budget (Wishlist is Empty)
-Future<void> showCancelTripWithoutWishlistDialog({
-  required BuildContext context,
-  VoidCallback? onCancel,
-  VoidCallback? onConfirm,
-}) {
-  return _showTwoButtonsBudgetDialog(
-    context: context,
-    title: 'Cancel Top-up',
-    messages: const [
-      'Your budget is insufficient. The system will proceed with cancelling this trip.',
-    ],
-      onCancel: onCancel,
-      onConfirm: onConfirm
-  );
-}
-
 // Initial Total Budget Top-up Insufficient
 Future<void> showInsufficientTopUpTotalBudgetDialog({
   required BuildContext context,
@@ -884,7 +813,7 @@ Future<void> showInsufficientTopUpTotalBudgetDialog({
     title: 'Insufficient Top-up',
     messages: const [
       'Your top-up amount is still not sufficient,'
-          'the system will adjust the plan based on'
+          'the system will adjust the plan based on '
           'the latest amount.',
     ],
     onContinue: onContinue,
@@ -931,6 +860,7 @@ Future<void> _showTwoButtonsBudgetDialog({
   required String title,
   required List<String> messages,
   Color? color,
+  bool? icon,
   VoidCallback? onCancel,
   VoidCallback? onConfirm,
 }) {
@@ -942,16 +872,14 @@ Future<void> _showTwoButtonsBudgetDialog({
         title: title,
 
         contentCard: ConstrainedBox(
-          constraints: const BoxConstraints(
-            maxWidth: 500,
-          ),
+          constraints: const BoxConstraints(maxWidth: 500),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               for (int i = 0; i < messages.length; i++) ...[
                 if (i > 0) const SizedBox(height: 16),
-                BaseBudgetDialog._buildWarningRow(messages[i], color: color),
+                BaseBudgetDialog._buildWarningRow(messages[i], color: color, icon: icon),
               ],
             ],
           ),
@@ -1004,7 +932,8 @@ Future<void> showTopUpConfirmation({
       'Are you sure you want to top-up MYR ${topUpAmount.toStringAsFixed(2)} ($symbol ${convertedAmt.toStringAsFixed(2)})?',
     ],
     color: appTheme.black,
+    icon: false,
     onCancel: onCancel,
-    onConfirm: onConfirm
+    onConfirm: onConfirm,
   );
 }

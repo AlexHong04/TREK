@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../models/services/i_auth_service.dart';
 import '../../models/services/i_itinerary_service.dart';
 import '../../models/services/itinerary_service.dart';
 import '../../models/entities/future_suggestion.dart';
@@ -10,9 +11,13 @@ import 'package:intl/intl.dart';
 
 class WholeItineraryDetailViewModel extends ChangeNotifier {
   final IItineraryService _itineraryService;
+  final IAuthService _authService;
 
-  WholeItineraryDetailViewModel({IItineraryService? itineraryService})
-    : _itineraryService = itineraryService ?? ItineraryService();
+  WholeItineraryDetailViewModel({
+    IItineraryService? itineraryService,
+    required IAuthService authService,
+  }) : _itineraryService = itineraryService ?? ItineraryService(),
+       _authService = authService;
 
   WholeItineraryUiState _uiState = const WholeItineraryUiState();
 
@@ -76,9 +81,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
   }
 
   /// True if budget is insufficient or wishlist is not fully covered.
-  bool get needsTopUp =>
-      hasExtraBudgetNeeded ||
-      hasUncoveredWishlist;
+  bool get needsTopUp => hasExtraBudgetNeeded || hasUncoveredWishlist;
 
   /// Confirm is only allowed once every time slot has been filled, we are
   /// not busy generating, and no extra budget is needed.
@@ -127,8 +130,9 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     }
 
     final covered = coveredWishlistItems.toSet();
-    final unmatched =
-        wishlist.where((item) => !covered.contains(item)).toList();
+    final unmatched = wishlist
+        .where((item) => !covered.contains(item))
+        .toList();
 
     return List.unmodifiable(unmatched);
   }
@@ -260,6 +264,23 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     );
   }
 
+  // zhiqin
+  String get preferredCurrency => _authService.preferredCurrency;
+
+  // zhiqin
+  Future<double?> convertAmountToCurrency({required double amount}) async {
+    try {
+      final result = await _authService.convertToPreferredCurrency(
+        amount: amount,
+        fromCurrency: 'MYR',
+      );
+      return result;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // zhiqin
   Future<bool> topUpBudget(double amount) async {
     if (amount <= 0) {
       return false;
@@ -393,7 +414,8 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     int coveredCount = 0;
     for (final w in updatedWishlist) {
       final lowerItem = w.toLowerCase().trim();
-      final isCovered = activeDestinations.any(
+      final isCovered =
+          activeDestinations.any(
             (dest) => dest.contains(lowerItem) || lowerItem.contains(dest),
           ) ||
           activeDescriptions.any((desc) => desc.contains(lowerItem));
@@ -403,8 +425,8 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     }
 
     final double parsedBudget = double.tryParse(_uiState.budgetText) ?? 0.0;
-    final double mathShortfall =
-        (_uiState.totalAllocatedBudget - parsedBudget).clamp(0.0, double.infinity);
+    final double mathShortfall = (_uiState.totalAllocatedBudget - parsedBudget)
+        .clamp(0.0, double.infinity);
 
     final double newExtraBudget = mathShortfall;
 
@@ -459,8 +481,9 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
       final budgetLimit = stashedMatch?.allocatedBudget ?? 50.0;
 
       final newActivity = await _itineraryService.generateAlternativeItinerary(
-        destination:
-            destination.isNotEmpty ? destination : _uiState.destinationTitle,
+        destination: destination.isNotEmpty
+            ? destination
+            : _uiState.destinationTitle,
         slotDate: targetSlot.date,
         startTime: targetSlot.startTime ?? '09:00',
         endTime: targetSlot.endTime ?? '11:00',
@@ -510,10 +533,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
       return;
     }
 
-    _uiState = _uiState.copyWith(
-      isRegeneratingPlan: true,
-      errorMessage: null,
-    );
+    _uiState = _uiState.copyWith(isRegeneratingPlan: true, errorMessage: null);
     notifyListeners();
 
     try {
@@ -524,20 +544,22 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         ...activeActivities.map((a) => a.destination.trim()),
       }.toList();
 
-      final double effectiveRemainingBudget =
-          (totalBudget - spentBudget).clamp(0.0, double.infinity);
-
-      final newFilledActivities =
-          await _itineraryService.regenerateEmptySlotsFromRemainingPlan(
-        destination: _uiState.destinationTitle,
-        remainingBudget: effectiveRemainingBudget,
-        remainingActivities: activeActivities,
-        emptySlots: emptySlots,
-        excludedPlaces: excludedPlaces,
-        uncoveredWishlist: uncoveredWishlistItems,
-        preference: _uiState.preference,
-        constraints: _uiState.constraints,
+      final double effectiveRemainingBudget = (totalBudget - spentBudget).clamp(
+        0.0,
+        double.infinity,
       );
+
+      final newFilledActivities = await _itineraryService
+          .regenerateEmptySlotsFromRemainingPlan(
+            destination: _uiState.destinationTitle,
+            remainingBudget: effectiveRemainingBudget,
+            remainingActivities: activeActivities,
+            emptySlots: emptySlots,
+            excludedPlaces: excludedPlaces,
+            uncoveredWishlist: uncoveredWishlistItems,
+            preference: _uiState.preference,
+            constraints: _uiState.constraints,
+          );
 
       final Map<String, Activity> filledMap = {
         for (final act in newFilledActivities) act.activitiesId: act,
@@ -554,15 +576,19 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         0.0,
         (sum, a) => sum + a.allocatedBudget,
       );
-      final mathShortfall =
-          (newTotalAllocated - totalBudget).clamp(0.0, double.infinity);
+      final mathShortfall = (newTotalAllocated - totalBudget).clamp(
+        0.0,
+        double.infinity,
+      );
 
       // Recalculate covered wishlist
       final wishlist = _uiState.wishlist ?? [];
       int coveredCount = 0;
       if (wishlist.isNotEmpty) {
         final activeDestinations = updatedList
-            .where((a) => a.status != 'empty' && a.destination.trim().isNotEmpty)
+            .where(
+              (a) => a.status != 'empty' && a.destination.trim().isNotEmpty,
+            )
             .map((a) => a.destination.toLowerCase().trim())
             .toSet();
         final activeDescriptions = updatedList
@@ -571,7 +597,9 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
             .toList();
         for (final w in wishlist) {
           final lower = w.toLowerCase().trim();
-          if (activeDestinations.any((d) => d.contains(lower) || lower.contains(d)) ||
+          if (activeDestinations.any(
+                (d) => d.contains(lower) || lower.contains(d),
+              ) ||
               activeDescriptions.any((d) => d.contains(lower))) {
             coveredCount++;
           }
