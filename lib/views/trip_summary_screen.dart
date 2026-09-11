@@ -603,38 +603,9 @@ class TripSummaryScreen extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) => BaseBudgetDialog(
-        title: 'Confirm Recommendation',
-        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-        contentPadding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
-        sectionSpacing: 12,
-        actionsTopSpacing: 16,
-        summaryCard: _buildFutureRecommendationSummaryCard(
-          viewModel.uiState.futureRecommendations,
-        ),
-        warningText:
-            'Each trip can accept a future budget recommendation only once. '
-            'Once accepted, it cannot be changed.',
-        actions: Row(
-          children: [
-            Expanded(
-              child: _buildRecommendationDialogButton(
-                text: 'Cancel',
-                backgroundColor: appTheme.redButton,
-                height: 44,
-                onPressed: () => Navigator.pop(dialogContext, false),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildRecommendationDialogButton(
-                text: 'Accept',
-                height: 44,
-                onPressed: () => Navigator.pop(dialogContext, true),
-              ),
-            ),
-          ],
-        ),
+      builder: (dialogContext) => _buildFutureRecommendationConfirmDialog(
+        dialogContext,
+        recommendations: viewModel.uiState.futureRecommendations,
       ),
     );
 
@@ -654,6 +625,83 @@ class TripSummaryScreen extends StatelessWidget {
         'Future budget recommendations saved successfully.',
       );
     }
+  }
+
+  Widget _buildFutureRecommendationConfirmDialog(
+    BuildContext dialogContext, {
+    required List<FutureBudgetRecommendationUiState> recommendations,
+  }) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Confirm Recommendation',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: appTheme.black,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildFutureRecommendationSummaryCard(recommendations),
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.warning_amber_rounded,
+                    color: appTheme.popupWarningMsg,
+                    size: 22,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Each trip can accept a future budget recommendation '
+                      'only once. Once accepted, it cannot be changed.',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 14,
+                        color: appTheme.popupWarningMsg,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildRecommendationDialogButton(
+                      text: 'Cancel',
+                      backgroundColor: appTheme.redButton,
+                      height: 44,
+                      onPressed: () => Navigator.pop(dialogContext, false),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildRecommendationDialogButton(
+                      text: 'Accept',
+                      height: 44,
+                      onPressed: () => Navigator.pop(dialogContext, true),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _showInvalidRecommendationTotalDialog(
