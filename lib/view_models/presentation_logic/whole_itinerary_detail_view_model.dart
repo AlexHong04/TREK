@@ -62,10 +62,23 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         (a.destination.trim().isEmpty && a.description.trim().isEmpty),
   );
 
-  /// True if extra budget is needed.
+  /// True if extra budget is needed or spent budget exceeds total budget.
   bool get hasExtraBudgetNeeded =>
       _uiState.estimatedExtraBudgetNeeded > 0.0 ||
-      (totalBudget > 0 && spentBudget > totalBudget);
+      (totalBudget > 0 && spentBudget > totalBudget) ||
+      (spentBudget > totalBudget);
+
+  /// True if wishlist has uncovered items.
+  bool get hasUncoveredWishlist {
+    final wishlist = _uiState.wishlist;
+    if (wishlist == null || wishlist.isEmpty) return false;
+    return _uiState.wishlistItemsCoveredCount < wishlist.length;
+  }
+
+  /// True if budget is insufficient or wishlist is not fully covered.
+  bool get needsTopUp =>
+      hasExtraBudgetNeeded ||
+      hasUncoveredWishlist;
 
   /// Confirm is only allowed once every time slot has been filled, we are
   /// not busy generating, and no extra budget is needed.

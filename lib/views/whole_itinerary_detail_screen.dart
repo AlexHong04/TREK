@@ -1235,6 +1235,7 @@ class _WholeItineraryDetailScreenState
   ) {
     final bool hasEmptySlots = viewModel.hasEmptyActivitySlots;
     final bool isRegenerating = viewModel.uiState.isRegeneratingPlan;
+    final bool needsTopUp = viewModel.needsTopUp;
 
     return Container(
       color: appTheme.gray_50_03,
@@ -1251,57 +1252,59 @@ class _WholeItineraryDetailScreenState
             margin: const EdgeInsets.only(bottom: 12),
             child: Row(
               children: [
-                // Left: Top-up Button
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: appTheme.white_A700,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: appTheme.teal_A700, width: 1.5),
-                      boxShadow: [
-                        BoxShadow(
-                          color: appTheme.teal_50,
-                          offset: const Offset(0, 4),
-                          blurRadius: 6,
-                        ),
-                      ],
-                    ),
-                    child: Material(
-                      color: appTheme.transparentCustom,
-                      borderRadius: BorderRadius.circular(16),
-                      child: InkWell(
-                        onTap: () async {
-                          await _checkWishlistWarning(viewModel);
-                        },
+                // Left: Top-up Button (Only appears when budget is insufficient or wishlist uncovered)
+                if (needsTopUp) ...[
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: appTheme.white_A700,
                         borderRadius: BorderRadius.circular(16),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.add_card_rounded,
-                                size: 20,
-                                color: appTheme.teal_A700,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Top-up',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                  fontFamily: 'Inter',
+                        border: Border.all(color: appTheme.teal_A700, width: 1.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: appTheme.teal_50,
+                            offset: const Offset(0, 4),
+                            blurRadius: 6,
+                          ),
+                        ],
+                      ),
+                      child: Material(
+                        color: appTheme.transparentCustom,
+                        borderRadius: BorderRadius.circular(16),
+                        child: InkWell(
+                          onTap: () async {
+                            await _checkWishlistWarning(viewModel);
+                          },
+                          borderRadius: BorderRadius.circular(16),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.add_card_rounded,
+                                  size: 20,
                                   color: appTheme.teal_A700,
-                                ).copyWith(height: 22 / 18),
-                              ),
-                            ],
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Top-up',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                    fontFamily: 'Inter',
+                                    color: appTheme.teal_A700,
+                                  ).copyWith(height: 22 / 18),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
+                  const SizedBox(width: 12),
+                ],
                 // Right: Regenerate Plan Button (if empty slots exist) OR Confirm Button (if all filled)
                 Expanded(
                   child: hasEmptySlots
