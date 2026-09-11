@@ -447,7 +447,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: DualCurrencyAmount(
                             amount: trip.totalBudget,
                             baseCurrency: 'MYR',
-                            baseLabel: 'RM',
+                            baseLabel: 'MYR',
                             textAlign: TextAlign.end,
                             crossAxisAlignment: CrossAxisAlignment.end,
                             primaryStyle: TextStyle(

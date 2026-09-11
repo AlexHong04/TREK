@@ -344,7 +344,7 @@ class _AllPlansScreenState extends State<AllPlansScreen> {
                         DualCurrencyAmount(
                           amount: trip.totalBudget.toDouble(),
                           baseCurrency: 'MYR',
-                          baseLabel: 'RM',
+                          baseLabel: 'MYR',
                           primaryStyle: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
