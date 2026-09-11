@@ -484,7 +484,14 @@ class FinancialDashboardScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Expense', style: TextStyle(fontSize: 15)),
+        Text(
+          'Expense',
+          style: TextStyle(
+            color: appTheme.gray_800,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         const SizedBox(height: 16),
         SizedBox(
           height: 155,
@@ -508,7 +515,10 @@ class FinancialDashboardScreen extends StatelessWidget {
           spacing: 14,
           runSpacing: 8,
           children: [
-            _DotLegend(label: 'Allocated Budget', color: appTheme.gray_400),
+            _DotLegend(
+              label: 'Allocated Budget',
+              color: appTheme.blue_gray_300,
+            ),
             _DotLegend(label: 'Expenses', color: appTheme.teal_800),
             _DotLegend(
               label: 'Overspending',
@@ -541,7 +551,7 @@ class FinancialDashboardScreen extends StatelessWidget {
             children: [
               Expanded(
                 child: _ColumnHeading(
-                  color: appTheme.gray_800,
+                  color: appTheme.blue_gray_300,
                   label: 'Budget',
                 ),
               ),
@@ -1852,7 +1862,7 @@ class _ExpenseBars extends StatelessWidget {
             _AmountBar(
               amount: category.budget,
               height: barHeight(category.budget),
-              color: appTheme.gray_400,
+              color: appTheme.blue_gray_300,
             ),
             const SizedBox(width: 10),
             _AmountBar(
@@ -2024,7 +2034,7 @@ class _BreakdownRow extends StatelessWidget {
             _MoneyCell(
               amount: category.budget,
               percentage: category.budget == 0 ? 0 : 100,
-              color: appTheme.blue_gray_700,
+              color: appTheme.blue_gray_300,
             ),
             _MoneyCell(
               amount: category.expense,
