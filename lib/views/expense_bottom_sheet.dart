@@ -10,6 +10,7 @@ import '../models/entities/activity.dart';
 import '../models/entities/expense.dart';
 import '../models/entities/expense_item.dart';
 import '../theme/app_theme.dart';
+import '../utils/expense_text_validation.dart';
 import '../view_models/presentation_logic/activity_view_model.dart';
 import '../view_models/ui_state/activity_ui_state.dart';
 import '../widgets/converted_amount_text.dart';
@@ -206,9 +207,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         _buildPaymentMethodSection(uiState),
         SizedBox(height: 10),
         _buildReceiptSection(uiState),
-        if (uiState.isScanningReceipt ||
-            uiState.ocrRawText.isNotEmpty ||
-            uiState.errorMessage.startsWith('Unable to read the receipt.')) ...[
+        if (uiState.isScanningReceipt || uiState.ocrRawText.isNotEmpty) ...[
           SizedBox(height: 10),
           _buildOcrReviewSection(uiState),
         ],
@@ -555,7 +554,8 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
             _ExpenseItemForm(
               key: ValueKey(_editingItemIndex ?? 'new-item'),
               currency: _activeExpenseCurrency(uiState),
-              initialItem: _editingItemIndex == null
+              initialItem: _editingItemIndex == null ||
+                      _editingItemIndex! >= uiState.draftExpenseItems.length
                   ? null
                   : uiState.draftExpenseItems[_editingItemIndex!],
               onChanged: (hasChanges) {
@@ -755,13 +755,15 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
             controller: _taxController,
             keyboardType: TextInputType.numberWithOptions(decimal: true),
             inputFormatters: [
-              FilteringTextInputFormatter.allow(
-                RegExp(r'^\d{0,5}([.,]\d{0,2})?$'),
+              _ThousandsSeparatorInputFormatter(
+                maximumIntegerDigits: 5,
+                decimalDigits: 2,
+                allowZero: true,
               ),
             ],
             onSubmitted: (_) => _confirmTaxAmount(),
             decoration: _fieldDecoration('0.00').copyWith(
-              prefixText: '$currency ',
+              prefixText: '${currency == 'MYR' ? 'RM' : currency} ',
               prefixStyle: TextStyle(
                 color: appTheme.gray_900,
                 fontWeight: FontWeight.w600,
@@ -875,7 +877,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                     IconButton(
                       onPressed: uiState.isScanningReceipt
                           ? null
-                          : context.read<ActivityViewModel>().removeReceipt,
+                          : () => _removeReceipt(uiState),
                       icon: Icon(Icons.close, color: appTheme.errorRed),
                     ),
                   ],
@@ -971,39 +973,6 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     final hasOcrDateTime = uiState.ocrTransactionDateTime != null;
     final hasOcrTotal = uiState.ocrExtractedTotal != null;
     final currency = _activeExpenseCurrency(uiState);
-    final ocrFailed =
-        uiState.ocrRawText.isEmpty &&
-        uiState.errorMessage.startsWith('Unable to read the receipt.');
-
-    if (ocrFailed) {
-      return _ExpenseSectionCard(
-        title: 'RECEIPT OCR',
-        child: Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: _scanReceipt,
-                child: Text('Retry OCR'),
-              ),
-            ),
-            SizedBox(width: 10),
-            Expanded(
-              child: ElevatedButton(
-                onPressed: context
-                    .read<ActivityViewModel>()
-                    .clearExpenseMessage,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: appTheme.teal_A700,
-                  foregroundColor: appTheme.white_A700,
-                ),
-                child: Text('Manual Entry'),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
     return _ExpenseSectionCard(
       title: 'RECEIPT OCR REVIEW',
       child: Column(
@@ -1035,6 +1004,42 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                 ? formatCurrencyAmount(currency, uiState.ocrExtractedTotal!)
                 : 'Not detected',
           ),
+          if (uiState.hasOcrTotalMismatch) ...[
+            SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Color(0xFFFFF4E5),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Color(0xFFFFB74D)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Receipt total does not match the detected items.',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Receipt total: '
+                    '${formatCurrencyAmount(currency, uiState.ocrExtractedTotal!)}',
+                  ),
+                  Text(
+                    'Calculated from items and tax: '
+                    '${formatCurrencyAmount(currency, uiState.draftTotalAmount)}',
+                  ),
+                  Text(
+                    'Difference: '
+                    '${formatCurrencyAmount(currency, uiState.ocrTotalDifference.abs())}',
+                  ),
+                  SizedBox(height: 4),
+                  Text('Please review the detected expense items.'),
+                ],
+              ),
+            ),
+          ],
           if (uiState.ocrItemLines.isNotEmpty) ...[
             SizedBox(height: 8),
             Text('Possible receipt items', style: _fieldLabelStyle),
@@ -1121,7 +1126,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   }
 
   double? _parsePrice(String value) {
-    return double.tryParse(value.trim().replaceAll(',', '.'));
+    return double.tryParse(value.trim().replaceAll(',', ''));
   }
 
   void _showValidationMessage(String message) {
@@ -1259,6 +1264,25 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     );
   }
 
+  Future<void> _removeReceipt(ActivityUiState uiState) async {
+    if (uiState.hasOcrDraftData) {
+      final shouldRemove = await _showConfirmationDialog(
+        title: 'Remove Receipt and OCR Items?',
+        message:
+            'Removing this receipt will also clear the tax and remove its OCR-extracted items. Manually added items will be kept.',
+        confirmLabel: 'Remove',
+        isDestructive: true,
+      );
+      if (!shouldRemove || !mounted) return;
+    }
+
+    context.read<ActivityViewModel>().removeReceiptAndOcrData();
+    _taxController.clear();
+    if (mounted) {
+      setState(() => _hasAppliedOcrValues = false);
+    }
+  }
+
   /// Receipt validation has already succeeded before this dialog is shown.
   /// The tourist may crop the image or keep the original before OCR starts.
   Future<void> _offerReceiptCropThenScan() async {
@@ -1363,7 +1387,11 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     if (!isConfirmed || !mounted) return;
 
     context.read<ActivityViewModel>().removeExpenseItem(index);
-    if (clearEditor) _discardItem();
+    if (clearEditor || _editingItemIndex == index) {
+      _discardItem();
+    } else if (_editingItemIndex != null && _editingItemIndex! > index) {
+      setState(() => _editingItemIndex = _editingItemIndex! - 1);
+    }
   }
 
   Future<bool> _showConfirmationDialog({
@@ -1465,6 +1493,9 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
   final TextEditingController _quantityController = TextEditingController();
   final TextEditingController _unitPriceController = TextEditingController();
   final ValueNotifier<double> _subtotalNotifier = ValueNotifier(0.0);
+  final FocusNode _itemNameFocus = FocusNode();
+  final FocusNode _descriptionFocus = FocusNode();
+  final FocusNode _merchantFocus = FocusNode();
 
   late DateTime _selectedDate;
   late TimeOfDay _selectedTime;
@@ -1480,7 +1511,9 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
     _itemNameController.text = initialItem?.itemName ?? '';
     _descriptionController.text = initialItem?.itemDescription ?? '';
     _merchantController.text = initialItem?.merchantName ?? '';
-    _quantityController.text = initialItem?.quantity.toString() ?? '';
+    _quantityController.text = initialItem == null
+        ? ''
+        : NumberFormat.decimalPattern('en_US').format(initialItem.quantity);
     _unitPriceController.text = initialItem == null
         ? ''
         : initialItem.unitPrice.toStringAsFixed(2);
@@ -1505,6 +1538,9 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
     _quantityController.dispose();
     _unitPriceController.dispose();
     _subtotalNotifier.dispose();
+    _itemNameFocus.dispose();
+    _descriptionFocus.dispose();
+    _merchantFocus.dispose();
     super.dispose();
   }
 
@@ -1514,7 +1550,8 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
   }
 
   void _refreshSubtotal() {
-    final quantity = int.tryParse(_quantityController.text) ?? 0;
+    final quantity =
+        int.tryParse(_quantityController.text.replaceAll(',', '')) ?? 0;
     final unitPrice = _parsePrice(_unitPriceController.text) ?? 0.0;
     _subtotalNotifier.value = quantity * unitPrice;
   }
@@ -1551,18 +1588,44 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
 
   void _saveItem() {
     final name = _itemNameController.text.trim();
-    final quantity = int.tryParse(_quantityController.text.trim());
+    final description = _descriptionController.text.trim();
+    final merchantName = _merchantController.text.trim();
+    final quantity = int.tryParse(
+      _quantityController.text.trim().replaceAll(',', ''),
+    );
     final price = _parsePrice(_unitPriceController.text);
     if (name.isEmpty) {
       widget.onValidationError('Item name cannot be empty.');
       return;
     }
+    for (final validationMessage in <String?>[
+      validateExpenseItemName(name),
+      validateExpenseDescription(description),
+      validateExpenseMerchantName(merchantName),
+    ]) {
+      if (validationMessage != null) {
+        widget.onValidationError(validationMessage);
+        return;
+      }
+    }
     if (quantity == null || quantity <= 0) {
       widget.onValidationError('Item quantity must be greater than zero.');
       return;
     }
-    if (price == null || price < 0) {
-      widget.onValidationError('Enter a valid unit price of zero or more.');
+    if (quantity > 9999) {
+      widget.onValidationError('Item quantity cannot exceed 9,999.');
+      return;
+    }
+    if (price == null || price <= 0) {
+      widget.onValidationError('Unit price must be greater than zero.');
+      return;
+    }
+    if (price > 99999) {
+      widget.onValidationError('Unit price cannot exceed 99,999.');
+      return;
+    }
+    if (quantity * price > 999999) {
+      widget.onValidationError('Item subtotal cannot exceed 999,999.');
       return;
     }
 
@@ -1577,8 +1640,8 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
     widget.onSave(
       ExpenseItem(
         itemName: name,
-        itemDescription: _nullIfEmpty(_descriptionController.text),
-        merchantName: _nullIfEmpty(_merchantController.text),
+        itemDescription: _nullIfEmpty(description),
+        merchantName: _nullIfEmpty(merchantName),
         expenseDateTime: dateTime,
         quantity: quantity,
         unitPrice: price,
@@ -1592,18 +1655,78 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
   }
 
   double? _parsePrice(String value) {
-    return double.tryParse(value.trim().replaceAll(',', '.'));
+    return double.tryParse(value.trim().replaceAll(',', ''));
   }
 
   List<TextInputFormatter>? _inputFormattersFor(
     TextEditingController controller,
   ) {
     if (controller == _quantityController) {
-      return [FilteringTextInputFormatter.digitsOnly];
+      return [
+        _ThousandsSeparatorInputFormatter(
+          maximumIntegerDigits: 4,
+          decimalDigits: 0,
+        ),
+      ];
     }
     if (controller == _unitPriceController) {
-      return [FilteringTextInputFormatter.allow(RegExp(r'^\d*[.,]?\d{0,2}'))];
+      return [
+        _ThousandsSeparatorInputFormatter(
+          maximumIntegerDigits: 5,
+          decimalDigits: 2,
+        ),
+      ];
     }
+    if (controller == _descriptionController) {
+      return [LengthLimitingTextInputFormatter(60)];
+    }
+    if (controller == _merchantController) {
+      return [LengthLimitingTextInputFormatter(50)];
+    }
+    return null;
+  }
+
+  Widget _buildLimitedFieldLabel({
+    required String label,
+    required TextEditingController controller,
+    required FocusNode focusNode,
+    required int limit,
+  }) {
+    return AnimatedBuilder(
+      animation: Listenable.merge([controller, focusNode]),
+      builder: (context, _) {
+        final count = controller.text.characters.length;
+        final showCounter = focusNode.hasFocus && count > 0;
+        final warningStart = (limit * 0.8).ceil();
+        final counterColor = count >= limit
+            ? appTheme.errorRed
+            : count >= warningStart
+            ? appTheme.wholeBudgetProgress
+            : appTheme.teal_A700;
+        return Row(
+          children: [
+            Text(label.toUpperCase(), style: _fieldLabelStyle),
+            Spacer(),
+            if (showCounter)
+              Text(
+                '$count/$limit',
+                style: _fieldLabelStyle.copyWith(color: counterColor),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  FocusNode? _focusNodeFor(TextEditingController controller) {
+    if (controller == _descriptionController) return _descriptionFocus;
+    if (controller == _merchantController) return _merchantFocus;
+    return null;
+  }
+
+  int? _characterLimitFor(TextEditingController controller) {
+    if (controller == _descriptionController) return 60;
+    if (controller == _merchantController) return 50;
     return null;
   }
 
@@ -1645,10 +1768,22 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('ITEM ENTRY', style: _fieldLabelStyle),
+                      _buildLimitedFieldLabel(
+                        label: 'Item Entry',
+                        controller: _itemNameController,
+                        focusNode: _itemNameFocus,
+                        limit: 30,
+                      ),
                       SizedBox(height: 6),
                       TextField(
                         controller: _itemNameController,
+                        focusNode: _itemNameFocus,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                            RegExp(r'[A-Za-z0-9 -]'),
+                          ),
+                          LengthLimitingTextInputFormatter(30),
+                        ],
                         decoration: _fieldDecoration('Item'),
                         style: itemNameTextStyle,
                       ),
@@ -1692,7 +1827,7 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
                     SizedBox(width: 12),
                     Expanded(
                       child: _buildTextField(
-                        'Unit Price (${widget.currency})',
+                        'Unit Price (${widget.currency == 'MYR' ? 'RM' : widget.currency})',
                         _unitPriceController,
                         '0.00',
                         TextInputType.numberWithOptions(decimal: true),
@@ -1795,13 +1930,24 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
     String? hint, [
     TextInputType? keyboardType,
   ]) {
+    final focusNode = _focusNodeFor(controller);
+    final characterLimit = _characterLimitFor(controller);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label.toUpperCase(), style: _fieldLabelStyle),
+        if (focusNode != null && characterLimit != null)
+          _buildLimitedFieldLabel(
+            label: label,
+            controller: controller,
+            focusNode: focusNode,
+            limit: characterLimit,
+          )
+        else
+          Text(label.toUpperCase(), style: _fieldLabelStyle),
         SizedBox(height: 6),
         TextField(
           controller: controller,
+          focusNode: focusNode,
           keyboardType: keyboardType,
           inputFormatters: _inputFormattersFor(controller),
           decoration: _fieldDecoration(hint),
@@ -1882,6 +2028,51 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: appTheme.gray_100),
       ),
+    );
+  }
+}
+
+class _ThousandsSeparatorInputFormatter extends TextInputFormatter {
+  final int maximumIntegerDigits;
+  final int decimalDigits;
+  final bool allowZero;
+
+  const _ThousandsSeparatorInputFormatter({
+    required this.maximumIntegerDigits,
+    required this.decimalDigits,
+    this.allowZero = false,
+  });
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final raw = newValue.text.replaceAll(',', '');
+    if (raw.isEmpty) return newValue.copyWith(text: '');
+    final validPattern = decimalDigits == 0
+        ? RegExp(r'^\d+$')
+        : RegExp('^\\d+(?:\\.\\d{0,$decimalDigits})?\$');
+    if (!validPattern.hasMatch(raw)) return oldValue;
+
+    final parts = raw.split('.');
+    final integerPart = parts.first;
+    if (integerPart.length > maximumIntegerDigits) return oldValue;
+    if (integerPart.startsWith('0') &&
+        (!allowZero || integerPart.length > 1)) {
+      return oldValue;
+    }
+
+    final groupedInteger = NumberFormat.decimalPattern(
+      'en_US',
+    ).format(int.parse(integerPart));
+    final hasDecimalPoint = decimalDigits > 0 && raw.contains('.');
+    final formatted = hasDecimalPoint
+        ? '$groupedInteger.${parts.length > 1 ? parts[1] : ''}'
+        : groupedInteger;
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 }

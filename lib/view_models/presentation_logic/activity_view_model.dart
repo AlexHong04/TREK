@@ -77,6 +77,8 @@ class ActivityViewModel extends ChangeNotifier {
       selectedActivity: activity,
       currentActivityId: activity.activitiesId,
       draftExpenseItems: const [],
+      ocrDraftItemIndexes: const {},
+      draftTaxFromOcr: false,
       draftTotalAmount: 0.0,
       paymentMethod: '',
       originalCurrency: _expenseCurrency,
@@ -181,7 +183,14 @@ class ActivityViewModel extends ChangeNotifier {
     }
 
     final updatedItems = [..._uiState.draftExpenseItems]..removeAt(index);
-    _updateDraftExpenseItems(updatedItems);
+    final updatedOcrIndexes = _uiState.ocrDraftItemIndexes
+        .where((ocrIndex) => ocrIndex != index)
+        .map((ocrIndex) => ocrIndex > index ? ocrIndex - 1 : ocrIndex)
+        .toSet();
+    _updateDraftExpenseItems(
+      updatedItems,
+      ocrItemIndexes: updatedOcrIndexes,
+    );
   }
 
   /// Removes only unsaved draft items after the tourist agrees to replace them
@@ -191,6 +200,8 @@ class ActivityViewModel extends ChangeNotifier {
       draftExpenseItems: const [],
       draftTaxAmount: 0.0,
       draftTotalAmount: 0.0,
+      ocrDraftItemIndexes: const {},
+      draftTaxFromOcr: false,
       errorMessage: '',
       successMessage: '',
     );
@@ -206,6 +217,7 @@ class ActivityViewModel extends ChangeNotifier {
     _uiState = _uiState.copyWith(
       draftTaxAmount: normalizedTax,
       draftTotalAmount: total,
+      draftTaxFromOcr: false,
       errorMessage: '',
       successMessage: '',
     );
@@ -386,8 +398,27 @@ class ActivityViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void removeReceipt() {
-    _uiState = _uiState.copyWith(receiptLocalPath: '', clearOcrData: true);
+  void removeReceiptAndOcrData() {
+    final retainedItems = <ExpenseItem>[];
+    for (var index = 0; index < _uiState.draftExpenseItems.length; index++) {
+      if (!_uiState.ocrDraftItemIndexes.contains(index)) {
+        retainedItems.add(_uiState.draftExpenseItems[index]);
+      }
+    }
+    _uiState = _uiState.copyWith(
+      receiptLocalPath: '',
+      clearOcrData: true,
+      draftExpenseItems: retainedItems,
+      draftTaxAmount: 0.0,
+      draftTotalAmount: _expenseTrackingService.calculateTotalExpense(
+        retainedItems,
+        0.0,
+      ),
+      ocrDraftItemIndexes: const {},
+      draftTaxFromOcr: false,
+      errorMessage: '',
+      successMessage: '',
+    );
     notifyListeners();
   }
 
@@ -408,9 +439,16 @@ class ActivityViewModel extends ChangeNotifier {
       return 0;
     }
 
-    final detectedTax =
-        _uiState.ocrExtractedTax ?? _inferTaxFromReceiptTotal(expenseItems);
-    _updateDraftExpenseItems(expenseItems, detectedTax);
+    final inferredTax = _inferTaxFromReceiptTotal(expenseItems);
+    final detectedTax = _uiState.ocrExtractedTax ?? inferredTax;
+    _updateDraftExpenseItems(
+      expenseItems,
+      newTaxAmount: detectedTax,
+      ocrItemIndexes: Set<int>.from(
+        List<int>.generate(expenseItems.length, (index) => index),
+      ),
+      taxFromOcr: _uiState.ocrExtractedTax != null || inferredTax > 0,
+    );
     return expenseItems.length;
   }
 
@@ -454,6 +492,7 @@ class ActivityViewModel extends ChangeNotifier {
 
     _uiState = _uiState.copyWith(
       isScanningReceipt: true,
+      clearOcrData: true,
       errorMessage: '',
       successMessage: '',
     );
@@ -463,6 +502,7 @@ class ActivityViewModel extends ChangeNotifier {
       final receiptText = await _expenseTrackingService.readReceiptText(
         receiptLocalPath,
       );
+      debugPrint('[Receipt OCR raw text]\n$receiptText');
       final extractedTotal = _expenseTrackingService.extractReceiptTotal(
         receiptText,
       );
@@ -472,6 +512,21 @@ class ActivityViewModel extends ChangeNotifier {
       final extractedDateTime = _expenseTrackingService.extractReceiptDateTime(
         receiptText,
       );
+      final extractedItems = _expenseTrackingService
+          .buildDraftExpenseItemsFromReceipt(
+            receiptText: receiptText,
+            merchantName: _expenseTrackingService.extractMerchantName(
+              receiptText,
+            ),
+            transactionDateTime: extractedDateTime,
+          );
+      if (!_expenseTrackingService.isLikelyReceiptText(receiptText) ||
+          extractedTotal == null ||
+          extractedItems.isEmpty) {
+        throw Exception(
+          'Unable to read the receipt. Please try another image or continue with the manual entry.',
+        );
+      }
       String extractedTotalError = '';
 
       if (extractedTotal != null) {
@@ -601,6 +656,8 @@ class ActivityViewModel extends ChangeNotifier {
         draftExpenseItems: const [],
         draftTaxAmount: 0.0,
         draftTotalAmount: 0.0,
+        ocrDraftItemIndexes: const {},
+        draftTaxFromOcr: false,
         paymentMethod: '',
         receiptLocalPath: '',
         clearOcrData: true,
@@ -700,9 +757,11 @@ class ActivityViewModel extends ChangeNotifier {
   }
 
   void _updateDraftExpenseItems(
-    List<ExpenseItem> items, [
+    List<ExpenseItem> items, {
     double? newTaxAmount,
-  ]) {
+    Set<int>? ocrItemIndexes,
+    bool? taxFromOcr,
+  }) {
     final tax = newTaxAmount ?? _uiState.draftTaxAmount;
     final itemsWithCalculatedSubtotals = items
         .map(
@@ -722,6 +781,9 @@ class ActivityViewModel extends ChangeNotifier {
         itemsWithCalculatedSubtotals,
         tax,
       ),
+      ocrDraftItemIndexes:
+          ocrItemIndexes ?? _uiState.ocrDraftItemIndexes,
+      draftTaxFromOcr: taxFromOcr ?? _uiState.draftTaxFromOcr,
       errorMessage: '',
       successMessage: '',
     );

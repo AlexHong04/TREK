@@ -36,6 +36,8 @@ class ActivityUiState {
   final double? ocrExtractedTotal;
   final double? ocrExtractedTax;
   final List<String> ocrItemLines;
+  final Set<int> ocrDraftItemIndexes;
+  final bool draftTaxFromOcr;
   final String errorMessage;
   final String successMessage;
 
@@ -88,6 +90,8 @@ class ActivityUiState {
     this.ocrExtractedTotal,
     this.ocrExtractedTax,
     this.ocrItemLines = const [],
+    this.ocrDraftItemIndexes = const {},
+    this.draftTaxFromOcr = false,
     this.errorMessage = '',
     this.successMessage = '',
     this.recordedExpenses = const [],
@@ -108,6 +112,17 @@ class ActivityUiState {
 
   double get itemsSubtotal =>
       draftExpenseItems.fold(0.0, (total, item) => total + item.subtotal);
+
+  bool get hasOcrDraftData =>
+      ocrDraftItemIndexes.isNotEmpty || draftTaxFromOcr;
+
+  double get ocrTotalDifference =>
+      ocrExtractedTotal == null ? 0.0 : draftTotalAmount - ocrExtractedTotal!;
+
+  bool get hasOcrTotalMismatch =>
+      ocrExtractedTotal != null &&
+      ocrDraftItemIndexes.isNotEmpty &&
+      ocrTotalDifference.abs() > 0.01;
 
   double get usedPercentageValue => totalBudget <= 0 ? 0.0 : (spentBudget / totalBudget).clamp(0.0, 1.0);
 
@@ -251,6 +266,8 @@ class ActivityUiState {
     double? ocrExtractedTotal,
     double? ocrExtractedTax,
     List<String>? ocrItemLines,
+    Set<int>? ocrDraftItemIndexes,
+    bool? draftTaxFromOcr,
     bool clearOcrData = false,
     bool clearOcrTransactionDateTime = false,
     bool clearOcrExtractedTotal = false,
@@ -311,6 +328,8 @@ class ActivityUiState {
           ? null
           : ocrExtractedTax ?? this.ocrExtractedTax,
       ocrItemLines: clearOcrData ? const [] : ocrItemLines ?? this.ocrItemLines,
+      ocrDraftItemIndexes: ocrDraftItemIndexes ?? this.ocrDraftItemIndexes,
+      draftTaxFromOcr: draftTaxFromOcr ?? this.draftTaxFromOcr,
       errorMessage: errorMessage ?? this.errorMessage,
       successMessage: successMessage ?? this.successMessage,
       recordedExpenses: recordedExpenses ?? this.recordedExpenses,

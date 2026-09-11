@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../models/services/i_auth_service.dart';
@@ -10,8 +11,16 @@ String formatCurrencyAmount(
   int decimalDigits = 2,
 }) {
   final normalizedCurrency = currency.trim().toUpperCase();
+  final displayCurrency = normalizedCurrency == 'MYR' ? 'RM' : normalizedCurrency;
   final sign = amount < 0 ? '-' : '';
-  return '$normalizedCurrency $sign${amount.abs().toStringAsFixed(decimalDigits)}';
+  final decimalPattern = decimalDigits > 0
+      ? '.${List.filled(decimalDigits, '0').join()}'
+      : '';
+  final formattedAmount = NumberFormat(
+    '#,##0$decimalPattern',
+    'en_US',
+  ).format(amount.abs());
+  return '$displayCurrency $sign$formattedAmount';
 }
 
 class ConvertedAmountText extends StatefulWidget {

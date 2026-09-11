@@ -171,6 +171,8 @@ abstract interface class IExpenseTrackingService {
 
   Future<String> readReceiptText(String receiptLocalPath);
 
+  bool isLikelyReceiptText(String receiptText);
+
   String? extractMerchantName(String receiptText);
 
   DateTime? extractReceiptDateTime(String receiptText);
