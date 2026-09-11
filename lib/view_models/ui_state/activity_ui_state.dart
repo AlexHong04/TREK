@@ -13,6 +13,8 @@ class ActivityUiState {
   final List<DateTime> availableDates;
   final DateTime? filterDate;
   final String tripDestination;
+  final DateTime? tripStartDate;
+  final DateTime? tripEndDate;
 
   // Temporary Add Expense form data.
   final Activity? selectedActivity;
@@ -33,6 +35,7 @@ class ActivityUiState {
   final String ocrRawText;
   final String ocrMerchantName;
   final DateTime? ocrTransactionDateTime;
+  final bool ocrDateWasDefaulted;
   final double? ocrExtractedTotal;
   final double? ocrExtractedTax;
   final List<String> ocrItemLines;
@@ -69,6 +72,8 @@ class ActivityUiState {
     this.availableDates = const [],
     this.filterDate,
     this.tripDestination = '',
+    this.tripStartDate,
+    this.tripEndDate,
     this.selectedActivity,
     this.draftExpenseItems = const [],
     this.draftTaxAmount = 0.0,
@@ -87,6 +92,7 @@ class ActivityUiState {
     this.ocrRawText = '',
     this.ocrMerchantName = '',
     this.ocrTransactionDateTime,
+    this.ocrDateWasDefaulted = false,
     this.ocrExtractedTotal,
     this.ocrExtractedTax,
     this.ocrItemLines = const [],
@@ -244,6 +250,8 @@ class ActivityUiState {
     List<DateTime>? availableDates,
     DateTime? filterDate,
     String? tripDestination,
+    DateTime? tripStartDate,
+    DateTime? tripEndDate,
     bool clearFilterDate = false,
     Activity? selectedActivity,
     List<ExpenseItem>? draftExpenseItems,
@@ -263,6 +271,7 @@ class ActivityUiState {
     String? ocrRawText,
     String? ocrMerchantName,
     DateTime? ocrTransactionDateTime,
+    bool? ocrDateWasDefaulted,
     double? ocrExtractedTotal,
     double? ocrExtractedTax,
     List<String>? ocrItemLines,
@@ -299,6 +308,8 @@ class ActivityUiState {
       availableDates: availableDates ?? this.availableDates,
       filterDate: clearFilterDate ? null : (filterDate ?? this.filterDate),
       tripDestination: tripDestination ?? this.tripDestination,
+      tripStartDate: tripStartDate ?? this.tripStartDate,
+      tripEndDate: tripEndDate ?? this.tripEndDate,
       selectedActivity: selectedActivity ?? this.selectedActivity,
       draftExpenseItems: draftExpenseItems ?? this.draftExpenseItems,
       draftTaxAmount: draftTaxAmount ?? this.draftTaxAmount,
@@ -321,6 +332,9 @@ class ActivityUiState {
       ocrTransactionDateTime: clearOcrData || clearOcrTransactionDateTime
           ? null
           : ocrTransactionDateTime ?? this.ocrTransactionDateTime,
+      ocrDateWasDefaulted: clearOcrData
+          ? false
+          : ocrDateWasDefaulted ?? this.ocrDateWasDefaulted,
       ocrExtractedTotal: clearOcrData || clearOcrExtractedTotal
           ? null
           : ocrExtractedTotal ?? this.ocrExtractedTotal,
@@ -328,8 +342,12 @@ class ActivityUiState {
           ? null
           : ocrExtractedTax ?? this.ocrExtractedTax,
       ocrItemLines: clearOcrData ? const [] : ocrItemLines ?? this.ocrItemLines,
-      ocrDraftItemIndexes: ocrDraftItemIndexes ?? this.ocrDraftItemIndexes,
-      draftTaxFromOcr: draftTaxFromOcr ?? this.draftTaxFromOcr,
+      ocrDraftItemIndexes: clearOcrData
+          ? const {}
+          : ocrDraftItemIndexes ?? this.ocrDraftItemIndexes,
+      draftTaxFromOcr: clearOcrData
+          ? false
+          : draftTaxFromOcr ?? this.draftTaxFromOcr,
       errorMessage: errorMessage ?? this.errorMessage,
       successMessage: successMessage ?? this.successMessage,
       recordedExpenses: recordedExpenses ?? this.recordedExpenses,

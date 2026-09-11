@@ -53,6 +53,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   bool _isRecordingNewExpense = false;
   bool _hasAppliedOcrValues = false;
   bool _hasUnfinishedItemFormChanges = false;
+  bool _showUnknownItemPlaceholder = false;
   String? _topMessage;
   Timer? _topMessageTimer;
 
@@ -335,7 +336,9 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     final currency = _savedExpenseCurrency(expense);
     final recordedOn = expense.createdAt == null
         ? 'Recorded expense'
-        : DateFormat('dd MMM yyyy, hh:mm a').format(expense.createdAt!);
+        : DateFormat(
+            'dd MMM yyyy, hh:mm a',
+          ).format(expense.createdAt!.toLocal());
 
     return Material(
       color: appTheme.transparentCustom,
@@ -455,7 +458,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                 Text(
                   expense.createdAt == null
                       ? 'Recorded: Date and time unavailable'
-                      : 'Recorded: ${DateFormat('dd MMM yyyy, hh:mm a').format(expense.createdAt!)}',
+                      : 'Recorded: ${DateFormat('dd MMM yyyy, hh:mm a').format(expense.createdAt!.toLocal())}',
                 ),
                 Text(
                   expense.receiptImageUrl == null
@@ -552,8 +555,11 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
             ),
           if (_showItemForm)
             _ExpenseItemForm(
-              key: ValueKey(_editingItemIndex ?? 'new-item'),
+              key: ValueKey(
+                '${_editingItemIndex ?? 'new-item'}-$_showUnknownItemPlaceholder',
+              ),
               currency: _activeExpenseCurrency(uiState),
+              itemNameHint: _showUnknownItemPlaceholder ? 'Unknown' : 'Item',
               initialItem: _editingItemIndex == null ||
                       _editingItemIndex! >= uiState.draftExpenseItems.length
                   ? null
@@ -987,9 +993,12 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
           _buildOcrValue(
             'Date and time',
             hasOcrDateTime
-                ? DateFormat(
-                    'dd MMM yyyy, hh:mm a',
-                  ).format(uiState.ocrTransactionDateTime!)
+                ? uiState.ocrDateWasDefaulted
+                    ? '${DateFormat('dd MMM yyyy, hh:mm a').format(uiState.ocrTransactionDateTime!)} '
+                        '(not detected — selected activity date used)'
+                    : DateFormat(
+                        'dd MMM yyyy, hh:mm a',
+                      ).format(uiState.ocrTransactionDateTime!)
                 : 'Not detected',
           ),
           _buildOcrValue(
@@ -1142,6 +1151,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
 
   void _editItem(ExpenseItem item, int index) {
     setState(() {
+      _showUnknownItemPlaceholder = false;
       _editingItemIndex = index;
       _showItemForm = true;
       _hasUnfinishedItemFormChanges = false;
@@ -1150,6 +1160,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
 
   void _discardItem() {
     setState(() {
+      _showUnknownItemPlaceholder = false;
       _editingItemIndex = null;
       _showItemForm = false;
       _hasUnfinishedItemFormChanges = false;
@@ -1164,6 +1175,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
       return;
     }
     setState(() {
+      _showUnknownItemPlaceholder = false;
       _editingItemIndex = null;
       _showItemForm = true;
       _hasUnfinishedItemFormChanges = false;
@@ -1206,21 +1218,42 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     }
 
     if (uiState.ocrRawText.isNotEmpty) {
+      var reviewReceiptDate = false;
+      if (viewModel.ocrDateDiffersFromSelectedActivity) {
+        final useReceiptDate = await _showConfirmationDialog(
+          title: 'Receipt Date Differs from Activity',
+          message:
+              'This receipt date does not match the selected activity date. Do you want to use it anyway?',
+          confirmLabel: 'Use Receipt Date',
+          cancelLabel: 'Review Date',
+        );
+        if (!mounted) return;
+        reviewReceiptDate = !useReceiptDate;
+      }
       final itemCount = viewModel.applyOcrItemsToDraft();
-      final detectedTax = viewModel.uiState.draftTaxAmount;
+      final updatedState = viewModel.uiState;
+      final detectedTax = updatedState.draftTaxAmount;
+      final hasUnknownItem = updatedState.draftExpenseItems.length == 1 &&
+          updatedState.draftExpenseItems.first.itemName == 'Unknown';
       _taxController.text = detectedTax > 0
           ? detectedTax.toStringAsFixed(2)
           : '';
       if (itemCount > 0) {
         setState(() {
-          _editingItemIndex = null;
-          _showItemForm = false;
+          _editingItemIndex = reviewReceiptDate || hasUnknownItem ? 0 : null;
+          _showItemForm = reviewReceiptDate || hasUnknownItem;
           _hasAppliedOcrValues = true;
           _hasUnfinishedItemFormChanges = false;
         });
       } else {
+        setState(() {
+          _editingItemIndex = null;
+          _showItemForm = true;
+          _showUnknownItemPlaceholder = true;
+          _hasUnfinishedItemFormChanges = false;
+        });
         _showValidationMessage(
-          'No item details were detected. Please add the expense item manually.',
+          'No item details were detected. "Unknown" was added temporarily; please replace it with the actual item name.',
         );
       }
     }
@@ -1466,6 +1499,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
 
 class _ExpenseItemForm extends StatefulWidget {
   final String currency;
+  final String itemNameHint;
   final ExpenseItem? initialItem;
   final ValueChanged<bool> onChanged;
   final ValueChanged<ExpenseItem> onSave;
@@ -1475,6 +1509,7 @@ class _ExpenseItemForm extends StatefulWidget {
   const _ExpenseItemForm({
     super.key,
     required this.currency,
+    required this.itemNameHint,
     required this.initialItem,
     required this.onChanged,
     required this.onSave,
@@ -1508,7 +1543,9 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
     _selectedTime = TimeOfDay.fromDateTime(
       initialItem?.expenseDateTime ?? DateTime.now(),
     );
-    _itemNameController.text = initialItem?.itemName ?? '';
+    _itemNameController.text =
+        initialItem?.itemName ??
+        (widget.itemNameHint == 'Unknown' ? 'Unknown' : '');
     _descriptionController.text = initialItem?.itemDescription ?? '';
     _merchantController.text = initialItem?.merchantName ?? '';
     _quantityController.text = initialItem == null
@@ -1528,6 +1565,19 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
       controller.addListener(_handleFieldChanged);
     }
     _refreshSubtotal();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ExpenseItemForm oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.itemNameHint == 'Unknown' &&
+        oldWidget.itemNameHint != 'Unknown' &&
+        _itemNameController.text.trim().isEmpty) {
+      _itemNameController.text = 'Unknown';
+      _itemNameController.selection = TextSelection.collapsed(
+        offset: _itemNameController.text.length,
+      );
+    }
   }
 
   @override

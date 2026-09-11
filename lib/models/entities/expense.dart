@@ -26,7 +26,7 @@ class Expense {
       paymentMethod: json['payment_method'] as String?,
       receiptImageUrl: json['receipt_image_url'] as String?,
       createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'] as String)
+          ? _parseCreatedAt(json['created_at'].toString())
           : null,
     );
   }
@@ -64,4 +64,26 @@ class Expense {
 
   static String _optionalCurrency(Object? value) =>
       value?.toString().trim().toUpperCase() ?? '';
+
+  static DateTime _parseCreatedAt(String value) {
+    final normalized = value.trim().replaceFirst(' ', 'T');
+    final parsed = DateTime.parse(normalized);
+    final hasTimeZone = RegExp(r'(?:Z|[+-]\d{2}(?::?\d{2})?)$').hasMatch(
+      normalized,
+    );
+    if (hasTimeZone) return parsed.toLocal();
+
+    // Supabase timestamps without an explicit offset are stored as UTC in this
+    // project. Mark the parsed components as UTC before displaying locally.
+    return DateTime.utc(
+      parsed.year,
+      parsed.month,
+      parsed.day,
+      parsed.hour,
+      parsed.minute,
+      parsed.second,
+      parsed.millisecond,
+      parsed.microsecond,
+    ).toLocal();
+  }
 }

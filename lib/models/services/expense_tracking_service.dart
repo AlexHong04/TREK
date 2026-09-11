@@ -202,7 +202,7 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       caseSensitive: false,
     ).firstMatch(receiptText);
 
-    if ((dateMatch == null && namedDateMatch == null) || timeMatch == null) {
+    if (dateMatch == null && namedDateMatch == null) {
       return null;
     }
 
@@ -221,9 +221,9 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       month = _monthNumber(namedDateMatch.group(2)!);
       year = int.tryParse(namedDateMatch.group(3)!);
     }
-    var hour = int.tryParse(timeMatch.group(1)!);
-    final minute = int.tryParse(timeMatch.group(2)!);
-    final period = timeMatch.group(3)?.toUpperCase();
+    var hour = timeMatch == null ? 0 : int.tryParse(timeMatch.group(1)!);
+    final minute = timeMatch == null ? 0 : int.tryParse(timeMatch.group(2)!);
+    final period = timeMatch?.group(3)?.toUpperCase();
 
     if (day == null ||
         month == null ||
@@ -420,9 +420,6 @@ class ExpenseTrackingService implements IExpenseTrackingService {
 
   String? extractReceiptCurrency(String receiptText) {
     final normalized = receiptText.toUpperCase();
-    if (RegExp(r'\bMYR\b|\bRM\s*(?=\d)|\bRM\b').hasMatch(normalized)) {
-      return 'MYR';
-    }
     if (RegExp(r'\bSGD\b|S\$').hasMatch(normalized)) return 'SGD';
     if (RegExp(r'\bAUD\b|A\$').hasMatch(normalized)) return 'AUD';
     if (RegExp(r'\bCAD\b|C\$').hasMatch(normalized)) return 'CAD';
@@ -431,9 +428,12 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     if (RegExp(r'\bEUR\b|€').hasMatch(normalized)) return 'EUR';
     if (RegExp(r'\bGBP\b|£').hasMatch(normalized)) return 'GBP';
     if (RegExp(r'\bJPY\b|¥').hasMatch(normalized)) return 'JPY';
-    if (RegExp(r'\bCNY\b').hasMatch(normalized)) return 'CNY';
+    if (RegExp(r'\bCNY\b|\bRMB\b').hasMatch(normalized)) return 'CNY';
     if (RegExp(r'\bTHB\b|฿').hasMatch(normalized)) return 'THB';
     if (RegExp(r'\bINR\b|₹').hasMatch(normalized)) return 'INR';
+    if (RegExp(r'\bMYR\b|\bRM\s*(?=\d)|\bRM\b').hasMatch(normalized)) {
+      return 'MYR';
+    }
     return null;
   }
 
@@ -892,10 +892,19 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     }
 
     final itemLines = <_ExtractedReceiptItem>[];
+    final merchantName = extractMerchantName(receiptText)?.toLowerCase().trim();
+    final firstSummaryIndex = lines.indexWhere(
+      (line) => _isSubtotalLabel(line) || _isFinalTotalLabel(line),
+    );
+    final fallbackEnd = firstSummaryIndex < 0 ? lines.length : firstSummaryIndex;
 
-    for (var index = 0; index < lines.length; index++) {
+    for (var index = 0; index < fallbackEnd; index++) {
       final line = lines[index];
-      if (_isReceiptLabel(line) || !RegExp(r'[a-zA-Z]').hasMatch(line)) {
+      final normalizedLine = line.toLowerCase().trim();
+      if (_isReceiptLabel(line) ||
+          normalizedLine == merchantName ||
+          _isNonItemReceiptText(normalizedLine) ||
+          !RegExp(r'[a-zA-Z]').hasMatch(line)) {
         continue;
       }
 
@@ -915,7 +924,9 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       }
 
       double? price;
-      for (final possiblePriceLine in lines.skip(index + 1).take(8)) {
+      for (final possiblePriceLine in lines
+          .skip(index + 1)
+          .take(fallbackEnd - index - 1)) {
         final amounts = _amountsFromLine(possiblePriceLine);
         if (amounts.isNotEmpty) {
           price = amounts.first;
@@ -934,6 +945,13 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       uniqueItems['${item.name}|${item.unitPrice}'] = item;
     }
     return uniqueItems.values.toList();
+  }
+
+  bool _isNonItemReceiptText(String line) {
+    return RegExp(
+      r'^(?:trans|transaction|mcc|payment|thank\s+you|please\s+come\s+again|welcome)(?:\b|\s*[-:])',
+      caseSensitive: false,
+    ).hasMatch(line);
   }
 
   static final RegExp _amountPattern = RegExp(

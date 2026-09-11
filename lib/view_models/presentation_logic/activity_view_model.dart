@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:intl/intl.dart';
 
 import '../../models/entities/expense_item.dart';
 import '../../models/local_data_source/camera_source.dart';
@@ -61,6 +62,15 @@ class ActivityViewModel extends ChangeNotifier {
   ActivityUiState _uiState = const ActivityUiState();
 
   ActivityUiState get uiState => _uiState;
+
+  bool get ocrDateDiffersFromSelectedActivity {
+    final receiptDate = _uiState.ocrTransactionDateTime;
+    final activity = _uiState.selectedActivity;
+    return receiptDate != null &&
+        activity != null &&
+        !_uiState.ocrDateWasDefaulted &&
+        !_isSameDate(receiptDate, activity.date);
+  }
 
   void _handleAuthChanged() {
     notifyListeners();
@@ -436,7 +446,30 @@ class ActivityViewModel extends ChangeNotifier {
           transactionDateTime: _uiState.ocrTransactionDateTime,
         );
     if (expenseItems.isEmpty) {
-      return 0;
+      final detectedTax = _uiState.ocrExtractedTax ?? 0.0;
+      final extractedTotal = _uiState.ocrExtractedTotal ?? 0.0;
+      final itemAmount = extractedTotal - detectedTax;
+      final selectedActivity = _uiState.selectedActivity;
+      if (itemAmount <= 0 || selectedActivity == null) return 0;
+      final unknownItem = ExpenseItem(
+        itemName: 'Unknown',
+        merchantName: _uiState.ocrMerchantName.trim().isEmpty
+            ? null
+            : _uiState.ocrMerchantName.trim(),
+        expenseDateTime:
+            _uiState.ocrTransactionDateTime ??
+            _activityDateTime(selectedActivity),
+        quantity: 1,
+        unitPrice: itemAmount,
+        subtotal: itemAmount,
+      );
+      _updateDraftExpenseItems(
+        [unknownItem],
+        newTaxAmount: detectedTax,
+        ocrItemIndexes: const {0},
+        taxFromOcr: _uiState.ocrExtractedTax != null,
+      );
+      return 1;
     }
 
     final inferredTax = _inferTaxFromReceiptTotal(expenseItems);
@@ -509,25 +542,45 @@ class ActivityViewModel extends ChangeNotifier {
       final extractedTax = _expenseTrackingService.extractReceiptTax(
         receiptText,
       );
-      final extractedDateTime = _expenseTrackingService.extractReceiptDateTime(
+      final parsedDateTime = _expenseTrackingService.extractReceiptDateTime(
         receiptText,
       );
+      final detectedCurrency = _expenseTrackingService.extractReceiptCurrency(
+        receiptText,
+      );
+      if (detectedCurrency != null && detectedCurrency != _expenseCurrency) {
+        throw ArgumentError(
+          'This receipt appears to use a foreign currency. Please upload a Malaysian Ringgit (RM) receipt.',
+        );
+      }
+      final selectedActivity = _uiState.selectedActivity;
+      if (selectedActivity == null) {
+        throw ArgumentError('Select an activity before scanning a receipt.');
+      }
+      final extractedDateTime = _resolveAmbiguousReceiptDateTime(
+        parsedDateTime,
+        selectedActivity,
+      );
+      final effectiveTransactionDateTime =
+          extractedDateTime ?? _activityDateTime(selectedActivity);
+      _validateTransactionDateTime(effectiveTransactionDateTime);
       final extractedItems = _expenseTrackingService
           .buildDraftExpenseItemsFromReceipt(
             receiptText: receiptText,
             merchantName: _expenseTrackingService.extractMerchantName(
               receiptText,
             ),
-            transactionDateTime: extractedDateTime,
+            transactionDateTime: effectiveTransactionDateTime,
           );
       if (!_expenseTrackingService.isLikelyReceiptText(receiptText) ||
-          extractedTotal == null ||
-          extractedItems.isEmpty) {
+          extractedTotal == null) {
         throw Exception(
           'Unable to read the receipt. Please try another image or continue with the manual entry.',
         );
       }
-      String extractedTotalError = '';
+      String extractedTotalError = extractedItems.isEmpty
+          ? 'No purchased item details were found on this receipt. Please enter the expense item manually.'
+          : '';
 
       if (extractedTotal != null) {
         try {
@@ -543,8 +596,8 @@ class ActivityViewModel extends ChangeNotifier {
         ocrRawText: receiptText,
         ocrMerchantName:
             _expenseTrackingService.extractMerchantName(receiptText) ?? '',
-        ocrTransactionDateTime: extractedDateTime,
-        clearOcrTransactionDateTime: extractedDateTime == null,
+        ocrTransactionDateTime: effectiveTransactionDateTime,
+        ocrDateWasDefaulted: extractedDateTime == null,
         originalCurrency: _expenseCurrency,
         ocrExtractedTotal: extractedTotal,
         clearOcrExtractedTotal: extractedTotal == null,
@@ -564,6 +617,102 @@ class ActivityViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  DateTime _activityDateTime(Activity activity) {
+    var hour = activity.date.hour;
+    var minute = activity.date.minute;
+    final timeParts = activity.startTime?.split(':');
+    if (timeParts != null && timeParts.length >= 2) {
+      hour = int.tryParse(timeParts[0]) ?? hour;
+      minute = int.tryParse(timeParts[1]) ?? minute;
+    }
+    return DateTime(
+      activity.date.year,
+      activity.date.month,
+      activity.date.day,
+      hour,
+      minute,
+    );
+  }
+
+  DateTime? _resolveAmbiguousReceiptDateTime(
+    DateTime? parsedDateTime,
+    Activity selectedActivity,
+  ) {
+    if (parsedDateTime == null ||
+        parsedDateTime.day > 12 ||
+        parsedDateTime.month > 12 ||
+        parsedDateTime.day == parsedDateTime.month) {
+      return parsedDateTime;
+    }
+
+    final swapped = DateTime(
+      parsedDateTime.year,
+      parsedDateTime.day,
+      parsedDateTime.month,
+      parsedDateTime.hour,
+      parsedDateTime.minute,
+    );
+    final bounds = _tripDateBounds();
+    bool isAllowed(DateTime value) {
+      if (value.isAfter(DateTime.now())) return false;
+      if (bounds == null) return true;
+      return !value.isBefore(bounds.start) && !value.isAfter(bounds.end);
+    }
+
+    final parsedIsAllowed = isAllowed(parsedDateTime);
+    final swappedIsAllowed = isAllowed(swapped);
+    if (swappedIsAllowed && !parsedIsAllowed) return swapped;
+    if (parsedIsAllowed && !swappedIsAllowed) return parsedDateTime;
+    if (swappedIsAllowed &&
+        _isSameDate(swapped, selectedActivity.date) &&
+        !_isSameDate(parsedDateTime, selectedActivity.date)) {
+      return swapped;
+    }
+    return parsedDateTime;
+  }
+
+  ({DateTime start, DateTime end})? _tripDateBounds() {
+    DateTime? start = _uiState.tripStartDate;
+    DateTime? end = _uiState.tripEndDate;
+    final activityDates = _uiState.allActivities.isNotEmpty
+        ? _uiState.allActivities.map((activity) => activity.date).toList()
+        : _uiState.availableDates;
+    if ((start == null || end == null) && activityDates.isNotEmpty) {
+      activityDates.sort();
+      start ??= activityDates.first;
+      end ??= activityDates.last;
+    }
+    if (start == null || end == null) return null;
+    return (
+      start: DateTime(start.year, start.month, start.day),
+      end: DateTime(end.year, end.month, end.day, 23, 59, 59, 999),
+    );
+  }
+
+  void _validateTransactionDateTime(DateTime transactionDateTime) {
+    if (transactionDateTime.isAfter(DateTime.now())) {
+      throw ArgumentError(
+        'Transaction date and time cannot be later than the current time.',
+      );
+    }
+    final bounds = _tripDateBounds();
+    if (bounds != null &&
+        (transactionDateTime.isBefore(bounds.start) ||
+            transactionDateTime.isAfter(bounds.end))) {
+      throw ArgumentError(
+        'Receipt date must be within the trip period: '
+        '${DateFormat('dd MMM yyyy').format(bounds.start)} to '
+        '${DateFormat('dd MMM yyyy').format(bounds.end)}.',
+      );
+    }
+  }
+
+  void _validateDraftExpenseDates() {
+    for (final item in _uiState.draftExpenseItems) {
+      _validateTransactionDateTime(item.expenseDateTime);
+    }
+  }
+
   void clearExpenseMessage() {
     _uiState = _uiState.copyWith(errorMessage: '', successMessage: '');
     notifyListeners();
@@ -581,6 +730,7 @@ class ActivityViewModel extends ChangeNotifier {
       }
       _expenseTrackingService.validateTaxAmount(_uiState.draftTaxAmount);
       _expenseTrackingService.validateExpenseItems(_uiState.draftExpenseItems);
+      _validateDraftExpenseDates();
       _expenseTrackingService.validateTotalAmount(_uiState.draftTotalAmount);
       _expenseTrackingService.validateExpenseWithinRemainingBudget(
         totalAmount: _uiState.draftTotalAmount,
@@ -612,6 +762,7 @@ class ActivityViewModel extends ChangeNotifier {
     try {
       _expenseTrackingService.validateTaxAmount(_uiState.draftTaxAmount);
       _expenseTrackingService.validateExpenseItems(_uiState.draftExpenseItems);
+      _validateDraftExpenseDates();
       _expenseTrackingService.validateTotalAmount(_uiState.draftTotalAmount);
       _expenseTrackingService.validateExpenseWithinRemainingBudget(
         totalAmount: _uiState.draftTotalAmount,
@@ -862,6 +1013,8 @@ class ActivityViewModel extends ChangeNotifier {
           activities: result.activities,
           totalBudget: result.trip.totalBudget,
           tripDestination: result.trip.destination,
+          tripStartDate: result.trip.startDate,
+          tripEndDate: result.trip.endDate,
           originalCurrency: _expenseCurrency,
           sufficientDays: days,
         );
@@ -993,6 +1146,17 @@ class ActivityViewModel extends ChangeNotifier {
           knownDestination ??
           tripResult?.trip.destination ??
           _uiState.tripDestination;
+      final matchingTrip = tripResult?.trip.tripId == tripId
+          ? tripResult?.trip
+          : null;
+      final sortedActivityDates = allActivities
+          .map((activity) => activity.date)
+          .toList()
+        ..sort();
+      final effectiveTripStartDate = matchingTrip?.startDate ??
+          (sortedActivityDates.isEmpty ? null : sortedActivityDates.first);
+      final effectiveTripEndDate = matchingTrip?.endDate ??
+          (sortedActivityDates.isEmpty ? null : sortedActivityDates.last);
 
       // *** SET CRITICAL STATE FIRST — before any non-essential calls ***
       _uiState = _uiState.copyWith(
@@ -1006,6 +1170,8 @@ class ActivityViewModel extends ChangeNotifier {
         filterDate: targetDate,
         tripId: tripId,
         tripDestination: effectiveDestination,
+        tripStartDate: effectiveTripStartDate,
+        tripEndDate: effectiveTripEndDate,
         originalCurrency: _expenseCurrency,
       );
       notifyListeners();
