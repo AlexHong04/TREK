@@ -915,6 +915,7 @@ class ItineraryService implements IItineraryService {
     required String tripDestination,
     String? userCoordinates,
     DateTime? currentDate,
+    DateTime? tripEndDate,
   }) async {
     // 1. Create lookup map for preserving IDs and metadata
     final Map<String, Activity> activityLookup = {
@@ -947,6 +948,7 @@ class ItineraryService implements IItineraryService {
           tripDestination: tripDestination,
           userCoordinates: userCoordinates,
           currentDate: currentDate,
+          tripEndDate: tripEndDate,
         );
 
     final defaultDayTripId = remainingActivities.isNotEmpty
@@ -973,16 +975,19 @@ class ItineraryService implements IItineraryService {
         activityImgUrl: item['activityImgUrl']?.toString().isNotEmpty == true
             ? item['activityImgUrl'].toString()
             : (originalActivity?.activityImgUrl ?? 'assets/logo.png'),
-        date: item['date'] != null
-            ? DateTime.tryParse(item['date'].toString()) ??
-                  (originalActivity?.date ?? DateTime.now())
-            : (originalActivity?.date ?? DateTime.now()),
+        date: originalActivity?.date ?? DateTime.now(),
         allocatedBudget: allocatedBudget,
         overspendAmount: allocatedBudget > 0 ? 0 : null,
         status: item['status']?.toString() ?? 'pending',
-        startTime: item['startTime']?.toString() ?? '09:00',
-        endTime: item['endTime']?.toString() ?? '10:00',
-        duration: item['duration']?.toString() ?? '60 min',
+        startTime: item['startTime']?.toString() ??
+            originalActivity?.startTime ??
+            '09:00',
+        endTime: item['endTime']?.toString() ??
+            originalActivity?.endTime ??
+            '10:00',
+        duration: item['duration']?.toString() ??
+            originalActivity?.duration ??
+            '60 min',
         activityCategory:
             item['activityCategory']?.toString() ??
             (originalActivity?.activityCategory ?? 'General'),

@@ -113,11 +113,11 @@ class GeminiApiConfig {
     - Budget: \$$budget
     ${preference != null ? '- Preference: $preference (You MUST heavily prioritize planning activities that strictly match this theme!)' : ''}
     ${resolvedArrivals.isNotEmpty ? '''- Arrival Details:
-${resolvedArrivals.asMap().entries.map((e) => '      * Arrival ${e.key + 1}: ${e.value.location} at ${e.value.time}').join('\n')}
-      * CRITICAL FOR DAY 1: Day 1 activities MUST start after the initial arrival time (${resolvedArrivals.first.time}) at "${resolvedArrivals.first.location}". Route connecting activities accordingly!''' : ''}
+${resolvedArrivals.asMap().entries.map((e) => '      * Arrival ${e.key + 1} (${e.value.type}): ${e.value.location}${e.value.date.isNotEmpty ? ' on ${e.value.date}' : ''} at ${e.value.time}').join('\n')}
+      * CRITICAL FOR DAY 1: Day 1 activities MUST start after the initial arrival time (${resolvedArrivals.first.time}${resolvedArrivals.first.date.isNotEmpty ? ' on ${resolvedArrivals.first.date}' : ''}) at "${resolvedArrivals.first.location}" (arriving via ${resolvedArrivals.first.type}). Route connecting activities accordingly!''' : ''}
     ${resolvedDepartures.isNotEmpty ? '''- Departure Details:
-${resolvedDepartures.asMap().entries.map((e) => '      * Departure ${e.key + 1}: ${e.value.location} at ${e.value.time}').join('\n')}
-      * CRITICAL FOR FINAL DAY: Final day schedule MUST finish in time for the traveler to reach "${resolvedDepartures.last.location}" before ${resolvedDepartures.last.time}!''' : ''}
+${resolvedDepartures.asMap().entries.map((e) => '      * Departure ${e.key + 1} (${e.value.type}): ${e.value.location}${e.value.date.isNotEmpty ? ' on ${e.value.date}' : ''} at ${e.value.time}').join('\n')}
+      * CRITICAL FOR FINAL DAY: Final day schedule MUST finish in time for the traveler to reach "${resolvedDepartures.last.location}" (departing via ${resolvedDepartures.last.type}) before ${resolvedDepartures.last.time}${resolvedDepartures.last.date.isNotEmpty ? ' on ${resolvedDepartures.last.date}' : ''}!''' : ''}
     ${resolvedHotels.isNotEmpty ? '''- Accommodation / Hotel:
 ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.value.location} (Check-in: ${e.value.checkInTime}, Check-out: ${e.value.checkOutTime})').join('\n')}
       * CRITICAL FOR HOTEL: Daily activities should conveniently route to/from this accommodation area. Factor in hotel check-in on Day 1 (around ${resolvedHotels.first.checkInTime}) and check-out on the final day (around ${resolvedHotels.last.checkOutTime}).''' : ''}
@@ -129,9 +129,9 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
     - MANDATORY: You MUST INCLUDE EVERY SINGLE ONE of these wishlist items in the generated itinerary: ${wishlist.join(', ')}.
     - NEVER omit or exclude ANY of these wishlist items under any circumstances! Every single wishlist item MUST appear as a scheduled activity in the itinerary under its actual place name.
     - To fit the entire plan within the updated Budget (\$$budget), aggressively economize on all other activities:
-      * Choose affordable local eateries/hawker stalls (e.g. RM 5-15) for ordinary meals.
+      * Choose affordable local eateries/hawker stalls (e.g. MYR 5-15) for ordinary meals.
       * Choose free public attractions, parks, or walking tours for other non-wishlist slots.
-      * Keep transport minimal or walking (RM 0.0).
+      * Keep transport minimal or walking (MYR 0.0).
     - "wishlistItemsCoveredCount" MUST BE EXACTLY ${wishlist.length} (since 100% of the wishlist items are included).
     - "estimatedExtraBudgetNeeded" MUST be 0.0 since the plan MUST fit within \$$budget.
     ''' : '''
@@ -173,7 +173,7 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
     - Public parks, sightseeing of landmarks, walking tours, and free attractions MUST have an allocatedBudget of 0.
     - "Transportation" pricing rule:
       * If consecutive activities are CLOSE to each other (walking distance, e.g. within ~1km or in the same complex/neighborhood), transit is by WALKING and "allocatedBudget" MUST be 0.0.
-      * If activities are FAR (different areas or > 1km requiring public transit, LRT, MRT, Monorail, or Grab), "allocatedBudget" MUST have a realistic transit fare greater than 0 (e.g., RM 2.00 - RM 15.00).
+      * If activities are FAR (different areas or > 1km requiring public transit, LRT, MRT, Monorail, or Grab), "allocatedBudget" MUST have a realistic transit fare greater than 0 (e.g., MYR 2.00 - MYR 15.00).
     - Only assign costs to food/dining, transportation, and places that explicitly require entrance tickets.
     '''}
     
@@ -202,7 +202,7 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
         - If two consecutive activities are CLOSE to each other (within walking distance, e.g. < 1km, adjacent streets, or within the same mall/complex like Pavilion KL to Lot 10, or Suria KLCC to KLCC Park):
           + Transit mode is WALKING: set "destination" to "Walk to [Next Destination]" or "Pedestrian Walkway", "description" to "Short 5-10 min walk to the next venue", "duration" to "5-15 min", and "allocatedBudget" to 0.0 (Walking is completely free!).
         - If two consecutive activities are FAR from each other (requiring motorized transit, different neighborhoods, or > 1km):
-          + Transit mode is VEHICULAR (MRT, LRT, Bus, or Grab): set "destination" to the station, terminal, or transit route (e.g. "KLCC LRT Station", "Bukit Bintang MRT Station"), "description" to describe the transit route (e.g. "Take MRT Kajang Line / Grab ride to destination"), "duration" to "15-30 min", and "allocatedBudget" to a realistic fare greater than 0 (e.g. RM 3.00 - RM 15.00).
+          + Transit mode is VEHICULAR (MRT, LRT, Bus, or Grab): set "destination" to the station, terminal, or transit route (e.g. "KLCC LRT Station", "Bukit Bintang MRT Station"), "description" to describe the transit route (e.g. "Take MRT Kajang Line / Grab ride to destination"), "duration" to "15-30 min", and "allocatedBudget" to a realistic fare greater than 0 (e.g. MYR 3.00 - MYR 15.00).
       * "activityCategory" for all of these transfer activities MUST strictly be "Transportation".
 
     CRITICAL RULE FOR DESTINATIONS/RESTAURANTS:
@@ -326,7 +326,7 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
     required Map<String, double> categoryExpenses,
   }) async {
     final categoryText = categoryExpenses.entries
-        .map((entry) => '- ${entry.key}: RM ${entry.value.toStringAsFixed(2)}')
+        .map((entry) => '- ${entry.key}: MYR ${entry.value.toStringAsFixed(2)}')
         .join('\n');
     final prompt =
         '''
@@ -334,9 +334,9 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
 
     Trip Financial Data:
     - Destination: $destination
-    - Total Allocated Budget: RM ${allocatedBudget.toStringAsFixed(2)}
-    - Total Expense: RM ${totalExpense.toStringAsFixed(2)}
-    - Remaining Budget: RM ${remainingBudget.toStringAsFixed(2)}
+    - Total Allocated Budget: MYR ${allocatedBudget.toStringAsFixed(2)}
+    - Total Expense: MYR ${totalExpense.toStringAsFixed(2)}
+    - Remaining Budget: MYR ${remainingBudget.toStringAsFixed(2)}
     - Expenses By Category:
     $categoryText
 
@@ -406,7 +406,7 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
     required Map<String, double> categoryExpenses,
   }) async {
     final categoryText = categoryExpenses.entries
-        .map((entry) => '- ${entry.key}: RM ${entry.value.toStringAsFixed(2)}')
+        .map((entry) => '- ${entry.key}: MYR ${entry.value.toStringAsFixed(2)}')
         .join('\n');
     final prompt =
         '''
@@ -414,8 +414,8 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
 
     Completed Trip Financial Data:
     - Destination: $destination
-    - Total Allocated Budget: RM ${allocatedBudget.toStringAsFixed(2)}
-    - Total Expense: RM ${totalExpense.toStringAsFixed(2)}
+    - Total Allocated Budget: MYR ${allocatedBudget.toStringAsFixed(2)}
+    - Total Expense: MYR ${totalExpense.toStringAsFixed(2)}
     - Expenses By Category:
     $categoryText
 
@@ -521,7 +521,7 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
     - Target Area / Neighborhood: $targetAreaOrNeighborhood (Must be located nearby this neighborhood to minimize travel time)
     - Preferred Category: ${category.isNotEmpty ? category : "Attraction or Restaurant"}
     - Time Slot: $startTime to $endTime
-    - Budget Ceiling: RM ${budgetLimit.toStringAsFixed(2)}
+    - Budget Ceiling: MYR ${budgetLimit.toStringAsFixed(2)}
 
     CRITICAL EXCLUSION LIST (DUPLICATES PROHIBITED):
     The user already has the following places in their itinerary or explicitly rejected them. You MUST NOT suggest any of these places or slight variations of them:
@@ -617,7 +617,7 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
 
     Parameters:
     - Destination City: $destinationCity
-    - Remaining Budget Available for Empty Slots: RM ${remainingBudget.toStringAsFixed(2)}
+    - Remaining Budget Available for Empty Slots: MYR ${remainingBudget.toStringAsFixed(2)}
     ${preference != null && preference.isNotEmpty ? '- Trip Preference / Theme: $preference' : ''}
     ${constraints != null && constraints.isNotEmpty ? '- Personal Constraints: ${constraints.join(', ')}' : ''}
     ${uncoveredWishlist != null && uncoveredWishlist.isNotEmpty ? '- Uncovered Wishlist Items (Optionally place these into suitable empty slots if they fit): ${uncoveredWishlist.join(', ')}' : ''}
@@ -641,7 +641,7 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
        - If a slot falls around lunch (12:00-14:00) or dinner (18:00-20:30), prefer suggesting a "Restaurant".
     3. Realistic Places & Budget:
        - Every destination MUST be an EXACT, FULL official business name or landmark on Google Maps in $destinationCity.
-       - The total allocatedBudget across all returned slots should fit within RM ${remainingBudget.toStringAsFixed(2)}.
+       - The total allocatedBudget across all returned slots should fit within MYR ${remainingBudget.toStringAsFixed(2)}.
        - Public parks, walking tours, and free landmarks MUST have an allocatedBudget of 0.0.
        - "activityCategory" MUST strictly be one of: "Attraction", "Restaurant", "Transportation".
 
@@ -717,22 +717,35 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
     required String tripDestination,
     String? userCoordinates,
     DateTime? currentDate,
+    DateTime? tripEndDate,
   }) async {
     final locationConstraint = userCoordinates != null
         ? 'Current GPS Coordinates: $userCoordinates (within $tripDestination)'
         : 'Destination: $tripDestination';
 
-    // 1. Minify input payload to keep prompt fast and focused
+    // Derive a time-of-day label from startTime so Gemini knows meal context
+    // without being anchored to exact times it must preserve anyway.
+    String _timeOfDay(String? startTime) {
+      if (startTime == null || startTime.isEmpty) return 'daytime';
+      final hour = int.tryParse(startTime.split(':').first) ?? 12;
+      if (hour < 12) return 'morning';
+      if (hour < 17) return 'afternoon';
+      return 'evening';
+    }
+
+    // 1. Minify input payload — only fields Gemini needs to make decisions.
+    //    activitiesId: for 1-to-1 mapping back.
+    //    category: so meal slots stay as meals, attractions stay as attractions.
+    //    timeOfDay: morning/afternoon/evening hint for meal appropriateness.
+    //    date: which day this slot falls on for day-by-day coherence.
     final sanitizedRemainingSlots = remainingActivities
         .map(
           (act) => {
             'activitiesId': act['activitiesId'],
             'category':
                 act['activityCategory'] ?? act['category'] ?? 'Attraction',
-            'originalDestination': act['destination'],
-            'startTime': act['startTime'],
-            'endTime': act['endTime'],
-            'allocatedBudget': act['allocatedBudget'],
+            'timeOfDay': _timeOfDay(act['startTime']?.toString()),
+            'date': act['date']?.toString().split('T').first ?? '',
           },
         )
         .toList();
@@ -747,33 +760,42 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
       }
     }
 
+    final tripEndInfo = tripEndDate != null
+        ? '\n    - Trip End Date: ${tripEndDate.toIso8601String().split('T').first}'
+        : '';
+
     final prompt =
         '''
     You are an expert travel itinerary budget recovery engine.
     The tourist has reached a budget constraint. Re-plan their remaining itinerary slots to strictly fit the remaining funds.
-    
-    Constraints:
+
+    Context:
     - Location / Base: $locationConstraint
-    - Current Date/Time: ${currentDate?.toIso8601String() ?? DateTime.now().toIso8601String()}
-    - Effective Remaining Budget Ceiling: RM ${effectiveRemainingBudget.toStringAsFixed(2)}
-    
-    Remaining Time Slots to Fill:
+    - Current Date/Time: ${currentDate?.toIso8601String() ?? DateTime.now().toIso8601String()}$tripEndInfo
+    - Already Spent So Far: MYR ${currentSpentBudget.toStringAsFixed(2)}
+    - Remaining Budget Ceiling (total for ALL slots below): MYR ${effectiveRemainingBudget.toStringAsFixed(2)}
+    - Number of Remaining Slots: ${sanitizedRemainingSlots.length}
+
+    Remaining Slots to Re-plan:
     ${jsonEncode(sanitizedRemainingSlots)}
-    
+
     Rules:
     1. Strict Slot Count (1-to-1 Mapping):
        - You MUST return an array with EXACTLY ${sanitizedRemainingSlots.length} items.
-       - For every slot, PRESERVE the exact "activitiesId", "startTime", and "endTime" passed in the input. Do NOT generate new IDs.
+       - For every slot, PRESERVE the exact "activitiesId" from the input. Do NOT generate new IDs.
     2. Category Preservation:
        - Match the slot's original category. If the original slot was a restaurant/food category, replace it with an affordable local food spot/hawker stall; do NOT replace a meal slot with a park.
-    3. Budget & Realism:
-       - The sum of ALL "allocatedBudget" values across the returned items MUST be <= RM ${effectiveRemainingBudget.toStringAsFixed(2)}.
-       - If remaining budget is RM 0 or near 0, use free activities (public parks, walking tours, free galleries) and minimal meal costs (hawker food RM 5-10).
+       - Use the "timeOfDay" hint: morning slots should have breakfast options, afternoon slots should have lunch options, evening slots should have dinner options.
+    3. Budget Distribution:
+       - The sum of ALL "allocatedBudget" values across the returned items MUST be <= MYR ${effectiveRemainingBudget.toStringAsFixed(2)}.
+       - Distribute the budget sensibly across remaining days — do not spend everything on early slots and leave later days with nothing.
+       - If remaining budget is MYR 0 or near 0, use free activities (public parks, walking tours, free galleries) and minimal meal costs (hawker food MYR 5-10).
        - Public parks, walking tours, and free sights MUST have "allocatedBudget": 0.0.
     4. Geographic Proximity:
        - All venues must be within close walking distance or short public transit of $locationConstraint. Never suggest cross-city travel.
+       - Activities on the same date should be geographically close to each other for a practical day plan.
        - Every destination must be a specific, real-world Google Maps place name (no generic names like "Local Eatery").
-    
+
     Output Schema:
     Return ONLY a raw JSON array matching this structure (no markdown fences, no extra text):
     [
@@ -782,8 +804,6 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
         "destination": "Exact Place Name",
         "description": "Short 1-sentence reason (e.g., Free entrance landmark near current location)",
         "activityCategory": "Restaurant | Attraction | Transportation",
-        "startTime": "HH:mm",
-        "endTime": "HH:mm",
         "allocatedBudget": 0.0
       }
     ]

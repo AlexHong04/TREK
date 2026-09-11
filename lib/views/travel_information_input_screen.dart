@@ -80,9 +80,28 @@ class _TravelInformationInputScreenState
     while (_hotelLocationControllers.length > hotels.length) {
       _hotelLocationControllers.removeLast().dispose();
     }
+    for (int i = 0; i < hotels.length; i++) {
+      if (i < _hotelLocationControllers.length &&
+          _hotelLocationControllers[i].text != hotels[i].location &&
+          hotels[i].location.isEmpty) {
+        _hotelLocationControllers[i].text = '';
+      }
+    }
   }
 
   void _addHotel(TravelInformationInputViewModel viewModel) {
+    if (viewModel.uiState.selectedDestinations.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Please select destination state(s) first before adding hotels.',
+          ),
+          backgroundColor: appTheme.redButton,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     setState(() {
       _hotelLocationControllers.add(TextEditingController());
     });
@@ -275,6 +294,7 @@ class _TravelInformationInputScreenState
                             picked.start,
                             picked.end,
                           );
+                          viewModel.updateTripDates(picked.start, picked.end);
                         }
                       },
                       validator: viewModel.validateDate,
@@ -290,8 +310,8 @@ class _TravelInformationInputScreenState
                         final double? enteredAmount =
                             double.tryParse(value.text.trim());
                         return CustomTextField(
-                          sectionTitle: 'TRIP BUDGET (RM)',
-                          hintText: 'Total Trip Budget (RM)',
+                          sectionTitle: 'TRIP BUDGET (MYR)',
+                          hintText: 'Total Trip Budget (MYR)',
                           prefixIcon: Icons.account_balance_wallet_outlined,
                           prefixIconColor: appTheme.teal_A700,
                           controller: _budgetController,
@@ -346,7 +366,7 @@ class _TravelInformationInputScreenState
                                           DualCurrencyAmount(
                                             amount: enteredAmount,
                                             baseCurrency: 'MYR',
-                                            baseLabel: 'RM',
+                                            baseLabel: 'MYR',
                                             primaryStyle: TextStyle(
                                               fontSize: 14,
                                               fontWeight: FontWeight.w800,
@@ -535,8 +555,10 @@ class _TravelInformationInputScreenState
                           .toList(),
                       'arrivalLocation': viewModel.uiState.arrivalLocation,
                       'arrivalTime': viewModel.uiState.arrivalTime,
+                      'arrivalDate': viewModel.uiState.arrivalDate,
                       'departureLocation': viewModel.uiState.departureLocation,
                       'departureTime': viewModel.uiState.departureTime,
+                      'departureDate': viewModel.uiState.departureDate,
                       'hotels': viewModel.uiState.hotels
                           .map((e) => e.toJson())
                           .toList(),
@@ -619,10 +641,20 @@ class _TravelInformationInputScreenState
   ) {
     return FormField<List<String>>(
       initialValue: viewModel.uiState.selectedDestinations,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
       validator: (_) => viewModel.validateDestinations(),
       builder: (FormFieldState<List<String>> field) {
         final selectedDestinations = viewModel.uiState.selectedDestinations;
-        final hasError = field.hasError;
+        final hasError = field.hasError && selectedDestinations.isEmpty;
+
+        if (selectedDestinations.isNotEmpty && field.hasError) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (field.mounted) {
+              field.didChange(selectedDestinations);
+              field.validate();
+            }
+          });
+        }
 
         return Container(
           margin: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -664,6 +696,7 @@ class _TravelInformationInputScreenState
                       onTap: () {
                         viewModel.clearDestinations();
                         field.didChange(const []);
+                        field.validate();
                       },
                       child: Text(
                         'Clear all',
@@ -680,8 +713,16 @@ class _TravelInformationInputScreenState
               const SizedBox(height: 10.0),
               InkWell(
                 onTap: () async {
-                  await _showDestinationSelectionModal(context, viewModel);
+                  await _showDestinationSelectionModal(
+                    context,
+                    viewModel,
+                    onSelectionChanged: () {
+                      field.didChange(viewModel.uiState.selectedDestinations);
+                      field.validate();
+                    },
+                  );
                   field.didChange(viewModel.uiState.selectedDestinations);
+                  field.validate();
                 },
                 borderRadius: BorderRadius.circular(12.0),
                 child: Row(
@@ -714,6 +755,7 @@ class _TravelInformationInputScreenState
                                     field.didChange(
                                       viewModel.uiState.selectedDestinations,
                                     );
+                                    field.validate();
                                   }),
                                 ),
                                 GestureDetector(
@@ -721,10 +763,17 @@ class _TravelInformationInputScreenState
                                     await _showDestinationSelectionModal(
                                       context,
                                       viewModel,
+                                      onSelectionChanged: () {
+                                        field.didChange(
+                                          viewModel.uiState.selectedDestinations,
+                                        );
+                                        field.validate();
+                                      },
                                     );
                                     field.didChange(
                                       viewModel.uiState.selectedDestinations,
                                     );
+                                    field.validate();
                                   },
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(
@@ -823,8 +872,9 @@ class _TravelInformationInputScreenState
 
   Future<void> _showDestinationSelectionModal(
     BuildContext context,
-    TravelInformationInputViewModel viewModel,
-  ) {
+    TravelInformationInputViewModel viewModel, {
+    VoidCallback? onSelectionChanged,
+  }) {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -992,6 +1042,7 @@ class _TravelInformationInputScreenState
                               return InkWell(
                                 onTap: () {
                                   viewModel.toggleDestination(item.name);
+                                  onSelectionChanged?.call();
                                   setModalState(() {});
                                 },
                                 borderRadius: BorderRadius.circular(12.0),
@@ -1080,6 +1131,7 @@ class _TravelInformationInputScreenState
                             TextButton(
                               onPressed: () {
                                 viewModel.clearDestinations();
+                                onSelectionChanged?.call();
                                 setModalState(() {});
                               },
                               child: Text(
@@ -1239,107 +1291,180 @@ class _TravelInformationInputScreenState
 
             return Padding(
               padding: EdgeInsets.only(
-                bottom: index == arrivals.length - 1 ? 0.0 : 8.0,
+                bottom: index == arrivals.length - 1 ? 0.0 : 14.0,
               ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: InkWell(
-                      onTap: () => _showAirportSelectionModal(
-                        context,
-                        viewModel,
-                        isArrival: true,
-                        index: index,
-                      ),
-                      borderRadius: BorderRadius.circular(10.0),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12.0,
-                          vertical: 10.0,
-                        ),
-                        decoration: BoxDecoration(
-                          color: appTheme.gray_50_01,
-                          borderRadius: BorderRadius.circular(10.0),
-                          border: Border.all(
-                            color: arrival.location.isNotEmpty
-                                ? appTheme.teal_A700.withValues(alpha: 0.35)
-                                : appTheme.gray_200,
-                            width: 1.0,
+                  if (arrivals.length > 1) ...[
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'ARRIVAL ${index + 1}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            fontFamily: 'Inter',
+                            color: appTheme.blue_gray_300,
+                            letterSpacing: 0.5,
                           ),
                         ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.flight_land_rounded,
-                              color: appTheme.teal_A700,
-                              size: 18,
+                        InkWell(
+                          onTap: () => _removeArrival(index, viewModel),
+                          borderRadius: BorderRadius.circular(8.0),
+                          child: Padding(
+                            padding: const EdgeInsets.all(4.0),
+                            child: Icon(
+                              Icons.close_rounded,
+                              size: 18.0,
+                              color: appTheme.blue_gray_300,
                             ),
-                            const SizedBox(width: 8.0),
-                            Expanded(
-                              child: Text(
-                                arrival.location.isNotEmpty
-                                    ? arrival.location
-                                    : (arrivals.length > 1
-                                        ? 'Select arrival airport ${index + 1}'
-                                        : 'Select arrival airport'),
-                                style: TextStyle(
-                                  fontSize: 13.5,
-                                  fontWeight: arrival.location.isNotEmpty
-                                      ? FontWeight.w600
-                                      : FontWeight.w400,
-                                  fontFamily: 'Inter',
-                                  color: arrival.location.isNotEmpty
-                                      ? appTheme.gray_800
-                                      : appTheme.blue_gray_300,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6.0),
+                  ],
+                  InkWell(
+                    onTap: () => _showTransitHubSelectionModal(
+                      context,
+                      viewModel,
+                      isArrival: true,
+                      index: index,
+                    ),
+                    borderRadius: BorderRadius.circular(10.0),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12.0,
+                        vertical: 10.0,
+                      ),
+                      decoration: BoxDecoration(
+                        color: appTheme.gray_50_01,
+                        borderRadius: BorderRadius.circular(10.0),
+                        border: Border.all(
+                          color: arrival.location.isNotEmpty
+                              ? appTheme.teal_A700.withValues(alpha: 0.35)
+                              : appTheme.gray_200,
+                          width: 1.0,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _getArrivalTransitIcon(arrival.type),
+                            color: appTheme.teal_A700,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8.0),
+                          Expanded(
+                            child: Text(
+                              arrival.location.isNotEmpty
+                                  ? arrival.location
+                                  : _getArrivalPlaceholder(
+                                      arrival.type,
+                                      index,
+                                      arrivals.length,
+                                    ),
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: arrival.location.isNotEmpty
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
+                                fontFamily: 'Inter',
+                                color: arrival.location.isNotEmpty
+                                    ? appTheme.gray_800
+                                    : appTheme.blue_gray_300,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 4.0),
+                          Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: appTheme.blue_gray_300,
+                            size: 18.0,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8.0),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'DATE',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                fontFamily: 'Inter',
+                                color: appTheme.blue_gray_300,
+                                letterSpacing: 0.5,
                               ),
                             ),
-                            const SizedBox(width: 4.0),
-                            Icon(
-                              Icons.keyboard_arrow_down_rounded,
-                              color: appTheme.blue_gray_300,
-                              size: 18.0,
+                            const SizedBox(height: 4.0),
+                            _buildDatePickerButton(
+                              context: context,
+                              date: arrival.date,
+                              isFullWidth: true,
+                              onTap: () => _pickTransitDate(
+                                context: context,
+                                viewModel: viewModel,
+                                isArrival: true,
+                                initialDateString: arrival.date,
+                                onDatePicked: (d) =>
+                                    viewModel.updateArrivalDate(index, d),
+                              ),
                             ),
                           ],
                         ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 8.0),
-                  _buildTimePickerButton(
-                    context: context,
-                    time: arrival.time,
-                    onTap: () => _pickTime(
-                      context: context,
-                      initialTimeString: arrival.time,
-                      onTimePicked: (t) =>
-                          viewModel.updateArrivalTime(index, t),
-                    ),
-                  ),
-                  if (arrivals.length > 1) ...[
-                    const SizedBox(width: 4.0),
-                    InkWell(
-                      onTap: () => _removeArrival(index, viewModel),
-                      borderRadius: BorderRadius.circular(8.0),
-                      child: Padding(
-                        padding: const EdgeInsets.all(4.0),
-                        child: Icon(
-                          Icons.close_rounded,
-                          size: 18.0,
-                          color: appTheme.blue_gray_300,
+                      const SizedBox(width: 10.0),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'TIME',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                fontFamily: 'Inter',
+                                color: appTheme.blue_gray_300,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 4.0),
+                            _buildTimePickerButton(
+                              context: context,
+                              time: arrival.time,
+                              isFullWidth: true,
+                              onTap: () => _pickTime(
+                                context: context,
+                                initialTimeString: arrival.time,
+                                onTimePicked: (t) =>
+                                    viewModel.updateArrivalTime(index, t),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
+                    ],
+                  ),
+                  if (index < arrivals.length - 1) ...[
+                    const SizedBox(height: 14.0),
+                    Divider(color: appTheme.gray_100, height: 1.0),
                   ],
                 ],
               ),
             );
           }),
-
-          const SizedBox(height: 10.0),
 
           const SizedBox(height: 14.0),
           Divider(color: appTheme.gray_100, height: 1.0),
@@ -1427,100 +1552,175 @@ class _TravelInformationInputScreenState
 
             return Padding(
               padding: EdgeInsets.only(
-                bottom: index == departures.length - 1 ? 0.0 : 8.0,
+                bottom: index == departures.length - 1 ? 0.0 : 14.0,
               ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: InkWell(
-                      onTap: () => _showAirportSelectionModal(
-                        context,
-                        viewModel,
-                        isArrival: false,
-                        index: index,
-                      ),
-                      borderRadius: BorderRadius.circular(10.0),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12.0,
-                          vertical: 10.0,
-                        ),
-                        decoration: BoxDecoration(
-                          color: appTheme.gray_50_01,
-                          borderRadius: BorderRadius.circular(10.0),
-                          border: Border.all(
-                            color: departure.location.isNotEmpty
-                                ? appTheme.teal_A700.withValues(alpha: 0.35)
-                                : appTheme.gray_200,
-                            width: 1.0,
+                  if (departures.length > 1) ...[
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'DEPARTURE ${index + 1}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            fontFamily: 'Inter',
+                            color: appTheme.blue_gray_300,
+                            letterSpacing: 0.5,
                           ),
                         ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.flight_takeoff_rounded,
-                              color: appTheme.teal_A700,
-                              size: 18,
+                        InkWell(
+                          onTap: () => _removeDeparture(index, viewModel),
+                          borderRadius: BorderRadius.circular(8.0),
+                          child: Padding(
+                            padding: const EdgeInsets.all(4.0),
+                            child: Icon(
+                              Icons.close_rounded,
+                              size: 18.0,
+                              color: appTheme.blue_gray_300,
                             ),
-                            const SizedBox(width: 8.0),
-                            Expanded(
-                              child: Text(
-                                departure.location.isNotEmpty
-                                    ? departure.location
-                                    : (departures.length > 1
-                                        ? 'Select departure airport ${index + 1}'
-                                        : 'Select departure airport'),
-                                style: TextStyle(
-                                  fontSize: 13.5,
-                                  fontWeight: departure.location.isNotEmpty
-                                      ? FontWeight.w600
-                                      : FontWeight.w400,
-                                  fontFamily: 'Inter',
-                                  color: departure.location.isNotEmpty
-                                      ? appTheme.gray_800
-                                      : appTheme.blue_gray_300,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6.0),
+                  ],
+                  InkWell(
+                    onTap: () => _showTransitHubSelectionModal(
+                      context,
+                      viewModel,
+                      isArrival: false,
+                      index: index,
+                    ),
+                    borderRadius: BorderRadius.circular(10.0),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12.0,
+                        vertical: 10.0,
+                      ),
+                      decoration: BoxDecoration(
+                        color: appTheme.gray_50_01,
+                        borderRadius: BorderRadius.circular(10.0),
+                        border: Border.all(
+                          color: departure.location.isNotEmpty
+                              ? appTheme.teal_A700.withValues(alpha: 0.35)
+                              : appTheme.gray_200,
+                          width: 1.0,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _getDepartureTransitIcon(departure.type),
+                            color: appTheme.teal_A700,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8.0),
+                          Expanded(
+                            child: Text(
+                              departure.location.isNotEmpty
+                                  ? departure.location
+                                  : _getDeparturePlaceholder(
+                                      departure.type,
+                                      index,
+                                      departures.length,
+                                    ),
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: departure.location.isNotEmpty
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
+                                fontFamily: 'Inter',
+                                color: departure.location.isNotEmpty
+                                    ? appTheme.gray_800
+                                    : appTheme.blue_gray_300,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 4.0),
+                          Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: appTheme.blue_gray_300,
+                            size: 18.0,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8.0),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'DATE',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                fontFamily: 'Inter',
+                                color: appTheme.blue_gray_300,
+                                letterSpacing: 0.5,
                               ),
                             ),
-                            const SizedBox(width: 4.0),
-                            Icon(
-                              Icons.keyboard_arrow_down_rounded,
-                              color: appTheme.blue_gray_300,
-                              size: 18.0,
+                            const SizedBox(height: 4.0),
+                            _buildDatePickerButton(
+                              context: context,
+                              date: departure.date,
+                              isFullWidth: true,
+                              onTap: () => _pickTransitDate(
+                                context: context,
+                                viewModel: viewModel,
+                                isArrival: false,
+                                initialDateString: departure.date,
+                                onDatePicked: (d) =>
+                                    viewModel.updateDepartureDate(index, d),
+                              ),
                             ),
                           ],
                         ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 8.0),
-                  _buildTimePickerButton(
-                    context: context,
-                    time: departure.time,
-                    onTap: () => _pickTime(
-                      context: context,
-                      initialTimeString: departure.time,
-                      onTimePicked: (t) =>
-                          viewModel.updateDepartureTime(index, t),
-                    ),
-                  ),
-                  if (departures.length > 1) ...[
-                    const SizedBox(width: 4.0),
-                    InkWell(
-                      onTap: () => _removeDeparture(index, viewModel),
-                      borderRadius: BorderRadius.circular(8.0),
-                      child: Padding(
-                        padding: const EdgeInsets.all(4.0),
-                        child: Icon(
-                          Icons.close_rounded,
-                          size: 18.0,
-                          color: appTheme.blue_gray_300,
+                      const SizedBox(width: 10.0),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'TIME',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                fontFamily: 'Inter',
+                                color: appTheme.blue_gray_300,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 4.0),
+                            _buildTimePickerButton(
+                              context: context,
+                              time: departure.time,
+                              isFullWidth: true,
+                              onTap: () => _pickTime(
+                                context: context,
+                                initialTimeString: departure.time,
+                                onTimePicked: (t) =>
+                                    viewModel.updateDepartureTime(index, t),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
+                    ],
+                  ),
+                  if (index < departures.length - 1) ...[
+                    const SizedBox(height: 14.0),
+                    Divider(color: appTheme.gray_100, height: 1.0),
                   ],
                 ],
               ),
@@ -1536,6 +1736,7 @@ class _TravelInformationInputScreenState
     TravelInformationInputViewModel viewModel,
   ) {
     final hotels = viewModel.uiState.hotels;
+    final hasDestinations = viewModel.uiState.selectedDestinations.isNotEmpty;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -1612,7 +1813,9 @@ class _TravelInformationInputScreenState
                       Icon(
                         Icons.add_circle_outline_rounded,
                         size: 14.0,
-                        color: appTheme.teal_A700,
+                        color: hasDestinations
+                            ? appTheme.teal_A700
+                            : appTheme.blue_gray_300,
                       ),
                       const SizedBox(width: 4.0),
                       Text(
@@ -1621,7 +1824,9 @@ class _TravelInformationInputScreenState
                           fontSize: 12.0,
                           fontWeight: FontWeight.w600,
                           fontFamily: 'Inter',
-                          color: appTheme.teal_A700,
+                          color: hasDestinations
+                              ? appTheme.teal_A700
+                              : appTheme.blue_gray_300,
                         ),
                       ),
                     ],
@@ -1630,6 +1835,41 @@ class _TravelInformationInputScreenState
               ),
             ],
           ),
+          if (!hasDestinations) ...[
+            const SizedBox(height: 8.0),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 10.0,
+                vertical: 8.0,
+              ),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF8E1),
+                borderRadius: BorderRadius.circular(8.0),
+                border: Border.all(color: const Color(0xFFFFD54F)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 16.0,
+                    color: Color(0xFFF57F17),
+                  ),
+                  SizedBox(width: 8.0),
+                  Expanded(
+                    child: Text(
+                      'Please select destination state(s) above first to enter hotel details.',
+                      style: TextStyle(
+                        fontSize: 12.0,
+                        fontWeight: FontWeight.w500,
+                        fontFamily: 'Inter',
+                        color: Color(0xFFF57F17),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 10.0),
 
           // HOTELS LIST
@@ -1681,19 +1921,39 @@ class _TravelInformationInputScreenState
                   ],
                   TextField(
                     controller: controller,
-                    onTap: () => viewModel.onHotelFocused(index),
+                    readOnly: !hasDestinations,
+                    onTap: () {
+                      if (!hasDestinations) {
+                        FocusScope.of(context).unfocus();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text(
+                              'Please select destination state(s) first before entering hotel details.',
+                            ),
+                            backgroundColor: appTheme.redButton,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                        return;
+                      }
+                      viewModel.onHotelFocused(index);
+                    },
                     onChanged: (text) =>
                         viewModel.onHotelLocationChanged(index, text),
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w400,
                       fontFamily: 'Inter',
-                      color: appTheme.gray_800,
+                      color: hasDestinations
+                          ? appTheme.gray_800
+                          : appTheme.blue_gray_300,
                     ),
                     decoration: InputDecoration(
-                      hintText: hotels.length > 1
-                          ? 'Hotel ${index + 1} name or area'
-                          : 'Hotel name or area (e.g. George Town)',
+                      hintText: !hasDestinations
+                          ? 'Select destination state(s) first...'
+                          : (hotels.length > 1
+                              ? 'Hotel ${index + 1} name or area'
+                              : 'Hotel name or area (e.g. George Town)'),
                       hintStyle: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w400,
@@ -1702,7 +1962,9 @@ class _TravelInformationInputScreenState
                       ),
                       prefixIcon: Icon(
                         Icons.hotel_outlined,
-                        color: appTheme.teal_A700,
+                        color: hasDestinations
+                            ? appTheme.teal_A700
+                            : appTheme.blue_gray_300,
                         size: 20,
                       ),
                       prefixIconConstraints: const BoxConstraints(
@@ -1763,12 +2025,26 @@ class _TravelInformationInputScreenState
                               context: context,
                               time: hotel.checkInTime,
                               isFullWidth: true,
-                              onTap: () => _pickTime(
-                                context: context,
-                                initialTimeString: hotel.checkInTime,
-                                onTimePicked: (t) =>
-                                    viewModel.updateHotelCheckInTime(index, t),
-                              ),
+                              onTap: () {
+                                if (!hasDestinations) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: const Text(
+                                        'Please select destination state(s) first before setting hotel times.',
+                                      ),
+                                      backgroundColor: appTheme.redButton,
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                  return;
+                                }
+                                _pickTime(
+                                  context: context,
+                                  initialTimeString: hotel.checkInTime,
+                                  onTimePicked: (t) =>
+                                      viewModel.updateHotelCheckInTime(index, t),
+                                );
+                              },
                             ),
                           ],
                         ),
@@ -1793,12 +2069,26 @@ class _TravelInformationInputScreenState
                               context: context,
                               time: hotel.checkOutTime,
                               isFullWidth: true,
-                              onTap: () => _pickTime(
-                                context: context,
-                                initialTimeString: hotel.checkOutTime,
-                                onTimePicked: (t) =>
-                                    viewModel.updateHotelCheckOutTime(index, t),
-                              ),
+                              onTap: () {
+                                if (!hasDestinations) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: const Text(
+                                        'Please select destination state(s) first before setting hotel times.',
+                                      ),
+                                      backgroundColor: appTheme.redButton,
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                  return;
+                                }
+                                _pickTime(
+                                  context: context,
+                                  initialTimeString: hotel.checkOutTime,
+                                  onTimePicked: (t) =>
+                                      viewModel.updateHotelCheckOutTime(index, t),
+                                );
+                              },
                             ),
                           ],
                         ),
@@ -1816,6 +2106,123 @@ class _TravelInformationInputScreenState
         ],
       ),
     );
+  }
+
+  Widget _buildDatePickerButton({
+    required BuildContext context,
+    required String date,
+    required VoidCallback onTap,
+    bool isFullWidth = false,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10.0),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 7.0),
+        decoration: BoxDecoration(
+          color: appTheme.gray_50_01,
+          borderRadius: BorderRadius.circular(10.0),
+          border: Border.all(
+            color: date.isNotEmpty
+                ? appTheme.teal_A700.withValues(alpha: 0.35)
+                : appTheme.gray_200,
+            width: 1.0,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: isFullWidth ? MainAxisSize.max : MainAxisSize.min,
+          mainAxisAlignment:
+              isFullWidth ? MainAxisAlignment.center : MainAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.calendar_today_rounded,
+              size: 15.0,
+              color: appTheme.teal_A700,
+            ),
+            const SizedBox(width: 6.0),
+            Text(
+              date.isNotEmpty ? date : 'Select date',
+              style: TextStyle(
+                fontSize: 13.0,
+                fontWeight: date.isNotEmpty ? FontWeight.w600 : FontWeight.w400,
+                fontFamily: 'Inter',
+                color: date.isNotEmpty
+                    ? appTheme.teal_A700
+                    : appTheme.blue_gray_300,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickTransitDate({
+    required BuildContext context,
+    required TravelInformationInputViewModel viewModel,
+    required bool isArrival,
+    required String initialDateString,
+    required ValueChanged<String> onDatePicked,
+  }) async {
+    final startDate = viewModel.uiState.startDate;
+    final endDate = viewModel.uiState.endDate;
+
+    if (startDate == null || endDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Please select trip dates in the "WHEN?" section first.',
+          ),
+          backgroundColor: appTheme.redButton,
+        ),
+      );
+      return;
+    }
+
+    final firstAllowed = startDate.subtract(const Duration(days: 1));
+    final lastAllowed = endDate.add(const Duration(days: 1));
+
+    DateTime initialDate = isArrival ? startDate : endDate;
+    if (initialDateString.trim().isNotEmpty) {
+      final parsed = DateTime.tryParse(initialDateString.trim());
+      if (parsed != null) {
+        if (parsed.isBefore(firstAllowed)) {
+          initialDate = firstAllowed;
+        } else if (parsed.isAfter(lastAllowed)) {
+          initialDate = lastAllowed;
+        } else {
+          initialDate = parsed;
+        }
+      }
+    }
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: firstAllowed,
+      lastDate: lastAllowed,
+      helpText: isArrival
+          ? 'SELECT ARRIVAL DATE (±1 DAY OF TRIP)'
+          : 'SELECT DEPARTURE DATE (±1 DAY OF TRIP)',
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: appTheme.teal_A700,
+              onPrimary: appTheme.white_A700,
+              surface: appTheme.white_A700,
+              onSurface: appTheme.gray_800,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      final formatted = picked.toLocal().toString().split(' ')[0];
+      onDatePicked(formatted);
+    }
   }
 
   Widget _buildTimePickerButton({
@@ -1909,23 +2316,87 @@ class _TravelInformationInputScreenState
     }
   }
 
-  Future<void> _showAirportSelectionModal(
+  IconData _getArrivalTransitIcon(String type) {
+    switch (type.toLowerCase()) {
+      case 'train':
+        return Icons.directions_subway_rounded;
+      case 'bus':
+        return Icons.directions_bus_rounded;
+      case 'flight':
+      default:
+        return Icons.flight_land_rounded;
+    }
+  }
+
+  IconData _getDepartureTransitIcon(String type) {
+    switch (type.toLowerCase()) {
+      case 'train':
+        return Icons.directions_subway_rounded;
+      case 'bus':
+        return Icons.directions_bus_rounded;
+      case 'flight':
+      default:
+        return Icons.flight_takeoff_rounded;
+    }
+  }
+
+  IconData _getTransitHubIcon(String type) {
+    switch (type.toLowerCase()) {
+      case 'train':
+        return Icons.directions_subway_rounded;
+      case 'bus':
+        return Icons.directions_bus_rounded;
+      case 'flight':
+      default:
+        return Icons.local_airport_rounded;
+    }
+  }
+
+  String _getArrivalPlaceholder(String type, int index, int total) {
+    final suffix = total > 1 ? ' ${index + 1}' : '';
+    switch (type.toLowerCase()) {
+      case 'train':
+        return 'Select arrival train station$suffix';
+      case 'bus':
+        return 'Select arrival bus terminal$suffix';
+      case 'flight':
+      default:
+        return 'Select arrival airport$suffix';
+    }
+  }
+
+  String _getDeparturePlaceholder(String type, int index, int total) {
+    final suffix = total > 1 ? ' ${index + 1}' : '';
+    switch (type.toLowerCase()) {
+      case 'train':
+        return 'Select departure train station$suffix';
+      case 'bus':
+        return 'Select departure bus terminal$suffix';
+      case 'flight':
+      default:
+        return 'Select departure airport$suffix';
+    }
+  }
+
+  Future<void> _showTransitHubSelectionModal(
     BuildContext context,
     TravelInformationInputViewModel viewModel, {
     required bool isArrival,
     required int index,
   }) {
-    final currentSelected = isArrival
+    final currentItem = isArrival
         ? (index < viewModel.uiState.arrivals.length
-            ? viewModel.uiState.arrivals[index].location
-            : '')
+            ? viewModel.uiState.arrivals[index]
+            : const TransitPoint(id: ''))
         : (index < viewModel.uiState.departures.length
-            ? viewModel.uiState.departures[index].location
-            : '');
+            ? viewModel.uiState.departures[index]
+            : const TransitPoint(id: ''));
+
+    final currentSelected = currentItem.location;
+    final initialMode =
+        currentItem.type.isNotEmpty ? currentItem.type : 'Flight';
 
     final destinations = viewModel.uiState.selectedDestinations;
-    final recommendedAirports = getTransitHubSuggestions(destinations);
-    final allAirports = getAllMalaysiaAirports();
 
     return showModalBottomSheet(
       context: context,
@@ -1933,29 +2404,60 @@ class _TravelInformationInputScreenState
       backgroundColor: appTheme.transparentCustom,
       builder: (modalContext) {
         String searchQuery = '';
+        String activeMode = initialMode;
 
         return StatefulBuilder(
           builder: (context, setModalState) {
             final query = searchQuery.trim().toLowerCase();
 
+            final recommendedHubs = getTransitHubSuggestions(
+              destinations,
+              transitType: activeMode,
+            );
+            final allHubs = getAllTransitHubs(transitType: activeMode);
+
             final filteredRecommended = query.isEmpty
-                ? recommendedAirports
-                : recommendedAirports
+                ? recommendedHubs
+                : recommendedHubs
                     .where((a) => a.toLowerCase().contains(query))
                     .toList();
 
-            final otherAirports = allAirports
-                .where((a) => !recommendedAirports.contains(a))
+            final otherHubs = allHubs
+                .where((a) => !recommendedHubs.contains(a))
                 .toList();
 
             final filteredOthers = query.isEmpty
-                ? otherAirports
-                : otherAirports
+                ? otherHubs
+                : otherHubs
                     .where((a) => a.toLowerCase().contains(query))
                     .toList();
 
+            final isTrain = activeMode.toLowerCase() == 'train';
+            final isBus = activeMode.toLowerCase() == 'bus';
+
+            final String typeLabel = isTrain
+                ? 'Train Station'
+                : (isBus ? 'Bus Terminal' : 'Airport');
+            final String modalTitle = isArrival
+                ? 'Select Arrival $typeLabel'
+                : 'Select Departure $typeLabel';
+            final String otherHeader = isTrain
+                ? 'OTHER MALAYSIA TRAIN STATIONS'
+                : (isBus
+                    ? 'OTHER MALAYSIA BUS TERMINALS'
+                    : 'OTHER MALAYSIA AIRPORTS');
+            final String searchHint = isTrain
+                ? 'Search train station (e.g. KL Sentral, Ipoh)...'
+                : (isBus
+                    ? 'Search bus terminal (e.g. TBS, Larkin)...'
+                    : 'Search airport or city (e.g. KLIA, Penang)...');
+
+            final bool hasExactMatch = [...filteredRecommended, ...filteredOthers]
+                .any((h) => h.toLowerCase() == query);
+            final bool canAddCustom = query.isNotEmpty && !hasExactMatch;
+
             return Container(
-              height: MediaQuery.of(context).size.height * 0.78,
+              height: MediaQuery.of(context).size.height * 0.82,
               decoration: BoxDecoration(
                 color: appTheme.white_A700,
                 borderRadius: const BorderRadius.vertical(
@@ -1984,38 +2486,93 @@ class _TravelInformationInputScreenState
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              isArrival
-                                  ? 'Select Arrival Airport'
-                                  : 'Select Departure Airport',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                fontFamily: 'Inter',
-                                color: appTheme.gray_800,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                modalTitle,
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  fontFamily: 'Inter',
+                                  color: appTheme.gray_800,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 2.0),
-                            Text(
-                              destinations.isNotEmpty
-                                  ? 'Based on destination: ${destinations.join(", ")}'
-                                  : 'Major Commercial Airports of Malaysia',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontFamily: 'Inter',
-                                color: appTheme.blue_gray_300,
+                              const SizedBox(height: 2.0),
+                              Text(
+                                destinations.isNotEmpty
+                                    ? 'Based on destination: ${destinations.join(", ")}'
+                                    : 'Major $typeLabel Options in Malaysia',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontFamily: 'Inter',
+                                  color: appTheme.blue_gray_300,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                         IconButton(
                           icon: Icon(Icons.close, color: appTheme.gray_800),
                           onPressed: () => Navigator.pop(context),
                         ),
                       ],
+                    ),
+                  ),
+
+                  // Mode Selector Tabs inside Modal
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20.0,
+                      vertical: 4.0,
+                    ),
+                    child: Container(
+                      padding: const EdgeInsets.all(4.0),
+                      decoration: BoxDecoration(
+                        color: appTheme.gray_50_01,
+                        borderRadius: BorderRadius.circular(12.0),
+                        border: Border.all(color: appTheme.gray_200),
+                      ),
+                      child: Row(
+                        children: [
+                          _buildModalModeTab(
+                            icon: Icons.flight_rounded,
+                            label: 'Flight',
+                            isSelected: activeMode.toLowerCase() == 'flight',
+                            onTap: () {
+                              setModalState(() {
+                                activeMode = 'Flight';
+                              });
+                              viewModel.syncTransitType('Flight', index: index);
+                            },
+                          ),
+                          const SizedBox(width: 4.0),
+                          _buildModalModeTab(
+                            icon: Icons.directions_subway_rounded,
+                            label: 'Train',
+                            isSelected: activeMode.toLowerCase() == 'train',
+                            onTap: () {
+                              setModalState(() {
+                                activeMode = 'Train';
+                              });
+                              viewModel.syncTransitType('Train', index: index);
+                            },
+                          ),
+                          const SizedBox(width: 4.0),
+                          _buildModalModeTab(
+                            icon: Icons.directions_bus_rounded,
+                            label: 'Bus',
+                            isSelected: activeMode.toLowerCase() == 'bus',
+                            onTap: () {
+                              setModalState(() {
+                                activeMode = 'Bus';
+                              });
+                              viewModel.syncTransitType('Bus', index: index);
+                            },
+                          ),
+                        ],
+                      ),
                     ),
                   ),
 
@@ -2043,7 +2600,7 @@ class _TravelInformationInputScreenState
                           color: appTheme.gray_800,
                         ),
                         decoration: InputDecoration(
-                          hintText: 'Search airport or city (e.g. KLIA, Penang)...',
+                          hintText: searchHint,
                           hintStyle: TextStyle(
                             fontSize: 14,
                             fontFamily: 'Inter',
@@ -2081,7 +2638,7 @@ class _TravelInformationInputScreenState
                             Navigator.pop(context);
                           },
                           child: Text(
-                            'Clear airport selection',
+                            'Clear $typeLabel selection',
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -2097,9 +2654,11 @@ class _TravelInformationInputScreenState
                   const SizedBox(height: 4.0),
                   Divider(height: 1.0, color: appTheme.gray_100),
 
-                  // Airport List
+                  // Hubs List
                   Expanded(
-                    child: (filteredRecommended.isEmpty && filteredOthers.isEmpty)
+                    child: (filteredRecommended.isEmpty &&
+                            filteredOthers.isEmpty &&
+                            !canAddCustom)
                         ? Center(
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
@@ -2111,7 +2670,7 @@ class _TravelInformationInputScreenState
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  'No airports found',
+                                  'No $typeLabel options found',
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontFamily: 'Inter',
@@ -2127,6 +2686,73 @@ class _TravelInformationInputScreenState
                               vertical: 12.0,
                             ),
                             children: [
+                              // Custom entry option
+                              if (canAddCustom) ...[
+                                InkWell(
+                                  onTap: () {
+                                    final customName = searchQuery.trim();
+                                    viewModel.syncTransitType(
+                                      activeMode,
+                                      index: index,
+                                    );
+                                    if (isArrival) {
+                                      viewModel.updateArrivalLocation(
+                                        index,
+                                        customName,
+                                      );
+                                    } else {
+                                      viewModel.updateDepartureLocation(
+                                        index,
+                                        customName,
+                                      );
+                                    }
+                                    Navigator.pop(context);
+                                  },
+                                  borderRadius: BorderRadius.circular(12.0),
+                                  child: Container(
+                                    margin: const EdgeInsets.only(bottom: 12.0),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14.0,
+                                      vertical: 12.0,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: appTheme.teal_50,
+                                      borderRadius: BorderRadius.circular(12.0),
+                                      border: Border.all(
+                                        color: appTheme.teal_A700,
+                                        width: 1.0,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.add_location_alt_rounded,
+                                          size: 20,
+                                          color: appTheme.teal_A700,
+                                        ),
+                                        const SizedBox(width: 10.0),
+                                        Expanded(
+                                          child: Text(
+                                            'Use "${searchQuery.trim()}" as $typeLabel',
+                                            style: TextStyle(
+                                              fontSize: 13.5,
+                                              fontWeight: FontWeight.w600,
+                                              fontFamily: 'Inter',
+                                              color: appTheme.teal_A700,
+                                            ),
+                                          ),
+                                        ),
+                                        Icon(
+                                          Icons.arrow_forward_ios_rounded,
+                                          size: 14,
+                                          color: appTheme.teal_A700,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+
                               if (destinations.isNotEmpty &&
                                   filteredRecommended.isNotEmpty) ...[
                                 Row(
@@ -2150,24 +2776,29 @@ class _TravelInformationInputScreenState
                                   ],
                                 ),
                                 const SizedBox(height: 8.0),
-                                ...filteredRecommended.map((airport) {
-                                  final isSelected = currentSelected == airport;
+                                ...filteredRecommended.map((hub) {
+                                  final isSelected = currentSelected == hub;
                                   return Padding(
                                     padding: const EdgeInsets.only(bottom: 8.0),
-                                    child: _buildAirportModalItem(
-                                      airport: airport,
+                                    child: _buildTransitHubModalItem(
+                                      transitHub: hub,
+                                      transitType: activeMode,
                                       isSelected: isSelected,
                                       isRecommended: true,
                                       onTap: () {
+                                        viewModel.syncTransitType(
+                                          activeMode,
+                                          index: index,
+                                        );
                                         if (isArrival) {
                                           viewModel.updateArrivalLocation(
                                             index,
-                                            airport,
+                                            hub,
                                           );
                                         } else {
                                           viewModel.updateDepartureLocation(
                                             index,
-                                            airport,
+                                            hub,
                                           );
                                         }
                                         Navigator.pop(context);
@@ -2184,7 +2815,7 @@ class _TravelInformationInputScreenState
                                   Padding(
                                     padding: const EdgeInsets.only(bottom: 8.0),
                                     child: Text(
-                                      'OTHER MALAYSIA AIRPORTS',
+                                      otherHeader,
                                       style: TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.w800,
@@ -2194,24 +2825,29 @@ class _TravelInformationInputScreenState
                                       ),
                                     ),
                                   ),
-                                ...filteredOthers.map((airport) {
-                                  final isSelected = currentSelected == airport;
+                                ...filteredOthers.map((hub) {
+                                  final isSelected = currentSelected == hub;
                                   return Padding(
                                     padding: const EdgeInsets.only(bottom: 8.0),
-                                    child: _buildAirportModalItem(
-                                      airport: airport,
+                                    child: _buildTransitHubModalItem(
+                                      transitHub: hub,
+                                      transitType: activeMode,
                                       isSelected: isSelected,
                                       isRecommended: false,
                                       onTap: () {
+                                        viewModel.syncTransitType(
+                                          activeMode,
+                                          index: index,
+                                        );
                                         if (isArrival) {
                                           viewModel.updateArrivalLocation(
                                             index,
-                                            airport,
+                                            hub,
                                           );
                                         } else {
                                           viewModel.updateDepartureLocation(
                                             index,
-                                            airport,
+                                            hub,
                                           );
                                         }
                                         Navigator.pop(context);
@@ -2232,8 +2868,50 @@ class _TravelInformationInputScreenState
     );
   }
 
-  Widget _buildAirportModalItem({
-    required String airport,
+  Widget _buildModalModeTab({
+    required IconData icon,
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8.0),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          decoration: BoxDecoration(
+            color: isSelected ? appTheme.teal_A700 : appTheme.transparentCustom,
+            borderRadius: BorderRadius.circular(8.0),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 14.0,
+                color: isSelected ? appTheme.white_A700 : appTheme.blue_gray_300,
+              ),
+              const SizedBox(width: 6.0),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  fontFamily: 'Inter',
+                  color: isSelected ? appTheme.white_A700 : appTheme.gray_800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTransitHubModalItem({
+    required String transitHub,
+    required String transitType,
     required bool isSelected,
     required bool isRecommended,
     required VoidCallback onTap,
@@ -2269,7 +2947,7 @@ class _TravelInformationInputScreenState
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                Icons.local_airport_rounded,
+                _getTransitHubIcon(transitType),
                 size: 18.0,
                 color: (isSelected || isRecommended)
                     ? appTheme.teal_A700
@@ -2279,7 +2957,7 @@ class _TravelInformationInputScreenState
             const SizedBox(width: 12.0),
             Expanded(
               child: Text(
-                airport,
+                transitHub,
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
@@ -2305,6 +2983,19 @@ class _TravelInformationInputScreenState
     required List<String> suggestions,
     required ValueChanged<String> onSelect,
   }) {
+    final seen = <String>{};
+    final uniqueSuggestions = suggestions.where((s) {
+      final key = s
+          .trim()
+          .toLowerCase()
+          .replaceAll(RegExp(r',\s*malaysia$', caseSensitive: false), '')
+          .replaceAll(RegExp(r'\s+'), ' ')
+          .trim();
+      return key.isNotEmpty && seen.add(key);
+    }).toList();
+
+    if (uniqueSuggestions.isEmpty) return const SizedBox.shrink();
+
     return Container(
       decoration: BoxDecoration(
         color: appTheme.white_A700,
@@ -2324,13 +3015,13 @@ class _TravelInformationInputScreenState
       child: ListView.separated(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        itemCount: suggestions.length,
+        itemCount: uniqueSuggestions.length,
         separatorBuilder: (context, index) => Divider(
           color: appTheme.gray_100,
           height: 1.0,
         ),
         itemBuilder: (context, index) {
-          final suggestion = suggestions[index];
+          final suggestion = uniqueSuggestions[index];
           return ListTile(
             leading: Icon(
               Icons.hotel_rounded,

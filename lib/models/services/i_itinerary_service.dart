@@ -100,6 +100,7 @@ abstract interface class IItineraryService {
     required String tripDestination,
     String? userCoordinates,
     DateTime? currentDate,
+    DateTime? tripEndDate,
   });
 
   Future<void> saveRevisedItineraryActivities(List<Activity> activities);

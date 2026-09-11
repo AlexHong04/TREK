@@ -9,9 +9,12 @@ String formatCurrencyAmount(
   String currency,
   double amount, {
   int decimalDigits = 2,
+  bool displayMyrAsCode = false,
 }) {
   final normalizedCurrency = currency.trim().toUpperCase();
-  final displayCurrency = normalizedCurrency == 'MYR' ? 'RM' : normalizedCurrency;
+  final displayCurrency = normalizedCurrency == 'MYR' && !displayMyrAsCode
+      ? 'RM'
+      : normalizedCurrency;
   final sign = amount < 0 ? '-' : '';
   final decimalPattern = decimalDigits > 0
       ? '.${List.filled(decimalDigits, '0').join()}'
@@ -33,6 +36,7 @@ class ConvertedAmountText extends StatefulWidget {
   final CrossAxisAlignment crossAxisAlignment;
   final TextAlign textAlign;
   final bool showLabelsWhenSameCurrency;
+  final bool displayMyrAsCode;
 
   const ConvertedAmountText({
     super.key,
@@ -45,6 +49,7 @@ class ConvertedAmountText extends StatefulWidget {
     this.crossAxisAlignment = CrossAxisAlignment.start,
     this.textAlign = TextAlign.start,
     this.showLabelsWhenSameCurrency = false,
+    this.displayMyrAsCode = false,
   });
 
   @override
@@ -149,7 +154,11 @@ class _ConvertedAmountTextState extends State<ConvertedAmountText> {
         );
 
     if (displayCurrency == preferredCurrency) {
-      final text = formatCurrencyAmount(displayCurrency, widget.amount);
+      final text = formatCurrencyAmount(
+        displayCurrency,
+        widget.amount,
+        displayMyrAsCode: widget.displayMyrAsCode,
+      );
       return Text(
         widget.showLabelsWhenSameCurrency
             ? '${widget.convertedLabel}: $text'
@@ -174,7 +183,11 @@ class _ConvertedAmountTextState extends State<ConvertedAmountText> {
       );
     } else {
       convertedLine = Text(
-        formatCurrencyAmount(preferredCurrency, _convertedAmount!),
+        formatCurrencyAmount(
+          preferredCurrency,
+          _convertedAmount!,
+          displayMyrAsCode: widget.displayMyrAsCode,
+        ),
         textAlign: widget.textAlign,
         style: secondaryStyle,
       );
@@ -185,7 +198,11 @@ class _ConvertedAmountTextState extends State<ConvertedAmountText> {
       crossAxisAlignment: widget.crossAxisAlignment,
       children: [
         Text(
-          formatCurrencyAmount(displayCurrency, widget.amount),
+          formatCurrencyAmount(
+            displayCurrency,
+            widget.amount,
+            displayMyrAsCode: widget.displayMyrAsCode,
+          ),
           textAlign: widget.textAlign,
           style: primaryStyle,
         ),

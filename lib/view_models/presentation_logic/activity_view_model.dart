@@ -1763,8 +1763,10 @@ class ActivityViewModel extends ChangeNotifier {
           ? 'Lat: ${currentPosition.latitude.toStringAsFixed(5)}, Lon: ${currentPosition.longitude.toStringAsFixed(5)}'
           : null;
 
-      final effectiveRemainingBudget =
-          _uiState.totalBudget - _uiState.spentBudget;
+      final rawRemaining = _uiState.totalBudget - _uiState.spentBudget;
+      // Clamp to zero so the Gemini prompt never receives a negative ceiling
+      // (which would guarantee generation failure or garbage output).
+      final effectiveRemainingBudget = rawRemaining < 0 ? 0.0 : rawRemaining;
 
       // 2. Delegate generation and Supabase updates completely to Service
       final revisedActivities = await _itineraryService
@@ -1777,6 +1779,7 @@ class ActivityViewModel extends ChangeNotifier {
             tripDestination: _uiState.tripDestination,
             userCoordinates: userCoordinates,
             currentDate: DateTime.now(),
+            tripEndDate: _uiState.tripEndDate,
           );
 
       // Nothing was generated (e.g. no slots left to re-plan, or the engine
@@ -1800,11 +1803,25 @@ class ActivityViewModel extends ChangeNotifier {
         return revisedMap[a.activitiesId] ?? a;
       }).toList();
 
+      final updatedAllActivities = _uiState.allActivities.map((a) {
+        return revisedMap[a.activitiesId] ?? a;
+      }).toList();
+
       _uiState = _uiState.copyWith(
         isLoading: false,
         activities: updatedActivities,
+        allActivities: updatedAllActivities,
       );
       notifyListeners();
+
+      // 4. Reconcile budget card values after recovery
+      try {
+        await reconcileTripOverspend();
+        await refreshSpentAmounts();
+      } catch (e) {
+        debugPrint('Post-recovery budget refresh error (non-fatal): $e');
+      }
+
       return true;
     } catch (e, stackTrace) {
       debugPrint('Error in generateBudgetRecoveryPlan: $e');

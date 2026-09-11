@@ -66,13 +66,10 @@ class _ActivityScreenState extends State<ActivityScreen> {
               _destination = innerTrip['destination'].toString();
             }
             if (innerTrip['total_budget'] != null) {
-              _knownTotalBudget = (innerTrip['total_budget'] as num?)
-                  ?.toDouble();
+              _knownTotalBudget = (innerTrip['total_budget'] as num?)?.toDouble();
             }
             // Use trip start date when no filterDate and viewing read-only
-            if (_filterDate == null &&
-                _forceViewOnly &&
-                innerTrip['start_date'] != null) {
+            if (_filterDate == null && _forceViewOnly && innerTrip['start_date'] != null) {
               try {
                 final sd = DateTime.parse(innerTrip['start_date'].toString());
                 _filterDate = DateTime(sd.year, sd.month, sd.day);
@@ -87,9 +84,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                 _destination = (innerTrip as dynamic).destination.toString();
               }
               if ((innerTrip as dynamic).computedStatus != null) {
-                _tripComputedStatus = (innerTrip as dynamic).computedStatus
-                    .toString()
-                    .toLowerCase();
+                _tripComputedStatus = (innerTrip as dynamic).computedStatus.toString().toLowerCase();
               }
               _knownTotalBudget = (innerTrip as dynamic).totalBudget as double?;
               // Use trip start date when no filterDate and viewing read-only
@@ -131,9 +126,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
               extractedTripId!,
               filterDate: _filterDate,
               knownTotalBudget: _knownTotalBudget,
-              knownDestination: _destination != 'Trip Itinerary'
-                  ? _destination
-                  : null,
+              knownDestination: _destination != 'Trip Itinerary' ? _destination : null,
             );
           }
         });
@@ -224,24 +217,84 @@ class _ActivityScreenState extends State<ActivityScreen> {
     showBudgetReallocationFailureDialog(
       context: context,
       onContinue: () async {
-        // 1. Dismiss the dialog
+        // 1. Dismiss the failure dialog
         Navigator.of(context, rootNavigator: true).pop();
 
-        // 2. Trigger the budget recovery plan generation
-        final viewModel = context.read<ActivityViewModel>();
-        final success = await viewModel.generateBudgetRecoveryPlan(
-          dayTripId: state.selectedActivity?.dayTripId,
-          availableBudget: state.totalBudget - state.spentBudget,
+        // 2. Show loading spinner while recovery runs
+        BuildContext? loadingDialogContext;
+        showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogCtx) {
+            loadingDialogContext = dialogCtx;
+            return PopScope(
+              canPop: false,
+              child: Center(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 40),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 28,
+                    vertical: 24,
+                  ),
+                  decoration: BoxDecoration(
+                    color: appTheme.white_A700,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(color: appTheme.teal_A700),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Re-optimizing your itinerary...',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Inter',
+                          color: appTheme.gray_900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
         );
 
-        // 3. Optional: Provide UI feedback if recovery fails
-        if (!success && mounted) {
-          final error = viewModel.uiState.errorMessage;
-          if (error.isNotEmpty) {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text(error)));
+        // 3. Trigger the budget recovery plan generation
+        final viewModel = context.read<ActivityViewModel>();
+        bool success;
+        try {
+          success = await viewModel.generateBudgetRecoveryPlan(
+            dayTripId: state.selectedActivity?.dayTripId,
+            availableBudget: state.totalBudget - state.spentBudget,
+          );
+        } catch (e) {
+          debugPrint('Recovery plan error: $e');
+          success = false;
+        } finally {
+          if (loadingDialogContext != null && loadingDialogContext!.mounted) {
+            Navigator.of(loadingDialogContext!, rootNavigator: true).pop();
           }
+        }
+
+        if (!mounted) return;
+
+        if (success) {
+          showThreeSecondMessage(
+            context,
+            'Your plan has been optimized to fit your remaining budget.',
+          );
+        } else {
+          // Fallback: re-show budget recovery dialog so user can top up or
+          // end trip instead of being stuck with just an error message.
+          final latestState = viewModel.uiState;
+          _showBudgetRecoveryDialog(
+            latestState,
+            onEndTrip: viewModel.endTrip,
+            onTopUpBudget: (amount) => viewModel.topUpBudget(amount),
+          );
         }
       },
     );
@@ -254,9 +307,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
       remainingBudget: state.remainingBudget,
       exceededAmount: state.exceededAmount,
       totalOverspent: state.overspentBudget,
-      estimatedDays: '${state.sufficientDays.toString()} day(s)',
-      warningText1:
-          'Your itinerary will be adjusted automatically to stay within your budget',
+      estimatedDays: state.sufficientDays.toString(),
+      warningText1: 'Plan will be modified automatically.',
       onContinue: () async {
         // 1. Show a labelled, non-dismissible loading dialog while the plan is
         // being re-optimized (instead of the bare screen-wide spinner).
@@ -321,28 +373,25 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
         if (!mounted) return;
 
+        // Dismiss the threshold dialog (still underneath the loading
+        // dialog we just popped) so we return to the activity screen.
+        if (mounted) {
+          Navigator.of(context, rootNavigator: true).pop();
+        }
+
         if (success) {
           showThreeSecondMessage(
             context,
             'Your plan has been optimized to fit your remaining budget.',
           );
-          // 4. Take the tourist straight to the updated plan so they can see
-          // the re-optimized (future) activities instead of a static screen.
-          Navigator.of(context).pushNamed(
-            AppRoutes.wholeItineraryDetailScreen,
-            arguments: <String, dynamic>{
-              'isReadOnly': true,
-              'tripId': viewModel.uiState.tripId,
-            },
-          );
         } else {
-          final error = viewModel.uiState.errorMessage;
-          showThreeSecondMessage(
-            context,
-            error.isNotEmpty
-                ? error
-                : 'Failed to optimize the plan. Please try again.',
-            isError: true,
+          // Fallback: re-show budget recovery dialog so the user can
+          // top up or end the trip.
+          final latestState = viewModel.uiState;
+          _showBudgetRecoveryDialog(
+            latestState,
+            onEndTrip: viewModel.endTrip,
+            onTopUpBudget: (amount) => viewModel.topUpBudget(amount),
           );
         }
       },
@@ -361,86 +410,36 @@ class _ActivityScreenState extends State<ActivityScreen> {
       minTopUp: minTopUp,
       remainingBudget: uiState.remainingBudget,
       warningText:
-          'Insufficient top-up amount will trigger alternative recommendation directly.',
+          'Top-up amount should at least MYR ${minTopUp.toStringAsFixed(2)}, insufficient top-up amount will trigger alternative recommendation directly.',
       onEndTrip: () {
         _showEndTripConfirmationDialog(uiState);
       },
       onTopUpBudget: (amount) async {
-        final viewModel = context.read<ActivityViewModel>();
-        String symbol = viewModel.preferredCurrency;
-        double? convertedAmt = await viewModel.convertAmountToCurrency(amount: amount);
-
-        if (context.mounted) {
-          Navigator.of(context).pop();
-        }
-
-        // Wait until the first dialog is removed.
-        await Future.delayed(const Duration(milliseconds: 100));
-
-        if (!context.mounted) return false;
-
-        bool confirmed = false;
-
-        await showTopUpConfirmation(
-          context: context,
-          topUpAmount: amount,
-          symbol: symbol,
-          convertedAmt: convertedAmt??amount,
-          onCancel: () {
-            confirmed = false;
-          },
-          onConfirm: () {
-            confirmed = true;
-          },
-        );
-
-        if (!confirmed) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted) return;
-
-            _showBudgetRecoveryDialog(
-              viewModel.uiState,
-              onEndTrip: () {
-                _showEndTripConfirmationDialog(viewModel.uiState);
-              },
-              onTopUpBudget: onTopUpBudget,
-            );
-          });
-
-          return false;
-        }
-
         final success = await onTopUpBudget(amount);
 
         if (!context.mounted) return false;
 
         if (!success) {
-          showThreeSecondMessage(
-            context,
-            'Failed to top up budget',
-            isError: true,
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to top up budget.')),
           );
+
           return false;
         }
 
+        // Get the latest state AFTER topUpBudget()
+        final viewModel = context.read<ActivityViewModel>();
         final latestState = viewModel.uiState;
 
+        // Top-up succeeded, but shortage still remains.
         if (latestState.shortageAmount > 0) {
+          // Wait until the first dialog is completely removed.
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!mounted) return;
 
-            _showInsufficientTopUpDialog(
-              latestState,
-              topUpAmount: amount,
-            );
+            _showInsufficientTopUpDialog(latestState, topUpAmount: amount);
           });
         }
-
-        showThreeSecondMessage(
-          context,
-          'Budget top up successfully',
-          isError: false,
-        );
 
         return true;
       },
@@ -461,7 +460,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
           onEndTrip: () {
             _showEndTripConfirmationDialog(uiState);
           },
-          onTopUpBudget: (amount) => viewModel.topUpBudget(amount),
+          onTopUpBudget: (amount) =>
+              viewModel.topUpBudget(amount),
         );
       },
 
@@ -472,7 +472,12 @@ class _ActivityScreenState extends State<ActivityScreen> {
         if (!mounted) return false;
 
         if (!success) {
-          showThreeSecondMessage(context, 'Failed to end trip', isError: true);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to end trip.'),
+            ),
+          );
+
           return false;
         }
 
@@ -484,7 +489,6 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
         // Then leave ActivityScreen and return to Home.
         Navigator.of(context, rootNavigator: true).pop();
-        showThreeSecondMessage(context, 'Trip ended successfully', isError: false);
 
         return true;
       },
@@ -568,17 +572,19 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
         if (!mounted) return;
 
-        if (!success) {
-          final error = viewModel.uiState.errorMessage;
-          showThreeSecondMessage(
-            context,
-            error.isNotEmpty ? error : 'Failed to re-optimize itinerary.',
-            isError: true,
-          );
-        } else {
+        if (success) {
           showThreeSecondMessage(
             context,
             'Itinerary successfully updated to fit your budget!',
+          );
+        } else {
+          // Fallback: re-show budget recovery dialog so user can retry
+          // with a different top-up or choose to end the trip.
+          final latestState = viewModel.uiState;
+          _showBudgetRecoveryDialog(
+            latestState,
+            onEndTrip: viewModel.endTrip,
+            onTopUpBudget: (amount) => viewModel.topUpBudget(amount),
           );
         }
       },
@@ -809,7 +815,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                   DualCurrencyAmount(
                     amount: uiState.spentBudget,
                     baseCurrency: 'MYR',
-                    baseLabel: 'RM',
+                    baseLabel: 'MYR',
                     primaryStyle: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
@@ -837,7 +843,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                   DualCurrencyAmount(
                     amount: uiState.totalBudget,
                     baseCurrency: 'MYR',
-                    baseLabel: 'RM',
+                    baseLabel: 'MYR',
                     primaryStyle: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
@@ -876,7 +882,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                   amountWidget: DualCurrencyAmount(
                     amount: uiState.spentBudget,
                     baseCurrency: 'MYR',
-                    baseLabel: 'RM',
+                    baseLabel: 'MYR',
                     crossAxisAlignment: CrossAxisAlignment.start,
                     textAlign: TextAlign.start,
                     primaryStyle: TextStyle(
@@ -901,7 +907,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                   amountWidget: DualCurrencyAmount(
                     amount: uiState.remainingBudget,
                     baseCurrency: 'MYR',
-                    baseLabel: 'RM',
+                    baseLabel: 'MYR',
                     crossAxisAlignment: CrossAxisAlignment.start,
                     textAlign: TextAlign.start,
                     primaryStyle: TextStyle(
@@ -931,7 +937,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                   amountWidget: DualCurrencyAmount(
                     amount: uiState.overspentBudget,
                     baseCurrency: 'MYR',
-                    baseLabel: 'RM',
+                    baseLabel: 'MYR',
                     crossAxisAlignment: CrossAxisAlignment.start,
                     textAlign: TextAlign.start,
                     primaryStyle: TextStyle(
@@ -1117,8 +1123,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                         return;
                       }
 
-                      final bool isTripOngoing =
-                          _tripComputedStatus == 'ongoing';
+                      final bool isTripOngoing = _tripComputedStatus == 'ongoing';
 
                       // If trip is not ongoing, open expense sheet in view-only mode
                       if (!isTripOngoing) {
@@ -1134,16 +1139,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
                       // If viewing a future day, open expense sheet in view-only mode
                       final todayNow = DateTime.now();
-                      final todayDateOnly = DateTime(
-                        todayNow.year,
-                        todayNow.month,
-                        todayNow.day,
-                      );
-                      final activityDateOnly = DateTime(
-                        activity.date.year,
-                        activity.date.month,
-                        activity.date.day,
-                      );
+                      final todayDateOnly = DateTime(todayNow.year, todayNow.month, todayNow.day);
+                      final activityDateOnly = DateTime(activity.date.year, activity.date.month, activity.date.day);
                       if (activityDateOnly.isAfter(todayDateOnly)) {
                         viewModel.selectActivityForExpense(activity);
                         await showExpenseBottomSheet(
@@ -1163,28 +1160,19 @@ class _ActivityScreenState extends State<ActivityScreen> {
                         try {
                           String timeToParse = st.trim();
                           // Handle "hh:mm AM/PM" format
-                          if (timeToParse.contains('AM') ||
-                              timeToParse.contains('PM')) {
-                            final parsed = DateFormat(
-                              'hh:mm a',
-                            ).parse(timeToParse);
+                          if (timeToParse.contains('AM') || timeToParse.contains('PM')) {
+                            final parsed = DateFormat('hh:mm a').parse(timeToParse);
                             activityStart = DateTime(
-                              activity.date.year,
-                              activity.date.month,
-                              activity.date.day,
-                              parsed.hour,
-                              parsed.minute,
+                              activity.date.year, activity.date.month, activity.date.day,
+                              parsed.hour, parsed.minute,
                             );
                           } else {
                             // Handle "HH:mm" 24-hour format
                             final parts = timeToParse.split(':');
                             if (parts.length >= 2) {
                               activityStart = DateTime(
-                                activity.date.year,
-                                activity.date.month,
-                                activity.date.day,
-                                int.parse(parts[0]),
-                                int.parse(parts[1]),
+                                activity.date.year, activity.date.month, activity.date.day,
+                                int.parse(parts[0]), int.parse(parts[1]),
                               );
                             }
                           }
@@ -1402,7 +1390,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                       child: DualCurrencyAmount(
                         amount: activity.allocatedBudget,
                         baseCurrency: 'MYR',
-                        baseLabel: 'RM',
+                        baseLabel: 'MYR',
                         crossAxisAlignment: CrossAxisAlignment.start,
                         textAlign: TextAlign.start,
                         primaryStyle: TextStyle(
@@ -1442,7 +1430,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                             DualCurrencyAmount(
                               amount: spent,
                               baseCurrency: 'MYR',
-                              baseLabel: 'RM',
+                              baseLabel: 'MYR',
                               crossAxisAlignment: CrossAxisAlignment.start,
                               textAlign: TextAlign.start,
                               primaryStyle: TextStyle(

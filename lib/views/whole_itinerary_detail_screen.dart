@@ -579,7 +579,7 @@ class _WholeItineraryDetailScreenState
               DualCurrencyAmount(
                 amount: double.tryParse(viewModel.uiState.budgetText) ?? 0.0,
                 baseCurrency: 'MYR',
-                baseLabel: 'RM',
+                baseLabel: 'MYR',
                 primaryStyle: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
@@ -615,7 +615,7 @@ class _WholeItineraryDetailScreenState
               DualCurrencyAmount(
                 amount: viewModel.uiState.totalAllocatedBudget,
                 baseCurrency: 'MYR',
-                baseLabel: 'RM',
+                baseLabel: 'MYR',
                 primaryStyle: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
@@ -896,7 +896,7 @@ class _WholeItineraryDetailScreenState
                 DualCurrencyAmount(
                   amount: viewModel.uiState.estimatedExtraBudgetNeeded,
                   baseCurrency: 'MYR',
-                  baseLabel: 'RM',
+                  baseLabel: 'MYR',
                   primaryStyle: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
@@ -1671,7 +1671,7 @@ class _WholeItineraryDetailScreenState
                       DualCurrencyAmount(
                         amount: (activity.allocatedBudget as num).toDouble(),
                         baseCurrency: 'MYR',
-                        baseLabel: 'RM',
+                        baseLabel: 'MYR',
                         crossAxisAlignment: CrossAxisAlignment.start,
                         textAlign: TextAlign.start,
                         primaryStyle: TextStyle(
@@ -1713,7 +1713,7 @@ class _WholeItineraryDetailScreenState
                     child: DualCurrencyAmount(
                       amount: (activity.overspendAmount as num).toDouble(),
                       baseCurrency: 'MYR',
-                      baseLabel: 'RM',
+                      baseLabel: 'MYR',
                       crossAxisAlignment: CrossAxisAlignment.start,
                       textAlign: TextAlign.start,
                       primaryStyle: TextStyle(
