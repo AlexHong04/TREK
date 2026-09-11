@@ -511,7 +511,11 @@ class ActivityViewModel extends ChangeNotifier {
       (total, item) => total + item.subtotal,
     );
     final inferredTax = receiptTotal - itemsSubtotal;
-    return inferredTax > 0 ? inferredTax : 0.0;
+    final maximumReasonableTax = receiptTotal * 0.20;
+    if (inferredTax <= 0 || inferredTax > maximumReasonableTax) {
+      return 0.0;
+    }
+    return inferredTax;
   }
 
   /// Scans the selected receipt and keeps the extracted values temporary until
@@ -539,9 +543,15 @@ class ActivityViewModel extends ChangeNotifier {
       final extractedTotal = _expenseTrackingService.extractReceiptTotal(
         receiptText,
       );
-      final extractedTax = _expenseTrackingService.extractReceiptTax(
+      final detectedTax = _expenseTrackingService.extractReceiptTax(
         receiptText,
       );
+      final extractedTax = detectedTax != null &&
+              extractedTotal != null &&
+              detectedTax >= 0 &&
+              detectedTax <= extractedTotal * 0.20
+          ? detectedTax
+          : null;
       final parsedDateTime = _expenseTrackingService.extractReceiptDateTime(
         receiptText,
       );

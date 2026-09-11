@@ -917,54 +917,67 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   }
 
   Future<void> _showSavedReceiptPreview(String receiptImageUrl) async {
+    await _showReceiptImagePopup(
+      Image.network(
+        receiptImageUrl,
+        fit: BoxFit.contain,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Center(
+            child: CircularProgressIndicator(color: appTheme.teal_A700),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) => Center(
+          child: Text(
+            'Unable to load this receipt image.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: appTheme.blue_gray_700),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showReceiptImagePopup(Widget receiptImage) async {
     await showDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-        titlePadding: EdgeInsets.fromLTRB(20, 18, 20, 0),
-        title: _buildDetailDialogHeader(
-          title: 'Receipt Image',
-          icon: Icons.image_outlined,
-        ),
-        content: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(dialogContext).height * 0.62,
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: InteractiveViewer(
-              minScale: 1,
-              maxScale: 4,
-              child: Image.network(
-                receiptImageUrl,
-                fit: BoxFit.contain,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return SizedBox(
-                    height: 240,
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        color: appTheme.teal_A700,
-                      ),
+        backgroundColor: appTheme.white_A700,
+        insetPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 20),
+        child: SizedBox(
+          width: MediaQuery.sizeOf(dialogContext).width * 0.92,
+          height: MediaQuery.sizeOf(dialogContext).height * 0.84,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(18, 16, 18, 18),
+            child: Column(
+              children: [
+                _buildDetailDialogHeader(
+                  title: 'Receipt Image',
+                  icon: Icons.image_outlined,
+                ),
+                SizedBox(height: 14),
+                Expanded(
+                  child: Container(
+                    width: double.infinity,
+                    clipBehavior: Clip.antiAlias,
+                    decoration: BoxDecoration(
+                      color: appTheme.gray_50,
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) => SizedBox(
-                  height: 180,
-                  child: Center(
-                    child: Text(
-                      'Unable to load this receipt image.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: appTheme.blue_gray_700),
+                    child: InteractiveViewer(
+                      minScale: 1,
+                      maxScale: 4,
+                      child: Center(child: receiptImage),
                     ),
                   ),
                 ),
-              ),
+                SizedBox(height: 16),
+                _buildDialogCancelButton(dialogContext),
+              ],
             ),
           ),
         ),
-        actionsPadding: EdgeInsets.fromLTRB(20, 0, 20, 18),
-        actions: [_buildDialogCancelButton(dialogContext)],
       ),
     );
   }
@@ -1278,34 +1291,16 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   }
 
   Future<void> _showReceiptPreview(String receiptLocalPath) async {
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => Dialog(
-        child: Stack(
-          children: [
-            Padding(
-              padding: EdgeInsets.all(16),
-              child: InteractiveViewer(
-                child: Image.file(
-                  File(receiptLocalPath),
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, _, _) => SizedBox(
-                    height: 180,
-                    child: Center(child: Text('Unable to display receipt image.')),
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              top: 4,
-              right: 4,
-              child: IconButton(
-                onPressed: () => Navigator.pop(dialogContext),
-                icon: Icon(Icons.close, color: appTheme.errorRed),
-                tooltip: 'Close receipt preview',
-              ),
-            ),
-          ],
+    await _showReceiptImagePopup(
+      Image.file(
+        File(receiptLocalPath),
+        fit: BoxFit.contain,
+        errorBuilder: (_, _, _) => Center(
+          child: Text(
+            'Unable to display receipt image.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: appTheme.blue_gray_700),
+          ),
         ),
       ),
     );
@@ -1332,6 +1327,113 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     final hasOcrDateTime = uiState.ocrTransactionDateTime != null;
     final hasOcrTotal = uiState.ocrExtractedTotal != null;
     final currency = _activeExpenseCurrency(uiState);
+    final detectedItemCount = uiState.ocrDraftItemIndexes.where((index) {
+      return index >= 0 &&
+          index < uiState.draftExpenseItems.length &&
+          uiState.draftExpenseItems[index].itemName.trim().toLowerCase() !=
+              'unknown';
+    }).length;
+    if (_hasAppliedOcrValues) {
+      final merchant = uiState.ocrMerchantName.isEmpty
+          ? 'Merchant not detected'
+          : uiState.ocrMerchantName;
+      final dateAndTime = hasOcrDateTime
+          ? DateFormat(
+              'dd MMM yyyy, hh:mm a',
+            ).format(uiState.ocrTransactionDateTime!)
+          : 'Date and time not detected';
+      final total = hasOcrTotal
+          ? _formatExpenseCurrencyAmount(
+              currency,
+              uiState.ocrExtractedTotal!,
+            )
+          : 'Not detected';
+      final tax = uiState.ocrExtractedTax == null
+          ? 'Not detected'
+          : _formatExpenseCurrencyAmount(
+              currency,
+              uiState.ocrExtractedTax!,
+            );
+      final hasMeaningfulMismatch = uiState.hasOcrTotalMismatch &&
+          uiState.ocrTotalDifference.abs() > 0.05;
+
+      return _ExpenseSectionCard(
+        title: 'RECEIPT OCR REVIEW',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.check_circle_outline,
+                  color: appTheme.teal_A700,
+                  size: 17,
+                ),
+                SizedBox(width: 6),
+                Text(
+                  'Receipt scanned',
+                  style: TextStyle(
+                    color: appTheme.teal_A700,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 4),
+            Text(
+              'OCR may make mistakes. Use a clear, well-lit receipt and review the results.',
+              style: TextStyle(
+                color: appTheme.blue_gray_300,
+                fontSize: 11,
+                height: 1.3,
+              ),
+            ),
+            SizedBox(height: 7),
+            Text(
+              '$merchant | $dateAndTime',
+              style: TextStyle(color: appTheme.gray_900, fontSize: 13),
+            ),
+            SizedBox(height: 7),
+            Text(
+              'Total: $total | Tax: $tax',
+              style: TextStyle(
+                color: appTheme.gray_900,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            SizedBox(height: 7),
+            Text(
+              '$detectedItemCount ${detectedItemCount == 1 ? 'item' : 'items'} added - review them above.',
+              style: TextStyle(
+                color: appTheme.teal_800,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            if (hasMeaningfulMismatch) ...[
+              SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Color(0xFFFFF4E5),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Color(0xFFFFB74D)),
+                ),
+                child: Text(
+                  'The receipt total differs by '
+                  '${_formatExpenseCurrencyAmount(currency, uiState.ocrTotalDifference.abs())}. '
+                  'Please review the detected items.',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
     return _ExpenseSectionCard(
       title: 'RECEIPT OCR REVIEW',
       child: Column(
@@ -1420,9 +1522,22 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
           ),
           SizedBox(height: 10),
           if (_hasAppliedOcrValues)
-            Text(
-              'OCR values created editable expense items below.',
-              style: TextStyle(color: appTheme.teal_A700, fontSize: 12),
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: appTheme.teal_50,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$detectedItemCount receipt ${detectedItemCount == 1 ? 'item was' : 'items were'} detected. '
+                'Compare the editable items below with the receipt before saving.',
+                style: TextStyle(
+                  color: appTheme.teal_800,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
         ],
       ),
@@ -1784,30 +1899,122 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     required String title,
     required String message,
     required String confirmLabel,
-    String cancelLabel = 'No',
+    String cancelLabel = 'Cancel',
     bool isDestructive = false,
   }) async {
     final isConfirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text(cancelLabel),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isDestructive
-                  ? appTheme.errorRed
-                  : appTheme.teal_A700,
-              foregroundColor: appTheme.white_A700,
+      barrierDismissible: false,
+      builder: (dialogContext) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: appTheme.white_A700,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: 360),
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(20, 22, 20, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: appTheme.gray_900,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: isDestructive
+                        ? Color(0xFFFFF1F2)
+                        : appTheme.teal_50,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: isDestructive
+                          ? appTheme.errorRed
+                          : appTheme.teal_A200,
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        isDestructive
+                            ? Icons.warning_amber_rounded
+                            : Icons.info_outline_rounded,
+                        color: isDestructive
+                            ? appTheme.errorRed
+                            : appTheme.teal_A700,
+                        size: 22,
+                      ),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          message,
+                          style: TextStyle(
+                            color: appTheme.gray_800,
+                            fontSize: 14,
+                            height: 1.4,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(dialogContext, false),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: appTheme.blue_gray_700,
+                          minimumSize: Size.fromHeight(48),
+                          side: BorderSide(color: appTheme.gray_200),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: Text(
+                          cancelLabel,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(dialogContext, true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isDestructive
+                              ? appTheme.errorRed
+                              : appTheme.teal_A700,
+                          foregroundColor: appTheme.white_A700,
+                          minimumSize: Size.fromHeight(48),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: Text(
+                          confirmLabel,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            child: Text(confirmLabel),
           ),
-        ],
+        ),
       ),
     );
 
