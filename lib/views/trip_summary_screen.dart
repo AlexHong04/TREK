@@ -604,7 +604,7 @@ class TripSummaryScreen extends StatelessWidget {
         builder: (dialogContext) => BaseBudgetDialog(
           title: 'Invalid Percentage Total',
           warningText:
-              'The three categories currently total '
+              'The recommendation percentages currently total '
               '${viewModel.futureRecommendationTotal.round()}%. '
               'Please adjust them so the total is exactly 100%.',
           actions: _buildRecommendationDialogButton(

@@ -167,19 +167,23 @@ class BudgetService implements IBudgetService {
       );
     }
 
-    // Find restaurant activities here.
+    // Find restaurant activities that can donate budget. The activity that
+    // caused the overspend must never fund its own shortfall.
     final List<Activity> remainingRestaurantActivities = allRemainingActivities
         .where((activity) {
           final bool isRestaurant =
               activity.activityCategory.toLowerCase() == 'restaurant';
+          final bool isCurrentActivity =
+              activity.activitiesId == currentActivity.activitiesId;
 
           debugPrint(
             '[CHECK] ${activity.activitiesId} | '
             '${activity.destination} | '
-            'Restaurant: $isRestaurant',
+            'Restaurant: $isRestaurant | '
+            'Current activity: $isCurrentActivity',
           );
 
-          return isRestaurant;
+          return isRestaurant && !isCurrentActivity;
         })
         .toList();
 
@@ -285,7 +289,14 @@ class BudgetService implements IBudgetService {
     // PERFORM REALLOCATION
     // ----------------------------------------------------------
 
-    final List<Activity> modifiedActivities = [];
+    // Reallocation is a transfer, not a second expense deduction. Credit the
+    // overspent activity by exactly the amount removed from future restaurant
+    // activities so the sum of all allocated budgets remains unchanged.
+    final List<Activity> modifiedActivities = [
+      currentActivity.copyWith(
+        allocatedBudget: currentActivity.allocatedBudget + overspentAmount,
+      ),
+    ];
 
     for (final restaurant in remainingRestaurantActivities) {
       final double oldBudget = restaurant.allocatedBudget;

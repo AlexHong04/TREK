@@ -410,7 +410,7 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
         .join('\n');
     final prompt =
         '''
-    You are a travel financial planning assistant. Recommend how this user should distribute a future trip budget across exactly THREE categories, based only on the completed trip data below.
+    You are a travel financial planning assistant. Recommend a balanced and practical future trip budget across exactly THREE essential categories, using the completed trip only as a spending signal rather than copying it directly.
 
     Completed Trip Financial Data:
     - Destination: $destination
@@ -421,17 +421,19 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
 
     CRITICAL RULES:
     - Return exactly one recommendation for each category: "Attraction", "Transport", and "Food".
-    - "percentage" MUST be a whole number from 0 to 100.
+    - Every category is essential and MUST receive between 20% and 60% inclusive, even when its completed-trip expense was RM 0.
+    - "percentage" MUST be a whole number.
     - The three percentages MUST add up to exactly 100.
-    - Recommend a practical future allocation using the completed trip's spending pattern.
+    - Keep the allocation reasonably balanced. A category with higher historical spending may receive more, but it must never receive the entire budget.
+    - Do not interpret missing or zero spending as proof that the tourist will not need that category on the next trip.
     - Do NOT return currency amounts, explanations, extra categories, or additional fields.
 
     Format your response as this valid JSON object:
     {
       "recommendations": [
-        {"category": "Attraction", "percentage": 30},
-        {"category": "Transport", "percentage": 15},
-        {"category": "Food", "percentage": 55}
+        {"category": "Attraction", "percentage": 25},
+        {"category": "Transport", "percentage": 50},
+        {"category": "Food", "percentage": 25}
       ]
     }
 

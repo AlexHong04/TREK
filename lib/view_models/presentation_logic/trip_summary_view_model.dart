@@ -364,8 +364,8 @@ class TripSummaryViewModel extends ChangeNotifier {
       category: recommendation.category,
       aiPercentage: recommendation.percentage,
       selectedPercentage: recommendation.percentage,
-      minimumPercentage: (recommendation.percentage - 5).clamp(0, 100),
-      maximumPercentage: (recommendation.percentage + 5).clamp(0, 100),
+      minimumPercentage: (recommendation.percentage - 5).clamp(15, 65),
+      maximumPercentage: (recommendation.percentage + 5).clamp(15, 65),
     );
   }
 

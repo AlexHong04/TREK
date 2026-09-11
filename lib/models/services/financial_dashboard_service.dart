@@ -322,7 +322,9 @@ class FinancialDashboardService implements IFinancialDashboardService {
         !_futureRecommendationCategories.every(percentages.containsKey)) {
       return false;
     }
-    if (percentages.values.any((value) => value < 0 || value > 100)) {
+    if (percentages.values.any(
+      (value) => !value.isFinite || value < 15 || value > 65,
+    )) {
       return false;
     }
     final total = percentages.values.fold<double>(
@@ -432,8 +434,8 @@ class FinancialDashboardService implements IFinancialDashboardService {
       final percentage = value['percentage'];
       if (category == null || percentage is! num) continue;
       final percentageValue = percentage.toDouble();
-      if (percentageValue < 0 ||
-          percentageValue > 100 ||
+      if (percentageValue < 20 ||
+          percentageValue > 60 ||
           percentageValue != percentageValue.roundToDouble()) {
         continue;
       }
