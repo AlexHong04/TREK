@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../models/services/i_auth_service.dart';
 import '../theme/app_theme.dart';
 import '../view_models/presentation_logic/trip_summary_view_model.dart';
+import '../widgets/custom_app_bar.dart';
 import 'budget_popup.dart';
 
 class TripSummaryScreen extends StatelessWidget {
@@ -594,72 +595,167 @@ class TripSummaryScreen extends StatelessWidget {
     BuildContext context,
     TripSummaryViewModel viewModel,
   ) async {
+    if (!viewModel.isFutureRecommendationTotalValid) {
+      await _showInvalidRecommendationTotalDialog(context, viewModel);
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => BaseBudgetDialog(
+        title: 'Confirm Recommendation',
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        contentPadding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+        sectionSpacing: 12,
+        actionsTopSpacing: 16,
+        summaryCard: _buildFutureRecommendationSummaryCard(
+          viewModel.uiState.futureRecommendations,
+        ),
+        warningText:
+            'Each trip can accept a future budget recommendation only once. '
+            'Once accepted, it cannot be changed.',
+        actions: Row(
+          children: [
+            Expanded(
+              child: _buildRecommendationDialogButton(
+                text: 'Cancel',
+                backgroundColor: appTheme.redButton,
+                height: 44,
+                onPressed: () => Navigator.pop(dialogContext, false),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildRecommendationDialogButton(
+                text: 'Accept',
+                height: 44,
+                onPressed: () => Navigator.pop(dialogContext, true),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
     final result = await viewModel.acceptFutureBudgetRecommendations();
     if (!context.mounted) return;
 
     if (result == FutureRecommendationAcceptResult.invalidTotal) {
-      await showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (dialogContext) => BaseBudgetDialog(
-          title: 'Invalid Percentage Total',
-          warningText:
-              'The recommendation percentages currently total '
-              '${viewModel.futureRecommendationTotal.round()}%. '
-              'Please adjust them so the total is exactly 100%.',
-          actions: _buildRecommendationDialogButton(
-            text: 'Adjust Again',
-            onPressed: () => Navigator.pop(dialogContext),
-          ),
-        ),
-      );
+      await _showInvalidRecommendationTotalDialog(context, viewModel);
       return;
     }
 
     if (result == FutureRecommendationAcceptResult.saved) {
-      await showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (dialogContext) => BaseBudgetDialog(
-          title: 'Saved Successfully',
-          titleColor: appTheme.teal_800,
-          contentCard: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(Icons.check_circle_outline, color: appTheme.teal_800),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Your future budget recommendations have been saved.',
+      showThreeSecondMessage(
+        context,
+        'Future budget recommendations saved successfully.',
+      );
+    }
+  }
+
+  Future<void> _showInvalidRecommendationTotalDialog(
+    BuildContext context,
+    TripSummaryViewModel viewModel,
+  ) {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => BaseBudgetDialog(
+        title: 'Invalid Percentage Total',
+        warningText:
+            'The recommendation percentages currently total '
+            '${viewModel.futureRecommendationTotal.round()}%. '
+            'Please adjust them so the total is exactly 100%.',
+        actions: _buildRecommendationDialogButton(
+          text: 'Adjust Again',
+          onPressed: () => Navigator.pop(dialogContext),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFutureRecommendationSummaryCard(
+    List<FutureBudgetRecommendationUiState> recommendations,
+  ) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: appTheme.popupCreamBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: appTheme.popupCreamStroke, width: 1.4),
+      ),
+      child: Column(
+        children: [
+          for (var index = 0; index < recommendations.length; index++) ...[
+            if (index > 0) const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '${recommendations[index].category} Budget:',
                   style: TextStyle(
-                    color: appTheme.teal_800,
+                    color: appTheme.popupBrownBudget,
                     fontSize: 14,
-                    height: 1.4,
+                    fontWeight: FontWeight.w600,
                   ),
+                ),
+                Text(
+                  '${recommendations[index].selectedPercentage.round()}%',
+                  style: TextStyle(
+                    color: appTheme.gray_900,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 10),
+          Divider(color: appTheme.popupCreamStroke, height: 1),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Total:',
+                style: TextStyle(
+                  color: appTheme.popupBrownBudget,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              Text(
+                '${recommendations.fold<double>(0, (total, item) => total + item.selectedPercentage).round()}%',
+                style: TextStyle(
+                  color: appTheme.teal_800,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ],
           ),
-          actions: _buildRecommendationDialogButton(
-            text: 'Continue',
-            onPressed: () => Navigator.pop(dialogContext),
-          ),
-        ),
-      );
-    }
+        ],
+      ),
+    );
   }
 
   Widget _buildRecommendationDialogButton({
     required String text,
     required VoidCallback onPressed,
+    Color? backgroundColor,
+    double height = 48,
   }) {
     return SizedBox(
       width: double.infinity,
-      height: 48,
+      height: height,
       child: ElevatedButton(
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: appTheme.teal_A700,
+          backgroundColor: backgroundColor ?? appTheme.teal_A700,
           foregroundColor: appTheme.white_A700,
           elevation: 0,
           shape: RoundedRectangleBorder(

@@ -305,6 +305,14 @@ class TripSummaryViewModel extends ChangeNotifier {
     (total, recommendation) => total + recommendation.selectedPercentage,
   );
 
+  bool get isFutureRecommendationTotalValid {
+    if (_uiState.futureRecommendations.isEmpty) return false;
+    return _service.hasValidFutureRecommendationTotal({
+      for (final recommendation in _uiState.futureRecommendations)
+        recommendation.category: recommendation.selectedPercentage,
+    });
+  }
+
   Future<FutureRecommendationAcceptResult>
   acceptFutureBudgetRecommendations() async {
     if (_uiState.futureRecommendations.isEmpty ||
@@ -317,7 +325,7 @@ class TripSummaryViewModel extends ChangeNotifier {
       for (final recommendation in _uiState.futureRecommendations)
         recommendation.category: recommendation.selectedPercentage,
     };
-    final isValid = _service.hasValidFutureRecommendationTotal(percentages);
+    final isValid = isFutureRecommendationTotalValid;
     if (_uiState.hasAdjustedFutureRecommendations && !isValid) {
       return FutureRecommendationAcceptResult.invalidTotal;
     }
