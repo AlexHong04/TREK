@@ -113,11 +113,11 @@ class GeminiApiConfig {
     - Budget: \$$budget
     ${preference != null ? '- Preference: $preference (You MUST heavily prioritize planning activities that strictly match this theme!)' : ''}
     ${resolvedArrivals.isNotEmpty ? '''- Arrival Details:
-${resolvedArrivals.asMap().entries.map((e) => '      * Arrival ${e.key + 1}: ${e.value.location} at ${e.value.time}').join('\n')}
-      * CRITICAL FOR DAY 1: Day 1 activities MUST start after the initial arrival time (${resolvedArrivals.first.time}) at "${resolvedArrivals.first.location}". Route connecting activities accordingly!''' : ''}
+${resolvedArrivals.asMap().entries.map((e) => '      * Arrival ${e.key + 1} (${e.value.type}): ${e.value.location}${e.value.date.isNotEmpty ? ' on ${e.value.date}' : ''} at ${e.value.time}').join('\n')}
+      * CRITICAL FOR DAY 1: Day 1 activities MUST start after the initial arrival time (${resolvedArrivals.first.time}${resolvedArrivals.first.date.isNotEmpty ? ' on ${resolvedArrivals.first.date}' : ''}) at "${resolvedArrivals.first.location}" (arriving via ${resolvedArrivals.first.type}). Route connecting activities accordingly!''' : ''}
     ${resolvedDepartures.isNotEmpty ? '''- Departure Details:
-${resolvedDepartures.asMap().entries.map((e) => '      * Departure ${e.key + 1}: ${e.value.location} at ${e.value.time}').join('\n')}
-      * CRITICAL FOR FINAL DAY: Final day schedule MUST finish in time for the traveler to reach "${resolvedDepartures.last.location}" before ${resolvedDepartures.last.time}!''' : ''}
+${resolvedDepartures.asMap().entries.map((e) => '      * Departure ${e.key + 1} (${e.value.type}): ${e.value.location}${e.value.date.isNotEmpty ? ' on ${e.value.date}' : ''} at ${e.value.time}').join('\n')}
+      * CRITICAL FOR FINAL DAY: Final day schedule MUST finish in time for the traveler to reach "${resolvedDepartures.last.location}" (departing via ${resolvedDepartures.last.type}) before ${resolvedDepartures.last.time}${resolvedDepartures.last.date.isNotEmpty ? ' on ${resolvedDepartures.last.date}' : ''}!''' : ''}
     ${resolvedHotels.isNotEmpty ? '''- Accommodation / Hotel:
 ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.value.location} (Check-in: ${e.value.checkInTime}, Check-out: ${e.value.checkOutTime})').join('\n')}
       * CRITICAL FOR HOTEL: Daily activities should conveniently route to/from this accommodation area. Factor in hotel check-in on Day 1 (around ${resolvedHotels.first.checkInTime}) and check-out on the final day (around ${resolvedHotels.last.checkOutTime}).''' : ''}
