@@ -61,14 +61,18 @@ class ExpenseRepository implements IExpenseRepository {
     }
   }
 
-  /// Records the parent expense with the next formatted EX ID.
-  Future<Expense> insertExpense(Expense expense) async {
-    try {
-      final expenseId = await _nextFormattedId(
+  Future<String> generateNextExpenseId() => _nextFormattedId(
         table: _expensesTable,
         idColumn: 'expense_id',
         prefix: _expenseIdPrefix,
       );
+
+  /// Records the parent expense, generating an EX ID when none was prepared.
+  Future<Expense> insertExpense(Expense expense) async {
+    try {
+      final expenseId = expense.expenseId?.trim().isNotEmpty == true
+          ? expense.expenseId!
+          : await generateNextExpenseId();
       final expenseWithId = expense.copyWith(expenseId: expenseId);
 
       final response = await SupabaseConfig.client

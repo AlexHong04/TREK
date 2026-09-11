@@ -1323,41 +1323,37 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     );
     validateTotalAmount(totalAmount);
 
+    final expenseId = await _expenseRepository.generateNextExpenseId();
+    String? receiptImageUrl;
+    if (receiptLocalPath != null && receiptLocalPath.trim().isNotEmpty) {
+      receiptImageUrl = await _expenseRepository.uploadReceiptImage(
+        localImagePath: receiptLocalPath,
+        expenseId: expenseId,
+      );
+    }
+
     final savedExpense = await _expenseRepository.insertExpense(
       Expense(
+        expenseId: expenseId,
         activitiesId: activitiesId,
         totalAmount: totalAmount,
         currency: originalCurrency,
         paymentMethod: paymentMethod.trim(),
+        receiptImageUrl: receiptImageUrl,
       ),
     );
 
-    final expenseId = savedExpense.expenseId;
-    if (expenseId == null || expenseId.isEmpty) {
+    final savedExpenseId = savedExpense.expenseId;
+    if (savedExpenseId == null || savedExpenseId.isEmpty) {
       throw Exception('Supabase did not return an expense ID.');
     }
 
     final itemsWithExpenseId = itemsWithCalculatedSubtotals
-        .map((item) => item.copyWith(expenseId: expenseId))
+        .map((item) => item.copyWith(expenseId: savedExpenseId))
         .toList();
 
     await _expenseRepository.insertExpenseItems(itemsWithExpenseId);
-
-    if (receiptLocalPath == null || receiptLocalPath.trim().isEmpty) {
-      return savedExpense;
-    }
-
-    final receiptImageUrl = await _expenseRepository.uploadReceiptImage(
-      localImagePath: receiptLocalPath,
-      expenseId: expenseId,
-    );
-
-    await _expenseRepository.updateReceiptImageUrl(
-      expenseId: expenseId,
-      receiptImageUrl: receiptImageUrl,
-    );
-
-    return savedExpense.copyWith(receiptImageUrl: receiptImageUrl);
+    return savedExpense;
   }
 
   double calculateItemSubtotal(int quantity, double unitPrice) {
