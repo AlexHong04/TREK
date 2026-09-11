@@ -1259,7 +1259,10 @@ class _WholeItineraryDetailScreenState
                       decoration: BoxDecoration(
                         color: appTheme.white_A700,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: appTheme.teal_A700, width: 1.5),
+                        border: Border.all(
+                          color: appTheme.teal_A700,
+                          width: 1.5,
+                        ),
                         boxShadow: [
                           BoxShadow(
                             color: appTheme.teal_50,
