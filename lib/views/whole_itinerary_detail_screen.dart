@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 
 import '../view_models/presentation_logic/whole_itinerary_detail_view_model.dart';
 import '../models/services/i_auth_service.dart';
+import '../models/services/i_profile_service.dart'; // added this
 import '../main.dart';
 import '../widgets/custom_app_bar.dart';
 import '../widgets/dual_currency_amount.dart';
@@ -27,6 +28,7 @@ class WholeItineraryDetailScreen extends StatefulWidget {
 
     // Retrieve constraints from current user
     final authService = context.read<IAuthService>();
+    final profileService = context.read<IProfileService>(); // added this
     final constraints =
         authService.currentUser?.personalConstraints
             .map((c) => '${c.category}: ${c.constraintName}')
@@ -50,7 +52,7 @@ class WholeItineraryDetailScreen extends StatefulWidget {
 
     return ChangeNotifierProvider<WholeItineraryDetailViewModel>(
       create: (context) {
-        final vm = WholeItineraryDetailViewModel(authService: authService);
+        final vm = WholeItineraryDetailViewModel(authService: authService, profileService: profileService); // changed this
         final resolvedTripId = tripId ?? trip?.tripId ?? '';
 
         if (isReadOnly && (tripId != null || trip != null)) {

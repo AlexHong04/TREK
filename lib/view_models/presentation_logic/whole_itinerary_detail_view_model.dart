@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../models/services/i_auth_service.dart';
+import '../../models/services/i_profile_service.dart'; // added this
 import '../../models/services/i_itinerary_service.dart';
 import '../../models/services/itinerary_service.dart';
 import '../../models/entities/future_suggestion.dart';
@@ -12,12 +13,15 @@ import 'package:intl/intl.dart';
 class WholeItineraryDetailViewModel extends ChangeNotifier {
   final IItineraryService _itineraryService;
   final IAuthService _authService;
+  final IProfileService _profileService; // added this
 
   WholeItineraryDetailViewModel({
     IItineraryService? itineraryService,
     required IAuthService authService,
+    required IProfileService profileService, // added this
   }) : _itineraryService = itineraryService ?? ItineraryService(),
-       _authService = authService;
+       _authService = authService,
+        _profileService = profileService; // added this
 
   WholeItineraryUiState _uiState = const WholeItineraryUiState();
 
@@ -293,12 +297,12 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
   }
 
   // zhiqin
-  String get preferredCurrency => _authService.preferredCurrency;
+  String get preferredCurrency => _profileService.preferredCurrency; // changed this
 
   // zhiqin
   Future<double?> convertAmountToCurrency({required double amount}) async {
     try {
-      final result = await _authService.convertToPreferredCurrency(
+      final result = await _profileService.convertToPreferredCurrency( // changed this
         amount: amount,
         fromCurrency: 'MYR',
       );

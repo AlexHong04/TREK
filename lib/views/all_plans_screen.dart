@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/services/i_auth_service.dart';
+import '../models/services/i_profile_service.dart'; // added this
 import '../theme/app_theme.dart';
 import '../view_models/presentation_logic/whole_itinerary_detail_view_model.dart';
 import '../view_models/ui_state/whole_itinerary_ui_state.dart';
@@ -13,9 +14,10 @@ class AllPlansScreen extends StatefulWidget {
 
   static Widget builder(BuildContext context) {
     final authService = context.read<IAuthService>();
+    final profileService = context.read<IProfileService>(); // added this
 
     return ChangeNotifierProvider<WholeItineraryDetailViewModel>(
-      create: (_) => WholeItineraryDetailViewModel(authService: authService),
+      create: (_) => WholeItineraryDetailViewModel(authService: authService, profileService: profileService), // changed this
       child: const AllPlansScreen(),
     );
   }

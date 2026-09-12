@@ -263,7 +263,7 @@ class ActivityViewModel extends ChangeNotifier {
 
   Future<double?> convertAmountToCurrency({required double amount}) async {
     try {
-      final result = await _authService.convertToPreferredCurrency(
+      final result = await _profileService.convertToPreferredCurrency(
         amount: amount,
         fromCurrency: 'MYR',
       );

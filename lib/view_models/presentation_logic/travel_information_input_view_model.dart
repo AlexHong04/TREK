@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/configurations/frankfurter_api_config.dart';
 import '../../models/services/i_auth_service.dart';
+import '../../models/services/i_profile_service.dart'; // added this
 import '../../models/services/i_itinerary_service.dart';
 import '../../models/services/itinerary_service.dart';
 import '../../utils/place_text_validation.dart';
@@ -13,6 +14,7 @@ import '../ui_state/travel_information_ui_state.dart';
 class TravelInformationInputViewModel extends ChangeNotifier {
   final IItineraryService _itineraryService;
   final IAuthService? _authService;
+  final IProfileService _profileService; // added this
   Timer? _hotelDebounce;
   String _currentHotelQuery = '';
   String? _activeHotelField;
@@ -20,7 +22,9 @@ class TravelInformationInputViewModel extends ChangeNotifier {
   TravelInformationInputViewModel({
     IItineraryService? itineraryService,
     IAuthService? authService,
+    required IProfileService profileService, // added this
   })  : _itineraryService = itineraryService ?? ItineraryService(),
+        _profileService = profileService, // added this
         _authService = authService {
     _authService?.addListener(_onAuthServiceChanged);
     _syncPreferredCurrency();
@@ -28,7 +32,7 @@ class TravelInformationInputViewModel extends ChangeNotifier {
   }
 
   void _syncPreferredCurrency() {
-    final currency = _authService?.preferredCurrency.trim().toUpperCase();
+    final currency = _profileService?.preferredCurrency.trim().toUpperCase(); // changed this
     if (currency != null &&
         currency.isNotEmpty &&
         currency != _uiState.preferredCurrency) {
@@ -840,6 +844,7 @@ class TravelInformationInputViewModelScope extends StatelessWidget {
       create: (context) => TravelInformationInputViewModel(
         itineraryService: context.read<IItineraryService>(),
         authService: context.read<IAuthService>(),
+        profileService: context.read<IProfileService>(), // added this
       ),
       child: child,
     );
