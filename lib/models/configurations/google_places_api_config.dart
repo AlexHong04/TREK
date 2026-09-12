@@ -282,6 +282,29 @@ class GooglePlacesApiConfig {
     return [];
   }
 
+  /// Normalizes a hotel name for deduplication comparison (trims whitespace, lowercases, collapses internal whitespace, removes trailing location/country suffix).
+  static String normalizeHotelName(String name) {
+    var key = name.trim().toLowerCase();
+    key = key.replaceAll(RegExp(r',\s*malaysia$', caseSensitive: false), '');
+    key = key.replaceAll(RegExp(r'\s+'), ' ');
+    return key.trim();
+  }
+
+  /// Deduplicates a collection of hotel names while preserving original order and formatting of first occurrences.
+  static List<String> deduplicateHotels(Iterable<String> rawSuggestions) {
+    final seen = <String>{};
+    final unique = <String>[];
+    for (final raw in rawSuggestions) {
+      final trimmed = raw.trim();
+      if (trimmed.isEmpty) continue;
+      final normalizedKey = normalizeHotelName(trimmed);
+      if (normalizedKey.isNotEmpty && seen.add(normalizedKey)) {
+        unique.add(trimmed);
+      }
+    }
+    return unique;
+  }
+
   /// Searches Google Places (New) Autocomplete specifically for hotels/accommodations, biased or filtered by [destinations].
   static Future<List<String>> getHotelAutocompleteSuggestions(
     String query, {
@@ -298,7 +321,8 @@ class GooglePlacesApiConfig {
     // 1. If query is empty: search Google Places API for hotels in each selected destination
     if (trimmedQuery.isEmpty) {
       if (validDestinations == null || validDestinations.isEmpty) {
-        return await _fetchHotelAutocomplete('Hotel, Malaysia');
+        final results = await _fetchHotelAutocomplete('Hotel, Malaysia');
+        return deduplicateHotels(results).take(6).toList();
       }
 
       final targetDestinations = validDestinations.take(3).toList();
@@ -306,18 +330,19 @@ class GooglePlacesApiConfig {
         (dest) => _fetchHotelAutocomplete('Hotel, $dest'),
       );
       final resultsList = await Future.wait(futures);
-      final Set<String> combined = {};
+      final List<String> combined = [];
       for (final list in resultsList) {
         combined.addAll(list);
       }
-      return combined.take(6).toList();
+      return deduplicateHotels(combined).take(6).toList();
     }
 
     // 2. If user typed a query:
     if (validDestinations == null || validDestinations.isEmpty) {
       final results = await _fetchHotelAutocomplete(trimmedQuery);
-      if (results.isNotEmpty) return results;
-      return await _fetchHotelAutocomplete('$trimmedQuery Hotel');
+      if (results.isNotEmpty) return deduplicateHotels(results).take(6).toList();
+      final fallback = await _fetchHotelAutocomplete('$trimmedQuery Hotel');
+      return deduplicateHotels(fallback).take(6).toList();
     }
 
     // If query already contains any destination name
@@ -328,8 +353,9 @@ class GooglePlacesApiConfig {
 
     if (alreadyIncludesDestination) {
       final results = await _fetchHotelAutocomplete(trimmedQuery);
-      if (results.isNotEmpty) return results;
-      return await _fetchHotelAutocomplete('$trimmedQuery Hotel');
+      if (results.isNotEmpty) return deduplicateHotels(results).take(6).toList();
+      final fallback = await _fetchHotelAutocomplete('$trimmedQuery Hotel');
+      return deduplicateHotels(fallback).take(6).toList();
     }
 
     // Query for each selected destination in parallel
@@ -338,12 +364,12 @@ class GooglePlacesApiConfig {
       (dest) => _fetchHotelAutocomplete('$trimmedQuery, $dest'),
     );
     final resultsList = await Future.wait(futures);
-    final Set<String> combined = {};
+    final List<String> combined = [];
     for (final list in resultsList) {
       combined.addAll(list);
     }
 
-    if (combined.length < 2) {
+    if (deduplicateHotels(combined).length < 2) {
       final fallback = await _fetchHotelAutocomplete(
         lowerQuery.contains('hotel') ? trimmedQuery : '$trimmedQuery Hotel',
       );
@@ -355,7 +381,7 @@ class GooglePlacesApiConfig {
       combined.addAll(generic);
     }
 
-    return combined.take(6).toList();
+    return deduplicateHotels(combined).take(6).toList();
   }
 
   static Future<List<String>> _fetchHotelAutocomplete(
@@ -388,19 +414,19 @@ class GooglePlacesApiConfig {
           final data = jsonDecode(response.body);
           final suggestions = data['suggestions'] as List?;
           if (suggestions != null) {
-            return suggestions
-                .map((s) {
-                  final mainText =
-                      s['placePrediction']?['structuredFormat']?['mainText']?['text']
-                          as String?;
-                  final fullText =
-                      s['placePrediction']?['text']?['text'] as String?;
-                  return mainText ?? fullText;
-                })
-                .where((text) => text != null)
-                .cast<String>()
-                .take(5)
-                .toList();
+            final List<String> parsedList = [];
+            for (final s in suggestions) {
+              final structured = s['placePrediction']?['structuredFormat'];
+              final mainText =
+                  structured?['mainText']?['text'] as String?;
+              final fullText =
+                  s['placePrediction']?['text']?['text'] as String?;
+              final text = mainText?.trim() ?? fullText?.trim();
+              if (text != null && text.isNotEmpty) {
+                parsedList.add(text);
+              }
+            }
+            return deduplicateHotels(parsedList).take(5).toList();
           }
         }
       } else {
@@ -413,19 +439,19 @@ class GooglePlacesApiConfig {
           final data = jsonDecode(response.body);
           final suggestions = data['suggestions'] as List?;
           if (suggestions != null) {
-            return suggestions
-                .map((s) {
-                  final mainText =
-                      s['placePrediction']?['structuredFormat']?['mainText']?['text']
-                          as String?;
-                  final fullText =
-                      s['placePrediction']?['text']?['text'] as String?;
-                  return mainText ?? fullText;
-                })
-                .where((text) => text != null)
-                .cast<String>()
-                .take(5)
-                .toList();
+            final List<String> parsedList = [];
+            for (final s in suggestions) {
+              final structured = s['placePrediction']?['structuredFormat'];
+              final mainText =
+                  structured?['mainText']?['text'] as String?;
+              final fullText =
+                  s['placePrediction']?['text']?['text'] as String?;
+              final text = mainText?.trim() ?? fullText?.trim();
+              if (text != null && text.isNotEmpty) {
+                parsedList.add(text);
+              }
+            }
+            return deduplicateHotels(parsedList).take(5).toList();
           }
         }
       }

@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 class TravelInformationUiState {
   final bool isLoading;
+  final String preferredCurrency;
   final String? selectedPreference;
   final String? selectedEmergencyFund;
   final String? errorMessage;
+  final String? wishlistError;
   final List<String> selectedDestinations;
   final List<String> wishlistItems;
   final List<String> suggestions;
@@ -16,6 +18,8 @@ class TravelInformationUiState {
   final bool isSearchingHotelSuggestions;
   final String? activeHotelField;
   final List<DateTimeRange> unavailableDateRanges;
+  final DateTime? startDate;
+  final DateTime? endDate;
   final List<TransitPoint> arrivals;
   final List<TransitPoint> departures;
   final List<HotelStay> hotels;
@@ -24,10 +28,18 @@ class TravelInformationUiState {
       arrivals.isNotEmpty ? arrivals.first.location : '';
   String get arrivalTime =>
       arrivals.isNotEmpty ? arrivals.first.time : '09:00 AM';
+  String get arrivalDate =>
+      arrivals.isNotEmpty ? arrivals.first.date : '';
   String get departureLocation =>
       departures.isNotEmpty ? departures.first.location : '';
   String get departureTime =>
       departures.isNotEmpty ? departures.first.time : '06:00 PM';
+  String get departureDate =>
+      departures.isNotEmpty ? departures.first.date : '';
+  DateTime? get allowedTransitStartDate =>
+      startDate?.subtract(const Duration(days: 1));
+  DateTime? get allowedTransitEndDate =>
+      endDate?.add(const Duration(days: 1));
   String get hotelLocation => hotels.isNotEmpty ? hotels.first.location : '';
   String get hotelCheckInTime =>
       hotels.isNotEmpty ? hotels.first.checkInTime : '03:00 PM';
@@ -36,9 +48,11 @@ class TravelInformationUiState {
 
   const TravelInformationUiState({
     this.isLoading = false,
+    this.preferredCurrency = 'MYR',
     this.selectedPreference,
     this.selectedEmergencyFund,
     this.errorMessage,
+    this.wishlistError,
     this.selectedDestinations = const [],
     this.wishlistItems = const [],
     this.suggestions = const [],
@@ -50,11 +64,13 @@ class TravelInformationUiState {
     this.isSearchingHotelSuggestions = false,
     this.activeHotelField,
     this.unavailableDateRanges = const [],
+    this.startDate,
+    this.endDate,
     this.arrivals = const [
-      TransitPoint(id: 'arr_0', location: '', time: '09:00 AM'),
+      TransitPoint(id: 'arr_0', location: '', time: '09:00 AM', type: 'Flight', date: ''),
     ],
     this.departures = const [
-      TransitPoint(id: 'dep_0', location: '', time: '06:00 PM'),
+      TransitPoint(id: 'dep_0', location: '', time: '06:00 PM', type: 'Flight', date: ''),
     ],
     this.hotels = const [
       HotelStay(
@@ -68,9 +84,12 @@ class TravelInformationUiState {
 
   TravelInformationUiState copyWith({
     bool? isLoading,
+    String? preferredCurrency,
     String? selectedPreference,
     String? selectedEmergencyFund,
     String? errorMessage,
+    String? wishlistError,
+    bool clearWishlistError = false,
     List<String>? selectedDestinations,
     List<String>? wishlistItems,
     List<String>? suggestions,
@@ -84,26 +103,31 @@ class TravelInformationUiState {
     String? activeHotelField,
     bool clearActiveHotelField = false,
     List<DateTimeRange>? unavailableDateRanges,
+    DateTime? startDate,
+    DateTime? endDate,
     List<TransitPoint>? arrivals,
     List<TransitPoint>? departures,
     List<HotelStay>? hotels,
     String? arrivalLocation,
     String? arrivalTime,
+    String? arrivalDate,
     String? departureLocation,
     String? departureTime,
+    String? departureDate,
     String? hotelLocation,
     String? hotelCheckInTime,
     String? hotelCheckOutTime,
   }) {
     List<TransitPoint>? resolvedArrivals = arrivals;
     if (resolvedArrivals == null &&
-        (arrivalLocation != null || arrivalTime != null)) {
+        (arrivalLocation != null || arrivalTime != null || arrivalDate != null)) {
       final currentFirst = this.arrivals.isNotEmpty
           ? this.arrivals.first
           : const TransitPoint(id: 'arr_0');
       final updatedFirst = currentFirst.copyWith(
         location: arrivalLocation ?? currentFirst.location,
         time: arrivalTime ?? currentFirst.time,
+        date: arrivalDate ?? currentFirst.date,
       );
       resolvedArrivals = [
         updatedFirst,
@@ -113,13 +137,14 @@ class TravelInformationUiState {
 
     List<TransitPoint>? resolvedDepartures = departures;
     if (resolvedDepartures == null &&
-        (departureLocation != null || departureTime != null)) {
+        (departureLocation != null || departureTime != null || departureDate != null)) {
       final currentFirst = this.departures.isNotEmpty
           ? this.departures.first
           : const TransitPoint(id: 'dep_0');
       final updatedFirst = currentFirst.copyWith(
         location: departureLocation ?? currentFirst.location,
         time: departureTime ?? currentFirst.time,
+        date: departureDate ?? currentFirst.date,
       );
       resolvedDepartures = [
         updatedFirst,
@@ -148,10 +173,14 @@ class TravelInformationUiState {
 
     return TravelInformationUiState(
       isLoading: isLoading ?? this.isLoading,
+      preferredCurrency: preferredCurrency ?? this.preferredCurrency,
       selectedPreference: selectedPreference ?? this.selectedPreference,
       selectedEmergencyFund:
           selectedEmergencyFund ?? this.selectedEmergencyFund,
       errorMessage: errorMessage ?? this.errorMessage,
+      wishlistError: clearWishlistError
+          ? null
+          : (wishlistError ?? this.wishlistError),
       selectedDestinations: selectedDestinations ?? this.selectedDestinations,
       wishlistItems: wishlistItems ?? this.wishlistItems,
       suggestions: suggestions ?? this.suggestions,
@@ -171,6 +200,8 @@ class TravelInformationUiState {
           : (activeHotelField ?? this.activeHotelField),
       unavailableDateRanges:
           unavailableDateRanges ?? this.unavailableDateRanges,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
       arrivals: resolvedArrivals ?? this.arrivals,
       departures: resolvedDepartures ?? this.departures,
       hotels: resolvedHotels ?? this.hotels,
@@ -178,33 +209,54 @@ class TravelInformationUiState {
   }
 }
 
-class PreferenceItemModel {
-  PreferenceItemModel({required this.label, required this.icon});
-
+class PreferenceItem {
   final String label;
   final IconData icon;
+
+  const PreferenceItem({required this.label, required this.icon});
+}
+
+typedef PreferenceItemModel = PreferenceItem;
+
+class EmergencyFundItem {
+  final String label;
+  final IconData icon;
+
+  const EmergencyFundItem({required this.label, required this.icon});
 }
 
 class TransitPoint {
   final String id;
   final String location;
   final String time;
+  final String type;
+  final String date;
 
   const TransitPoint({
     required this.id,
     this.location = '',
     this.time = '09:00 AM',
+    this.type = 'Flight',
+    this.date = '',
   });
+
+  bool get isFlight => type.toLowerCase() == 'flight';
+  bool get isTrain => type.toLowerCase() == 'train';
+  bool get isBus => type.toLowerCase() == 'bus';
 
   TransitPoint copyWith({
     String? id,
     String? location,
     String? time,
+    String? type,
+    String? date,
   }) {
     return TransitPoint(
       id: id ?? this.id,
       location: location ?? this.location,
       time: time ?? this.time,
+      type: type ?? this.type,
+      date: date ?? this.date,
     );
   }
 
@@ -213,6 +265,8 @@ class TransitPoint {
       'id': id,
       'location': location,
       'time': time,
+      'type': type,
+      'date': date,
     };
   }
 
@@ -221,6 +275,8 @@ class TransitPoint {
       id: json['id'] as String? ?? '',
       location: json['location'] as String? ?? '',
       time: json['time'] as String? ?? '09:00 AM',
+      type: json['type'] as String? ?? 'Flight',
+      date: json['date'] as String? ?? '',
     );
   }
 }

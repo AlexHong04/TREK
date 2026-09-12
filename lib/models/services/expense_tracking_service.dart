@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/cupertino.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
@@ -9,6 +10,7 @@ import '../entities/expense_item.dart';
 import '../repository/expense_repository.dart';
 import '../repository/itinerary_repository.dart';
 import '../repository/i_itinerary_repository.dart';
+import '../../utils/expense_text_validation.dart';
 import 'budget_service.dart';
 import 'i_profile_service.dart';
 import 'i_itinerary_service.dart';
@@ -44,17 +46,69 @@ class ExpenseTrackingService implements IExpenseTrackingService {
   /// Checks the receipt rules before the crop tool or OCR is opened.
   @override
   Future<void> validateReceiptImage(String receiptLocalPath) async {
+    if (receiptLocalPath.trim().isEmpty) {
+      throw ArgumentError('Please select a receipt image.');
+    }
+
     final imageFile = File(receiptLocalPath);
     final extension = receiptLocalPath.split('.').last.toLowerCase();
     const supportedExtensions = {'jpg', 'jpeg', 'png'};
 
-    if (receiptLocalPath.trim().isEmpty ||
-        !supportedExtensions.contains(extension) ||
-        !await imageFile.exists() ||
-        await imageFile.length() > _maximumReceiptSizeInBytes) {
+    if (!supportedExtensions.contains(extension)) {
       throw ArgumentError(
-        'Invalid receipt image. Please upload a JPG, JPEG, or PNG image not exceeding 15 MB.',
+        'Unsupported receipt format. Please select a JPG, JPEG, or PNG image.',
       );
+    }
+
+    if (!await imageFile.exists()) {
+      throw ArgumentError('The selected receipt image could not be found.');
+    }
+
+    if (await imageFile.length() > _maximumReceiptSizeInBytes) {
+      throw ArgumentError(
+        'Receipt image is too large. The maximum file size is 15 MB.',
+      );
+    }
+
+    final bytes = await imageFile.readAsBytes();
+    final isJpeg = bytes.length >= 3 &&
+        bytes[0] == 0xFF &&
+        bytes[1] == 0xD8 &&
+        bytes[2] == 0xFF;
+    final isPng = bytes.length >= 8 &&
+        bytes[0] == 0x89 &&
+        bytes[1] == 0x50 &&
+        bytes[2] == 0x4E &&
+        bytes[3] == 0x47 &&
+        bytes[4] == 0x0D &&
+        bytes[5] == 0x0A &&
+        bytes[6] == 0x1A &&
+        bytes[7] == 0x0A;
+    final signatureMatchesExtension =
+        (extension == 'png' && isPng) ||
+        ((extension == 'jpg' || extension == 'jpeg') && isJpeg);
+    if (!signatureMatchesExtension) {
+      throw ArgumentError(
+        'The selected file is not a valid JPG, JPEG, or PNG image.',
+      );
+    }
+
+    ui.Codec? codec;
+    ui.FrameInfo? frame;
+    try {
+      codec = await ui.instantiateImageCodec(
+        bytes,
+        targetWidth: 1,
+        targetHeight: 1,
+      );
+      frame = await codec.getNextFrame();
+    } catch (_) {
+      throw ArgumentError(
+        'The selected image is corrupted or cannot be opened. Please select another receipt image.',
+      );
+    } finally {
+      frame?.image.dispose();
+      codec?.dispose();
     }
   }
 
@@ -84,69 +138,126 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     }
   }
 
-  /// Prefers a receipt heading such as "JUICE STATION" over an address.
-  /// The value is still only a suggestion for the tourist to review.
+  @override
+  bool isLikelyReceiptText(String receiptText) {
+    final normalized = receiptText.toLowerCase();
+    final hasSummaryLabel = RegExp(
+      r'\b(?:grand\s+total|total|subtotal|amount\s+due|cash|change|tax|gst|sst)\b',
+    ).hasMatch(normalized);
+    final amountCount = _receiptLines(receiptText)
+        .expand(_amountsFromLine)
+        .length;
+    return hasSummaryLabel && amountCount >= 2;
+  }
+
+  /// Prefers text in the receipt header so uppercase product rows lower down
+  /// are not mistaken for the merchant.
   String? extractMerchantName(String receiptText) {
     final lines = _receiptLines(receiptText);
-    final merchantCandidates = <String>[];
+    if (lines.isEmpty) return null;
 
-    for (final line in lines) {
-      final isAllCapName =
-          line == line.toUpperCase() &&
-          RegExp(r'[A-Z]').hasMatch(line) &&
-          !RegExp(r'\d').hasMatch(line) &&
-          !_isReceiptLabel(line);
-      if (isAllCapName && line.length >= 3 && line.length <= 40) {
-        merchantCandidates.add(line);
+    final transactionStart = lines.indexWhere(
+      (line) =>
+          RegExp(r'\b\d{1,4}[/-]\d{1,2}[/-]\d{1,4}\b').hasMatch(line) ||
+          _isSubtotalLabel(line) ||
+          _isNonItemReceiptText(line),
+    );
+    final headerEnd = transactionStart > 0
+        ? transactionStart
+        : (lines.length < 8 ? lines.length : 8);
+
+    bool isCandidate(String line) {
+      final normalized = line.trim();
+      if (normalized.length < 3 || normalized.length > 50) return false;
+      if (!RegExp(r'[a-zA-Z]').hasMatch(normalized)) return false;
+      if (_isReceiptLabel(normalized) || _isNonItemReceiptText(normalized)) {
+        return false;
       }
+      if (_amountsFromLine(normalized).isNotEmpty) return false;
+      if (RegExp(
+        r'\b(?:tel|fax|website|www\.|email|tax id)\b',
+        caseSensitive: false,
+      ).hasMatch(normalized)) {
+        return false;
+      }
+      return true;
     }
 
-    if (merchantCandidates.isNotEmpty) {
-      merchantCandidates.sort(
-        (first, second) => second
-            .split(RegExp(r'\s+'))
-            .length
-            .compareTo(first.split(RegExp(r'\s+')).length),
-      );
-      return merchantCandidates.first;
+    for (final line in lines.take(headerEnd)) {
+      if (isCandidate(line)) return line;
     }
 
     for (final line in lines) {
-      final isSummaryLine = _isReceiptLabel(line);
-
-      if (!isSummaryLine && RegExp(r'[a-zA-Z]').hasMatch(line)) {
-        return line;
-      }
+      if (isCandidate(line)) return line;
     }
 
     return null;
   }
 
-  /// Finds a date and time when the receipt contains both in familiar numeric
-  /// formats such as 26/08/2026 or 2021/02/25 and 01:45 PM. Returns null if
-  /// either is absent or invalid, so the existing picker remains the fallback.
+  /// Finds numeric and month-name dates, including 24 Sep 18 15:32:37.
   DateTime? extractReceiptDateTime(String receiptText) {
-    final dateMatch = RegExp(
+    final numericDatePattern = RegExp(
       r'\b(\d{1,4})[/-](\d{1,2})[/-](\d{1,4})\b',
+    );
+    RegExpMatch? dateMatch;
+    for (final candidate in numericDatePattern.allMatches(receiptText)) {
+      final firstPart = int.tryParse(candidate.group(1)!);
+      final secondPart = int.tryParse(candidate.group(2)!);
+      final thirdPart = int.tryParse(candidate.group(3)!);
+      if (firstPart == null || secondPart == null || thirdPart == null) {
+        continue;
+      }
+
+      final isYearFirst = firstPart >= 1000;
+      final candidateDay = isYearFirst ? thirdPart : firstPart;
+      final candidateMonth = secondPart;
+      var candidateYear = isYearFirst ? firstPart : thirdPart;
+      if (candidateYear < 100) candidateYear += 2000;
+
+      final candidateDate = DateTime(
+        candidateYear,
+        candidateMonth,
+        candidateDay,
+      );
+      final isValidDate = candidateDate.year == candidateYear &&
+          candidateDate.month == candidateMonth &&
+          candidateDate.day == candidateDay;
+      if (isValidDate) {
+        dateMatch = candidate;
+        break;
+      }
+    }
+    final namedDateMatch = RegExp(
+      r'\b(\d{1,2})\s+(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{2,4})\b',
+      caseSensitive: false,
     ).firstMatch(receiptText);
     final timeMatch = RegExp(
-      r'\b(\d{1,2})[:.](\d{2})\s*(AM|PM)?\b',
+      r'\b(\d{1,2})[:.](\d{2})(?::\d{2})?\s*(AM|PM)?\b',
       caseSensitive: false,
     ).firstMatch(receiptText);
 
-    if (dateMatch == null || timeMatch == null) {
+    if (dateMatch == null && namedDateMatch == null) {
       return null;
     }
 
-    final firstDatePart = int.tryParse(dateMatch.group(1)!);
-    final month = int.tryParse(dateMatch.group(2)!);
-    final thirdDatePart = int.tryParse(dateMatch.group(3)!);
-    final isYearFirst = (firstDatePart ?? 0) >= 1000;
-    final day = isYearFirst ? thirdDatePart : firstDatePart;
-    var year = isYearFirst ? firstDatePart : thirdDatePart;
-    var hour = int.tryParse(timeMatch.group(1)!);
-    final minute = int.tryParse(timeMatch.group(2)!);
-    final period = timeMatch.group(3)?.toUpperCase();
+    int? day;
+    int? month;
+    int? year;
+    if (dateMatch != null) {
+      final firstDatePart = int.tryParse(dateMatch.group(1)!);
+      final thirdDatePart = int.tryParse(dateMatch.group(3)!);
+      final isYearFirst = (firstDatePart ?? 0) >= 1000;
+      day = isYearFirst ? thirdDatePart : firstDatePart;
+      month = int.tryParse(dateMatch.group(2)!);
+      year = isYearFirst ? firstDatePart : thirdDatePart;
+    } else {
+      day = int.tryParse(namedDateMatch!.group(1)!);
+      month = _monthNumber(namedDateMatch.group(2)!);
+      year = int.tryParse(namedDateMatch.group(3)!);
+    }
+    var hour = timeMatch == null ? 0 : int.tryParse(timeMatch.group(1)!);
+    final minute = timeMatch == null ? 0 : int.tryParse(timeMatch.group(2)!);
+    final period = timeMatch?.group(3)?.toUpperCase();
 
     if (day == null ||
         month == null ||
@@ -177,6 +288,14 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     return isInvalidDate ? null : dateTime;
   }
 
+  int? _monthNumber(String monthName) {
+    const months = {
+      'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
+      'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12,
+    };
+    return months[monthName.substring(0, 3).toLowerCase()];
+  }
+
   /// Finds the amount on a labelled total line. Some receipt layouts put the
   /// total amount on the next OCR line, so that line is also checked.
   double? extractReceiptTotal(String receiptText) {
@@ -190,10 +309,36 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     ];
 
     final lines = _receiptLines(receiptText);
+    final summaryTotal = _summaryAmountFor(lines, 'total');
+    if (summaryTotal != null && summaryTotal > 0) {
+      return summaryTotal;
+    }
+    final totalLabelIndex = lines.lastIndexWhere(_isFinalTotalLabel);
+    if (totalLabelIndex >= 0) {
+      for (final line in lines.skip(totalLabelIndex + 1).toList().reversed) {
+        if (!RegExp(r'\b(?:RM|MYR)\s*\d', caseSensitive: false)
+            .hasMatch(line)) {
+          continue;
+        }
+        final amounts = _amountsFromLine(line);
+        if (amounts.isNotEmpty && amounts.last > 0) return amounts.last;
+
+        final compactAmount = RegExp(
+          r'\b(?:RM|MYR)\s*(\d{3,})\b',
+          caseSensitive: false,
+        ).firstMatch(line);
+        final compactDigits = int.tryParse(compactAmount?.group(1) ?? '');
+        if (compactDigits != null && compactDigits > 0) {
+          return compactDigits / 100;
+        }
+      }
+    }
     for (var index = lines.length - 1; index >= 0; index--) {
       final line = lines[index];
       final normalizedLine = line.toLowerCase();
-      if (!totalLabels.any(normalizedLine.contains)) {
+      if (!totalLabels.any(normalizedLine.contains) ||
+          _isSubtotalLabel(normalizedLine) ||
+          normalizedLine.contains('previous balance')) {
         continue;
       }
 
@@ -228,10 +373,11 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       if (index + 1 < lines.length) {
         final followingAmounts = lines
             .skip(index + 1)
+            .take(2)
             .expand(_amountsFromLine)
             .toList();
         if (followingAmounts.isNotEmpty) {
-          return followingAmounts.last;
+          return followingAmounts.first;
         }
       }
     }
@@ -264,9 +410,11 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     ];
 
     final lines = _receiptLines(receiptText);
-    final subtotalIndex = lines.indexWhere(
-      (line) => line.toLowerCase().contains('subtotal'),
-    );
+    final summaryTax = _summaryAmountFor(lines, 'tax');
+    if (summaryTax != null && summaryTax >= 0) {
+      return summaryTax;
+    }
+    final subtotalIndex = lines.indexWhere(_isSubtotalLabel);
     final taxIndex = lines.indexWhere(
       (line) => line.toLowerCase().trim() == 'tax',
     );
@@ -312,6 +460,31 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       }
     }
 
+    final hasFuzzyTaxLabel = lines.any(
+      (line) => RegExp(
+        r'\b(?:[s35]{2}t|gst|tax)\b',
+        caseSensitive: false,
+      ).hasMatch(line),
+    );
+    if (hasFuzzyTaxLabel) {
+      final items = _extractReceiptItems(receiptText);
+      final total = extractReceiptTotal(receiptText);
+      if (items.isNotEmpty && total != null) {
+        final itemsSubtotal = items.fold<double>(
+          0.0,
+          (sum, item) => sum + (item.quantity * item.unitPrice),
+        );
+        final rounding = lines
+            .expand(_amountsFromLine)
+            .where((amount) => amount < 0 && amount.abs() <= 0.10)
+            .fold<double>(0.0, (sum, amount) => sum + amount);
+        final inferredTax = total - itemsSubtotal - rounding;
+        if (inferredTax > 0 && inferredTax <= total * 0.20) {
+          return inferredTax;
+        }
+      }
+    }
+
     return null;
   }
 
@@ -326,9 +499,6 @@ class ExpenseTrackingService implements IExpenseTrackingService {
 
   String? extractReceiptCurrency(String receiptText) {
     final normalized = receiptText.toUpperCase();
-    if (RegExp(r'\bMYR\b|\bRM\s*(?=\d)|\bRM\b').hasMatch(normalized)) {
-      return 'MYR';
-    }
     if (RegExp(r'\bSGD\b|S\$').hasMatch(normalized)) return 'SGD';
     if (RegExp(r'\bAUD\b|A\$').hasMatch(normalized)) return 'AUD';
     if (RegExp(r'\bCAD\b|C\$').hasMatch(normalized)) return 'CAD';
@@ -337,9 +507,12 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     if (RegExp(r'\bEUR\b|€').hasMatch(normalized)) return 'EUR';
     if (RegExp(r'\bGBP\b|£').hasMatch(normalized)) return 'GBP';
     if (RegExp(r'\bJPY\b|¥').hasMatch(normalized)) return 'JPY';
-    if (RegExp(r'\bCNY\b').hasMatch(normalized)) return 'CNY';
+    if (RegExp(r'\bCNY\b|\bRMB\b').hasMatch(normalized)) return 'CNY';
     if (RegExp(r'\bTHB\b|฿').hasMatch(normalized)) return 'THB';
     if (RegExp(r'\bINR\b|₹').hasMatch(normalized)) return 'INR';
+    if (RegExp(r'\bMYR\b|\bRM\s*(?=\d)|\bRM\b').hasMatch(normalized)) {
+      return 'MYR';
+    }
     return null;
   }
 
@@ -372,6 +545,18 @@ class ExpenseTrackingService implements IExpenseTrackingService {
 
   List<_ExtractedReceiptItem> _extractReceiptItems(String receiptText) {
     final lines = _receiptLines(receiptText);
+    final simpleColumnItems = _extractSimpleItemAmountColumns(lines);
+    if (simpleColumnItems.isNotEmpty) {
+      return simpleColumnItems;
+    }
+    final discountedColumnItems = _extractDiscountedColumnItems(lines);
+    if (discountedColumnItems.isNotEmpty) {
+      return discountedColumnItems;
+    }
+    final inlineItems = _extractInlineItemsBeforeSummary(lines);
+    if (inlineItems.isNotEmpty) {
+      return inlineItems;
+    }
     final descriptionHeaderIndex = lines.indexWhere(
       (line) => line.toLowerCase().contains('description'),
     );
@@ -395,7 +580,7 @@ class ExpenseTrackingService implements IExpenseTrackingService {
         final line = lines[index];
         final normalizedLine = line.toLowerCase().trim();
         if (normalizedLine == 'notes' ||
-            normalizedLine.contains('subtotal') ||
+            _isSubtotalLabel(normalizedLine) ||
             normalizedLine.contains('sales tax') ||
             normalizedLine.startsWith('total')) {
           break;
@@ -529,9 +714,7 @@ class ExpenseTrackingService implements IExpenseTrackingService {
 
     // Some printed receipts output all product names first and all prices
     // afterward, followed by subtotal, tax, and total.
-    final subtotalIndex = lines.indexWhere(
-      (line) => line.toLowerCase().contains('subtotal'),
-    );
+    final subtotalIndex = lines.indexWhere(_isSubtotalLabel);
     if (subtotalIndex > 0) {
       final lastAddressIndex = lines
           .take(subtotalIndex)
@@ -792,10 +975,19 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     }
 
     final itemLines = <_ExtractedReceiptItem>[];
+    final merchantName = extractMerchantName(receiptText)?.toLowerCase().trim();
+    final firstSummaryIndex = lines.indexWhere(
+      (line) => _isSubtotalLabel(line) || _isFinalTotalLabel(line),
+    );
+    final fallbackEnd = firstSummaryIndex < 0 ? lines.length : firstSummaryIndex;
 
-    for (var index = 0; index < lines.length; index++) {
+    for (var index = 0; index < fallbackEnd; index++) {
       final line = lines[index];
-      if (_isReceiptLabel(line) || !RegExp(r'[a-zA-Z]').hasMatch(line)) {
+      final normalizedLine = line.toLowerCase().trim();
+      if (_isReceiptLabel(line) ||
+          normalizedLine == merchantName ||
+          _isNonItemReceiptText(normalizedLine) ||
+          !RegExp(r'[a-zA-Z]').hasMatch(line)) {
         continue;
       }
 
@@ -815,7 +1007,9 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       }
 
       double? price;
-      for (final possiblePriceLine in lines.skip(index + 1).take(8)) {
+      for (final possiblePriceLine in lines
+          .skip(index + 1)
+          .take(fallbackEnd - index - 1)) {
         final amounts = _amountsFromLine(possiblePriceLine);
         if (amounts.isNotEmpty) {
           price = amounts.first;
@@ -836,8 +1030,129 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     return uniqueItems.values.toList();
   }
 
+  List<_ExtractedReceiptItem> _extractSimpleItemAmountColumns(
+    List<String> lines,
+  ) {
+    final itemHeaderIndex = lines.indexWhere(
+      (line) => line.trim().toLowerCase() == 'item',
+    );
+    final subtotalIndex = lines.indexWhere(_isSubtotalLabel);
+    final amountHeaderIndex = lines.indexWhere(
+      (line) => RegExp(
+        r'^(?:amount|am[o0d]u?n?t|amdnt)$',
+        caseSensitive: false,
+      ).hasMatch(line.trim()),
+    );
+    if (itemHeaderIndex < 0 ||
+        subtotalIndex <= itemHeaderIndex ||
+        amountHeaderIndex < 0) {
+      return const [];
+    }
+
+    final names = lines
+        .sublist(itemHeaderIndex + 1, subtotalIndex)
+        .where((line) {
+          final normalized = line.trim();
+          final normalizedLower = normalized.toLowerCase();
+          final isColumnHeader = const {
+            'item',
+            'qty',
+            'quantity',
+            'amount',
+            'price',
+          }.contains(normalizedLower);
+          if (!RegExp(r'[a-zA-Z]').hasMatch(normalized) ||
+              isColumnHeader ||
+              _summaryLabelKind(normalized) != null ||
+              _isNonItemReceiptText(normalized) ||
+              _amountsFromLine(normalized).isNotEmpty ||
+              RegExp(r'^(?:inv|invoice)[-\s]', caseSensitive: false)
+                  .hasMatch(normalized) ||
+              RegExp(
+                r'^(?:pl(?:ease|eae)|thank|sample\s+recei)',
+                caseSensitive: false,
+              ).hasMatch(normalized)) {
+            return false;
+          }
+          if (RegExp(
+                r'\b(?:jalan|street|road|selangor|postcode|telephone|tel:)\b',
+                caseSensitive: false,
+              ).hasMatch(normalized) ||
+              (RegExp(r'\d').hasMatch(normalized) &&
+                  !normalizedLower.contains('item'))) {
+            return false;
+          }
+          final lettersOnly = normalized.replaceAll(RegExp(r'[^a-zA-Z]'), '');
+          return lettersOnly.isNotEmpty;
+        })
+        .toList();
+    if (names.isEmpty) return const [];
+
+    final prices = <double>[];
+    final missingLeadingDigitIndexes = <int>[];
+    for (final line in lines.skip(amountHeaderIndex + 1)) {
+      final corrected = line.trim().replaceFirst(
+        RegExp(r'^[bB](?=[.,]\d{2}$)'),
+        '8',
+      );
+      if (RegExp(r'^[.,]\d{2}$').hasMatch(corrected)) {
+        final value = double.tryParse('0$corrected');
+        if (value != null) {
+          missingLeadingDigitIndexes.add(prices.length);
+          prices.add(value);
+        }
+      } else if (RegExp(r'\d+[.,]\d{2}').hasMatch(corrected)) {
+        prices.addAll(
+          _amountsFromLine(corrected).where((amount) => amount > 0),
+        );
+      }
+      if (prices.length == names.length) break;
+    }
+    if (prices.length < names.length) return const [];
+
+    if (missingLeadingDigitIndexes.length == 1) {
+      final currentSubtotal = prices.fold<double>(
+        0.0,
+        (sum, price) => sum + price,
+      );
+      double? printedSubtotal;
+      for (final amount in lines
+          .skip(amountHeaderIndex + 1)
+          .expand(_amountsFromLine)
+          .where((amount) => amount > 0)) {
+        final difference = amount - currentSubtotal;
+        if (difference >= 1 &&
+            difference <= 9 &&
+            difference == difference.round()) {
+          printedSubtotal = amount;
+          break;
+        }
+      }
+      if (printedSubtotal != null) {
+        final missingIndex = missingLeadingDigitIndexes.single;
+        prices[missingIndex] += printedSubtotal - currentSubtotal;
+      }
+    }
+
+    return List.generate(
+      names.length,
+      (index) => _ExtractedReceiptItem(
+        name: names[index],
+        quantity: 1,
+        unitPrice: prices[index],
+      ),
+    );
+  }
+
+  bool _isNonItemReceiptText(String line) {
+    return RegExp(
+      r'^(?:trans|transaction|mcc|payment|thank\s+you|please\s+come\s+again|welcome)(?:\b|\s*[-:])',
+      caseSensitive: false,
+    ).hasMatch(line);
+  }
+
   static final RegExp _amountPattern = RegExp(
-    r'(?<!\d)(?:RM\s*)?(\d{1,3}(?:,\d{3})*(?:\.\d{2})|\d+(?:[.,]\d{2}))(?!\d)',
+    r'(?<!\d)(?:RM\s*)?(-?\s*(?:\d{1,3}(?:,\d{3})*(?:\.\d{2})|\d+(?:[.,]\d{2})))(?!\d)',
     caseSensitive: false,
   );
 
@@ -845,9 +1160,10 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     return _amountPattern
         .allMatches(line)
         .map(
-          (match) => match.group(1)!.contains(',')
-              ? match.group(1)!.replaceAll(',', '.')
-              : match.group(1)!,
+          (match) {
+            final value = match.group(1)!.replaceAll(' ', '');
+            return value.contains(',') ? value.replaceAll(',', '.') : value;
+          },
         )
         .map(double.tryParse)
         .whereType<double>()
@@ -871,11 +1187,284 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       'quantity',
       'price',
       'transaction',
+      'rounding',
+      'payment',
+      'mobile app',
+      'previous balance',
+      'balance',
+      'for here',
+      'take away',
+      'invoice',
+      'date:',
+      'server:',
       'tran:',
       'xid:',
       'usa',
     ];
     return labels.any(normalizedLine.contains);
+  }
+
+  bool _isFinalTotalLabel(String line) {
+    final normalized = line.toLowerCase().trim();
+    if (_isSubtotalLabel(normalized) ||
+        normalized.contains('previous balance')) {
+      return false;
+    }
+    return RegExp(
+      r'\b(?:grand\s+total|net\s+total|total\s+amount|amount\s+due|total\s+due|total\s+sales|total)\b',
+    ).hasMatch(normalized);
+  }
+
+  bool _isSubtotalLabel(String line) {
+    final normalized = line.toLowerCase().trim();
+    return RegExp(r'\bsub[-\s]*tota(?:l|!|1|\|)').hasMatch(normalized);
+  }
+
+  String? _summaryLabelKind(String line) {
+    final normalized = line.toLowerCase().trim();
+    if (_isSubtotalLabel(normalized)) {
+      return 'subtotal';
+    }
+    if (RegExp(r'\b(?:service\s+tax|sales\s+tax|tax|gst|sst|[s35]{2}t)\b')
+        .hasMatch(normalized)) {
+      return 'tax';
+    }
+    if (normalized.contains('rounding')) return 'rounding';
+    if (_isFinalTotalLabel(normalized)) return 'total';
+    return null;
+  }
+
+  double? _summaryAmountFor(List<String> lines, String targetKind) {
+    final labels = <MapEntry<int, String>>[];
+    for (var index = 0; index < lines.length; index++) {
+      final kind = _summaryLabelKind(lines[index]);
+      if (kind != null) labels.add(MapEntry(index, kind));
+    }
+    final subtotalPosition = labels.indexWhere(
+      (entry) => entry.value == 'subtotal',
+    );
+    final totalPosition = labels.lastIndexWhere(
+      (entry) => entry.value == 'total',
+    );
+    if (subtotalPosition < 0 || totalPosition <= subtotalPosition) return null;
+
+    final summaryLabels = labels.sublist(subtotalPosition, totalPosition + 1);
+    final targetPosition = summaryLabels.indexWhere(
+      (entry) => entry.value == targetKind,
+    );
+    if (targetPosition < 0) return null;
+
+    final directAmounts = _amountsFromLine(
+      lines[summaryLabels[targetPosition].key],
+    );
+    if (directAmounts.isNotEmpty) return directAmounts.last;
+
+    final inferredValues = _inferSummaryValues(lines);
+    final inferredValue = inferredValues[targetKind];
+    if (inferredValue != null) return inferredValue;
+
+    final start = summaryLabels.first.key;
+    final end = (summaryLabels.last.key + summaryLabels.length + 2)
+        .clamp(start + 1, lines.length)
+        .toInt();
+    final summaryAmounts = lines
+        .sublist(start, end)
+        .expand(_amountsFromLine)
+        .toList();
+    if (summaryAmounts.length < summaryLabels.length) return null;
+    return summaryAmounts[targetPosition];
+  }
+
+  Map<String, double> _inferSummaryValues(List<String> lines) {
+    final kinds = lines.map(_summaryLabelKind).whereType<String>().toSet();
+    if (!kinds.contains('subtotal') || !kinds.contains('total')) {
+      return const {};
+    }
+
+    final amounts = lines.expand(_amountsFromLine).toList();
+    final hasTax = kinds.contains('tax');
+    final hasRounding = kinds.contains('rounding');
+    final valueCount = 2 + (hasTax ? 1 : 0) + (hasRounding ? 1 : 0);
+    for (var start = 0; start + valueCount <= amounts.length; start++) {
+      final subtotal = amounts[start];
+      var cursor = start + 1;
+      final tax = hasTax ? amounts[cursor++] : 0.0;
+      final rounding = hasRounding ? amounts[cursor++] : 0.0;
+      final total = amounts[cursor];
+      if (subtotal <= 0 || tax < 0 || total <= 0) continue;
+      if ((subtotal + tax + rounding - total).abs() <= 0.02) {
+        return {
+          'subtotal': subtotal,
+          if (hasTax) 'tax': tax,
+          if (hasRounding) 'rounding': rounding,
+          'total': total,
+        };
+      }
+    }
+    return const {};
+  }
+
+  List<_ExtractedReceiptItem> _extractDiscountedColumnItems(
+    List<String> lines,
+  ) {
+    final subtotalLineIndex = lines.indexWhere(_isSubtotalLabel);
+    if (subtotalLineIndex <= 0) return const [];
+
+    final dateLineIndex = lines
+        .take(subtotalLineIndex)
+        .toList()
+        .lastIndexWhere((line) => line.toLowerCase().contains('date'));
+    final candidates = lines
+        .sublist(dateLineIndex >= 0 ? dateLineIndex + 1 : 0, subtotalLineIndex)
+        .where(_isLikelyProductOrDiscountLine)
+        .toList();
+    final productCount = candidates
+        .where((line) => !_isDiscountDescription(line))
+        .length;
+    if (productCount < 1 || !candidates.any(_isDiscountDescription)) {
+      return const [];
+    }
+
+    final subtotal = _summaryAmountFor(lines, 'subtotal');
+    if (subtotal == null) return const [];
+    final allAmounts = lines
+        .skip(dateLineIndex >= 0 ? dateLineIndex + 1 : 0)
+        .expand(_amountsFromLine)
+        .toList();
+    final subtotalAmountIndex = allAmounts.indexWhere(
+      (amount) => (amount - subtotal).abs() <= 0.005,
+    );
+    if (subtotalAmountIndex < candidates.length) return const [];
+    final itemAmounts = allAmounts.take(subtotalAmountIndex).toList();
+
+    final items = <_ExtractedReceiptItem>[];
+    for (var index = 0; index < candidates.length; index++) {
+      final description = candidates[index].trim();
+      final amount = itemAmounts[index];
+      if (_isDiscountDescription(description) || amount < 0) {
+        if (items.isEmpty || amount >= 0) continue;
+        final previous = items.removeLast();
+        final adjustedTotal =
+            (previous.unitPrice * previous.quantity + amount)
+                .clamp(0.0, double.infinity)
+                .toDouble();
+        items.add(
+          _ExtractedReceiptItem(
+            name: previous.name,
+            quantity: previous.quantity,
+            unitPrice: adjustedTotal / previous.quantity,
+          ),
+        );
+        continue;
+      }
+
+      if (amount <= 0) continue;
+      final quantityMatch = RegExp(r'\b(\d+)\s*$').firstMatch(description);
+      final parsedQuantity = int.tryParse(quantityMatch?.group(1) ?? '') ?? 1;
+      final quantity = parsedQuantity > 0 ? parsedQuantity : 1;
+      final name = description.replaceFirst(RegExp(r'\s+\d+\s*$'), '').trim();
+      items.add(
+        _ExtractedReceiptItem(
+          name: name,
+          quantity: quantity,
+          unitPrice: amount / quantity,
+        ),
+      );
+    }
+    return items;
+  }
+
+  bool _isLikelyProductOrDiscountLine(String line) {
+    final normalized = line.toLowerCase().trim();
+    if (_isDiscountDescription(normalized)) return true;
+    if (!RegExp(r'[a-z]').hasMatch(normalized) ||
+        _isReceiptLabel(normalized) ||
+        _looksLikeAddress(normalized) ||
+        normalized.contains('tax id') ||
+        normalized.contains('website') ||
+        normalized.contains('company') ||
+        normalized.contains('service tax')) {
+      return false;
+    }
+    return normalized.length >= 6 &&
+        !RegExp(r'^(?:dewi|dewt|staff|server|cashier|rm|rn|myr)$')
+            .hasMatch(normalized);
+  }
+
+  bool _isDiscountDescription(String line) {
+    final normalized = line.toLowerCase();
+    return normalized.contains('discount') ||
+        normalized.contains('%off') ||
+        normalized.contains('% off') ||
+        normalized.startsWith('msr') ||
+        normalized.startsWith('hsr');
+  }
+
+  List<_ExtractedReceiptItem> _extractInlineItemsBeforeSummary(
+    List<String> lines,
+  ) {
+    final firstSummaryIndex = lines.indexWhere((line) {
+      final normalized = line.toLowerCase();
+      return _isSubtotalLabel(normalized) || _isFinalTotalLabel(normalized);
+    });
+    final end = firstSummaryIndex < 0 ? lines.length : firstSummaryIndex;
+    final items = <_ExtractedReceiptItem>[];
+
+    for (final rawLine in lines.take(end)) {
+      final amounts = _amountsFromLine(rawLine);
+      if (amounts.isEmpty || !RegExp(r'[A-Za-z]').hasMatch(rawLine)) continue;
+
+      final withoutAmount = rawLine.replaceFirst(_amountPattern, '').trim();
+      final normalizedName = withoutAmount
+          .replaceFirst(RegExp(r'^\d+\s*[xX]\s*'), '')
+          .replaceFirst(RegExp(r'\s+\d+\s*$'), '')
+          .trim();
+      final normalizedLower = normalizedName.toLowerCase();
+      final amount = amounts.last;
+
+      final isDiscount = amount < 0 ||
+          normalizedLower.contains('discount') ||
+          normalizedLower.contains('%off') ||
+          normalizedLower.contains('% off');
+      if (isDiscount) {
+        if (items.isNotEmpty && amount < 0) {
+          final previous = items.removeLast();
+          final adjustedTotal =
+              (previous.unitPrice * previous.quantity + amount)
+                  .clamp(0.0, double.infinity)
+                  .toDouble();
+          items.add(
+            _ExtractedReceiptItem(
+              name: previous.name,
+              quantity: previous.quantity,
+              unitPrice: adjustedTotal / previous.quantity,
+            ),
+          );
+        }
+        continue;
+      }
+
+      if (amount <= 0 ||
+          normalizedName.length < 3 ||
+          _isReceiptLabel(normalizedName) ||
+          _looksLikeAddress(normalizedName) ||
+          RegExp(r'^(?:rm|rn|myr)$', caseSensitive: false)
+              .hasMatch(normalizedName)) {
+        continue;
+      }
+
+      final quantityMatch = RegExp(r'\b(\d+)\s*$').firstMatch(withoutAmount);
+      final parsedQuantity = int.tryParse(quantityMatch?.group(1) ?? '') ?? 1;
+      final quantity = parsedQuantity > 0 ? parsedQuantity : 1;
+      items.add(
+        _ExtractedReceiptItem(
+          name: normalizedName,
+          quantity: quantity,
+          unitPrice: amount / quantity,
+        ),
+      );
+    }
+    return items;
   }
 
   bool _looksLikeAddress(String line) {
@@ -931,41 +1520,37 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     );
     validateTotalAmount(totalAmount);
 
+    final expenseId = await _expenseRepository.generateNextExpenseId();
+    String? receiptImageUrl;
+    if (receiptLocalPath != null && receiptLocalPath.trim().isNotEmpty) {
+      receiptImageUrl = await _expenseRepository.uploadReceiptImage(
+        localImagePath: receiptLocalPath,
+        expenseId: expenseId,
+      );
+    }
+
     final savedExpense = await _expenseRepository.insertExpense(
       Expense(
+        expenseId: expenseId,
         activitiesId: activitiesId,
         totalAmount: totalAmount,
         currency: originalCurrency,
         paymentMethod: paymentMethod.trim(),
+        receiptImageUrl: receiptImageUrl,
       ),
     );
 
-    final expenseId = savedExpense.expenseId;
-    if (expenseId == null || expenseId.isEmpty) {
+    final savedExpenseId = savedExpense.expenseId;
+    if (savedExpenseId == null || savedExpenseId.isEmpty) {
       throw Exception('Supabase did not return an expense ID.');
     }
 
     final itemsWithExpenseId = itemsWithCalculatedSubtotals
-        .map((item) => item.copyWith(expenseId: expenseId))
+        .map((item) => item.copyWith(expenseId: savedExpenseId))
         .toList();
 
     await _expenseRepository.insertExpenseItems(itemsWithExpenseId);
-
-    if (receiptLocalPath == null || receiptLocalPath.trim().isEmpty) {
-      return savedExpense;
-    }
-
-    final receiptImageUrl = await _expenseRepository.uploadReceiptImage(
-      localImagePath: receiptLocalPath,
-      expenseId: expenseId,
-    );
-
-    await _expenseRepository.updateReceiptImageUrl(
-      expenseId: expenseId,
-      receiptImageUrl: receiptImageUrl,
-    );
-
-    return savedExpense.copyWith(receiptImageUrl: receiptImageUrl);
+    return savedExpense;
   }
 
   double calculateItemSubtotal(int quantity, double unitPrice) {
@@ -994,12 +1579,32 @@ class ExpenseTrackingService implements IExpenseTrackingService {
         throw ArgumentError('Item name cannot be empty.');
       }
 
+      final validationMessages = <String?>[
+        validateExpenseItemName(item.itemName),
+        validateExpenseDescription(item.itemDescription ?? ''),
+        validateExpenseMerchantName(item.merchantName ?? ''),
+      ];
+      for (final validationMessage in validationMessages) {
+        if (validationMessage != null) {
+          throw ArgumentError(validationMessage);
+        }
+      }
+
       if (item.quantity <= 0) {
         throw ArgumentError('Item quantity must be greater than zero.');
       }
+      if (item.quantity > 9999) {
+        throw ArgumentError('Item quantity cannot exceed 9,999.');
+      }
 
-      if (item.unitPrice < 0) {
-        throw ArgumentError('Item unit price cannot be negative.');
+      if (item.unitPrice <= 0) {
+        throw ArgumentError('Item unit price must be greater than zero.');
+      }
+      if (item.unitPrice > 99999) {
+        throw ArgumentError('Unit price cannot exceed 99,999.');
+      }
+      if (item.quantity * item.unitPrice > 999999) {
+        throw ArgumentError('Item subtotal cannot exceed 999,999.');
       }
     }
   }

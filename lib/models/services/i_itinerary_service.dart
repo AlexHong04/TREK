@@ -41,6 +41,24 @@ abstract interface class IItineraryService {
     required String dayTripId,
     double budgetLimit = 0.0,
     int dayNumber = 1,
+    String? preference,
+    List<String>? constraints,
+    String? previousActivityDestination,
+    String? nextActivityDestination,
+    bool isFirstDay = false,
+    bool isLastDay = false,
+    int totalDays = 1,
+  });
+
+  Future<List<Activity>> regenerateEmptySlotsFromRemainingPlan({
+    required String destination,
+    required double remainingBudget,
+    required List<Activity> remainingActivities,
+    required List<Activity> emptySlots,
+    required List<String> excludedPlaces,
+    List<String>? uncoveredWishlist,
+    String? preference,
+    List<String>? constraints,
   });
 
   Future<bool> saveItinerary(
@@ -89,6 +107,7 @@ abstract interface class IItineraryService {
     required String tripDestination,
     String? userCoordinates,
     DateTime? currentDate,
+    DateTime? tripEndDate,
   });
 
   Future<void> saveRevisedItineraryActivities(List<Activity> activities);
@@ -159,6 +178,8 @@ abstract interface class IExpenseTrackingService {
   Future<void> validateReceiptImage(String receiptLocalPath);
 
   Future<String> readReceiptText(String receiptLocalPath);
+
+  bool isLikelyReceiptText(String receiptText);
 
   String? extractMerchantName(String receiptText);
 

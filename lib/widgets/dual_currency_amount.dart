@@ -115,6 +115,15 @@ class _DualCurrencyAmountState extends State<DualCurrencyAmount> {
     final base = widget.baseCurrency.trim().toUpperCase();
     final baseLabel = (widget.baseLabel ?? base).toUpperCase();
 
+    // When the caller supplies an explicit label we render it verbatim, so a
+    // screen that asks for 'MYR' shows 'MYR' instead of the shortened 'RM'.
+    // The MYR -> 'RM' shorthand only applies when no label was provided.
+    final String baseLine = formatCurrencyAmount(
+      baseLabel,
+      widget.amount,
+      displayMyrAsCode: widget.baseLabel != null,
+    );
+
     final primaryStyle = widget.primaryStyle ??
         TextStyle(
           color: appTheme.gray_900,
@@ -133,7 +142,7 @@ class _DualCurrencyAmountState extends State<DualCurrencyAmount> {
     // Single line: no preferred currency, or it equals the base currency.
     if (preferred.isEmpty || base.isEmpty || preferred == base) {
       return Text(
-        _format(baseLabel, widget.amount),
+        baseLine,
         textAlign: widget.textAlign,
         style: primaryStyle,
         maxLines: 1,
@@ -144,7 +153,7 @@ class _DualCurrencyAmountState extends State<DualCurrencyAmount> {
     // Fall back to the base figure while the rate is loading or unavailable.
     if (!_hasConverted || _convertedAmount == null) {
       return Text(
-        _format(baseLabel, widget.amount),
+        baseLine,
         textAlign: widget.textAlign,
         style: primaryStyle,
         maxLines: 1,
@@ -153,7 +162,6 @@ class _DualCurrencyAmountState extends State<DualCurrencyAmount> {
     }
 
     final primaryLine = _format(preferred, _convertedAmount!);
-    final secondaryLine = _format(baseLabel, widget.amount);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -162,7 +170,7 @@ class _DualCurrencyAmountState extends State<DualCurrencyAmount> {
         Text(primaryLine, textAlign: widget.textAlign, style: primaryStyle,
             maxLines: 1, overflow: TextOverflow.ellipsis),
         const SizedBox(height: 2),
-        Text(secondaryLine, textAlign: widget.textAlign, style: secondaryStyle,
+        Text(baseLine, textAlign: widget.textAlign, style: secondaryStyle,
             maxLines: 1, overflow: TextOverflow.ellipsis),
       ],
     );

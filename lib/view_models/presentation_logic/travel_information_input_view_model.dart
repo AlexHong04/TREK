@@ -1,19 +1,106 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+
+import '../../models/configurations/frankfurter_api_config.dart';
+import '../../models/services/i_auth_service.dart';
 import '../../models/services/i_itinerary_service.dart';
 import '../../models/services/itinerary_service.dart';
+import '../../utils/place_text_validation.dart';
 import '../ui_state/travel_information_ui_state.dart';
 
 class TravelInformationInputViewModel extends ChangeNotifier {
   final IItineraryService _itineraryService;
+  final IAuthService? _authService;
   Timer? _hotelDebounce;
   String _currentHotelQuery = '';
   String? _activeHotelField;
 
-  TravelInformationInputViewModel({IItineraryService? itineraryService})
-    : _itineraryService = itineraryService ?? ItineraryService() {
+  TravelInformationInputViewModel({
+    IItineraryService? itineraryService,
+    IAuthService? authService,
+  })  : _itineraryService = itineraryService ?? ItineraryService(),
+        _authService = authService {
+    _authService?.addListener(_onAuthServiceChanged);
+    _syncPreferredCurrency();
     _loadExistingTrips();
   }
+
+  void _syncPreferredCurrency() {
+    final currency = _authService?.preferredCurrency.trim().toUpperCase();
+    if (currency != null &&
+        currency.isNotEmpty &&
+        currency != _uiState.preferredCurrency) {
+      _uiState = _uiState.copyWith(preferredCurrency: currency);
+    }
+  }
+
+  void _onAuthServiceChanged() {
+    _syncPreferredCurrency();
+    notifyListeners();
+  }
+
+  String get preferredCurrency => _uiState.preferredCurrency;
+
+  Future<double?> getExchangeRate({
+    required String fromCurrency,
+    required String toCurrency,
+  }) async {
+    if (fromCurrency.toUpperCase() == toCurrency.toUpperCase()) {
+      return 1.0;
+    }
+    try {
+      return await FrankfurterApiConfig.getRate(
+        fromCurrency: fromCurrency,
+        toCurrency: toCurrency,
+      );
+    } catch (e) {
+      debugPrint('Error fetching exchange rate: $e');
+      return null;
+    }
+  }
+
+  Future<double?> convertToMyr(double amount) async {
+    final currency = preferredCurrency;
+    if (currency == 'MYR') return amount;
+    final rate = await getExchangeRate(
+      fromCurrency: currency,
+      toCurrency: 'MYR',
+    );
+    if (rate != null) {
+      return amount * rate;
+    }
+    return null;
+  }
+
+  Future<double?> convertAmount({
+    required double amount,
+    required String fromCurrency,
+    required String toCurrency,
+  }) async {
+    if (fromCurrency.toUpperCase() == toCurrency.toUpperCase()) {
+      return amount;
+    }
+    final rate = await getExchangeRate(
+      fromCurrency: fromCurrency,
+      toCurrency: toCurrency,
+    );
+    if (rate != null) {
+      return amount * rate;
+    }
+    return null;
+  }
+
+  static final List<TextInputFormatter> _wishlistInputFormatters = [
+    FilteringTextInputFormatter.allow(
+      RegExp(r"[a-zA-Z0-9\u4e00-\u9fa5\s.,'()\-&/]"),
+    ),
+    LengthLimitingTextInputFormatter(60),
+  ];
+
+  List<TextInputFormatter> get wishlistInputFormatters =>
+      _wishlistInputFormatters;
 
   Future<void> _loadExistingTrips() async {
     try {
@@ -69,7 +156,18 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     } else {
       current.add(stateName);
     }
-    _uiState = _uiState.copyWith(selectedDestinations: current);
+    if (current.isEmpty) {
+      final resetHotels = _uiState.hotels
+          .map((h) => h.copyWith(location: ''))
+          .toList();
+      _uiState = _uiState.copyWith(
+        selectedDestinations: current,
+        hotels: resetHotels,
+      );
+      clearHotelSuggestions();
+    } else {
+      _uiState = _uiState.copyWith(selectedDestinations: current);
+    }
     notifyListeners();
 
     if (_currentWishlistQuery.trim().isNotEmpty) {
@@ -83,7 +181,18 @@ class TravelInformationInputViewModel extends ChangeNotifier {
   void removeDestination(String stateName) {
     final current = List<String>.from(_uiState.selectedDestinations)
       ..remove(stateName);
-    _uiState = _uiState.copyWith(selectedDestinations: current);
+    if (current.isEmpty) {
+      final resetHotels = _uiState.hotels
+          .map((h) => h.copyWith(location: ''))
+          .toList();
+      _uiState = _uiState.copyWith(
+        selectedDestinations: current,
+        hotels: resetHotels,
+      );
+      clearHotelSuggestions();
+    } else {
+      _uiState = _uiState.copyWith(selectedDestinations: current);
+    }
     notifyListeners();
 
     if (_currentWishlistQuery.trim().isNotEmpty) {
@@ -95,15 +204,30 @@ class TravelInformationInputViewModel extends ChangeNotifier {
   }
 
   void clearDestinations() {
-    _uiState = _uiState.copyWith(selectedDestinations: const []);
+    final resetHotels = _uiState.hotels
+        .map((h) => h.copyWith(location: ''))
+        .toList();
+    _uiState = _uiState.copyWith(
+      selectedDestinations: const [],
+      hotels: resetHotels,
+    );
+    clearHotelSuggestions();
     notifyListeners();
-    if (_activeHotelField != null) {
-      _loadHotelSuggestions(_currentHotelQuery);
-    }
   }
 
   void setSelectedDestinations(List<String> states) {
-    _uiState = _uiState.copyWith(selectedDestinations: states);
+    if (states.isEmpty) {
+      final resetHotels = _uiState.hotels
+          .map((h) => h.copyWith(location: ''))
+          .toList();
+      _uiState = _uiState.copyWith(
+        selectedDestinations: states,
+        hotels: resetHotels,
+      );
+      clearHotelSuggestions();
+    } else {
+      _uiState = _uiState.copyWith(selectedDestinations: states);
+    }
     notifyListeners();
 
     if (_currentWishlistQuery.trim().isNotEmpty) {
@@ -137,10 +261,56 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  void updateTripDates(DateTime start, DateTime end) {
+    final startFormatted = start.toLocal().toString().split(' ')[0];
+    final endFormatted = end.toLocal().toString().split(' ')[0];
+    final minDate = start.subtract(const Duration(days: 1));
+    final maxDate = end.add(const Duration(days: 1));
+
+    final updatedArrivals = _uiState.arrivals.map((arr) {
+      if (arr.date.trim().isEmpty) {
+        return arr.copyWith(date: startFormatted);
+      }
+      final parsed = DateTime.tryParse(arr.date.trim());
+      if (parsed == null || parsed.isBefore(minDate) || parsed.isAfter(maxDate)) {
+        return arr.copyWith(date: startFormatted);
+      }
+      return arr;
+    }).toList();
+
+    final updatedDepartures = _uiState.departures.map((dep) {
+      if (dep.date.trim().isEmpty) {
+        return dep.copyWith(date: endFormatted);
+      }
+      final parsed = DateTime.tryParse(dep.date.trim());
+      if (parsed == null || parsed.isBefore(minDate) || parsed.isAfter(maxDate)) {
+        return dep.copyWith(date: endFormatted);
+      }
+      return dep;
+    }).toList();
+
+    _uiState = _uiState.copyWith(
+      startDate: start,
+      endDate: end,
+      arrivals: updatedArrivals,
+      departures: updatedDepartures,
+    );
+    notifyListeners();
+  }
+
   void addArrival() {
     final newId = 'arr_${DateTime.now().millisecondsSinceEpoch}';
+    final defaultDate = _uiState.startDate != null
+        ? _uiState.startDate!.toLocal().toString().split(' ')[0]
+        : '';
     final updated = List<TransitPoint>.from(_uiState.arrivals)
-      ..add(TransitPoint(id: newId, location: '', time: '09:00 AM'));
+      ..add(TransitPoint(
+        id: newId,
+        location: '',
+        time: '09:00 AM',
+        type: 'Flight',
+        date: defaultDate,
+      ));
     _uiState = _uiState.copyWith(arrivals: updated);
     notifyListeners();
   }
@@ -174,10 +344,28 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     }
   }
 
+  void updateArrivalDate(int index, String date) {
+    if (index >= 0 && index < _uiState.arrivals.length) {
+      final updated = List<TransitPoint>.from(_uiState.arrivals);
+      updated[index] = updated[index].copyWith(date: date);
+      _uiState = _uiState.copyWith(arrivals: updated);
+      notifyListeners();
+    }
+  }
+
   void addDeparture() {
     final newId = 'dep_${DateTime.now().millisecondsSinceEpoch}';
+    final defaultDate = _uiState.endDate != null
+        ? _uiState.endDate!.toLocal().toString().split(' ')[0]
+        : '';
     final updated = List<TransitPoint>.from(_uiState.departures)
-      ..add(TransitPoint(id: newId, location: '', time: '06:00 PM'));
+      ..add(TransitPoint(
+        id: newId,
+        location: '',
+        time: '06:00 PM',
+        type: 'Flight',
+        date: defaultDate,
+      ));
     _uiState = _uiState.copyWith(departures: updated);
     notifyListeners();
   }
@@ -191,6 +379,65 @@ class TravelInformationInputViewModel extends ChangeNotifier {
       _uiState = _uiState.copyWith(departures: updated);
       notifyListeners();
     }
+  }
+
+  void updateDepartureDate(int index, String date) {
+    if (index >= 0 && index < _uiState.departures.length) {
+      final updated = List<TransitPoint>.from(_uiState.departures);
+      updated[index] = updated[index].copyWith(date: date);
+      _uiState = _uiState.copyWith(departures: updated);
+      notifyListeners();
+    }
+  }
+
+  void updateArrivalType(int index, String type) {
+    if (index >= 0 && index < _uiState.arrivals.length) {
+      final updated = List<TransitPoint>.from(_uiState.arrivals);
+      final current = updated[index];
+      if (current.type != type) {
+        updated[index] = current.copyWith(type: type, location: '');
+      }
+      _uiState = _uiState.copyWith(arrivals: updated);
+      notifyListeners();
+    }
+  }
+
+  void updateDepartureType(int index, String type) {
+    if (index >= 0 && index < _uiState.departures.length) {
+      final updated = List<TransitPoint>.from(_uiState.departures);
+      final current = updated[index];
+      if (current.type != type) {
+        updated[index] = current.copyWith(type: type, location: '');
+      }
+      _uiState = _uiState.copyWith(departures: updated);
+      notifyListeners();
+    }
+  }
+
+  void syncTransitType(String type, {int? index}) {
+    final updatedArrivals = _uiState.arrivals.asMap().entries.map((e) {
+      if (index == null || e.key == index || _uiState.arrivals.length == 1) {
+        if (e.value.type != type) {
+          return e.value.copyWith(type: type, location: '');
+        }
+      }
+      return e.value;
+    }).toList();
+
+    final updatedDepartures = _uiState.departures.asMap().entries.map((e) {
+      if (index == null || e.key == index || _uiState.departures.length == 1) {
+        if (e.value.type != type) {
+          return e.value.copyWith(type: type, location: '');
+        }
+      }
+      return e.value;
+    }).toList();
+
+    _uiState = _uiState.copyWith(
+      arrivals: updatedArrivals,
+      departures: updatedDepartures,
+    );
+    notifyListeners();
   }
 
   void updateDepartureLocation(int index, String location) {
@@ -222,6 +469,9 @@ class TravelInformationInputViewModel extends ChangeNotifier {
       updateDepartureLocation(0, location);
 
   void addHotel() {
+    if (_uiState.selectedDestinations.isEmpty) {
+      return;
+    }
     final newId = 'hotel_${DateTime.now().millisecondsSinceEpoch}';
     final updated = List<HotelStay>.from(_uiState.hotels)
       ..add(
@@ -247,6 +497,9 @@ class TravelInformationInputViewModel extends ChangeNotifier {
   }
 
   void updateHotelLocation(int index, String location) {
+    if (_uiState.selectedDestinations.isEmpty && location.trim().isNotEmpty) {
+      return;
+    }
     if (index >= 0 && index < _uiState.hotels.length) {
       final updated = List<HotelStay>.from(_uiState.hotels);
       updated[index] = updated[index].copyWith(location: location);
@@ -283,9 +536,17 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     final trimmed = item.trim();
     if (trimmed.isEmpty) return;
 
+    final error = validatePlaceInput(trimmed);
+    if (error != null) {
+      _uiState = _uiState.copyWith(wishlistError: error);
+      notifyListeners();
+      return;
+    }
+
     if (!_uiState.wishlistItems.contains(trimmed)) {
       _uiState = _uiState.copyWith(
         wishlistItems: [..._uiState.wishlistItems, trimmed],
+        clearWishlistError: true,
       );
     }
     clearSuggestions();
@@ -297,19 +558,89 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  String? validateTransitDates() {
+    if (_uiState.startDate == null || _uiState.endDate == null) {
+      return null;
+    }
+    final minDate = _uiState.startDate!.subtract(const Duration(days: 1));
+    final maxDate = _uiState.endDate!.add(const Duration(days: 1));
+
+    for (int i = 0; i < _uiState.arrivals.length; i++) {
+      final arr = _uiState.arrivals[i];
+      if (arr.date.trim().isNotEmpty) {
+        final parsed = DateTime.tryParse(arr.date.trim());
+        if (parsed != null && (parsed.isBefore(minDate) || parsed.isAfter(maxDate))) {
+          final minStr = minDate.toLocal().toString().split(' ')[0];
+          final maxStr = maxDate.toLocal().toString().split(' ')[0];
+          return 'Arrival ${i + 1} date must be between $minStr and $maxStr';
+        }
+      }
+    }
+
+    for (int i = 0; i < _uiState.departures.length; i++) {
+      final dep = _uiState.departures[i];
+      if (dep.date.trim().isNotEmpty) {
+        final parsed = DateTime.tryParse(dep.date.trim());
+        if (parsed != null && (parsed.isBefore(minDate) || parsed.isAfter(maxDate))) {
+          final minStr = minDate.toLocal().toString().split(' ')[0];
+          final maxStr = maxDate.toLocal().toString().split(' ')[0];
+          return 'Departure ${i + 1} date must be between $minStr and $maxStr';
+        }
+      }
+    }
+    return null;
+  }
+
+  String? validateHotels() {
+    final hasHotel = _uiState.hotels.any((h) => h.location.trim().isNotEmpty);
+    if (hasHotel && _uiState.selectedDestinations.isEmpty) {
+      return 'Please select destination state(s) first before entering hotel details';
+    }
+    return null;
+  }
+
+  String? validateWishlist(String? value) {
+    if ((value ?? '').trim().isEmpty) return null;
+    return validatePlaceInput(value);
+  }
+
   String? generateItinerary({
     String? destination,
     String? date,
     String? budget,
+    String? wishlistQuery,
   }) {
+    if (_uiState.wishlistError != null) {
+      return _uiState.wishlistError;
+    }
+    if ((wishlistQuery ?? '').trim().isNotEmpty) {
+      final wErr = validatePlaceInput(wishlistQuery);
+      if (wErr != null) {
+        _uiState = _uiState.copyWith(
+          wishlistError: wErr,
+          suggestions: const [],
+          isSearchingSuggestions: false,
+        );
+        notifyListeners();
+        return wErr;
+      }
+    }
     final String? destinationError = validateDestinations();
     final String? dateError = validateDate(date);
     final String? budgetError = validateBudget(budget);
+    final String? transitDateError = validateTransitDates();
+    final String? hotelError = validateHotels();
 
-    if (destinationError != null || dateError != null || budgetError != null) {
+    if (destinationError != null ||
+        dateError != null ||
+        budgetError != null ||
+        transitDateError != null ||
+        hotelError != null) {
       return destinationError ??
           dateError ??
           budgetError ??
+          transitDateError ??
+          hotelError ??
           'Please complete the form';
     }
 
@@ -332,9 +663,28 @@ class TravelInformationInputViewModel extends ChangeNotifier {
 
     final trimmed = value.trim();
     if (trimmed.isEmpty) {
-      clearSuggestions();
+      _uiState = _uiState.copyWith(
+        clearWishlistError: true,
+        suggestions: const [],
+        isSearchingSuggestions: false,
+      );
+      notifyListeners();
       return;
     }
+
+    final validationError = validatePlaceInput(trimmed);
+    if (validationError != null) {
+      _uiState = _uiState.copyWith(
+        wishlistError: validationError,
+        suggestions: const [],
+        isSearchingSuggestions: false,
+      );
+      notifyListeners();
+      return;
+    }
+
+    _uiState = _uiState.copyWith(clearWishlistError: true);
+    notifyListeners();
 
     _debounce = Timer(const Duration(milliseconds: 500), () async {
       _uiState = _uiState.copyWith(isSearchingSuggestions: true);
@@ -365,6 +715,7 @@ class TravelInformationInputViewModel extends ChangeNotifier {
   }
 
   void onHotelFocused(int index) {
+    if (_uiState.selectedDestinations.isEmpty) return;
     _activeHotelField = 'hotel_$index';
     _hotelDebounce?.cancel();
     final currentText = index < _uiState.hotels.length
@@ -374,6 +725,7 @@ class TravelInformationInputViewModel extends ChangeNotifier {
   }
 
   void onHotelLocationChanged(int index, String value) {
+    if (_uiState.selectedDestinations.isEmpty) return;
     updateHotelLocation(index, value);
     _activeHotelField = 'hotel_$index';
     _debounceHotelSearch(value);
@@ -436,8 +788,23 @@ class TravelInformationInputViewModel extends ChangeNotifier {
 
       if (_activeHotelField != capturedField) return;
 
+      final seen = <String>{};
+      final uniqueResults = <String>[];
+      for (final item in results) {
+        final trimmed = item.trim();
+        if (trimmed.isEmpty) continue;
+        final key = trimmed
+            .toLowerCase()
+            .replaceAll(RegExp(r',\s*malaysia$', caseSensitive: false), '')
+            .replaceAll(RegExp(r'\s+'), ' ')
+            .trim();
+        if (key.isNotEmpty && seen.add(key)) {
+          uniqueResults.add(trimmed);
+        }
+      }
+
       _uiState = _uiState.copyWith(
-        hotelSuggestions: results,
+        hotelSuggestions: uniqueResults,
         isSearchingHotelSuggestions: false,
       );
       notifyListeners();
@@ -452,8 +819,29 @@ class TravelInformationInputViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    _authService?.removeListener(_onAuthServiceChanged);
     _debounce?.cancel();
     _hotelDebounce?.cancel();
     super.dispose();
+  }
+}
+
+class TravelInformationInputViewModelScope extends StatelessWidget {
+  final Widget child;
+
+  const TravelInformationInputViewModelScope({
+    super.key,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider<TravelInformationInputViewModel>(
+      create: (context) => TravelInformationInputViewModel(
+        itineraryService: context.read<IItineraryService>(),
+        authService: context.read<IAuthService>(),
+      ),
+      child: child,
+    );
   }
 }

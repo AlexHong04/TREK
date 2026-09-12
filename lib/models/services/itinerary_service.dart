@@ -17,6 +17,38 @@ import 'i_itinerary_service.dart';
 class ItineraryService implements IItineraryService {
   final IItineraryRepository _itineraryRepository = ItineraryRepository();
 
+  static bool _isWishlistMatch(
+    String wishlistName,
+    String destinationName, [
+    String description = '',
+  ]) {
+    final wLower = wishlistName.toLowerCase().trim();
+    final dLower = destinationName.toLowerCase().trim();
+    final descLower = description.toLowerCase().trim();
+
+    if (dLower.contains(wLower) || wLower.contains(dLower)) return true;
+    if (descLower.contains(wLower)) return true;
+
+    final cleanW = wLower.replaceAll(RegExp(r'[^a-z0-9]'), '');
+    final cleanD = dLower.replaceAll(RegExp(r'[^a-z0-9]'), '');
+    final cleanDesc = descLower.replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+    if (cleanW.isNotEmpty) {
+      if (cleanD.contains(cleanW) || cleanW.contains(cleanD)) return true;
+      if (cleanDesc.contains(cleanW)) return true;
+    }
+
+    final tokens =
+        wLower.split(RegExp(r'[\s,]+')).where((t) => t.length >= 3).toList();
+    if (tokens.length >= 2) {
+      final matchedTokens =
+          tokens.where((t) => dLower.contains(t) || cleanD.contains(t)).length;
+      if (matchedTokens >= 2) return true;
+    }
+
+    return false;
+  }
+
   // kokhong - Gemini API + Google Places validation + image resolution
   @override
   Future<ItineraryGenerationResult> generateItinerary({
@@ -184,15 +216,13 @@ class ItineraryService implements IItineraryService {
             strictBudget &&
             wishlist != null &&
             wishlist.isNotEmpty) {
-          final destNames = jsonList
-              .map(
-                (item) => (item['destination'] as String? ?? '').toLowerCase(),
-              )
-              .toList();
           final allWishlistIncluded = wishlist.every((w) {
-            final lowerW = w.toLowerCase().trim();
-            return destNames.any(
-              (d) => d.contains(lowerW) || lowerW.contains(d),
+            return jsonList.any(
+              (item) => _isWishlistMatch(
+                w,
+                item['destination'] as String? ?? '',
+                item['description'] as String? ?? '',
+              ),
             );
           });
           if (!allWishlistIncluded && retries > 1) {
@@ -379,15 +409,12 @@ class ItineraryService implements IItineraryService {
       int resolvedWishlistCovered = 0;
       if (wishlist != null && wishlist.isNotEmpty) {
         resolvedWishlistCovered = responseWishlistItemsCoveredCount;
-        final activityDestinations = newActivities
-            .map((a) => a.destination.toLowerCase())
-            .toSet();
         int matchedCount = 0;
         for (final item in wishlist) {
-          final lowerItem = item.toLowerCase().trim();
-          if (activityDestinations.any(
-            (dest) => dest.contains(lowerItem) || lowerItem.contains(dest),
-          )) {
+          final isMatched = newActivities.any(
+            (a) => _isWishlistMatch(item, a.destination, a.description),
+          );
+          if (isMatched) {
             matchedCount++;
           }
         }
@@ -396,15 +423,14 @@ class ItineraryService implements IItineraryService {
           resolvedWishlistCovered = wishlist.length;
           resolvedExtraBudget = 0.0;
         } else {
-          // If Gemini returned 0 or didn't set coverage, but items matched in activities
-          if (resolvedWishlistCovered == 0 && matchedCount > 0) {
-            resolvedWishlistCovered = matchedCount.clamp(
-              0,
-              wishlist.length - 1,
-            );
-          } else if (resolvedWishlistCovered > wishlist.length) {
-            resolvedWishlistCovered = wishlist.length;
+          // If matched count in activities is higher than Gemini reported count, prefer matched count
+          if (matchedCount > resolvedWishlistCovered) {
+            resolvedWishlistCovered = matchedCount;
           }
+          resolvedWishlistCovered = resolvedWishlistCovered.clamp(
+            0,
+            wishlist.length,
+          );
         }
 
         // When wishlist is incomplete, ensure there is a realistic estimated shortfall for missing items
@@ -463,6 +489,13 @@ class ItineraryService implements IItineraryService {
     required String dayTripId,
     double budgetLimit = 0.0,
     int dayNumber = 1,
+    String? preference,
+    List<String>? constraints,
+    String? previousActivityDestination,
+    String? nextActivityDestination,
+    bool isFirstDay = false,
+    bool isLastDay = false,
+    int totalDays = 1,
   }) async {
     int retries = 3;
     final List<String> localExcluded = List.from(excludedActivity);
@@ -471,16 +504,26 @@ class ItineraryService implements IItineraryService {
     String imgUrl = '';
     Map<String, dynamic>? place;
 
+    // Derive target area from surrounding activities for better geographic context
+    final targetArea = previousActivityDestination ?? nextActivityDestination ?? destination;
+
     while (retries > 0) {
       final rawJson = await GeminiApiConfig.askGeminiForAlternative(
         destinationCity: destination,
-        targetAreaOrNeighborhood: destination,
+        targetAreaOrNeighborhood: targetArea,
         category: category,
         startTime: startTime,
         endTime: endTime,
         budgetLimit: budgetLimit,
         dayNumber: dayNumber,
         existingOrExcludedPlaces: localExcluded,
+        preference: preference,
+        constraints: constraints,
+        previousActivityDestination: previousActivityDestination,
+        nextActivityDestination: nextActivityDestination,
+        isFirstDay: isFirstDay,
+        isLastDay: isLastDay,
+        totalDays: totalDays,
       );
       try {
         item = jsonDecode(rawJson);
@@ -573,6 +616,182 @@ class ItineraryService implements IItineraryService {
       activityCategory: item['activityCategory'] as String? ?? category,
       isOverspend: false,
     );
+  }
+
+  @override
+  Future<List<Activity>> regenerateEmptySlotsFromRemainingPlan({
+    required String destination,
+    required double remainingBudget,
+    required List<Activity> remainingActivities,
+    required List<Activity> emptySlots,
+    required List<String> excludedPlaces,
+    List<String>? uncoveredWishlist,
+    String? preference,
+    List<String>? constraints,
+  }) async {
+    if (emptySlots.isEmpty) return [];
+
+    // Map remaining activities to lightweight maps for route/schedule context
+    final mappedRemaining = remainingActivities.map((a) {
+      return {
+        'date': a.date.toIso8601String().split('T').first,
+        'startTime': a.startTime ?? '',
+        'endTime': a.endTime ?? '',
+        'destination': a.destination,
+        'activityCategory': a.activityCategory,
+        'allocatedBudget': a.allocatedBudget,
+      };
+    }).toList();
+
+    // Map empty slots to lightweight maps
+    final mappedEmpty = emptySlots.map((s) {
+      return {
+        'activitiesId': s.activitiesId,
+        'date': s.date.toIso8601String().split('T').first,
+        'startTime': s.startTime ?? '',
+        'endTime': s.endTime ?? '',
+        'category': s.activityCategory,
+      };
+    }).toList();
+
+    final rawJson = await GeminiApiConfig.askGeminiToRegenerateEmptySlots(
+      destinationCity: destination,
+      remainingBudget: remainingBudget,
+      remainingActivities: mappedRemaining,
+      emptySlots: mappedEmpty,
+      excludedPlaces: excludedPlaces,
+      uncoveredWishlist: uncoveredWishlist,
+      preference: preference,
+      constraints: constraints,
+    );
+
+    List<dynamic> parsedList = [];
+    try {
+      final decoded = jsonDecode(rawJson);
+      if (decoded is List) {
+        parsedList = decoded;
+      }
+    } catch (e) {
+      developer.log('Error decoding regenerated empty slots: $e');
+    }
+
+    // Create a map of regenerated data by activitiesId
+    final Map<String, Map<String, dynamic>> itemsBySlotId = {};
+    for (int i = 0; i < parsedList.length; i++) {
+      final item = parsedList[i];
+      if (item is Map<String, dynamic>) {
+        final id = item['activitiesId']?.toString();
+        if (id != null && id.isNotEmpty) {
+          itemsBySlotId[id] = item;
+        } else if (i < emptySlots.length) {
+          itemsBySlotId[emptySlots[i].activitiesId] = item;
+        }
+      }
+    }
+
+    final List<Activity> resultActivities = [];
+
+    for (final slot in emptySlots) {
+      final item = itemsBySlotId[slot.activitiesId];
+      final destTitle = item?['destination'] as String? ?? '';
+
+      if (destTitle.isEmpty) {
+        // If Gemini failed for this slot, fallback to single alternative generator
+        try {
+          final singleFallback = await generateAlternativeItinerary(
+            destination: destination,
+            slotDate: slot.date,
+            startTime: slot.startTime ?? '09:00',
+            endTime: slot.endTime ?? '11:00',
+            category: slot.activityCategory.isNotEmpty
+                ? slot.activityCategory
+                : 'Attraction',
+            excludedActivity: excludedPlaces,
+            existingActivityId: slot.activitiesId,
+            dayTripId: slot.dayTripId,
+            budgetLimit: remainingBudget > 0
+                ? (remainingBudget / emptySlots.length)
+                : 30.0,
+          );
+          resultActivities.add(singleFallback);
+          continue;
+        } catch (_) {
+          resultActivities.add(slot);
+          continue;
+        }
+      }
+
+      String finalTitle = destTitle;
+      String imgUrl = '';
+      bool resolvedByGooglePlaces = false;
+
+      if (GooglePlacesApiConfig.isConfigured) {
+        try {
+          final place = await GooglePlacesApiConfig.searchPlace(destTitle);
+          if (place != null) {
+            resolvedByGooglePlaces = true;
+            if (place['name'] != null && place['name'].toString().isNotEmpty) {
+              finalTitle = place['name'];
+            }
+            final photos = place['photos'] as List?;
+            if (photos != null && photos.isNotEmpty) {
+              final firstPhoto = photos.first as Map<String, dynamic>;
+              final photoRef = firstPhoto['photo_reference'] as String?;
+              if (photoRef != null && photoRef.isNotEmpty) {
+                imgUrl = GooglePlacesApiConfig.getPhotoUrl(photoRef);
+              }
+            }
+          }
+        } catch (e) {
+          developer.log('Google Places search error for "$destTitle": $e');
+        }
+      }
+
+      if (imgUrl.isEmpty && !resolvedByGooglePlaces) {
+        final imageKeyword =
+            (item?['imageKeyword'] ?? item?['image_keyword'] ?? destTitle)
+                as String;
+        try {
+          final resolved = await ImageResolverConfig.resolveImage(
+            keyword: imageKeyword,
+            fallbackTitle: finalTitle,
+            lockIndex: 0,
+          );
+          imgUrl = resolved.imageUrl;
+          finalTitle = resolved.correctedTitle;
+        } catch (_) {}
+      }
+
+      final double allocatedBudget =
+          (item?['allocatedBudget'] as num?)?.toDouble() ?? 0.0;
+      final category =
+          (item?['activityCategory'] as String?) ??
+          (slot.activityCategory.isNotEmpty
+              ? slot.activityCategory
+              : 'Attraction');
+
+      resultActivities.add(
+        Activity(
+          activitiesId: slot.activitiesId,
+          dayTripId: slot.dayTripId,
+          destination: finalTitle,
+          description: (item?['description'] as String?) ?? '',
+          activityImgUrl: imgUrl,
+          date: slot.date,
+          allocatedBudget: allocatedBudget,
+          overspendAmount: allocatedBudget > 0 ? 0 : null,
+          status: 'pending',
+          startTime:
+              (item?['startTime'] as String?) ?? slot.startTime ?? '09:00',
+          endTime: (item?['endTime'] as String?) ?? slot.endTime ?? '11:00',
+          duration: (item?['duration'] as String?) ?? slot.duration ?? '60 min',
+          activityCategory: category,
+          isOverspend: false,
+        ),
+      );
+    }
+
+    return resultActivities;
   }
 
   // kokhong
@@ -740,6 +959,7 @@ class ItineraryService implements IItineraryService {
     required String tripDestination,
     String? userCoordinates,
     DateTime? currentDate,
+    DateTime? tripEndDate,
   }) async {
     // 1. Create lookup map for preserving IDs and metadata
     final Map<String, Activity> activityLookup = {
@@ -772,6 +992,7 @@ class ItineraryService implements IItineraryService {
           tripDestination: tripDestination,
           userCoordinates: userCoordinates,
           currentDate: currentDate,
+          tripEndDate: tripEndDate,
         );
 
     final defaultDayTripId = remainingActivities.isNotEmpty
@@ -798,16 +1019,20 @@ class ItineraryService implements IItineraryService {
         activityImgUrl: item['activityImgUrl']?.toString().isNotEmpty == true
             ? item['activityImgUrl'].toString()
             : (originalActivity?.activityImgUrl ?? 'assets/logo.png'),
-        date: item['date'] != null
-            ? DateTime.tryParse(item['date'].toString()) ??
-                  (originalActivity?.date ?? DateTime.now())
-            : (originalActivity?.date ?? DateTime.now()),
+        date: originalActivity?.date ?? DateTime.now(),
         allocatedBudget: allocatedBudget,
         overspendAmount: allocatedBudget > 0 ? 0 : null,
         status: item['status']?.toString() ?? 'pending',
-        startTime: item['startTime']?.toString() ?? '09:00',
-        endTime: item['endTime']?.toString() ?? '10:00',
-        duration: item['duration']?.toString() ?? '60 min',
+        startTime:
+            item['startTime']?.toString() ??
+            originalActivity?.startTime ??
+            '09:00',
+        endTime:
+            item['endTime']?.toString() ?? originalActivity?.endTime ?? '10:00',
+        duration:
+            item['duration']?.toString() ??
+            originalActivity?.duration ??
+            '60 min',
         activityCategory:
             item['activityCategory']?.toString() ??
             (originalActivity?.activityCategory ?? 'General'),

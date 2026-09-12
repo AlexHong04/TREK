@@ -135,6 +135,8 @@ abstract interface class IExpenseRepository {
 
   Future<List<ExpenseItem>> getExpenseItemsByExpenseId(String expenseId);
 
+  Future<String> generateNextExpenseId();
+
   Future<Expense> insertExpense(Expense expense);
 
   Future<void> insertExpenseItems(List<ExpenseItem> expenseItems);
