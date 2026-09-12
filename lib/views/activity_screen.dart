@@ -423,8 +423,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
       minTopUp: minTopUp,
       remainingBudget: uiState.remainingBudget,
       warningText:
-          'Top-up amount should at least MYR ${minTopUp.toStringAsFixed(2)}, insufficient top-up amount will trigger alternative recommendation directly.',
-      symbol: viewModel.preferredCurrency,
+          'Insufficient top-up amount will trigger alternative recommendation directly.',
+      validateTopUpAmount: viewModel.validateTopUpAmount,
       onEndTrip: () {
         _showEndTripConfirmationDialog(uiState);
       },
@@ -488,7 +488,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
           return false;
         }
 
-        final latestState = viewModel.uiState;
+        final viewModel2 = context.read<ActivityViewModel>();
+        final latestState = viewModel2.uiState;
 
         if (latestState.shortageAmount > 0) {
           // Wait until the first dialog is completely removed.

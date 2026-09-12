@@ -312,6 +312,32 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     }
   }
 
+  String? validateTopUpAmount({
+    required String value,
+    required double minTopUp,
+    required double shortageAmount,
+  }) {
+    if (value.trim().isEmpty) {
+      return null;
+    }
+
+    final amount = double.tryParse(value.trim());
+
+    if (amount == null) {
+      return 'Please enter a valid amount.';
+    }
+
+    if (amount < minTopUp) {
+      return 'Top-up amount must be at least RM ${minTopUp.toStringAsFixed(2)}.';
+    }
+
+    if (amount > shortageAmount) {
+      return 'Top-up amount cannot exceed RM ${shortageAmount.toStringAsFixed(2)}.';
+    }
+
+    return null;
+  }
+
   // zhiqin
   Future<bool> topUpBudget(double amount) async {
     if (amount <= 0) {

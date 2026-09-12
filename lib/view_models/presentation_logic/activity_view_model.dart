@@ -201,10 +201,7 @@ class ActivityViewModel extends ChangeNotifier {
         .where((ocrIndex) => ocrIndex != index)
         .map((ocrIndex) => ocrIndex > index ? ocrIndex - 1 : ocrIndex)
         .toSet();
-    _updateDraftExpenseItems(
-      updatedItems,
-      ocrItemIndexes: updatedOcrIndexes,
-    );
+    _updateDraftExpenseItems(updatedItems, ocrItemIndexes: updatedOcrIndexes);
   }
 
   /// Removes only unsaved draft items after the tourist agrees to replace them
@@ -550,7 +547,8 @@ class ActivityViewModel extends ChangeNotifier {
       final detectedTax = _expenseTrackingService.extractReceiptTax(
         receiptText,
       );
-      final extractedTax = detectedTax != null &&
+      final extractedTax =
+          detectedTax != null &&
               extractedTotal != null &&
               detectedTax >= 0 &&
               detectedTax <= extractedTotal * 0.20
@@ -946,8 +944,7 @@ class ActivityViewModel extends ChangeNotifier {
         itemsWithCalculatedSubtotals,
         tax,
       ),
-      ocrDraftItemIndexes:
-          ocrItemIndexes ?? _uiState.ocrDraftItemIndexes,
+      ocrDraftItemIndexes: ocrItemIndexes ?? _uiState.ocrDraftItemIndexes,
       draftTaxFromOcr: taxFromOcr ?? _uiState.draftTaxFromOcr,
       errorMessage: '',
       successMessage: '',
@@ -1163,13 +1160,13 @@ class ActivityViewModel extends ChangeNotifier {
       final matchingTrip = tripResult?.trip.tripId == tripId
           ? tripResult?.trip
           : null;
-      final sortedActivityDates = allActivities
-          .map((activity) => activity.date)
-          .toList()
-        ..sort();
-      final effectiveTripStartDate = matchingTrip?.startDate ??
+      final sortedActivityDates =
+          allActivities.map((activity) => activity.date).toList()..sort();
+      final effectiveTripStartDate =
+          matchingTrip?.startDate ??
           (sortedActivityDates.isEmpty ? null : sortedActivityDates.first);
-      final effectiveTripEndDate = matchingTrip?.endDate ??
+      final effectiveTripEndDate =
+          matchingTrip?.endDate ??
           (sortedActivityDates.isEmpty ? null : sortedActivityDates.last);
 
       // *** SET CRITICAL STATE FIRST — before any non-essential calls ***
@@ -1500,6 +1497,37 @@ class ActivityViewModel extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  String? validateTopUpAmount({
+    required String value,
+    required double minTopUp,
+    required double shortageAmount,
+  }) {
+    if (value.trim().isEmpty) {
+      return null;
+    }
+
+    final amount = double.tryParse(value.trim());
+
+    if (amount == null) {
+      return 'Please enter a valid amount.';
+    }
+
+    // Compare money as cents to avoid floating-point precision issues.
+    final amountCents = (amount * 100).round();
+    final minTopUpCents = (minTopUp * 100).round();
+    final shortageCents = (shortageAmount * 100).round();
+
+    if (amountCents < minTopUpCents) {
+      return 'Top-up amount must be at least MYR ${minTopUp.toStringAsFixed(2)}.';
+    }
+
+    if (amountCents > shortageCents) {
+      return 'Top-up amount cannot exceed MYR ${shortageAmount.toStringAsFixed(2)}.';
+    }
+
+    return null;
   }
 
   Future<bool> topUpBudget(double additionalAmount) async {

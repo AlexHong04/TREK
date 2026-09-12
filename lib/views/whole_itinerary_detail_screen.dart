@@ -373,6 +373,8 @@ class _WholeItineraryDetailScreenState
     _wishlistWarningShowing = true;
 
     try {
+      // estimatedExtraBudgetNeeded, min top-up to be converted
+
       double minTopUp = viewModel.uiState.estimatedExtraBudgetNeeded * 0.50;
 
       if (minTopUp <= 0.0) {
@@ -398,9 +400,11 @@ class _WholeItineraryDetailScreenState
           wishlistCovered: hasWishlist
               ? viewModel.uiState.wishlistItemsCoveredCount
               : null,
+          symbol: viewModel.preferredCurrency,
           warningText:
               'Insufficient top-up amount will trigger '
               'alternative recommendation directly.',
+          validateTopUpAmount: viewModel.validateTopUpAmount,
           onCancel: () {},
           onTopUpBudget: (double amount) {
             return _handleTopUp(
