@@ -1906,12 +1906,13 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         backgroundColor: appTheme.white_A700,
+        insetPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 24),
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: 360),
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(20, 22, 20, 18),
+          constraints: BoxConstraints(maxWidth: 500),
+          child: SingleChildScrollView(
+            padding: EdgeInsets.all(20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1919,9 +1920,10 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                 Text(
                   title,
                   style: TextStyle(
-                    color: appTheme.gray_900,
+                    color: appTheme.black,
+                    fontFamily: 'Inter',
                     fontSize: 20,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
                 SizedBox(height: 16),
@@ -1973,11 +1975,19 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                       child: OutlinedButton(
                         onPressed: () => Navigator.pop(dialogContext, false),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: appTheme.blue_gray_700,
+                          foregroundColor: isDestructive
+                              ? appTheme.blue_gray_700
+                              : appTheme.white_A700,
+                          backgroundColor:
+                              isDestructive ? null : appTheme.errorRed,
                           minimumSize: Size.fromHeight(48),
-                          side: BorderSide(color: appTheme.gray_200),
+                          side: BorderSide(
+                            color: isDestructive
+                                ? appTheme.gray_200
+                                : appTheme.errorRed,
+                          ),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(24),
                           ),
                         ),
                         child: Text(
@@ -1999,7 +2009,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                           minimumSize: Size.fromHeight(48),
                           elevation: 0,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(24),
                           ),
                         ),
                         child: Text(
