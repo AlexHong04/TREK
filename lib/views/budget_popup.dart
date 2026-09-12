@@ -937,3 +937,59 @@ Future<void> showTopUpConfirmation({
     onConfirm: onConfirm,
   );
 }
+
+Future<bool> showConfirmRemoveActivityDialog({
+  required BuildContext context,
+  required String activityName,
+}) async {
+  bool confirmed = false;
+  await showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) {
+      return BaseBudgetDialog(
+        title: 'Remove Activity',
+        titleColor: appTheme.black,
+        contentCard: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 500),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              BaseBudgetDialog._buildWarningRow(
+                'Are you sure you want to remove "$activityName" from your itinerary?',
+                color: appTheme.black,
+                icon: false,
+              ),
+            ],
+          ),
+        ),
+        actions: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Expanded(
+              child: _buildActionButton(
+                text: 'Cancel',
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
+                },
+                backgroundColor: appTheme.errorRed,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildActionButton(
+                text: 'Confirm',
+                onPressed: () {
+                  confirmed = true;
+                  Navigator.of(dialogContext).pop();
+                },
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+  return confirmed;
+}
