@@ -17,6 +17,38 @@ import 'i_itinerary_service.dart';
 class ItineraryService implements IItineraryService {
   final IItineraryRepository _itineraryRepository = ItineraryRepository();
 
+  static bool _isWishlistMatch(
+    String wishlistName,
+    String destinationName, [
+    String description = '',
+  ]) {
+    final wLower = wishlistName.toLowerCase().trim();
+    final dLower = destinationName.toLowerCase().trim();
+    final descLower = description.toLowerCase().trim();
+
+    if (dLower.contains(wLower) || wLower.contains(dLower)) return true;
+    if (descLower.contains(wLower)) return true;
+
+    final cleanW = wLower.replaceAll(RegExp(r'[^a-z0-9]'), '');
+    final cleanD = dLower.replaceAll(RegExp(r'[^a-z0-9]'), '');
+    final cleanDesc = descLower.replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+    if (cleanW.isNotEmpty) {
+      if (cleanD.contains(cleanW) || cleanW.contains(cleanD)) return true;
+      if (cleanDesc.contains(cleanW)) return true;
+    }
+
+    final tokens =
+        wLower.split(RegExp(r'[\s,]+')).where((t) => t.length >= 3).toList();
+    if (tokens.length >= 2) {
+      final matchedTokens =
+          tokens.where((t) => dLower.contains(t) || cleanD.contains(t)).length;
+      if (matchedTokens >= 2) return true;
+    }
+
+    return false;
+  }
+
   // kokhong - Gemini API + Google Places validation + image resolution
   @override
   Future<ItineraryGenerationResult> generateItinerary({
@@ -184,15 +216,13 @@ class ItineraryService implements IItineraryService {
             strictBudget &&
             wishlist != null &&
             wishlist.isNotEmpty) {
-          final destNames = jsonList
-              .map(
-                (item) => (item['destination'] as String? ?? '').toLowerCase(),
-              )
-              .toList();
           final allWishlistIncluded = wishlist.every((w) {
-            final lowerW = w.toLowerCase().trim();
-            return destNames.any(
-              (d) => d.contains(lowerW) || lowerW.contains(d),
+            return jsonList.any(
+              (item) => _isWishlistMatch(
+                w,
+                item['destination'] as String? ?? '',
+                item['description'] as String? ?? '',
+              ),
             );
           });
           if (!allWishlistIncluded && retries > 1) {
@@ -379,15 +409,12 @@ class ItineraryService implements IItineraryService {
       int resolvedWishlistCovered = 0;
       if (wishlist != null && wishlist.isNotEmpty) {
         resolvedWishlistCovered = responseWishlistItemsCoveredCount;
-        final activityDestinations = newActivities
-            .map((a) => a.destination.toLowerCase())
-            .toSet();
         int matchedCount = 0;
         for (final item in wishlist) {
-          final lowerItem = item.toLowerCase().trim();
-          if (activityDestinations.any(
-            (dest) => dest.contains(lowerItem) || lowerItem.contains(dest),
-          )) {
+          final isMatched = newActivities.any(
+            (a) => _isWishlistMatch(item, a.destination, a.description),
+          );
+          if (isMatched) {
             matchedCount++;
           }
         }
@@ -396,15 +423,14 @@ class ItineraryService implements IItineraryService {
           resolvedWishlistCovered = wishlist.length;
           resolvedExtraBudget = 0.0;
         } else {
-          // If Gemini returned 0 or didn't set coverage, but items matched in activities
-          if (resolvedWishlistCovered == 0 && matchedCount > 0) {
-            resolvedWishlistCovered = matchedCount.clamp(
-              0,
-              wishlist.length - 1,
-            );
-          } else if (resolvedWishlistCovered > wishlist.length) {
-            resolvedWishlistCovered = wishlist.length;
+          // If matched count in activities is higher than Gemini reported count, prefer matched count
+          if (matchedCount > resolvedWishlistCovered) {
+            resolvedWishlistCovered = matchedCount;
           }
+          resolvedWishlistCovered = resolvedWishlistCovered.clamp(
+            0,
+            wishlist.length,
+          );
         }
 
         // When wishlist is incomplete, ensure there is a realistic estimated shortfall for missing items

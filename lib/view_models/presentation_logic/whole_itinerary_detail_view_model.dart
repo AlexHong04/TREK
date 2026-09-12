@@ -95,27 +95,51 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
       !hasEmptyActivitySlots &&
       !hasExtraBudgetNeeded;
 
+  static bool _matchesWishlist(
+    String wishlistName,
+    String destinationName, [
+    String description = '',
+  ]) {
+    final wLower = wishlistName.toLowerCase().trim();
+    final dLower = destinationName.toLowerCase().trim();
+    final descLower = description.toLowerCase().trim();
+
+    if (dLower.contains(wLower) || wLower.contains(dLower)) return true;
+    if (descLower.contains(wLower)) return true;
+
+    final cleanW = wLower.replaceAll(RegExp(r'[^a-z0-9]'), '');
+    final cleanD = dLower.replaceAll(RegExp(r'[^a-z0-9]'), '');
+    final cleanDesc = descLower.replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+    if (cleanW.isNotEmpty) {
+      if (cleanD.contains(cleanW) || cleanW.contains(cleanD)) return true;
+      if (cleanDesc.contains(cleanW)) return true;
+    }
+
+    final tokens =
+        wLower.split(RegExp(r'[\s,]+')).where((t) => t.length >= 3).toList();
+    if (tokens.length >= 2) {
+      final matchedTokens =
+          tokens.where((t) => dLower.contains(t) || cleanD.contains(t)).length;
+      if (matchedTokens >= 2) return true;
+    }
+
+    return false;
+  }
+
   /// Wishlist items that are matched by any active activity in the itinerary.
   List<String> get coveredWishlistItems {
     final wishlist = _uiState.wishlist;
     if (wishlist == null || wishlist.isEmpty) return [];
 
-    final activeDestinations = _uiState.activities
+    final activeActivities = _uiState.activities
         .where((a) => a.status != 'empty' && a.destination.trim().isNotEmpty)
-        .map((a) => a.destination.toLowerCase().trim())
-        .toSet();
-
-    final activeDescriptions = _uiState.activities
-        .where((a) => a.status != 'empty')
-        .map((a) => a.description.toLowerCase().trim())
         .toList();
 
     return wishlist.where((item) {
-      final lowerItem = item.toLowerCase().trim();
-      return activeDestinations.any(
-            (dest) => dest.contains(lowerItem) || lowerItem.contains(dest),
-          ) ||
-          activeDescriptions.any((desc) => desc.contains(lowerItem));
+      return activeActivities.any(
+        (a) => _matchesWishlist(item, a.destination, a.description),
+      );
     }).toList();
   }
 
@@ -129,11 +153,11 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
       return [];
     }
 
-    if (_uiState.wishlistItemsCoveredCount == 0) {
-      return List.unmodifiable(wishlist);
+    final covered = coveredWishlistItems.toSet();
+    if (covered.length >= wishlist.length) {
+      return [];
     }
 
-    final covered = coveredWishlistItems.toSet();
     final unmatched = wishlist
         .where((item) => !covered.contains(item))
         .toList();
@@ -421,25 +445,14 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
 
     final updatedWishlist = List<String>.from(currentWishlist)..remove(item);
 
-    final activeDestinations = _uiState.activities
-        .where((a) => a.status != 'empty' && a.destination.trim().isNotEmpty)
-        .map((a) => a.destination.toLowerCase().trim())
-        .toSet();
-
-    final activeDescriptions = _uiState.activities
-        .where((a) => a.status != 'empty')
-        .map((a) => a.description.toLowerCase().trim())
-        .toList();
-
     int coveredCount = 0;
+    final activeActivities = _uiState.activities
+        .where((a) => a.status != 'empty' && a.destination.trim().isNotEmpty)
+        .toList();
     for (final w in updatedWishlist) {
-      final lowerItem = w.toLowerCase().trim();
-      final isCovered =
-          activeDestinations.any(
-            (dest) => dest.contains(lowerItem) || lowerItem.contains(dest),
-          ) ||
-          activeDescriptions.any((desc) => desc.contains(lowerItem));
-      if (isCovered) {
+      if (activeActivities.any(
+        (a) => _matchesWishlist(w, a.destination, a.description),
+      )) {
         coveredCount++;
       }
     }
@@ -649,22 +662,15 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
       final wishlist = _uiState.wishlist ?? [];
       int coveredCount = 0;
       if (wishlist.isNotEmpty) {
-        final activeDestinations = updatedList
+        final activeActivities = updatedList
             .where(
               (a) => a.status != 'empty' && a.destination.trim().isNotEmpty,
             )
-            .map((a) => a.destination.toLowerCase().trim())
-            .toSet();
-        final activeDescriptions = updatedList
-            .where((a) => a.status != 'empty')
-            .map((a) => a.description.toLowerCase().trim())
             .toList();
         for (final w in wishlist) {
-          final lower = w.toLowerCase().trim();
-          if (activeDestinations.any(
-                (d) => d.contains(lower) || lower.contains(d),
-              ) ||
-              activeDescriptions.any((d) => d.contains(lower))) {
+          if (activeActivities.any(
+            (a) => _matchesWishlist(w, a.destination, a.description),
+          )) {
             coveredCount++;
           }
         }
