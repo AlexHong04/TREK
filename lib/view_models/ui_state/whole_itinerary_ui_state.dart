@@ -22,6 +22,7 @@ class WholeItineraryUiState {
   final bool showWishlistWarning;
   final List<WholeTrip> allTrips;
   final String selectedStatusFilter; // 'All Plans', 'Pending', 'Completed'
+  final DateTime? selectedDateFilter;
   final String? preference;
   final List<String>? wishlist;
   final List<String>? constraints;
@@ -59,6 +60,7 @@ class WholeItineraryUiState {
     this.showWishlistWarning = false,
     this.allTrips = const [],
     this.selectedStatusFilter = 'All Plans',
+    this.selectedDateFilter,
     this.preference,
     this.wishlist,
     this.constraints,
@@ -72,13 +74,31 @@ class WholeItineraryUiState {
   });
 
   List<WholeTrip> get filteredTrips {
-    if (selectedStatusFilter == 'All Plans') {
-      return allTrips;
+    var result = allTrips;
+
+    if (selectedStatusFilter != 'All Plans') {
+      result = result.where((trip) {
+        final tripStatus = trip.computedStatus;
+        return tripStatus.toLowerCase() == selectedStatusFilter.toLowerCase();
+      }).toList();
     }
-    return allTrips.where((trip) {
-      final tripStatus = trip.computedStatus;
-      return tripStatus.toLowerCase() == selectedStatusFilter.toLowerCase();
-    }).toList();
+
+    if (selectedDateFilter != null) {
+      final filterDate = DateTime(
+        selectedDateFilter!.year,
+        selectedDateFilter!.month,
+        selectedDateFilter!.day,
+      );
+      result = result.where((trip) {
+        final start = DateTime(
+          trip.startDate.year, trip.startDate.month, trip.startDate.day);
+        final end = DateTime(
+          trip.endDate.year, trip.endDate.month, trip.endDate.day);
+        return !filterDate.isBefore(start) && !filterDate.isAfter(end);
+      }).toList();
+    }
+
+    return result;
   }
 
   WholeItineraryUiState copyWith({
@@ -98,6 +118,8 @@ class WholeItineraryUiState {
     bool? showWishlistWarning,
     List<WholeTrip>? allTrips,
     String? selectedStatusFilter,
+    DateTime? selectedDateFilter,
+    bool clearDateFilter = false,
     String? preference,
     List<String>? wishlist,
     List<String>? constraints,
@@ -184,6 +206,9 @@ class WholeItineraryUiState {
       showWishlistWarning: showWishlistWarning ?? this.showWishlistWarning,
       allTrips: allTrips ?? this.allTrips,
       selectedStatusFilter: selectedStatusFilter ?? this.selectedStatusFilter,
+      selectedDateFilter: clearDateFilter
+          ? null
+          : (selectedDateFilter ?? this.selectedDateFilter),
       preference: preference ?? this.preference,
       wishlist: wishlist ?? this.wishlist,
       constraints: constraints ?? this.constraints,
