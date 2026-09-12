@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 class TravelInformationUiState {
   final bool isLoading;
+  final String preferredCurrency;
   final String? selectedPreference;
   final String? selectedEmergencyFund;
   final String? errorMessage;
+  final String? wishlistError;
   final List<String> selectedDestinations;
   final List<String> wishlistItems;
   final List<String> suggestions;
@@ -46,9 +48,11 @@ class TravelInformationUiState {
 
   const TravelInformationUiState({
     this.isLoading = false,
+    this.preferredCurrency = 'MYR',
     this.selectedPreference,
     this.selectedEmergencyFund,
     this.errorMessage,
+    this.wishlistError,
     this.selectedDestinations = const [],
     this.wishlistItems = const [],
     this.suggestions = const [],
@@ -80,9 +84,12 @@ class TravelInformationUiState {
 
   TravelInformationUiState copyWith({
     bool? isLoading,
+    String? preferredCurrency,
     String? selectedPreference,
     String? selectedEmergencyFund,
     String? errorMessage,
+    String? wishlistError,
+    bool clearWishlistError = false,
     List<String>? selectedDestinations,
     List<String>? wishlistItems,
     List<String>? suggestions,
@@ -166,10 +173,14 @@ class TravelInformationUiState {
 
     return TravelInformationUiState(
       isLoading: isLoading ?? this.isLoading,
+      preferredCurrency: preferredCurrency ?? this.preferredCurrency,
       selectedPreference: selectedPreference ?? this.selectedPreference,
       selectedEmergencyFund:
           selectedEmergencyFund ?? this.selectedEmergencyFund,
       errorMessage: errorMessage ?? this.errorMessage,
+      wishlistError: clearWishlistError
+          ? null
+          : (wishlistError ?? this.wishlistError),
       selectedDestinations: selectedDestinations ?? this.selectedDestinations,
       wishlistItems: wishlistItems ?? this.wishlistItems,
       suggestions: suggestions ?? this.suggestions,

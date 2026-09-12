@@ -1,19 +1,106 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+
+import '../../models/configurations/frankfurter_api_config.dart';
+import '../../models/services/i_auth_service.dart';
 import '../../models/services/i_itinerary_service.dart';
 import '../../models/services/itinerary_service.dart';
+import '../../utils/place_text_validation.dart';
 import '../ui_state/travel_information_ui_state.dart';
 
 class TravelInformationInputViewModel extends ChangeNotifier {
   final IItineraryService _itineraryService;
+  final IAuthService? _authService;
   Timer? _hotelDebounce;
   String _currentHotelQuery = '';
   String? _activeHotelField;
 
-  TravelInformationInputViewModel({IItineraryService? itineraryService})
-    : _itineraryService = itineraryService ?? ItineraryService() {
+  TravelInformationInputViewModel({
+    IItineraryService? itineraryService,
+    IAuthService? authService,
+  })  : _itineraryService = itineraryService ?? ItineraryService(),
+        _authService = authService {
+    _authService?.addListener(_onAuthServiceChanged);
+    _syncPreferredCurrency();
     _loadExistingTrips();
   }
+
+  void _syncPreferredCurrency() {
+    final currency = _authService?.preferredCurrency.trim().toUpperCase();
+    if (currency != null &&
+        currency.isNotEmpty &&
+        currency != _uiState.preferredCurrency) {
+      _uiState = _uiState.copyWith(preferredCurrency: currency);
+    }
+  }
+
+  void _onAuthServiceChanged() {
+    _syncPreferredCurrency();
+    notifyListeners();
+  }
+
+  String get preferredCurrency => _uiState.preferredCurrency;
+
+  Future<double?> getExchangeRate({
+    required String fromCurrency,
+    required String toCurrency,
+  }) async {
+    if (fromCurrency.toUpperCase() == toCurrency.toUpperCase()) {
+      return 1.0;
+    }
+    try {
+      return await FrankfurterApiConfig.getRate(
+        fromCurrency: fromCurrency,
+        toCurrency: toCurrency,
+      );
+    } catch (e) {
+      debugPrint('Error fetching exchange rate: $e');
+      return null;
+    }
+  }
+
+  Future<double?> convertToMyr(double amount) async {
+    final currency = preferredCurrency;
+    if (currency == 'MYR') return amount;
+    final rate = await getExchangeRate(
+      fromCurrency: currency,
+      toCurrency: 'MYR',
+    );
+    if (rate != null) {
+      return amount * rate;
+    }
+    return null;
+  }
+
+  Future<double?> convertAmount({
+    required double amount,
+    required String fromCurrency,
+    required String toCurrency,
+  }) async {
+    if (fromCurrency.toUpperCase() == toCurrency.toUpperCase()) {
+      return amount;
+    }
+    final rate = await getExchangeRate(
+      fromCurrency: fromCurrency,
+      toCurrency: toCurrency,
+    );
+    if (rate != null) {
+      return amount * rate;
+    }
+    return null;
+  }
+
+  static final List<TextInputFormatter> _wishlistInputFormatters = [
+    FilteringTextInputFormatter.allow(
+      RegExp(r"[a-zA-Z0-9\u4e00-\u9fa5\s.,'()\-&/]"),
+    ),
+    LengthLimitingTextInputFormatter(60),
+  ];
+
+  List<TextInputFormatter> get wishlistInputFormatters =>
+      _wishlistInputFormatters;
 
   Future<void> _loadExistingTrips() async {
     try {
@@ -449,9 +536,17 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     final trimmed = item.trim();
     if (trimmed.isEmpty) return;
 
+    final error = validatePlaceInput(trimmed);
+    if (error != null) {
+      _uiState = _uiState.copyWith(wishlistError: error);
+      notifyListeners();
+      return;
+    }
+
     if (!_uiState.wishlistItems.contains(trimmed)) {
       _uiState = _uiState.copyWith(
         wishlistItems: [..._uiState.wishlistItems, trimmed],
+        clearWishlistError: true,
       );
     }
     clearSuggestions();
@@ -504,11 +599,32 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     return null;
   }
 
+  String? validateWishlist(String? value) {
+    if ((value ?? '').trim().isEmpty) return null;
+    return validatePlaceInput(value);
+  }
+
   String? generateItinerary({
     String? destination,
     String? date,
     String? budget,
+    String? wishlistQuery,
   }) {
+    if (_uiState.wishlistError != null) {
+      return _uiState.wishlistError;
+    }
+    if ((wishlistQuery ?? '').trim().isNotEmpty) {
+      final wErr = validatePlaceInput(wishlistQuery);
+      if (wErr != null) {
+        _uiState = _uiState.copyWith(
+          wishlistError: wErr,
+          suggestions: const [],
+          isSearchingSuggestions: false,
+        );
+        notifyListeners();
+        return wErr;
+      }
+    }
     final String? destinationError = validateDestinations();
     final String? dateError = validateDate(date);
     final String? budgetError = validateBudget(budget);
@@ -547,9 +663,28 @@ class TravelInformationInputViewModel extends ChangeNotifier {
 
     final trimmed = value.trim();
     if (trimmed.isEmpty) {
-      clearSuggestions();
+      _uiState = _uiState.copyWith(
+        clearWishlistError: true,
+        suggestions: const [],
+        isSearchingSuggestions: false,
+      );
+      notifyListeners();
       return;
     }
+
+    final validationError = validatePlaceInput(trimmed);
+    if (validationError != null) {
+      _uiState = _uiState.copyWith(
+        wishlistError: validationError,
+        suggestions: const [],
+        isSearchingSuggestions: false,
+      );
+      notifyListeners();
+      return;
+    }
+
+    _uiState = _uiState.copyWith(clearWishlistError: true);
+    notifyListeners();
 
     _debounce = Timer(const Duration(milliseconds: 500), () async {
       _uiState = _uiState.copyWith(isSearchingSuggestions: true);
@@ -684,8 +819,29 @@ class TravelInformationInputViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    _authService?.removeListener(_onAuthServiceChanged);
     _debounce?.cancel();
     _hotelDebounce?.cancel();
     super.dispose();
+  }
+}
+
+class TravelInformationInputViewModelScope extends StatelessWidget {
+  final Widget child;
+
+  const TravelInformationInputViewModelScope({
+    super.key,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider<TravelInformationInputViewModel>(
+      create: (context) => TravelInformationInputViewModel(
+        itineraryService: context.read<IItineraryService>(),
+        authService: context.read<IAuthService>(),
+      ),
+      child: child,
+    );
   }
 }

@@ -15,9 +15,8 @@ class TravelInformationInputScreen extends StatefulWidget {
   const TravelInformationInputScreen({super.key});
 
   static Widget builder(BuildContext context) {
-    return ChangeNotifierProvider<TravelInformationInputViewModel>(
-      create: (context) => TravelInformationInputViewModel(),
-      child: const TravelInformationInputScreen(),
+    return const TravelInformationInputViewModelScope(
+      child: TravelInformationInputScreen(),
     );
   }
 
@@ -33,6 +32,7 @@ class _TravelInformationInputScreenState
   late final TextEditingController _budgetController;
   late final TextEditingController _wishlistController;
   final List<TextEditingController> _hotelLocationControllers = [];
+  String? _previousCurrency;
 
   @override
   void initState() {
@@ -41,6 +41,46 @@ class _TravelInformationInputScreenState
     _budgetController = TextEditingController();
     _wishlistController = TextEditingController();
     _hotelLocationControllers.add(TextEditingController());
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final viewModel = Provider.of<TravelInformationInputViewModel>(context);
+    final currentCurrency = viewModel.preferredCurrency;
+    if (_previousCurrency != null && _previousCurrency != currentCurrency) {
+      final oldAmount = double.tryParse(_budgetController.text.trim());
+      if (oldAmount != null && oldAmount > 0) {
+        _convertBudgetOnCurrencyChange(
+          viewModel: viewModel,
+          oldAmount: oldAmount,
+          fromCurrency: _previousCurrency!,
+          toCurrency: currentCurrency,
+        );
+      }
+    }
+    _previousCurrency = currentCurrency;
+  }
+
+  Future<void> _convertBudgetOnCurrencyChange({
+    required TravelInformationInputViewModel viewModel,
+    required double oldAmount,
+    required String fromCurrency,
+    required String toCurrency,
+  }) async {
+    try {
+      final newAmount = await viewModel.convertAmount(
+        amount: oldAmount,
+        fromCurrency: fromCurrency,
+        toCurrency: toCurrency,
+      );
+      if (newAmount != null && mounted) {
+        final formatted = newAmount.toStringAsFixed(2);
+        _budgetController.text = formatted.endsWith('.00')
+            ? formatted.substring(0, formatted.length - 3)
+            : formatted;
+      }
+    } catch (_) {}
   }
 
   @override
@@ -143,262 +183,357 @@ class _TravelInformationInputScreenState
                   }
                 },
                 child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    const SizedBox(height: 22.0),
-                    _buildDestinationSection(context, viewModel),
-                    const SizedBox(height: 22.0),
-                    CustomTextField(
-                      sectionTitle: 'WISHLIST',
-                      hintText:
-                          viewModel.uiState.selectedDestinations.isNotEmpty
-                          ? 'Search places in ${viewModel.uiState.selectedDestinations.join(", ")}...'
-                          : 'Search wishlist...',
-                      prefixIcon: Icons.favorite_outline,
-                      prefixIconColor: appTheme.teal_A700,
-                      controller: _wishlistController,
-                      // Wishlist items can only be added by tapping a
-                      // suggestion, so submitting the field dismisses the keyboard.
-                      textInputAction: TextInputAction.search,
-                      onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
-                      onChanged: viewModel.onWishlistChanged,
-                      bottomWidget: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (viewModel.uiState.isSearchingSuggestions) ...[
-                            const SizedBox(height: 8.0),
-                            LinearProgressIndicator(
-                              minHeight: 2.0,
-                              backgroundColor: appTheme.transparentCustom,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                appTheme.teal_A700,
-                              ),
-                            ),
-                          ],
-                          if (viewModel.uiState.suggestions.isNotEmpty) ...[
-                            const SizedBox(height: 8.0),
-                            Container(
-                              decoration: BoxDecoration(
-                                color: appTheme.white_A700,
-                                borderRadius: BorderRadius.circular(12.0),
-                                border: Border.all(
-                                  color: appTheme.gray_200,
-                                  width: 1.0,
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 22.0),
+                      _buildDestinationSection(context, viewModel),
+                      const SizedBox(height: 22.0),
+                      CustomTextField(
+                        sectionTitle: 'WISHLIST',
+                        hintText:
+                            viewModel.uiState.selectedDestinations.isNotEmpty
+                            ? 'Search places in ${viewModel.uiState.selectedDestinations.join(", ")}...'
+                            : 'Search wishlist...',
+                        prefixIcon: Icons.favorite_outline,
+                        prefixIconColor: appTheme.teal_A700,
+                        controller: _wishlistController,
+                        inputFormatters: viewModel.wishlistInputFormatters,
+                        errorText: viewModel.uiState.wishlistError,
+                        validator: viewModel.validateWishlist,
+                        // Wishlist items can only be added by tapping a
+                        // suggestion, so submitting the field dismisses the keyboard.
+                        textInputAction: TextInputAction.search,
+                        onFieldSubmitted: (_) =>
+                            FocusScope.of(context).unfocus(),
+                        onChanged: viewModel.onWishlistChanged,
+                        bottomWidget: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (viewModel.uiState.isSearchingSuggestions) ...[
+                              const SizedBox(height: 8.0),
+                              LinearProgressIndicator(
+                                minHeight: 2.0,
+                                backgroundColor: appTheme.transparentCustom,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  appTheme.teal_A700,
                                 ),
                               ),
-                              child: ListView.separated(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                itemCount: viewModel.uiState.suggestions.length,
-                                separatorBuilder: (context, index) => Divider(
-                                  color: appTheme.gray_100,
-                                  height: 1.0,
+                            ],
+                            if (viewModel.uiState.suggestions.isNotEmpty) ...[
+                              const SizedBox(height: 8.0),
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: appTheme.white_A700,
+                                  borderRadius: BorderRadius.circular(12.0),
+                                  border: Border.all(
+                                    color: appTheme.gray_200,
+                                    width: 1.0,
+                                  ),
                                 ),
-                                itemBuilder: (context, index) {
-                                  final suggestion =
-                                      viewModel.uiState.suggestions[index];
-                                  return ListTile(
-                                    title: Text(
-                                      suggestion,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: 14.0,
-                                        fontFamily: 'Inter',
-                                        color: appTheme.gray_800,
+                                child: ListView.separated(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  itemCount:
+                                      viewModel.uiState.suggestions.length,
+                                  separatorBuilder: (context, index) => Divider(
+                                    color: appTheme.gray_100,
+                                    height: 1.0,
+                                  ),
+                                  itemBuilder: (context, index) {
+                                    final suggestion =
+                                        viewModel.uiState.suggestions[index];
+                                    return ListTile(
+                                      title: Text(
+                                        suggestion,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 14.0,
+                                          fontFamily: 'Inter',
+                                          color: appTheme.gray_800,
+                                        ),
                                       ),
-                                    ),
-                                    trailing: Icon(
-                                      Icons.arrow_forward_ios,
-                                      size: 14.0,
-                                      color: appTheme.blue_gray_300,
-                                    ),
-                                    dense: true,
-                                    onTap: () {
-                                      _wishlistController.clear();
-                                      viewModel.addWishlistItem(suggestion);
-                                      viewModel.clearSuggestions();
-                                    },
-                                  );
-                                },
+                                      trailing: Icon(
+                                        Icons.arrow_forward_ios,
+                                        size: 14.0,
+                                        color: appTheme.blue_gray_300,
+                                      ),
+                                      dense: true,
+                                      onTap: () {
+                                        _wishlistController.clear();
+                                        viewModel.addWishlistItem(suggestion);
+                                        viewModel.clearSuggestions();
+                                      },
+                                    );
+                                  },
+                                ),
                               ),
-                            ),
+                            ],
+                            if (viewModel.uiState.wishlistItems.isNotEmpty) ...[
+                              const SizedBox(height: 12.0),
+                              Wrap(
+                                spacing: 8.0,
+                                runSpacing: 8.0,
+                                children: viewModel.uiState.wishlistItems
+                                    .map(
+                                      (item) => _buildWishlistChip(
+                                        item,
+                                        () =>
+                                            viewModel.removeWishlistItem(item),
+                                      ),
+                                    )
+                                    .toList(),
+                              ),
+                            ],
                           ],
-                          if (viewModel.uiState.wishlistItems.isNotEmpty) ...[
-                            const SizedBox(height: 12.0),
-                            Wrap(
-                              spacing: 8.0,
-                              runSpacing: 8.0,
-                              children: viewModel.uiState.wishlistItems
-                                  .map(
-                                    (item) => _buildWishlistChip(
-                                      item,
-                                      () => viewModel.removeWishlistItem(item),
-                                    ),
-                                  )
-                                  .toList(),
-                            ),
-                          ],
-                        ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 22.0),
-                    CustomTextField(
-                      sectionTitle: 'WHEN?',
-                      hintText: 'Select dates',
-                      prefixIcon: Icons.calendar_today_outlined,
-                      prefixIconColor: appTheme.teal_A700,
-                      controller: _dateController,
-                      readOnly: true,
-                      onTap: () async {
-                        final picked = await showDateRangePicker(
-                          context: context,
-                          firstDate: DateTime.now(),
-                          lastDate: DateTime.now().add(
-                            const Duration(days: 365),
-                          ),
-                          builder: (context, child) {
-                            return Theme(
-                              data: Theme.of(context).copyWith(
-                                colorScheme: ColorScheme.light(
-                                  primary: appTheme.teal_A700,
-                                  onPrimary: appTheme.white_A700,
-                                  surface: appTheme.white_A700,
-                                  onSurface: appTheme.gray_800,
+                      const SizedBox(height: 22.0),
+                      CustomTextField(
+                        sectionTitle: 'WHEN?',
+                        hintText: 'Select dates',
+                        prefixIcon: Icons.calendar_today_outlined,
+                        prefixIconColor: appTheme.teal_A700,
+                        controller: _dateController,
+                        readOnly: true,
+                        onTap: () async {
+                          final picked = await showDateRangePicker(
+                            context: context,
+                            firstDate: DateTime.now(),
+                            lastDate: DateTime.now().add(
+                              const Duration(days: 365),
+                            ),
+                            builder: (context, child) {
+                              return Theme(
+                                data: Theme.of(context).copyWith(
+                                  colorScheme: ColorScheme.light(
+                                    primary: appTheme.teal_A700,
+                                    onPrimary: appTheme.white_A700,
+                                    surface: appTheme.white_A700,
+                                    onSurface: appTheme.gray_800,
+                                  ),
                                 ),
-                              ),
-                              child: child!,
-                            );
-                          },
-                          selectableDayPredicate:
-                              (DateTime day, DateTime? start, DateTime? end) {
-                                final checkDate = DateTime(
-                                  day.year,
-                                  day.month,
-                                  day.day,
-                                );
-                                for (final range
-                                    in viewModel
-                                        .uiState
-                                        .unavailableDateRanges) {
-                                  if (checkDate.compareTo(range.start) >= 0 &&
-                                      checkDate.compareTo(range.end) <= 0) {
-                                    return false; // Disable if date falls within an existing trip
+                                child: child!,
+                              );
+                            },
+                            selectableDayPredicate:
+                                (DateTime day, DateTime? start, DateTime? end) {
+                                  final checkDate = DateTime(
+                                    day.year,
+                                    day.month,
+                                    day.day,
+                                  );
+                                  for (final range
+                                      in viewModel
+                                          .uiState
+                                          .unavailableDateRanges) {
+                                    if (checkDate.compareTo(range.start) >= 0 &&
+                                        checkDate.compareTo(range.end) <= 0) {
+                                      return false; // Disable if date falls within an existing trip
+                                    }
                                   }
-                                }
-                                return true;
-                              },
-                        );
-                        if (picked != null) {
-                          _dateController.text = viewModel.formatDateRange(
-                            picked.start,
-                            picked.end,
+                                  return true;
+                                },
                           );
-                          viewModel.updateTripDates(picked.start, picked.end);
-                        }
-                      },
-                      validator: viewModel.validateDate,
-                    ),
-                    const SizedBox(height: 22.0),
-                    _buildArrivalDepartureSection(context, viewModel),
-                    const SizedBox(height: 22.0),
-                    _buildHotelSection(context, viewModel),
-                    const SizedBox(height: 22.0),
-                    ValueListenableBuilder<TextEditingValue>(
-                      valueListenable: _budgetController,
-                      builder: (context, value, _) {
-                        final double? enteredAmount =
-                            double.tryParse(value.text.trim());
-                        return CustomTextField(
-                          sectionTitle: 'TRIP BUDGET (MYR)',
-                          hintText: 'Total Trip Budget (MYR)',
-                          prefixIcon: Icons.account_balance_wallet_outlined,
-                          prefixIconColor: appTheme.teal_A700,
-                          controller: _budgetController,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          validator: viewModel.validateBudget,
-                          bottomWidget:
-                              (enteredAmount != null && enteredAmount > 0)
-                                  ? Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 14.0,
-                                        vertical: 10.0,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: appTheme.teal_50.withValues(
-                                          alpha: 0.45,
-                                        ),
-                                        borderRadius: BorderRadius.circular(
-                                          12.0,
-                                        ),
-                                        border: Border.all(
-                                          color: appTheme.teal_A700.withValues(
-                                            alpha: 0.2,
+                          if (picked != null) {
+                            _dateController.text = viewModel.formatDateRange(
+                              picked.start,
+                              picked.end,
+                            );
+                            viewModel.updateTripDates(picked.start, picked.end);
+                          }
+                        },
+                        validator: viewModel.validateDate,
+                      ),
+                      const SizedBox(height: 22.0),
+                      _buildArrivalDepartureSection(context, viewModel),
+                      const SizedBox(height: 22.0),
+                      _buildHotelSection(context, viewModel),
+                      const SizedBox(height: 22.0),
+                      ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: _budgetController,
+                        builder: (context, value, _) {
+                          final double? enteredAmount = double.tryParse(
+                            value.text.trim(),
+                          );
+                          final preferredCurrency = viewModel.preferredCurrency;
+
+                          return CustomTextField(
+                            sectionTitle: 'TRIP BUDGET ($preferredCurrency)',
+                            hintText: 'Total Trip Budget ($preferredCurrency)',
+                            prefixIcon: Icons.account_balance_wallet_outlined,
+                            prefixIconColor: appTheme.teal_A700,
+                            controller: _budgetController,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            validator: viewModel.validateBudget,
+                            bottomWidget:
+                                (enteredAmount != null && enteredAmount > 0)
+                                ? (preferredCurrency != 'MYR'
+                                      ? FutureBuilder<double?>(
+                                          future: viewModel.getExchangeRate(
+                                            fromCurrency: preferredCurrency,
+                                            toCurrency: 'MYR',
                                           ),
-                                          width: 1.0,
-                                        ),
-                                      ),
-                                      child: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              Icon(
-                                                Icons.currency_exchange_rounded,
-                                                size: 16,
-                                                color: appTheme.teal_700,
+                                          builder: (context, snapshot) {
+                                            final rate = snapshot.data;
+                                            final convertedMyr = rate != null
+                                                ? enteredAmount * rate
+                                                : null;
+                                            return Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 14.0,
+                                                    vertical: 10.0,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: appTheme.teal_50
+                                                    .withValues(alpha: 0.45),
+                                                borderRadius:
+                                                    BorderRadius.circular(12.0),
+                                                border: Border.all(
+                                                  color: appTheme.teal_A700
+                                                      .withValues(alpha: 0.2),
+                                                  width: 1.0,
+                                                ),
                                               ),
-                                              const SizedBox(width: 6),
+                                              child: Row(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment
+                                                        .spaceBetween,
+                                                children: [
+                                                  Row(
+                                                    children: [
+                                                      Icon(
+                                                        Icons
+                                                            .currency_exchange_rounded,
+                                                        size: 16,
+                                                        color:
+                                                            appTheme.teal_700,
+                                                      ),
+                                                      const SizedBox(width: 6),
+                                                      Text(
+                                                        'Equivalent Value:',
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                          fontFamily: 'Inter',
+                                                          color: appTheme
+                                                              .blue_gray_700,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment.end,
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    children: [
+                                                      Text(
+                                                        convertedMyr != null
+                                                            ? '$preferredCurrency ${enteredAmount.toStringAsFixed(2)}'
+                                                            : 'Converting...',
+                                                        style: TextStyle(
+                                                          fontSize: 14,
+                                                          fontWeight:
+                                                              FontWeight.w800,
+                                                          fontFamily: 'Inter',
+                                                          color:
+                                                              appTheme.teal_800,
+                                                        ),
+                                                      ),
+                                                      Text(
+                                                        convertedMyr != null
+                                                            ? 'MYR ${convertedMyr.toStringAsFixed(2)}'
+                                                            : 'Calculating...',
+                                                        style: TextStyle(
+                                                          fontSize: 11,
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                          fontFamily: 'Inter',
+                                                          color: appTheme
+                                                              .blue_gray_700,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                          },
+                                        )
+                                      : Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 14.0,
+                                            vertical: 10.0,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: appTheme.teal_50.withValues(
+                                              alpha: 0.45,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              12.0,
+                                            ),
+                                            border: Border.all(
+                                              color: appTheme.teal_A700
+                                                  .withValues(alpha: 0.2),
+                                              width: 1.0,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons
+                                                        .account_balance_wallet_outlined,
+                                                    size: 16,
+                                                    color: appTheme.teal_700,
+                                                  ),
+                                                  const SizedBox(width: 6),
+                                                  Text(
+                                                    'Total Trip Budget:',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      fontFamily: 'Inter',
+                                                      color: appTheme
+                                                          .blue_gray_700,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
                                               Text(
-                                                'Equivalent Value:',
+                                                'MYR ${enteredAmount.toStringAsFixed(2)}',
                                                 style: TextStyle(
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w800,
                                                   fontFamily: 'Inter',
-                                                  color: appTheme.blue_gray_700,
+                                                  color: appTheme.teal_800,
                                                 ),
                                               ),
                                             ],
                                           ),
-                                          DualCurrencyAmount(
-                                            amount: enteredAmount,
-                                            baseCurrency: 'MYR',
-                                            baseLabel: 'MYR',
-                                            primaryStyle: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w800,
-                                              fontFamily: 'Inter',
-                                              color: appTheme.teal_800,
-                                            ),
-                                            secondaryStyle: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w600,
-                                              fontFamily: 'Inter',
-                                              color: appTheme.blue_gray_700,
-                                            ),
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.end,
-                                            textAlign: TextAlign.end,
-                                          ),
-                                        ],
-                                      ),
-                                    )
-                                  : null,
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 22.0),
-                    _buildTravelPreferencesSection(viewModel),
-                    const SizedBox(height: 16.0),
-                  ],
+                                        ))
+                                : null,
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 22.0),
+                      _buildTravelPreferencesSection(viewModel),
+                      const SizedBox(height: 16.0),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-          _buildBottomSection(viewModel),
+            _buildBottomSection(viewModel),
           ],
         ),
       ),
@@ -523,7 +658,7 @@ class _TravelInformationInputScreenState
           color: appTheme.transparentCustom,
           borderRadius: BorderRadius.circular(14),
           child: InkWell(
-            onTap: () {
+            onTap: () async {
               if (_formKey.currentState?.validate() ?? false) {
                 final destination = viewModel.uiState.selectedDestinations.join(
                   ', ',
@@ -532,42 +667,87 @@ class _TravelInformationInputScreenState
                   destination: destination,
                   date: _dateController.text,
                   budget: _budgetController.text,
+                  wishlistQuery: _wishlistController.text,
                 );
                 if (error != null) {
                   ScaffoldMessenger.of(
                     context,
                   ).showSnackBar(SnackBar(content: Text(error)));
-                } else {
-                  Navigator.pushNamed(
-                    context,
-                    AppRoutes.wholeItineraryDetailScreen,
-                    arguments: {
-                      'destination': destination,
-                      'dates': _dateController.text,
-                      'budget': _budgetController.text,
-                      'preference': viewModel.uiState.selectedPreference,
-                      'wishlist': viewModel.uiState.wishlistItems,
-                      'arrivals': viewModel.uiState.arrivals
-                          .map((e) => e.toJson())
-                          .toList(),
-                      'departures': viewModel.uiState.departures
-                          .map((e) => e.toJson())
-                          .toList(),
-                      'arrivalLocation': viewModel.uiState.arrivalLocation,
-                      'arrivalTime': viewModel.uiState.arrivalTime,
-                      'arrivalDate': viewModel.uiState.arrivalDate,
-                      'departureLocation': viewModel.uiState.departureLocation,
-                      'departureTime': viewModel.uiState.departureTime,
-                      'departureDate': viewModel.uiState.departureDate,
-                      'hotels': viewModel.uiState.hotels
-                          .map((e) => e.toJson())
-                          .toList(),
-                      'hotelLocation': viewModel.uiState.hotelLocation,
-                      'hotelCheckInTime': viewModel.uiState.hotelCheckInTime,
-                      'hotelCheckOutTime': viewModel.uiState.hotelCheckOutTime,
-                    },
-                  );
+                  return;
                 }
+
+                final preferredCurrency = viewModel.preferredCurrency;
+                final double? enteredBudget = double.tryParse(
+                  _budgetController.text.trim(),
+                );
+
+                double? convertedBudgetInMyr;
+                if (preferredCurrency != 'MYR' &&
+                    enteredBudget != null &&
+                    enteredBudget > 0) {
+                  try {
+                    convertedBudgetInMyr = await viewModel.convertToMyr(
+                      enteredBudget,
+                    );
+                  } catch (_) {}
+                }
+
+                final confirmed = await _showPlanGenerationConfirmDialog(
+                  context: context,
+                  destination: destination,
+                  dates: _dateController.text,
+                  budget: _budgetController.text,
+                  currency: preferredCurrency,
+                  convertedBudgetInMyr: convertedBudgetInMyr,
+                  preference: viewModel.uiState.selectedPreference,
+                  wishlistCount: viewModel.uiState.wishlistItems.length,
+                  hotelCount: viewModel.uiState.hotels
+                      .where((h) => h.location.trim().isNotEmpty)
+                      .length,
+                  arrivalCount: viewModel.uiState.arrivals
+                      .where((a) => a.location.trim().isNotEmpty)
+                      .length,
+                  departureCount: viewModel.uiState.departures
+                      .where((d) => d.location.trim().isNotEmpty)
+                      .length,
+                );
+
+                if (confirmed != true || !context.mounted) return;
+
+                final finalBudget =
+                    (preferredCurrency != 'MYR' && convertedBudgetInMyr != null)
+                    ? convertedBudgetInMyr.toStringAsFixed(2)
+                    : _budgetController.text;
+
+                Navigator.pushNamed(
+                  context,
+                  AppRoutes.wholeItineraryDetailScreen,
+                  arguments: {
+                    'destination': destination,
+                    'dates': _dateController.text,
+                    'budget': finalBudget,
+                    'preference': viewModel.uiState.selectedPreference,
+                    'wishlist': viewModel.uiState.wishlistItems,
+                    'arrivals': viewModel.uiState.arrivals
+                        .map((e) => e.toJson())
+                        .toList(),
+                    'departures': viewModel.uiState.departures
+                        .map((e) => e.toJson())
+                        .toList(),
+                    'arrivalLocation': viewModel.uiState.arrivalLocation,
+                    'arrivalTime': viewModel.uiState.arrivalTime,
+                    'arrivalDate': viewModel.uiState.arrivalDate,
+                    'departureLocation': viewModel.uiState.departureLocation,
+                    'departureTime': viewModel.uiState.departureTime,
+                    'departureDate': viewModel.uiState.departureDate,
+                    'hotels': viewModel.uiState.hotels
+                        .map((e) => e.toJson())
+                        .toList(),
+                    'hotelLocation': viewModel.uiState.hotelLocation,
+                    'hotelCheckInTime': viewModel.uiState.hotelCheckInTime,
+                    'hotelCheckOutTime': viewModel.uiState.hotelCheckOutTime,
+                  },
+                );
               }
             },
             borderRadius: BorderRadius.circular(14),
@@ -583,7 +763,7 @@ class _TravelInformationInputScreenState
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'Generate trip',
+                    'Generate Trip',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
@@ -596,6 +776,295 @@ class _TravelInformationInputScreenState
           ),
         ),
       ),
+    );
+  }
+
+  Future<bool?> _showPlanGenerationConfirmDialog({
+    required BuildContext context,
+    required String destination,
+    required String dates,
+    required String budget,
+    required String currency,
+    double? convertedBudgetInMyr,
+    required String? preference,
+    required int wishlistCount,
+    required int hotelCount,
+    required int arrivalCount,
+    required int departureCount,
+  }) {
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24.0),
+          ),
+          backgroundColor: appTheme.white_A700,
+          elevation: 10.0,
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 20.0,
+            vertical: 24.0,
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420.0),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(22.0, 24.0, 22.0, 20.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10.0),
+                        decoration: BoxDecoration(
+                          color: appTheme.teal_50,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.travel_explore_rounded,
+                          color: appTheme.teal_A700,
+                          size: 24.0,
+                        ),
+                      ),
+                      const SizedBox(width: 14.0),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Generate Travel Plan?',
+                              style: TextStyle(
+                                fontSize: 18.0,
+                                fontWeight: FontWeight.w800,
+                                fontFamily: 'Inter',
+                                color: appTheme.gray_900,
+                              ),
+                            ),
+                            const SizedBox(height: 2.0),
+                            Text(
+                              'Please review your trip details',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w500,
+                                fontFamily: 'Inter',
+                                color: appTheme.blue_gray_300,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18.0),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14.0,
+                      vertical: 12.0,
+                    ),
+                    decoration: BoxDecoration(
+                      color: appTheme.gray_50_02,
+                      borderRadius: BorderRadius.circular(16.0),
+                      border: Border.all(color: appTheme.gray_100, width: 1.0),
+                    ),
+                    child: Column(
+                      children: [
+                        _buildDialogInfoRow(
+                          icon: Icons.location_on_rounded,
+                          label: 'Destination',
+                          value: destination,
+                        ),
+                        Divider(color: appTheme.gray_100, height: 16.0),
+                        _buildDialogInfoRow(
+                          icon: Icons.calendar_today_rounded,
+                          label: 'Dates',
+                          value: dates,
+                        ),
+                        Divider(color: appTheme.gray_100, height: 16.0),
+                        _buildDialogInfoRow(
+                          icon: Icons.account_balance_wallet_rounded,
+                          label: 'Budget',
+                          value:
+                              (currency == 'MYR' ||
+                                  convertedBudgetInMyr == null)
+                              ? '$currency $budget'
+                              : '$currency $budget (≈ MYR ${convertedBudgetInMyr.toStringAsFixed(2)})',
+                        ),
+                        if (preference != null && preference.isNotEmpty) ...[
+                          Divider(color: appTheme.gray_100, height: 16.0),
+                          _buildDialogInfoRow(
+                            icon: Icons.tune_rounded,
+                            label: 'Preference',
+                            value: preference,
+                          ),
+                        ],
+                        if (wishlistCount > 0) ...[
+                          Divider(color: appTheme.gray_100, height: 16.0),
+                          _buildDialogInfoRow(
+                            icon: Icons.favorite_rounded,
+                            label: 'Wishlist',
+                            value: '$wishlistCount item(s)',
+                          ),
+                        ],
+                        if (hotelCount > 0) ...[
+                          Divider(color: appTheme.gray_100, height: 16.0),
+                          _buildDialogInfoRow(
+                            icon: Icons.hotel_rounded,
+                            label: 'Accommodation',
+                            value:
+                                '$hotelCount stay${hotelCount > 1 ? 's' : ''}',
+                          ),
+                        ],
+                        if (arrivalCount > 0 || departureCount > 0) ...[
+                          Divider(color: appTheme.gray_100, height: 16.0),
+                          _buildDialogInfoRow(
+                            icon: Icons.flight_takeoff_rounded,
+                            label: 'Transit',
+                            value:
+                                '${arrivalCount + departureCount} transit hub(s)',
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14.0),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12.0,
+                      vertical: 10.0,
+                    ),
+                    decoration: BoxDecoration(
+                      color: appTheme.teal_50.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(12.0),
+                      border: Border.all(
+                        color: appTheme.teal_A700.withValues(alpha: 0.2),
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.auto_awesome,
+                          size: 16.0,
+                          color: appTheme.teal_700,
+                        ),
+                        const SizedBox(width: 8.0),
+                        Expanded(
+                          child: Text(
+                            'AI will generate a personalized day-by-day itinerary. You can freely edit and customize activities afterwards.',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w500,
+                              fontFamily: 'Inter',
+                              color: appTheme.teal_800,
+                              height: 1.35,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20.0),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () =>
+                              Navigator.of(dialogContext).pop(false),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: appTheme.errorRed,
+                            foregroundColor: appTheme.white_A700,
+                            padding: const EdgeInsets.symmetric(vertical: 13.0),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12.0),
+                            ),
+                          ),
+                          child: const Text(
+                            'Cancel',
+                            style: TextStyle(
+                              fontSize: 14.0,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: 'Inter',
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12.0),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () =>
+                              Navigator.of(dialogContext).pop(true),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: appTheme.teal_A700,
+                            foregroundColor: appTheme.white_A700,
+                            padding: const EdgeInsets.symmetric(vertical: 13.0),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12.0),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'Confirm',
+                                style: TextStyle(
+                                  fontSize: 14.0,
+                                  fontWeight: FontWeight.w700,
+                                  fontFamily: 'Inter',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDialogInfoRow({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, size: 15.0, color: appTheme.teal_A700),
+        const SizedBox(width: 8.0),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w500,
+            fontFamily: 'Inter',
+            color: appTheme.blue_gray_300,
+          ),
+        ),
+        const SizedBox(width: 8.0),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 13.0,
+              fontWeight: FontWeight.w600,
+              fontFamily: 'Inter',
+              color: appTheme.gray_900,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -765,7 +1234,9 @@ class _TravelInformationInputScreenState
                                       viewModel,
                                       onSelectionChanged: () {
                                         field.didChange(
-                                          viewModel.uiState.selectedDestinations,
+                                          viewModel
+                                              .uiState
+                                              .selectedDestinations,
                                         );
                                         field.validate();
                                       },
@@ -1952,8 +2423,8 @@ class _TravelInformationInputScreenState
                       hintText: !hasDestinations
                           ? 'Select destination state(s) first...'
                           : (hotels.length > 1
-                              ? 'Hotel ${index + 1} name or area'
-                              : 'Hotel name or area (e.g. George Town)'),
+                                ? 'Hotel ${index + 1} name or area'
+                                : 'Hotel name or area (e.g. George Town)'),
                       hintStyle: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w400,
@@ -2041,8 +2512,8 @@ class _TravelInformationInputScreenState
                                 _pickTime(
                                   context: context,
                                   initialTimeString: hotel.checkInTime,
-                                  onTimePicked: (t) =>
-                                      viewModel.updateHotelCheckInTime(index, t),
+                                  onTimePicked: (t) => viewModel
+                                      .updateHotelCheckInTime(index, t),
                                 );
                               },
                             ),
@@ -2085,8 +2556,8 @@ class _TravelInformationInputScreenState
                                 _pickTime(
                                   context: context,
                                   initialTimeString: hotel.checkOutTime,
-                                  onTimePicked: (t) =>
-                                      viewModel.updateHotelCheckOutTime(index, t),
+                                  onTimePicked: (t) => viewModel
+                                      .updateHotelCheckOutTime(index, t),
                                 );
                               },
                             ),
@@ -2131,8 +2602,9 @@ class _TravelInformationInputScreenState
         ),
         child: Row(
           mainAxisSize: isFullWidth ? MainAxisSize.max : MainAxisSize.min,
-          mainAxisAlignment:
-              isFullWidth ? MainAxisAlignment.center : MainAxisAlignment.start,
+          mainAxisAlignment: isFullWidth
+              ? MainAxisAlignment.center
+              : MainAxisAlignment.start,
           children: [
             Icon(
               Icons.calendar_today_rounded,
@@ -2386,15 +2858,16 @@ class _TravelInformationInputScreenState
   }) {
     final currentItem = isArrival
         ? (index < viewModel.uiState.arrivals.length
-            ? viewModel.uiState.arrivals[index]
-            : const TransitPoint(id: ''))
+              ? viewModel.uiState.arrivals[index]
+              : const TransitPoint(id: ''))
         : (index < viewModel.uiState.departures.length
-            ? viewModel.uiState.departures[index]
-            : const TransitPoint(id: ''));
+              ? viewModel.uiState.departures[index]
+              : const TransitPoint(id: ''));
 
     final currentSelected = currentItem.location;
-    final initialMode =
-        currentItem.type.isNotEmpty ? currentItem.type : 'Flight';
+    final initialMode = currentItem.type.isNotEmpty
+        ? currentItem.type
+        : 'Flight';
 
     final destinations = viewModel.uiState.selectedDestinations;
 
@@ -2419,8 +2892,8 @@ class _TravelInformationInputScreenState
             final filteredRecommended = query.isEmpty
                 ? recommendedHubs
                 : recommendedHubs
-                    .where((a) => a.toLowerCase().contains(query))
-                    .toList();
+                      .where((a) => a.toLowerCase().contains(query))
+                      .toList();
 
             final otherHubs = allHubs
                 .where((a) => !recommendedHubs.contains(a))
@@ -2429,8 +2902,8 @@ class _TravelInformationInputScreenState
             final filteredOthers = query.isEmpty
                 ? otherHubs
                 : otherHubs
-                    .where((a) => a.toLowerCase().contains(query))
-                    .toList();
+                      .where((a) => a.toLowerCase().contains(query))
+                      .toList();
 
             final isTrain = activeMode.toLowerCase() == 'train';
             final isBus = activeMode.toLowerCase() == 'bus';
@@ -2444,16 +2917,18 @@ class _TravelInformationInputScreenState
             final String otherHeader = isTrain
                 ? 'OTHER MALAYSIA TRAIN STATIONS'
                 : (isBus
-                    ? 'OTHER MALAYSIA BUS TERMINALS'
-                    : 'OTHER MALAYSIA AIRPORTS');
+                      ? 'OTHER MALAYSIA BUS TERMINALS'
+                      : 'OTHER MALAYSIA AIRPORTS');
             final String searchHint = isTrain
                 ? 'Search train station (e.g. KL Sentral, Ipoh)...'
                 : (isBus
-                    ? 'Search bus terminal (e.g. TBS, Larkin)...'
-                    : 'Search airport or city (e.g. KLIA, Penang)...');
+                      ? 'Search bus terminal (e.g. TBS, Larkin)...'
+                      : 'Search airport or city (e.g. KLIA, Penang)...');
 
-            final bool hasExactMatch = [...filteredRecommended, ...filteredOthers]
-                .any((h) => h.toLowerCase() == query);
+            final bool hasExactMatch = [
+              ...filteredRecommended,
+              ...filteredOthers,
+            ].any((h) => h.toLowerCase() == query);
             final bool canAddCustom = query.isNotEmpty && !hasExactMatch;
 
             return Container(
@@ -2656,7 +3131,8 @@ class _TravelInformationInputScreenState
 
                   // Hubs List
                   Expanded(
-                    child: (filteredRecommended.isEmpty &&
+                    child:
+                        (filteredRecommended.isEmpty &&
                             filteredOthers.isEmpty &&
                             !canAddCustom)
                         ? Center(
@@ -2890,7 +3366,9 @@ class _TravelInformationInputScreenState
               Icon(
                 icon,
                 size: 14.0,
-                color: isSelected ? appTheme.white_A700 : appTheme.blue_gray_300,
+                color: isSelected
+                    ? appTheme.white_A700
+                    : appTheme.blue_gray_300,
               ),
               const SizedBox(width: 6.0),
               Text(
@@ -2920,10 +3398,7 @@ class _TravelInformationInputScreenState
       onTap: onTap,
       borderRadius: BorderRadius.circular(12.0),
       child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 14.0,
-          vertical: 12.0,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),
         decoration: BoxDecoration(
           color: isSelected ? appTheme.gray_50_01 : appTheme.white_A700,
           borderRadius: BorderRadius.circular(12.0),
@@ -2931,8 +3406,8 @@ class _TravelInformationInputScreenState
             color: isSelected
                 ? appTheme.teal_A700
                 : (isRecommended
-                    ? appTheme.teal_A700.withValues(alpha: 0.35)
-                    : appTheme.gray_100),
+                      ? appTheme.teal_A700.withValues(alpha: 0.35)
+                      : appTheme.gray_100),
             width: isSelected ? 1.5 : 1.0,
           ),
         ),
@@ -3000,10 +3475,7 @@ class _TravelInformationInputScreenState
       decoration: BoxDecoration(
         color: appTheme.white_A700,
         borderRadius: BorderRadius.circular(12.0),
-        border: Border.all(
-          color: appTheme.gray_200,
-          width: 1.0,
-        ),
+        border: Border.all(color: appTheme.gray_200, width: 1.0),
         boxShadow: [
           BoxShadow(
             color: appTheme.black_900_0c,
@@ -3016,10 +3488,8 @@ class _TravelInformationInputScreenState
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         itemCount: uniqueSuggestions.length,
-        separatorBuilder: (context, index) => Divider(
-          color: appTheme.gray_100,
-          height: 1.0,
-        ),
+        separatorBuilder: (context, index) =>
+            Divider(color: appTheme.gray_100, height: 1.0),
         itemBuilder: (context, index) {
           final suggestion = uniqueSuggestions[index];
           return ListTile(
