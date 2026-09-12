@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../models/services/i_auth_service.dart';
+import '../models/services/i_profile_service.dart';
 import '../theme/app_theme.dart';
 import 'converted_amount_text.dart' show formatCurrencyAmount;
 
@@ -45,17 +45,17 @@ class _DualCurrencyAmountState extends State<DualCurrencyAmount> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _refreshIfNeeded(Provider.of<IAuthService>(context));
+    _refreshIfNeeded(Provider.of<IProfileService>(context));
   }
 
   @override
   void didUpdateWidget(covariant DualCurrencyAmount oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _refreshIfNeeded(context.read<IAuthService>());
+    _refreshIfNeeded(context.read<IProfileService>());
   }
 
-  void _refreshIfNeeded(IAuthService authService) {
-    final preferred = authService.preferredCurrency.trim().toUpperCase();
+  void _refreshIfNeeded(IProfileService profileService) {
+    final preferred = profileService.preferredCurrency.trim().toUpperCase();
     final base = widget.baseCurrency.trim().toUpperCase();
 
     if (_lastPreferred == preferred &&
@@ -76,7 +76,7 @@ class _DualCurrencyAmountState extends State<DualCurrencyAmount> {
 
     Future.microtask(() async {
       try {
-        final converted = await authService.convertToPreferredCurrency(
+        final converted = await profileService.convertToPreferredCurrency(
           amount: widget.amount,
           fromCurrency: base,
         );
@@ -110,8 +110,8 @@ class _DualCurrencyAmountState extends State<DualCurrencyAmount> {
 
   @override
   Widget build(BuildContext context) {
-    final authService = context.watch<IAuthService>();
-    final preferred = authService.preferredCurrency.trim().toUpperCase();
+    final profileService = context.watch<IProfileService>();
+    final preferred = profileService.preferredCurrency.trim().toUpperCase();
     final base = widget.baseCurrency.trim().toUpperCase();
     final baseLabel = (widget.baseLabel ?? base).toUpperCase();
 

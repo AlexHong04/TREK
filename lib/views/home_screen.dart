@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:Trek/view_models/presentation_logic/activity_view_model.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -25,6 +27,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
+  bool _verificationBannerDismissed = false;
 
   @override
   void dispose() {
@@ -48,12 +51,29 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHomePage(BuildContext context) {
+    final state = context.watch<HomeViewModel>().uiState;
     return Scaffold(
       backgroundColor: appTheme.gray_50_02,
       body: SafeArea(
         child: Column(
           children: [
             _buildTopBar(context),
+            if (context.watch<HomeViewModel>().uiState.isOffline)
+              const _HomeStatusBanner(
+                icon: Icons.cloud_off_outlined,
+                text: 'You’re offline. Showing saved information.',
+                isWarning: true,
+              ),
+            if (!state.isEmailVerified && !_verificationBannerDismissed)
+              _HomeStatusBanner(
+                icon: Icons.mark_email_unread_outlined,
+                text: _verificationBannerText(
+                  state.verificationDaysRemaining,
+                ),
+                onClose: () => setState(
+                      () => _verificationBannerDismissed = true,
+                ),
+              ),
             Expanded(
               child: RefreshIndicator(
                 onRefresh: () => context
@@ -92,6 +112,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     final profileName = context.select<HomeViewModel, String?>(
           (viewModel) => viewModel.uiState.userName,
+    );
+    final cachedProfilePicturePath = context.select<HomeViewModel, String?>(
+          (viewModel) => viewModel.uiState.cachedProfilePicturePath,
     );
     final trimmedName = profileName?.trim() ?? '';
     final initial = trimmedName.isEmpty ? 'T' : trimmedName[0].toUpperCase();
@@ -152,7 +175,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: SizedBox(
                   width: 40,
                   height: 40,
-                  child: profilePictureUrl?.isNotEmpty == true
+                  child: cachedProfilePicturePath?.isNotEmpty == true &&
+                      File(cachedProfilePicturePath!).existsSync()
+                      ? Image.file(
+                    File(cachedProfilePicturePath!),
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => initialAvatar(),
+                  )
+                      : profilePictureUrl?.isNotEmpty == true
                       ? Image.network(
                     profilePictureUrl!,
                     fit: BoxFit.cover,
@@ -168,6 +198,12 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+  }
+
+  static String _verificationBannerText(int daysRemaining) {
+    if (daysRemaining <= 0) return 'Verify your account email to continue.';
+    final unit = daysRemaining == 1 ? 'day' : 'days';
+    return 'Verify your account email within $daysRemaining $unit.';
   }
 
   Future<void> _openProfile(BuildContext context) async {
@@ -338,7 +374,8 @@ class _HomeScreenState extends State<HomeScreen> {
           onTap: () async {
             await Navigator.of(context).pushNamed(
               '/activityScreen',
-              arguments: {'trip': trip, 'isReadOnly': false},
+              arguments: {'trip': trip, 'isReadOnly': state.isOffline
+              },
             );
             // Refresh trip status when returning (e.g. trip was ended).
             if (context.mounted) {
@@ -695,6 +732,67 @@ class _HomeScreenState extends State<HomeScreen> {
       width: double.infinity,
       color: appTheme.gray_200,
       child: Icon(Icons.terrain, size: 48, color: appTheme.blue_gray_300),
+    );
+  }
+}
+
+class _HomeStatusBanner extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final bool isWarning;
+  final VoidCallback? onClose;
+
+  const _HomeStatusBanner({
+    required this.icon,
+    required this.text,
+    this.isWarning = false,
+    this.onClose,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final background =
+    isWarning ? appTheme.wholeAlertBudgetBg : appTheme.teal_50;
+    final foreground =
+    isWarning ? appTheme.wholeAlertBudgetText : appTheme.teal_800;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: foreground),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: foreground,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          if (onClose != null) ...[
+            const SizedBox(width: 4),
+            IconButton(
+              onPressed: onClose,
+              tooltip: 'Dismiss verification reminder',
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints(
+                minWidth: 32,
+                minHeight: 32,
+              ),
+              padding: EdgeInsets.zero,
+              icon: Icon(Icons.close_rounded, size: 18, color: foreground),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

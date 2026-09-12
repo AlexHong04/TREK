@@ -2,50 +2,52 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/services/i_auth_service.dart';
+import '../../utils/input_validator.dart';
+import '../../utils/network_error.dart';
 import '../ui_state/email_submission_ui_state.dart';
 
 class EmailSubmissionViewModel extends ChangeNotifier {
   final IAuthService _authService;
-
-  EmailSubmissionViewModel(this._authService);
-
-  EmailSubmissionUiState _uiState = const EmailSubmissionUiState();
-  EmailSubmissionUiState get uiState => _uiState;
+  bool _disposed = false;
   bool _emailTouched = false;
 
-  static final RegExp _emailPattern = RegExp(
-    r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$",
-  );
+  EmailSubmissionViewModel(
+      this._authService, {
+        String initialEmail = '',
+      }) : _uiState = EmailSubmissionUiState(email: initialEmail.trim());
+
+  EmailSubmissionUiState _uiState;
+  EmailSubmissionUiState get uiState => _uiState;
 
   void onEmailChanged(String value) {
-    final emailError = _emailTouched ? _validateEmail(value) : null;
+    final error = _emailTouched ? InputValidator.validateEmail(value) : null;
     _uiState = _uiState.copyWith(
       email: value,
       linkSent: false,
-      emailError: emailError,
-      clearEmailError: emailError == null,
+      emailError: error,
+      clearEmailError: error == null,
       clearErrorMessage: true,
     );
-    notifyListeners();
+    _notify();
   }
 
   void onEmailFocusLost() {
     _emailTouched = true;
-    final error = _validateEmail(_uiState.email);
+    final error = InputValidator.validateEmail(_uiState.email);
     _uiState = _uiState.copyWith(
       emailError: error,
       clearEmailError: error == null,
     );
-    notifyListeners();
+    _notify();
   }
 
   Future<void> onSendPressed() async {
+    if (_uiState.isLoading) return;
     _emailTouched = true;
-    final email = _uiState.email.trim();
-    final emailError = _validateEmail(email);
-    if (emailError != null) {
-      _uiState = _uiState.copyWith(emailError: emailError);
-      notifyListeners();
+    final error = InputValidator.validateEmail(_uiState.email);
+    if (error != null) {
+      _uiState = _uiState.copyWith(emailError: error);
+      _notify();
       return;
     }
 
@@ -54,52 +56,72 @@ class EmailSubmissionViewModel extends ChangeNotifier {
       clearEmailError: true,
       clearErrorMessage: true,
     );
-    notifyListeners();
+    _notify();
     try {
-      // Supabase deliberately returns the same response for registered and
-      // unregistered emails, satisfying FR100_55 without account enumeration.
-      await _authService.sendPasswordResetEmail(email: email);
+      // Supabase deliberately returns the same outward result for registered
+      // and unregistered addresses, preventing account enumeration.
+      await _authService.sendPasswordResetEmail(
+        email: InputValidator.normalizeEmail(_uiState.email),
+      );
+      if (_disposed) return;
       _uiState = _uiState.copyWith(isLoading: false, linkSent: true);
+    } on NetworkUnavailableException {
+      if (_disposed) return;
+      _uiState = _uiState.copyWith(
+        isLoading: false,
+        errorMessage: 'No internet connection. Check your connection and try again.',
+      );
     } catch (_) {
+      if (_disposed) return;
       _uiState = _uiState.copyWith(
         isLoading: false,
         errorMessage: 'Unable to send the reset link. Please try again.',
       );
     }
-    notifyListeners();
+    _notify();
   }
 
   Future<void> onResendPressed() => onSendPressed();
 
   void onUseAnotherEmailPressed() {
+    if (_uiState.isLoading) return;
     _emailTouched = false;
     _uiState = const EmailSubmissionUiState();
-    notifyListeners();
+    _notify();
   }
 
   void consumeErrorMessage() {
     _uiState = _uiState.copyWith(clearErrorMessage: true);
   }
 
-  String? _validateEmail(String value) {
-    final email = value.trim();
-    if (email.isEmpty) return 'Email address is required.';
-    if (!_emailPattern.hasMatch(email)) {
-      return 'Invalid email address. Email must follow local@domain.com format.';
-    }
-    return null;
+  void _notify() {
+    if (!_disposed) notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }
 
 class EmailSubmissionViewModelScope extends StatelessWidget {
   final Widget child;
+  final String initialEmail;
 
-  const EmailSubmissionViewModelScope({super.key, required this.child});
+  const EmailSubmissionViewModelScope({
+    super.key,
+    required this.child,
+    this.initialEmail = '',
+  });
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => EmailSubmissionViewModel(context.read<IAuthService>()),
+      create: (_) => EmailSubmissionViewModel(
+        context.read<IAuthService>(),
+        initialEmail: initialEmail,
+      ),
       child: child,
     );
   }

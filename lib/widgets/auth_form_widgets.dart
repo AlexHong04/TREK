@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import '../utils/input_validator.dart';
 
 void showAuthToast(
     BuildContext context,
@@ -145,25 +146,29 @@ class PasswordPolicyChecklist extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final checks = InputValidator.checkNewPassword(password);
     final requirements = <({String label, bool isMet})>[
-      (label: 'At least 8 characters', isMet: password.length >= 8),
+      (
+      label:
+      '${InputValidator.minPasswordLength}–${InputValidator.maxPasswordLength} characters',
+      isMet: checks.hasMinimumLength,
+      ),
       (
       label: 'At least one uppercase letter',
-      isMet: RegExp(r'[A-Z]').hasMatch(password),
+      isMet: checks.hasUppercase,
       ),
       (
       label: 'At least one lowercase letter',
-      isMet: RegExp(r'[a-z]').hasMatch(password),
+      isMet: checks.hasLowercase,
       ),
       (
       label: 'At least one number',
-      isMet: RegExp(r'\d').hasMatch(password),
+      isMet: checks.hasDigit,
       ),
       (
-      label: 'At least one special character',
-      isMet: RegExp(
-        r'[!@#$%^&*(),.?":{}|<>_\-+=/\\;\[\]~`]',
-      ).hasMatch(password),
+      label:
+      'At least one allowed special character: ${InputValidator.allowedPasswordSpecialCharacters}',
+      isMet: checks.hasSpecialCharacter,
       ),
     ];
 

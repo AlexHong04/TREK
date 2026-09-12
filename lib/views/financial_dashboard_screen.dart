@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../theme/app_theme.dart';
 import '../models/services/i_auth_service.dart';
+import '../models/services/i_profile_service.dart';
 import '../view_models/presentation_logic/financial_dashboard_view_model.dart';
 import 'profile_screen.dart';
 import 'trip_summary_screen.dart';
@@ -20,6 +21,7 @@ class FinancialDashboardScreen extends StatelessWidget {
     return ChangeNotifierProvider<FinancialDashboardViewModel>(
       create: (providerContext) => FinancialDashboardViewModel(
         authService: providerContext.read<IAuthService>(),
+        profileService: providerContext.read<IProfileService>(),
       )..loadCurrentDay(),
       child: FinancialDashboardScreen(onHomeSelected: onHomeSelected),
     );

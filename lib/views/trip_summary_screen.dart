@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../models/services/i_auth_service.dart';
+import '../models/services/i_profile_service.dart';
 import '../theme/app_theme.dart';
 import '../view_models/presentation_logic/trip_summary_view_model.dart';
 import 'budget_popup.dart';
@@ -17,6 +18,7 @@ class TripSummaryScreen extends StatelessWidget {
       create: (providerContext) => TripSummaryViewModel(
         tripId: tripId,
         authService: providerContext.read<IAuthService>(),
+        profileService: providerContext.read<IProfileService>(),
       )..loadTripSummary(),
       child: TripSummaryScreen(tripId: tripId),
     );

@@ -4,16 +4,16 @@ import '../entities/activity.dart';
 import '../entities/whole_trip.dart';
 import '../repository/i_itinerary_repository.dart';
 import '../repository/itinerary_repository.dart';
-import 'i_auth_service.dart';
+import 'i_profile_service.dart';
 import 'i_itinerary_service.dart';
 
 class BudgetService implements IBudgetService {
   final IItineraryRepository _itineraryRepository;
-  final IAuthService _authService;
+  final IProfileService _profileService;
 
-  BudgetService({required IAuthService authService})
+  BudgetService({required IProfileService profileService})
     : _itineraryRepository = ItineraryRepository(),
-      _authService = authService;
+      _profileService = profileService;
 
   @override
   Future<WholeTrip> deductRemainingBudget({
@@ -61,7 +61,7 @@ class BudgetService implements IBudgetService {
     final oldTopup = currentDay.topUpBudget ?? 0.00;
 
     double topUpAmountConverted =
-        await _authService.convertToPreferredCurrency(
+        await _profileService.convertToPreferredCurrency(
           amount: topupAmount,
           fromCurrency: 'MYR',
         ) ??

@@ -22,9 +22,9 @@ class EditProfileScreen extends StatelessWidget {
         if (state.saveSucceeded) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!context.mounted) return;
+            const message = 'Profile updated successfully.';
             viewModel.consumeSaveSuccess();
-            showThreeSecondMessage(context, 'Profile updated successfully.');
-            Navigator.pop(context, true);
+            showThreeSecondMessage(context, message);
           });
         }
         if (state.errorMessage != null) {
@@ -52,39 +52,50 @@ class EditProfileScreen extends StatelessWidget {
                 keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: const EdgeInsets.fromLTRB(20, 22, 20, 32),
                 children: [
-                  CustomTextField(
-                    sectionTitle: 'FULL NAME',
-                    hintText: 'Enter your full name',
-                    prefixIcon: Icons.badge_outlined,
-                    margin: EdgeInsets.zero,
-                    initialValue: state.fullName,
-                    enabled: !state.isSaving,
-                    textCapitalization: TextCapitalization.words,
-                    textInputAction: TextInputAction.next,
-                    autofillHints: const [AutofillHints.name],
-                    onChanged: viewModel.onFullNameChanged,
-                  ),
-                  const SizedBox(height: 12),
-                  CustomTextField(
-                    sectionTitle: 'EMAIL ADDRESS',
-                    hintText: '',
-                    prefixIcon: Icons.mark_email_read_outlined,
-                    margin: EdgeInsets.zero,
-                    initialValue: state.email,
-                    enabled: false,
-                    keyboardType: TextInputType.emailAddress,
+                  if (state.isOffline) ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: appTheme.wholeAlertBudgetBg,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        'You’re offline. Showing saved information; editing is unavailable.',
+                        style: TextStyle(color: appTheme.wholeAlertBudgetText),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  Focus(
+                    onFocusChange: (focused) {
+                      if (!focused) viewModel.onFullNameFocusLost();
+                    },
+                    child: CustomTextField(
+                      sectionTitle: 'FULL NAME',
+                      hintText: 'Enter your full name (optional)',
+                      prefixIcon: Icons.badge_outlined,
+                      margin: EdgeInsets.zero,
+                      initialValue: state.fullName,
+                      enabled: !state.isSaving && !state.isOffline,
+                      textCapitalization: TextCapitalization.words,
+                      textInputAction: TextInputAction.next,
+                      autofillHints: const [AutofillHints.name],
+                      onChanged: viewModel.onFullNameChanged,
+                      errorText: state.fullNameError,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   CurrencyPickerField(
                     value: state.currency,
                     currencies: state.availableCurrencies,
                     errorText: state.currencyError,
-                    enabled: !state.isSaving,
+                    enabled: !state.isSaving && !state.isOffline,
                     onChanged: viewModel.onCurrencyChanged,
                   ),
                   const SizedBox(height: 42),
                   FilledButton.icon(
-                    onPressed: state.isSaving ? null : viewModel.save,
+                    onPressed:
+                    state.isSaving || state.isOffline ? null : viewModel.save,
                     style: FilledButton.styleFrom(
                       minimumSize: const Size.fromHeight(52),
                       backgroundColor: appTheme.teal_A700,

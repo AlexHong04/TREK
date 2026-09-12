@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:sign_in_button/sign_in_button.dart';
 
@@ -11,15 +14,55 @@ class RegistrationScreen extends StatefulWidget {
   const RegistrationScreen({super.key});
 
   static Widget builder(BuildContext context) {
-    return const RegistrationViewModelScope(child: RegistrationScreen());
+    final argument = ModalRoute.of(context)?.settings.arguments;
+    return RegistrationViewModelScope(
+      initialEmail: argument is String ? argument : '',
+      child: const RegistrationScreen(),
+    );
   }
 
   @override
   State<RegistrationScreen> createState() => _RegistrationScreenState();
 }
 
-class _RegistrationScreenState extends State<RegistrationScreen> {
+class _RegistrationScreenState extends State<RegistrationScreen>
+    with WidgetsBindingObserver {
   bool _isPasswordFocused = false;
+  bool _wasBackgrounded = false;
+  RegistrationViewModel? _viewModel;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      _wasBackgrounded = true;
+    } else if (state == AppLifecycleState.resumed &&
+        _wasBackgrounded &&
+        mounted) {
+      _wasBackgrounded = false;
+      unawaited(_viewModel?.onAppResumedAfterGoogleSignIn());
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _viewModel = context.read<RegistrationViewModel>();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _viewModel = null;
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,7 +91,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
         void goToLogin() {
           if (state.isLoading) return;
-          Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            '/login',
+                (_) => false,
+            arguments: state.email,
+          );
         }
 
         return PopScope(
@@ -74,12 +122,16 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                         hintText: 'Enter your email address',
                         prefixIcon: Icons.email_outlined,
                         margin: EdgeInsets.zero,
+                        initialValue: state.email,
                         enabled: !state.isLoading,
                         keyboardType: TextInputType.emailAddress,
                         textInputAction: TextInputAction.next,
                         autofillHints: const [AutofillHints.email],
                         autocorrect: false,
                         enableSuggestions: false,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.deny(RegExp(r'\s')),
+                        ],
                         onChanged: viewModel.onEmailChanged,
                         errorText: state.emailError,
                       ),

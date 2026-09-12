@@ -1,13 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../models/services/i_auth_service.dart';
+import '../../models/services/i_profile_service.dart';
+import '../../utils/network_error.dart';
 import '../ui_state/personal_constraint_management_ui_state.dart';
 
 class PersonalConstraintManagementViewModel extends ChangeNotifier {
-  final IAuthService _authService;
+  final IProfileService _profileService;
+  bool _disposed = false;
+  bool _loadInProgress = false;
 
-  PersonalConstraintManagementViewModel(this._authService);
+  PersonalConstraintManagementViewModel(this._profileService) {
+    final cached = _profileService.currentUser?.personalConstraints
+        .map(
+          (constraint) => PersonalConstraintOptionData(
+        id: constraint.constraintId,
+        category: constraint.category,
+        name: constraint.constraintName,
+        isSelected: true,
+      ),
+    )
+        .toList(growable: false) ??
+        const <PersonalConstraintOptionData>[];
+    _uiState = PersonalConstraintManagementUiState(
+      options: _applyDisabledRules(_buildRequiredOptions(cached)),
+      isOffline: _profileService.isOffline,
+    );
+  }
 
   static const Map<String, List<String>> requiredOptions = {
     'Cultural & Religious': ['Halal', 'Non-Halal'],
@@ -27,8 +46,8 @@ class PersonalConstraintManagementViewModel extends ChangeNotifier {
   PersonalConstraintManagementUiState get uiState => _uiState;
 
   Future<void> load() async {
-    if (_uiState.isLoading) return;
-    final userId = _authService.currentUserId;
+    if (_loadInProgress) return;
+    final userId = _profileService.currentUserId;
     if (userId == null) {
       _uiState = _uiState.copyWith(
         errorMessage: 'Your session has expired. Please log in again.',
@@ -37,22 +56,42 @@ class PersonalConstraintManagementViewModel extends ChangeNotifier {
       return;
     }
 
+    if (_profileService.isOffline) {
+      _uiState = _uiState.copyWith(
+        isLoading: false,
+        isOffline: true,
+        clearErrorMessage: true,
+      );
+      notifyListeners();
+      return;
+    }
+
+    _loadInProgress = true;
     _uiState = _uiState.copyWith(
-      isLoading: true,
+      // Cached selections and the fixed option layout are already available,
+      // so a refresh must not replace the page with a blocking spinner.
+      isLoading: _uiState.options.isEmpty,
       clearErrorMessage: true,
     );
     notifyListeners();
     try {
-      final data = await _authService.loadPersonalConstraintOptions();
+      final data = await _profileService.loadPersonalConstraintOptions();
       final options = _buildRequiredOptions(data);
       final hasMissingDatabaseRows = options.any((option) => option.id.isEmpty);
       _uiState = _uiState.copyWith(
         options: _applyDisabledRules(options),
         isLoading: false,
+        isOffline: _profileService.isOffline,
         errorMessage: hasMissingDatabaseRows
             ? 'Some required constraint choices are missing from Supabase.'
             : null,
         clearErrorMessage: !hasMissingDatabaseRows,
+      );
+    } on NetworkUnavailableException {
+      _uiState = _uiState.copyWith(
+        isLoading: false,
+        isOffline: true,
+        clearErrorMessage: true,
       );
     } catch (_) {
       _uiState = _uiState.copyWith(
@@ -60,12 +99,14 @@ class PersonalConstraintManagementViewModel extends ChangeNotifier {
         isLoading: false,
         errorMessage: 'Unable to load personal constraints.',
       );
+    } finally {
+      _loadInProgress = false;
     }
     notifyListeners();
   }
 
   void toggle(String name) {
-    if (_uiState.isSaving) return;
+    if (_uiState.isSaving || _uiState.isOffline) return;
     final current = _uiState.options.firstWhere((item) => item.name == name);
     if (current.id.isEmpty || current.isDisabled) return;
 
@@ -90,7 +131,14 @@ class PersonalConstraintManagementViewModel extends ChangeNotifier {
     if (_uiState.isSaving || _uiState.options.any((item) => item.id.isEmpty)) {
       return;
     }
-    final userId = _authService.currentUserId;
+    if (_uiState.isOffline) {
+      _uiState = _uiState.copyWith(
+        errorMessage: 'Saved constraints are view-only while offline.',
+      );
+      notifyListeners();
+      return;
+    }
+    final userId = _profileService.currentUserId;
     if (userId == null) {
       _uiState = _uiState.copyWith(
         errorMessage: 'Your session has expired. Please log in again.',
@@ -111,10 +159,16 @@ class PersonalConstraintManagementViewModel extends ChangeNotifier {
           .map((option) => option.id)
           .toList()
         ..sort();
-      await _authService.savePersonalConstraints(ids);
+      await _profileService.savePersonalConstraints(ids);
       _uiState = _uiState.copyWith(
         isSaving: false,
         saveSucceeded: true,
+      );
+    } on NetworkUnavailableException {
+      _uiState = _uiState.copyWith(
+        isSaving: false,
+        isOffline: true,
+        errorMessage: 'No internet connection. Check your connection and try again.',
       );
     } catch (_) {
       _uiState = _uiState.copyWith(
@@ -189,6 +243,17 @@ class PersonalConstraintManagementViewModel extends ChangeNotifier {
   static String _normalize(String value) {
     return value.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
   }
+
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
 }
 
 class PersonalConstraintManagementViewModelScope extends StatelessWidget {
@@ -203,7 +268,7 @@ class PersonalConstraintManagementViewModelScope extends StatelessWidget {
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (_) => PersonalConstraintManagementViewModel(
-        context.read<IAuthService>(),
+        context.read<IProfileService>(),
       )..load(),
       child: child,
     );

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../theme/app_theme.dart';
 import '../view_models/presentation_logic/change_password_view_model.dart';
+import '../view_models/ui_state/change_password_ui_state.dart';
 import '../widgets/auth_form_widgets.dart';
 import '../widgets/custom_app_bar.dart';
 import '../widgets/custom_text_field.dart';
@@ -20,32 +21,54 @@ class ChangePasswordScreen extends StatefulWidget {
 
 class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   bool _isNewPasswordFocused = false;
+  bool _reauthenticationDialogOpen = false;
+  bool _passwordResultHandled = false;
 
   @override
   Widget build(BuildContext context) {
     return Consumer<ChangePasswordViewModel>(
       builder: (context, viewModel, _) {
         final state = viewModel.uiState;
-        if (state.passwordChanged) {
+        if (state.passwordSaved && !_passwordResultHandled) {
+          // Set this before scheduling. Auth refreshes can rebuild the screen
+          // several times in one frame; without a guard each rebuild schedules
+          // another Navigator.pop(), eventually removing Edit Account as well.
+          _passwordResultHandled = true;
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!context.mounted) return;
+            final message = state.successMessage ??
+                (state.isSetMode
+                    ? 'Password set successfully.'
+                    : 'Password changed. Please log in again.');
+            viewModel.consumePasswordSaved();
             showThreeSecondMessage(
               context,
-              'Password changed. Please log in again.',
+              message,
             );
-            Navigator.pushNamedAndRemoveUntil(
-              context,
-              '/login',
-                  (route) => false,
-            );
+            if (state.isSetMode) Navigator.pop(context, true);
           });
         }
         if (state.errorMessage != null) {
           final message = state.errorMessage!;
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!context.mounted) return;
-            viewModel.consumeErrorMessage();
+            viewModel.consumeMessages();
             showThreeSecondMessage(context, message, isError: true);
+          });
+        }
+        if (state.logoutRequested && !_reauthenticationDialogOpen) {
+          _reauthenticationDialogOpen = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) async {
+            if (!context.mounted) {
+              _reauthenticationDialogOpen = false;
+              return;
+            }
+            viewModel.consumeLogoutRequest();
+            try {
+              await _showGoogleReauthenticationDialog(context, viewModel);
+            } finally {
+              _reauthenticationDialogOpen = false;
+            }
           });
         }
 
@@ -54,30 +77,69 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
           child: Scaffold(
             backgroundColor: appTheme.gray_50_02,
-            appBar: const CustomAppBar(title: 'Change Password'),
+            appBar: CustomAppBar(title: state.title),
             body: SafeArea(
               top: false,
-              child: ListView(
-                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              child: state.mode == PasswordPageMode.loading
+                  ? Center(
+                child: CircularProgressIndicator(color: appTheme.teal_A700),
+              )
+                  : ListView(
+                keyboardDismissBehavior:
+                ScrollViewKeyboardDismissBehavior.manual,
                 padding: const EdgeInsets.fromLTRB(20, 34, 20, 32),
                 children: [
-                  _PasswordField(
-                    label: 'CURRENT PASSWORD',
-                    hint: 'Enter your current password',
-                    obscure: state.obscureCurrentPassword,
-                    enabled: !state.isSaving,
-                    errorText: state.currentPasswordError,
-                    onChanged: viewModel.onCurrentPasswordChanged,
-                    onFocusLost: viewModel.onCurrentPasswordFocusLost,
-                    onToggleVisibility:
-                    viewModel.toggleCurrentPasswordVisibility,
-                  ),
-                  const SizedBox(height: 22),
+                  if (state.isOffline) ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: appTheme.wholeAlertBudgetBg,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        'You’re offline. Password settings are view-only.',
+                        style: TextStyle(color: appTheme.wholeAlertBudgetText),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                  ],
+                  if (state.isSetMode) ...[
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: appTheme.teal_50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: appTheme.teal_A700),
+                      ),
+                      child: Text(
+                        state.requiresRecentGoogleAuthentication
+                            ? 'You currently use Google sign-in. Log out and sign in with Google again before setting your first password.'
+                            : 'You currently use Google sign-in. Set a password to also sign in with your account email and password. Google will remain linked.',
+                        style: TextStyle(color: appTheme.teal_800, height: 1.4),
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+                  ] else ...[
+                    _PasswordField(
+                      label: 'CURRENT PASSWORD',
+                      hint: 'Enter your current password',
+                      obscure: state.obscureCurrentPassword,
+                      enabled: !state.isSaving && !state.isOffline,
+                      errorText: state.currentPasswordError,
+                      onChanged: viewModel.onCurrentPasswordChanged,
+                      onFocusLost: viewModel.onCurrentPasswordFocusLost,
+                      onToggleVisibility:
+                      viewModel.toggleCurrentPasswordVisibility,
+                    ),
+                    const SizedBox(height: 22),
+                  ],
                   _PasswordField(
                     label: 'NEW PASSWORD',
-                    hint: 'Enter your new password',
+                    hint: state.isSetMode
+                        ? 'Create a password'
+                        : 'Enter your new password',
                     obscure: state.obscureNewPassword,
-                    enabled: !state.isSaving,
+                    enabled: !state.isSaving && !state.isOffline,
                     errorText: state.newPasswordError,
                     onChanged: viewModel.onNewPasswordChanged,
                     onFocusLost: viewModel.onNewPasswordFocusLost,
@@ -88,7 +150,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     },
                     onToggleVisibility: viewModel.toggleNewPasswordVisibility,
                     textInputAction: TextInputAction.done,
-                    onSubmitted: (_) => viewModel.changePassword(),
+                    onSubmitted: (_) => viewModel.savePassword(),
                     bottomWidget: PasswordPolicyChecklist(
                       password: state.newPassword,
                       isVisible: _isNewPasswordFocused,
@@ -97,7 +159,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   const SizedBox(height: 32),
                   FilledButton(
                     onPressed:
-                    state.isSaving ? null : viewModel.changePassword,
+                    state.isSaving || state.isOffline
+                        ? null
+                        : viewModel.savePassword,
                     style: FilledButton.styleFrom(
                       minimumSize: const Size.fromHeight(52),
                       backgroundColor: appTheme.teal_A700,
@@ -114,7 +178,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                         color: appTheme.white_A700,
                       ),
                     )
-                        : const Text('Change Password'),
+                        : Text(state.title),
                   ),
                   TextButton(
                     onPressed:
@@ -128,6 +192,54 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         );
       },
     );
+  }
+
+  Future<void> _showGoogleReauthenticationDialog(
+      BuildContext context,
+      ChangePasswordViewModel viewModel,
+      ) async {
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: Icon(Icons.security_outlined, color: appTheme.teal_A700),
+        title: const Text('Sign in with Google again'),
+        content: const Text(
+          'For security, log out and sign in with Google again before setting your password.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.logout_outlined),
+            label: const Text('Logout'),
+          ),
+        ],
+      ),
+    );
+    if (shouldLogout != true || !context.mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Log out?'),
+        content: const Text(
+          'You will be logged out of TREK and can sign in with Google again.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Logout'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await viewModel.logoutForGoogleReauthentication();
   }
 }
 

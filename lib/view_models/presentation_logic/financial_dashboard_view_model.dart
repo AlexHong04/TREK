@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 
 import '../../models/services/financial_dashboard_service.dart';
 import '../../models/services/i_auth_service.dart';
+import '../../models/services/i_profile_service.dart';
 import '../../models/services/i_itinerary_service.dart';
 import '../../theme/app_theme.dart';
 import '../ui_state/financial_dashboard_ui_state.dart';
@@ -15,6 +16,7 @@ export '../ui_state/financial_dashboard_ui_state.dart';
 class FinancialDashboardViewModel extends ChangeNotifier {
   final IFinancialDashboardService _service;
   final IAuthService _authService;
+  final IProfileService _profileService;
   int _currencyConversionRequest = 0;
   bool _isDisposed = false;
 
@@ -26,7 +28,9 @@ class FinancialDashboardViewModel extends ChangeNotifier {
   FinancialDashboardViewModel({
     IFinancialDashboardService? service,
     required IAuthService authService,
+    required IProfileService profileService,
   }) : _service = service ?? FinancialDashboardService(),
+        _profileService = profileService,
        _authService = authService {
     _authService.addListener(_handleAuthUserChanged);
     _syncAuthUser(notify: false);
@@ -43,7 +47,7 @@ class FinancialDashboardViewModel extends ChangeNotifier {
     final user = _authService.currentUser;
     final pictureUrl = user?.profilePicture?.trim();
     final preferredCurrency = _normalizeCurrency(
-      _authService.preferredCurrency,
+      _profileService.preferredCurrency,
     );
     _uiState = _uiState.copyWith(
       profileName: user?.fullName ?? '',
@@ -552,7 +556,7 @@ class FinancialDashboardViewModel extends ChangeNotifier {
   Future<void> _refreshCurrencyConversions() async {
     final request = ++_currencyConversionRequest;
     final preferredCurrency = _normalizeCurrency(
-      _authService.preferredCurrency,
+      _profileService.preferredCurrency,
     );
     final sourceCurrencies = <String>{
       'MYR',
@@ -577,7 +581,7 @@ class FinancialDashboardViewModel extends ChangeNotifier {
     var hasUnavailableRate = false;
     for (final currency in currenciesToConvert) {
       try {
-        final converted = await _authService.convertToPreferredCurrency(
+        final converted = await _profileService.convertToPreferredCurrency(
           amount: 1,
           fromCurrency: currency,
         );

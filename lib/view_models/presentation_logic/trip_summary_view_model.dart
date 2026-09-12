@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../models/services/financial_dashboard_service.dart';
 import '../../models/services/i_auth_service.dart';
+import '../../models/services/i_profile_service.dart';
 import '../../models/services/i_itinerary_service.dart';
 import '../ui_state/trip_summary_ui_state.dart';
 
@@ -17,6 +18,7 @@ class TripSummaryViewModel extends ChangeNotifier {
   final String tripId;
   final IFinancialDashboardService _service;
   final IAuthService _authService;
+  final IProfileService _profileService;
   int _currencyConversionRequest = 0;
   bool _isDisposed = false;
 
@@ -25,12 +27,14 @@ class TripSummaryViewModel extends ChangeNotifier {
   TripSummaryViewModel({
     required this.tripId,
     required IAuthService authService,
+    required IProfileService profileService,
     IFinancialDashboardService? service,
   }) : _service = service ?? FinancialDashboardService(),
+        _profileService = profileService,
        _authService = authService {
     _authService.addListener(_handleAuthUserChanged);
     _uiState = _uiState.copyWith(
-      preferredCurrency: _normalizeCurrency(_authService.preferredCurrency),
+      preferredCurrency: _normalizeCurrency(_profileService.preferredCurrency),
     );
   }
 
@@ -430,7 +434,7 @@ class TripSummaryViewModel extends ChangeNotifier {
   Future<void> _refreshCurrencyConversion() async {
     final request = ++_currencyConversionRequest;
     final preferredCurrency = _normalizeCurrency(
-      _authService.preferredCurrency,
+      _profileService.preferredCurrency,
     );
     if (preferredCurrency == 'MYR') {
       _uiState = _uiState.copyWith(
@@ -452,7 +456,7 @@ class TripSummaryViewModel extends ChangeNotifier {
     if (!_isDisposed) notifyListeners();
 
     try {
-      final rate = await _authService.convertToPreferredCurrency(
+      final rate = await _profileService.convertToPreferredCurrency(
         amount: 1,
         fromCurrency: 'MYR',
       );

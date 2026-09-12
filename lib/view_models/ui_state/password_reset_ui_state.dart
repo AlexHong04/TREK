@@ -33,13 +33,10 @@ class PasswordResetUiState {
       obscurePassword: obscurePassword ?? this.obscurePassword,
       isLoading: isLoading ?? this.isLoading,
       resetSucceeded: resetSucceeded ?? this.resetSucceeded,
-      passwordError: clearPasswordError
-          ? null
-          : (passwordError ?? this.passwordError),
-      errorMessage: clearErrorMessage
-          ? null
-          : (errorMessage ?? this.errorMessage),
+      passwordError:
+      clearPasswordError ? null : (passwordError ?? this.passwordError),
+      errorMessage:
+      clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
     );
   }
 }
-

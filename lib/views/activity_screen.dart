@@ -8,6 +8,7 @@ import '../theme/app_theme.dart';
 import '../utils/date_time_formatter.dart';
 import '../main.dart';
 import '../models/services/i_auth_service.dart';
+import '../models/services/i_profile_service.dart';
 import '../view_models/presentation_logic/activity_view_model.dart';
 import '../view_models/ui_state/activity_ui_state.dart';
 import '../widgets/custom_app_bar.dart';
@@ -21,7 +22,10 @@ class ActivityScreen extends StatefulWidget {
   static Widget builder(BuildContext context) {
     return ChangeNotifierProvider<ActivityViewModel>(
       create: (context) =>
-          ActivityViewModel(authService: context.read<IAuthService>()),
+          ActivityViewModel(
+              authService: context.read<IAuthService>(),
+              profileService: context.read<IProfileService>()
+          ),
       child: const ActivityScreen(),
     );
   }

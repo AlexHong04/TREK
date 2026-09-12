@@ -6,7 +6,11 @@ class ProfileUiState {
   final String email;
   final String currency;
   final String? profilePictureUrl;
+  final String? cachedProfilePicturePath;
   final bool isEmailVerified;
+  final int verificationDaysRemaining;
+  final bool hasPasswordSignIn;
+  final bool isOffline;
   final bool isLoading;
   final bool isUploadingPicture;
   final bool isSendingVerification;
@@ -20,7 +24,11 @@ class ProfileUiState {
     this.email = '',
     this.currency = 'MYR',
     this.profilePictureUrl,
+    this.cachedProfilePicturePath,
     this.isEmailVerified = false,
+    this.verificationDaysRemaining = 0,
+    this.hasPasswordSignIn = false,
+    this.isOffline = false,
     this.isLoading = false,
     this.isUploadingPicture = false,
     this.isSendingVerification = false,
@@ -36,12 +44,19 @@ class ProfileUiState {
           isSendingVerification ||
           isLoggingOut;
 
+  String get passwordActionLabel =>
+      hasPasswordSignIn ? 'Change Password' : 'Set Password';
+
   ProfileUiState copyWith({
     String? fullName,
     String? email,
     String? currency,
     String? profilePictureUrl,
+    String? cachedProfilePicturePath,
     bool? isEmailVerified,
+    int? verificationDaysRemaining,
+    bool? hasPasswordSignIn,
+    bool? isOffline,
     bool? isLoading,
     bool? isUploadingPicture,
     bool? isSendingVerification,
@@ -50,6 +65,7 @@ class ProfileUiState {
     String? successMessage,
     String? errorMessage,
     bool clearProfilePicture = false,
+    bool clearCachedProfilePicture = false,
     bool clearSuccessMessage = false,
     bool clearErrorMessage = false,
   }) {
@@ -60,7 +76,15 @@ class ProfileUiState {
       profilePictureUrl: clearProfilePicture
           ? null
           : (profilePictureUrl ?? this.profilePictureUrl),
+      cachedProfilePicturePath: clearCachedProfilePicture
+          ? null
+          : (cachedProfilePicturePath ?? this.cachedProfilePicturePath),
       isEmailVerified: isEmailVerified ?? this.isEmailVerified,
+      verificationDaysRemaining:
+      verificationDaysRemaining ?? this.verificationDaysRemaining,
+      hasPasswordSignIn:
+      hasPasswordSignIn ?? this.hasPasswordSignIn,
+      isOffline: isOffline ?? this.isOffline,
       isLoading: isLoading ?? this.isLoading,
       isUploadingPicture: isUploadingPicture ?? this.isUploadingPicture,
       isSendingVerification:

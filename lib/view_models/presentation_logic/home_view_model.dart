@@ -6,72 +6,63 @@ import '../../models/repository/itinerary_repository.dart';
 import '../ui_state/home_ui_state.dart';
 import '../../models/services/itinerary_service.dart';
 import '../../models/services/i_auth_service.dart';
+import '../../models/services/i_profile_service.dart';
+import '../../utils/input_validator.dart';
+import '../../utils/network_error.dart';
+
 
 class HomeViewModel extends ChangeNotifier {
   final ItineraryService _itineraryService = ItineraryService();
   final IAuthService _authService;
-
-  HomeUiState _uiState = const HomeUiState(email: 'User');
-  HomeUiState get uiState => _uiState;
+  final IProfileService _profileService;
+  bool _disposed = false;
+  bool _tripRequestInFlight = false;
 
   /// Monotonic id for trip loads. Only the newest in-flight request may write
   /// to the UI state, so a slow older response can never overwrite a newer one.
   int _tripRequestId = 0;
 
-  /// The user id the currently displayed trip belongs to. Lets us tell a real
-  /// sign-in/sign-out apart from an auth notification that changed nothing.
-  String? _lastUserId;
-
-  HomeViewModel(this._authService) {
-    _lastUserId = _authService.currentUserId;
-    _applyUserFields(notify: false);
-    _authService.addListener(_handleAuthUserChanged);
-    fetchLatestTripWithCurrentUserId();
+  // andrew
+  HomeViewModel(this._authService, this._profileService) {
+    _authService.addListener(_handleAccountChanged);
+    _syncProfile(notify: false);
+    if (!_authService.isOffline) fetchLatestTripWithCurrentUserId();
   }
 
-  void _handleAuthUserChanged() {
-    final user = _authService.currentUser;
-    final userId = user?.userId;
-    final userChanged = userId != _lastUserId;
-    _lastUserId = userId;
+  HomeUiState _uiState = const HomeUiState(email: '');
+  HomeUiState get uiState => _uiState;
 
-    if (user == null) {
-      // Signed out: invalidate any in-flight fetch and clear everything.
-      _tripRequestId++;
-      _uiState = const HomeUiState(email: 'User');
-      notifyListeners();
-      return;
-    }
-
-    // Same user, new auth event (token refresh, app resume, profile reload).
-    // Refresh ONLY the profile fields and keep the trip that is on screen.
-    // Nulling latestTrip/hasPlan here is what made the card flash "No plans
-    // yet" and momentarily drop the trip on every auth notification.
-    _applyUserFields(notify: true);
-
-    // Only reload the trip when a different user just signed in.
-    if (userChanged) {
+  void _handleAccountChanged() {
+    _syncProfile();
+    if (!_authService.isOffline && !_tripRequestInFlight) {
       fetchLatestTripWithCurrentUserId();
     }
   }
 
-  void _applyUserFields({bool notify = true}) {
-    final user = _authService.currentUser;
-    if (user == null) {
-      _uiState = const HomeUiState(email: 'User');
-    } else {
-      _uiState = _uiState.copyWith(
-        email: user.email,
-        userName: user.fullName,
-        profilePictureUrl: user.profilePicture,
-        clearProfilePicture: (user.profilePicture ?? '').isEmpty,
-      );
+  Future<void> refreshProfile() async {
+    try {
+      await _profileService.refreshCurrentUser();
+    } on NetworkUnavailableException {
+      _syncProfile();
     }
-    if (notify) notifyListeners();
   }
 
-  Future<void> refreshProfile() async {
-    await _authService.refreshCurrentUser();
+  void _syncProfile({bool notify = true}) {
+    final user = _profileService.currentUser;
+    _uiState = _uiState.copyWith(
+      email: user?.email ?? '',
+      userName: InputValidator.normalizeDisplayName(user?.fullName ?? ''),
+      profilePictureUrl: user?.profilePicture,
+      cachedProfilePicturePath: user?.cachedProfilePicturePath,
+      isOffline: _authService.isOffline,
+      isEmailVerified: user?.isEmailVerified ?? false,
+      verificationDaysRemaining: _authService.verificationDaysRemaining,
+      clearProfilePicture:
+      user?.profilePicture == null || user!.profilePicture!.isEmpty,
+      clearCachedProfilePicture: user?.cachedProfilePicturePath == null ||
+          user!.cachedProfilePicturePath!.isEmpty,
+    );
+    if (notify) _notify();
   }
 
   // kokhong
@@ -147,9 +138,15 @@ class HomeViewModel extends ChangeNotifier {
     // Initialize or reset states if needed
   }
 
+  // andrew
+  void _notify() {
+    if (!_disposed) notifyListeners();
+  }
+
   @override
   void dispose() {
-    _authService.removeListener(_handleAuthUserChanged);
+    _disposed = true;
+    _authService.removeListener(_handleAccountChanged);
     super.dispose();
   }
 
@@ -206,7 +203,10 @@ class HomeViewModelScope extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => HomeViewModel(context.read<IAuthService>()),
+      create: (_) => HomeViewModel(
+        context.read<IAuthService>(),
+        context.read<IProfileService>(),
+      ),
       child: child,
     );
   }

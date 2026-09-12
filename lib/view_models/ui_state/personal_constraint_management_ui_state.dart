@@ -35,6 +35,7 @@ class PersonalConstraintManagementUiState {
   final List<ConstraintOptionUiState> options;
   final bool isLoading;
   final bool isSaving;
+  final bool isOffline;
   final bool saveSucceeded;
   final String? errorMessage;
 
@@ -42,6 +43,7 @@ class PersonalConstraintManagementUiState {
     this.options = const [],
     this.isLoading = false,
     this.isSaving = false,
+    this.isOffline = false,
     this.saveSucceeded = false,
     this.errorMessage,
   });
@@ -50,6 +52,7 @@ class PersonalConstraintManagementUiState {
     List<ConstraintOptionUiState>? options,
     bool? isLoading,
     bool? isSaving,
+    bool? isOffline,
     bool? saveSucceeded,
     String? errorMessage,
     bool clearErrorMessage = false,
@@ -58,6 +61,7 @@ class PersonalConstraintManagementUiState {
       options: options ?? this.options,
       isLoading: isLoading ?? this.isLoading,
       isSaving: isSaving ?? this.isSaving,
+      isOffline: isOffline ?? this.isOffline,
       saveSucceeded: saveSucceeded ?? this.saveSucceeded,
       errorMessage:
       clearErrorMessage ? null : (errorMessage ?? this.errorMessage),

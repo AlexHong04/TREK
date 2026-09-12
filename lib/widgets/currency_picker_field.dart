@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme/app_theme.dart';
+import '../utils/input_validator.dart';
 
 class CurrencyPickerField extends StatelessWidget {
   final String sectionTitle;
@@ -214,6 +216,11 @@ class _CurrencyPickerSheetState extends State<_CurrencyPickerSheet> {
             const SizedBox(height: 16),
             TextField(
               textInputAction: TextInputAction.search,
+              inputFormatters: [
+                FilteringTextInputFormatter.deny(
+                  InputValidator.disallowedInvisibleCharacters,
+                ),
+              ],
               decoration: InputDecoration(
                 hintText: 'Search USD, MYR, EUR…',
                 prefixIcon: const Icon(Icons.search),

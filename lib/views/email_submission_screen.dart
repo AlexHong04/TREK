@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../view_models/presentation_logic/email_submission_view_model.dart';
@@ -9,7 +10,11 @@ class EmailSubmissionScreen extends StatelessWidget {
   const EmailSubmissionScreen({super.key});
 
   static Widget builder(BuildContext context) {
-    return const EmailSubmissionViewModelScope(child: EmailSubmissionScreen());
+    final argument = ModalRoute.of(context)?.settings.arguments;
+    return EmailSubmissionViewModelScope(
+      initialEmail: argument is String ? argument : '',
+      child: const EmailSubmissionScreen(),
+    );
   }
 
   @override
@@ -27,7 +32,12 @@ class EmailSubmissionScreen extends StatelessWidget {
         }
 
         void goToLogin() {
-          Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            '/login',
+                (_) => false,
+            arguments: state.email,
+          );
         }
 
         return PopScope(
@@ -45,7 +55,7 @@ class EmailSubmissionScreen extends StatelessWidget {
                 key: const ValueKey('link-sent'),
                 title: 'Password Reset Link Sent',
                 subtitle:
-                'If an account exists for ${state.email.trim()}, a reset link has been sent. Open it on this device to return to TREK.',
+                'If an account exists for ${state.email.trim()}, a reset link has been sent. Open it on any device; TREK will refresh the result when available.',
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -84,12 +94,16 @@ class EmailSubmissionScreen extends StatelessWidget {
                           hintText: 'Enter your email address',
                           prefixIcon: Icons.email_outlined,
                           margin: EdgeInsets.zero,
+                          initialValue: state.email,
                           enabled: !state.isLoading,
                           keyboardType: TextInputType.emailAddress,
                           textInputAction: TextInputAction.done,
                           autofillHints: const [AutofillHints.email],
                           autocorrect: false,
                           enableSuggestions: false,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.deny(RegExp(r'\s')),
+                          ],
                           onChanged: viewModel.onEmailChanged,
                           onFieldSubmitted: (_) => viewModel.onSendPressed(),
                           errorText: state.emailError,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../theme/app_theme.dart';
+import '../utils/input_validator.dart';
 
 class CustomTextField extends StatefulWidget {
   final String sectionTitle;
@@ -131,7 +132,12 @@ class _CustomTextFieldState extends State<CustomTextField> {
               textInputAction: widget.textInputAction,
               textCapitalization: widget.textCapitalization,
               autofillHints: widget.autofillHints,
-              inputFormatters: widget.inputFormatters,
+              inputFormatters: [
+                FilteringTextInputFormatter.deny(
+                  InputValidator.disallowedInvisibleCharacters,
+                ),
+                ...?widget.inputFormatters,
+              ],
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w400,

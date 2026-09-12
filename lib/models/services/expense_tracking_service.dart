@@ -10,7 +10,7 @@ import '../repository/expense_repository.dart';
 import '../repository/itinerary_repository.dart';
 import '../repository/i_itinerary_repository.dart';
 import 'budget_service.dart';
-import 'i_auth_service.dart';
+import 'i_profile_service.dart';
 import 'i_itinerary_service.dart';
 
 class _ExtractedReceiptItem {
@@ -30,10 +30,10 @@ class ExpenseTrackingService implements IExpenseTrackingService {
   final IBudgetService _budgetService;
   final IExpenseRepository _expenseRepository;
 
-  ExpenseTrackingService({required IAuthService authService})
+  ExpenseTrackingService({required IProfileService profileService})
     : _itineraryRepository = ItineraryRepository(),
       _expenseRepository = ExpenseRepository(),
-      _budgetService = BudgetService(authService: authService);
+      _budgetService = BudgetService(profileService: profileService);
 
   // final IItineraryRepository _itineraryRepository = ItineraryRepository();
   // final IBudgetService _budgetService = BudgetService();

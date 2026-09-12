@@ -3,40 +3,6 @@ import 'dart:io';
 import '../entities/personal_constraint.dart';
 import '../entities/user.dart';
 
-class AuthUserData {
-  final String id;
-  final String email;
-  final Map<String, dynamic> metadata;
-  final String provider;
-
-  const AuthUserData({
-    required this.id,
-    required this.email,
-    required this.provider,
-    this.metadata = const {},
-  });
-
-  bool get isTrustedOAuthProvider => provider != 'email';
-}
-
-class AuthSessionSnapshot {
-  final AuthUserData? user;
-  final bool isPasswordRecovery;
-  final bool isSignedInEvent;
-
-  const AuthSessionSnapshot({
-    this.user,
-    this.isPasswordRecovery = false,
-    this.isSignedInEvent = false,
-  });
-}
-
-class AuthRegistrationData {
-  final String userId;
-
-  const AuthRegistrationData({required this.userId});
-}
-
 class LoginLockStatus {
   final int failedAttempts;
   final DateTime? lockedUntil;
@@ -50,88 +16,50 @@ class LoginLockStatus {
       lockedUntil != null && lockedUntil!.isAfter(DateTime.now());
 }
 
-class RepositoryEmailAlreadyExistsException implements Exception {
-  const RepositoryEmailAlreadyExistsException();
-}
+class AccountAccessData {
+  final DateTime serverTime;
+  final DateTime verificationDeadline;
+  final bool isEmailVerified;
+  final bool requiresVerification;
+  final int verificationDaysRemaining;
+  final TrekAccountStatus accountStatus;
+  final bool hasPasswordSignIn;
 
-class RepositoryInvalidCredentialsException implements Exception {
-  const RepositoryInvalidCredentialsException();
-}
-
-class RepositoryIncorrectCurrentPasswordException implements Exception {
-  const RepositoryIncorrectCurrentPasswordException();
-}
-
-class RepositorySamePasswordException implements Exception {
-  const RepositorySamePasswordException();
-}
-
-/// Supabase authentication contract implemented by AuthRepository.
-abstract interface class IAuthRepository {
-  AuthUserData? get currentUser;
-
-  Stream<AuthSessionSnapshot> get authStateChanges;
-
-  Future<AuthRegistrationData> signUpWithEmail({
-    required String email,
-    required String password,
-    required String currency,
+  const AccountAccessData({
+    required this.serverTime,
+    required this.verificationDeadline,
+    required this.isEmailVerified,
+    required this.requiresVerification,
+    required this.verificationDaysRemaining,
+    required this.accountStatus,
+    required this.hasPasswordSignIn,
   });
-
-  Future<AuthUserData> signInWithEmail({
-    required String email,
-    required String password,
-  });
-
-  Future<void> signInWithGoogle();
-
-  Future<void> sendMagicLink({required String email});
-
-  Future<void> sendPasswordResetEmail({required String email});
-
-  Future<void> updatePassword({
-    required String newPassword,
-    String? currentPassword,
-  });
-
-  Future<void> signOut({bool allSessions = false});
 }
 
-/// Complete data-access contract used by the User Management services.
-///
-/// UserRepository implements this contract and delegates Supabase Auth work to
-/// IAuthRepository internally. Services therefore never depend on a concrete
-/// repository.
+/// App-data gateway implemented only by UserRepository. Supabase Auth methods
+/// deliberately live in IAuthRepository instead of being duplicated here.
 abstract interface class IUserRepository {
-  AuthUserData? get currentAuthUser;
+  Future<bool> completeEmailVerification();
 
-  Stream<AuthSessionSnapshot> get authStateChanges;
+  Future<AccountAccessData> getCurrentAccountAccess();
 
-  Future<AuthRegistrationData> signUpWithEmail({
-    required String email,
-    required String password,
-    required String currency,
-  });
+  Stream<User?> watchUserProfileByAuthId(String authUserId);
 
-  Future<AuthUserData> signInWithEmail({
-    required String email,
-    required String password,
-  });
+  Future<User?> getUserProfileByAuthId(String authUserId);
 
-  Future<void> signInWithGoogle();
+  Future<User?> getCachedUserProfileByAuthId(String authUserId);
 
-  Future<void> sendMagicLink({required String email});
+  Future<void> cacheUserProfile(User user);
 
-  Future<void> sendPasswordResetEmail({required String email});
+  Future<void> clearCachedUserProfile(String authUserId);
 
-  Future<void> updatePassword({
-    required String newPassword,
-    String? currentPassword,
-  });
+  Future<void> createUserProfile(User user);
 
-  Future<void> signOut({bool allSessions = false});
+  Future<LoginLockStatus> getLoginLockStatus(String email);
 
-  Future<bool> completeDeferredEmailVerification();
+  Future<LoginLockStatus> recordFailedLoginAttempt(String email);
+
+  Future<void> resetFailedLoginAttempts(String userId);
 
   Future<List<String>> getSupportedCurrencies();
 
@@ -140,16 +68,6 @@ abstract interface class IUserRepository {
     required String fromCurrency,
     required String toCurrency,
   });
-
-  Future<LoginLockStatus> getLoginLockStatus(String email);
-
-  Future<LoginLockStatus> recordFailedLoginAttempt(String email);
-
-  Future<void> resetFailedLoginAttempts(String userId);
-
-  Future<User?> getUserProfileByAuthId(String authUserId);
-
-  Future<void> createUserProfile(User user);
 
   Future<void> updateProfile({
     required String userId,

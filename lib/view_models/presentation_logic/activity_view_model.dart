@@ -12,6 +12,7 @@ import '../../models/repository/expense_repository.dart';
 import '../../models/repository/i_itinerary_repository.dart';
 import '../../models/services/budget_service.dart';
 import '../../models/services/i_auth_service.dart';
+import '../../models/services/i_profile_service.dart';
 import '../../models/services/expense_tracking_service.dart';
 import '../../models/services/itinerary_service.dart';
 import '../../models/services/i_itinerary_service.dart';
@@ -28,6 +29,7 @@ class ActivityViewModel extends ChangeNotifier {
   final IExpenseTrackingService _expenseTrackingService;
   final IExpenseRepository _expenseRepository;
   final IAuthService _authService;
+  final IProfileService _profileService;
   final ICachedActivity _cachedActivity;
   final CameraSource _cameraSource = CameraSource();
   final GallerySource _gallerySource = GallerySource();
@@ -41,18 +43,20 @@ class ActivityViewModel extends ChangeNotifier {
     IExpenseRepository? expenseRepository,
     ICachedActivity? cachedActivity,
     required IAuthService authService,
+    required IProfileService profileService,
   }) : _itineraryService = itineraryService ?? ItineraryService(),
        _budgetService =
-           budgetService ?? BudgetService(authService: authService),
+           budgetService ?? BudgetService(profileService: profileService),
        _expenseTrackingService =
            expenseTrackingService ??
-           ExpenseTrackingService(authService: authService),
+           ExpenseTrackingService(profileService: profileService),
        _expenseRepository = expenseRepository ?? ExpenseRepository(),
        _authService = authService,
+        _profileService = profileService,
        _cachedActivity = cachedActivity ?? GetCachedActivities() {
     _uiState = _uiState.copyWith(
       originalCurrency: _expenseCurrency,
-      displayCurrency: _authService.preferredCurrency,
+      displayCurrency: _profileService.preferredCurrency,
     );
     _loadAvailableCurrencies();
     _authService.addListener(_handleAuthChanged);
@@ -222,7 +226,7 @@ class ActivityViewModel extends ChangeNotifier {
 
   Future<void> _loadAvailableCurrencies() async {
     try {
-      final currencies = await _authService.getSupportedCurrencies();
+      final currencies = await _profileService.getSupportedCurrencies();
       _uiState = _uiState.copyWith(availableCurrencies: currencies);
       notifyListeners();
     } catch (_) {
@@ -233,7 +237,7 @@ class ActivityViewModel extends ChangeNotifier {
     }
   }
 
-  String get preferredCurrency => _authService.preferredCurrency;
+  String get preferredCurrency => _profileService.preferredCurrency;
 
   Future<void> convertAmount({
     required double amount,
@@ -241,9 +245,9 @@ class ActivityViewModel extends ChangeNotifier {
   }) async {
     _uiState = _uiState.copyWith(isConverting: true, currencyError: null);
     notifyListeners();
-    final targetCurrency = _authService.preferredCurrency;
+    final targetCurrency = _profileService.preferredCurrency;
     try {
-      final result = await _authService.convertToPreferredCurrency(
+      final result = await _profileService.convertToPreferredCurrency(
         amount: amount,
         fromCurrency: originalCurrency,
       );

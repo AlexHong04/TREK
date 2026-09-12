@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../models/services/i_auth_service.dart';
+import '../models/services/i_profile_service.dart';
 import '../theme/app_theme.dart';
 
 String formatCurrencyAmount(
@@ -53,17 +53,17 @@ class _ConvertedAmountTextState extends State<ConvertedAmountText> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _refreshConversionIfNeeded(Provider.of<IAuthService>(context));
+    _refreshConversionIfNeeded(Provider.of<IProfileService>(context));
   }
 
   @override
   void didUpdateWidget(covariant ConvertedAmountText oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _refreshConversionIfNeeded(context.read<IAuthService>());
+    _refreshConversionIfNeeded(context.read<IProfileService>());
   }
 
-  void _refreshConversionIfNeeded(IAuthService authService) {
-    final preferredCurrency = authService.preferredCurrency.trim().toUpperCase();
+  void _refreshConversionIfNeeded(IProfileService profileService) {
+    final preferredCurrency = profileService.preferredCurrency.trim().toUpperCase();
     final originalCurrency = widget.originalCurrency.trim().toUpperCase();
 
     final unchanged = _lastPreferredCurrency == preferredCurrency &&
@@ -85,7 +85,7 @@ class _ConvertedAmountTextState extends State<ConvertedAmountText> {
     _isLoading = true;
     Future.microtask(() async {
       try {
-        final convertedAmount = await authService.convertToPreferredCurrency(
+        final convertedAmount = await profileService.convertToPreferredCurrency(
           amount: widget.amount,
           fromCurrency: originalCurrency,
         );
@@ -120,8 +120,8 @@ class _ConvertedAmountTextState extends State<ConvertedAmountText> {
 
   @override
   Widget build(BuildContext context) {
-    final authService = context.watch<IAuthService>();
-    final preferredCurrency = authService.preferredCurrency.trim().toUpperCase();
+    final profileService = context.watch<IProfileService>();
+    final preferredCurrency = profileService.preferredCurrency.trim().toUpperCase();
     final originalCurrency = widget.originalCurrency.trim().toUpperCase();
     final displayCurrency = originalCurrency.isEmpty
         ? preferredCurrency

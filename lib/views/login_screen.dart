@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -25,7 +27,9 @@ class LoginScreen extends StatefulWidget {
         VoidCallback? onRegister,
         VoidCallback? onForgotPassword,
       }) {
+    final argument = ModalRoute.of(context)?.settings.arguments;
     return LoginViewModelScope(
+      initialEmail: argument is String ? argument : '',
       child: LoginScreen(
         onLoginSuccess: onLoginSuccess,
         onRegister: onRegister,
@@ -38,9 +42,70 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen>
+    with WidgetsBindingObserver {
   static const Duration _exitConfirmationWindow = Duration(seconds: 2);
   DateTime? _lastBackPressedAt;
+  LoginViewModel? _viewModel;
+  bool _wasBackgrounded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      _wasBackgrounded = true;
+    } else if (state == AppLifecycleState.resumed && _wasBackgrounded) {
+      _wasBackgrounded = false;
+      unawaited(_viewModel?.onAppResumedAfterGoogleSignIn());
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final next = context.read<LoginViewModel>();
+    if (identical(next, _viewModel)) return;
+    _viewModel?.removeListener(_handleViewModelEvent);
+    _viewModel = next;
+    next.addListener(_handleViewModelEvent);
+    _handleViewModelEvent();
+  }
+
+  void _handleViewModelEvent() {
+    final viewModel = _viewModel;
+    if (viewModel == null) return;
+    final state = viewModel.uiState;
+    final message = state.errorMessage ?? state.infoMessage;
+    final isError = state.errorMessage != null;
+    if (message != null) {
+      viewModel.consumeMessages();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        showAuthToast(context, message, isError: isError);
+      });
+    }
+    if (state.loginSucceeded) {
+      viewModel.consumeLoginSuccess();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        widget.onLoginSuccess?.call();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _viewModel?.removeListener(_handleViewModelEvent);
+    super.dispose();
+  }
 
   void _handleSystemBack() {
     final now = DateTime.now();
@@ -61,31 +126,16 @@ class _LoginScreenState extends State<LoginScreen> {
     return Consumer<LoginViewModel>(
       builder: (context, viewModel, _) {
         final state = viewModel.uiState;
-        if (state.errorMessage != null) {
-          final message = state.errorMessage!;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!context.mounted) return;
-            viewModel.consumeErrorMessage();
-            showAuthToast(context, message, isError: true);
-          });
-        }
-        if (state.loginSucceeded) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!context.mounted) return;
-            viewModel.consumeLoginSuccess();
-            if (widget.onLoginSuccess != null) {
-              widget.onLoginSuccess!();
-            }
-            // Normal app navigation is owned by MyApp's auth listener. This
-            // prevents Login and the root navigator from pushing Home twice.
-          });
-        }
 
         void openRegistration() {
           if (widget.onRegister != null) {
             widget.onRegister!();
           } else {
-            Navigator.pushNamed(context, '/register');
+            Navigator.pushNamed(
+              context,
+              '/register',
+              arguments: state.email,
+            );
           }
         }
 
@@ -93,7 +143,11 @@ class _LoginScreenState extends State<LoginScreen> {
           if (widget.onForgotPassword != null) {
             widget.onForgotPassword!();
           } else {
-            Navigator.pushNamed(context, '/forgotPassword');
+            Navigator.pushNamed(
+              context,
+              '/forgotPassword',
+              arguments: state.email,
+            );
           }
         }
 
@@ -120,12 +174,16 @@ class _LoginScreenState extends State<LoginScreen> {
                         hintText: 'Enter your email address',
                         prefixIcon: Icons.email_outlined,
                         margin: EdgeInsets.zero,
+                        initialValue: state.email,
                         enabled: !state.isLoading,
                         keyboardType: TextInputType.emailAddress,
                         textInputAction: TextInputAction.next,
                         autofillHints: const [AutofillHints.email],
                         autocorrect: false,
                         enableSuggestions: false,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.deny(RegExp(r'\s')),
+                        ],
                         onChanged: viewModel.onEmailChanged,
                         errorText: state.emailError,
                       ),
@@ -171,17 +229,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: const Text('Forgot Password?'),
                       ),
                     ),
-                    if (state.canResendVerification)
-                      TextButton(
-                        onPressed: state.isLoading
-                            ? null
-                            : viewModel.onResendVerificationPressed,
-                        child: Text(
-                          state.verificationEmailSent
-                              ? 'Verification email sent'
-                              : 'Resend verification email',
-                        ),
-                      ),
                     if (state.showMagicLinkOption)
                       TextButton(
                         onPressed: state.isLoading

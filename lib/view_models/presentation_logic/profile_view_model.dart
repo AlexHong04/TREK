@@ -2,46 +2,59 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/services/i_auth_service.dart';
+import '../../models/services/i_profile_service.dart';
+import '../../utils/input_validator.dart';
+import '../../utils/network_error.dart';
 import '../ui_state/profile_ui_state.dart';
 
 class ProfileViewModel extends ChangeNotifier {
   final IAuthService _authService;
+  final IProfileService _profileService;
+  bool _disposed = false;
+  bool _loadInProgress = false;
 
-  ProfileViewModel(this._authService) {
-    _authService.addListener(_syncFromAuthService);
+  ProfileViewModel(this._authService, this._profileService) {
+    _authService.addListener(_syncFromServices);
+    _applyCurrentUser();
   }
 
   ProfileUiState _uiState = const ProfileUiState();
   ProfileUiState get uiState => _uiState;
 
   Future<void> load() async {
-    if (_uiState.isLoading) return;
+    if (_loadInProgress) return;
+    _loadInProgress = true;
+    final needsBlockingLoad = _uiState.email.isEmpty;
     _uiState = _uiState.copyWith(
-      isLoading: true,
+      isLoading: needsBlockingLoad,
       clearErrorMessage: true,
       clearSuccessMessage: true,
     );
-    notifyListeners();
+    _notify();
     try {
-      final hadLoadedProfile = _uiState.email.isNotEmpty;
-      final wasEmailVerified = _uiState.isEmailVerified;
-      await _authService.refreshCurrentUser();
-      final user = _authService.currentUser;
-      if (user == null) {
-        throw StateError('No active tourist session.');
-      }
+      final wasVerified = _uiState.isEmailVerified;
+      await _profileService.refreshCurrentUser();
+      if (_disposed) return;
       _applyCurrentUser(isLoading: false);
-      _showVerificationSuccessIfNeeded(
-        hadLoadedProfile: hadLoadedProfile,
-        wasEmailVerified: wasEmailVerified,
-      );
+      if (!wasVerified && _uiState.isEmailVerified) {
+        _uiState = _uiState.copyWith(
+          successMessage: 'Email verified successfully.',
+        );
+      }
+    } on NetworkUnavailableException {
+      if (_disposed) return;
+      _applyCurrentUser(isLoading: false);
+      _uiState = _uiState.copyWith(isOffline: true);
     } catch (_) {
+      if (_disposed) return;
       _uiState = _uiState.copyWith(
         isLoading: false,
-        errorMessage: 'Unable to load your profile. Please try again.',
+        errorMessage: 'Unable to refresh your profile. Please try again.',
       );
+    } finally {
+      _loadInProgress = false;
     }
-    notifyListeners();
+    _notify();
   }
 
   Future<void> chooseFromGallery() {
@@ -54,102 +67,124 @@ class ProfileViewModel extends ChangeNotifier {
 
   Future<void> removePhoto() async {
     if (_uiState.isUploadingPicture ||
-        _uiState.profilePictureUrl?.isNotEmpty != true) {
+        (_uiState.profilePictureUrl?.isNotEmpty != true &&
+            _uiState.cachedProfilePicturePath?.isNotEmpty != true)) {
       return;
     }
-
     _uiState = _uiState.copyWith(
       isUploadingPicture: true,
       clearErrorMessage: true,
       clearSuccessMessage: true,
     );
-    notifyListeners();
+    _notify();
     try {
-      await _authService.removeProfilePicture();
+      await _profileService.removeProfilePicture();
+      if (_disposed) return;
       _uiState = _uiState.copyWith(
         isUploadingPicture: false,
         clearProfilePicture: true,
+        clearCachedProfilePicture: true,
         successMessage: 'Profile picture removed successfully.',
       );
+    } on NetworkUnavailableException {
+      if (_disposed) return;
+      _uiState = _uiState.copyWith(
+        isUploadingPicture: false,
+        isOffline: true,
+        errorMessage: 'No internet connection. Check your connection and try again.',
+      );
     } catch (_) {
+      if (_disposed) return;
       _uiState = _uiState.copyWith(
         isUploadingPicture: false,
         errorMessage: 'Unable to remove the profile picture. Please try again.',
       );
     }
-    notifyListeners();
+    _notify();
   }
 
   Future<void> _changeProfilePicture(ProfileImageSource source) async {
     if (_uiState.isUploadingPicture) return;
-    final userId = _authService.currentUserId;
-    if (userId == null) {
-      _uiState = _uiState.copyWith(
-        errorMessage: 'Your session has expired. Please log in again.',
-      );
-      notifyListeners();
-      return;
-    }
-
     _uiState = _uiState.copyWith(
       isUploadingPicture: true,
       clearErrorMessage: true,
       clearSuccessMessage: true,
     );
-    notifyListeners();
+    _notify();
     try {
-      final pictureUrl = await _authService.updateProfilePicture(source);
-      if (pictureUrl == null) {
-        _uiState = _uiState.copyWith(isUploadingPicture: false);
-      } else {
-        await _authService.refreshCurrentUser();
-        _uiState = _uiState.copyWith(
-          profilePictureUrl: pictureUrl,
-          isUploadingPicture: false,
-          successMessage: 'Profile picture updated successfully.',
-        );
-      }
+      final pictureUrl = await _profileService.updateProfilePicture(source);
+      if (_disposed) return;
+      _applyCurrentUser(isLoading: false);
+      _uiState = _uiState.copyWith(
+        profilePictureUrl: pictureUrl ?? _uiState.profilePictureUrl,
+        isUploadingPicture: false,
+        successMessage:
+        pictureUrl == null ? null : 'Profile picture updated successfully.',
+      );
+    } on NetworkUnavailableException {
+      if (_disposed) return;
+      _uiState = _uiState.copyWith(
+        isUploadingPicture: false,
+        isOffline: true,
+        errorMessage: 'No internet connection. Check your connection and try again.',
+      );
     } on ProfileImageTooLargeException {
+      if (_disposed) return;
       _uiState = _uiState.copyWith(
         isUploadingPicture: false,
         errorMessage: 'The image must be 5 MB or smaller.',
       );
     } on ProfileInvalidImageFormatException {
+      if (_disposed) return;
       _uiState = _uiState.copyWith(
         isUploadingPicture: false,
         errorMessage: 'Please select a valid JPG, JPEG, or PNG image.',
       );
     } catch (_) {
+      if (_disposed) return;
       _uiState = _uiState.copyWith(
         isUploadingPicture: false,
         errorMessage: 'Unable to update the profile picture. Please try again.',
       );
     }
-    notifyListeners();
+    _notify();
   }
 
   Future<void> sendVerificationEmail() async {
-    if (_uiState.isEmailVerified || _uiState.isSendingVerification) return;
+    if (_uiState.isEmailVerified ||
+        _uiState.isSendingVerification ||
+        _uiState.isOffline) {
+      return;
+    }
     _uiState = _uiState.copyWith(
       isSendingVerification: true,
       clearErrorMessage: true,
       clearSuccessMessage: true,
     );
-    notifyListeners();
+    _notify();
     try {
       await _authService.resendVerificationEmail(email: _uiState.email);
+      if (_disposed) return;
       _uiState = _uiState.copyWith(
         isSendingVerification: false,
         successMessage:
-        'Verification link sent. Open it on this device to verify your email.',
+        'Verification link sent. You may open it on any device.',
+      );
+    } on NetworkUnavailableException {
+      if (_disposed) return;
+      _uiState = _uiState.copyWith(
+        isSendingVerification: false,
+        isOffline: true,
+        errorMessage: 'No internet connection. Check your connection and try again.',
       );
     } catch (_) {
+      if (_disposed) return;
       _uiState = _uiState.copyWith(
         isSendingVerification: false,
         errorMessage: 'Unable to send the verification email.',
       );
     }
-    notifyListeners();
+    _notify();
   }
 
   Future<void> logout() async {
@@ -159,20 +194,58 @@ class ProfileViewModel extends ChangeNotifier {
       clearErrorMessage: true,
       clearSuccessMessage: true,
     );
-    notifyListeners();
+    _notify();
     try {
       await _authService.logout();
+      if (_disposed) return;
       _uiState = _uiState.copyWith(
         isLoggingOut: false,
         logoutSucceeded: true,
       );
     } catch (_) {
+      if (_disposed) return;
       _uiState = _uiState.copyWith(
         isLoggingOut: false,
         errorMessage: 'Unable to log out. Please try again.',
       );
     }
-    notifyListeners();
+    _notify();
+  }
+
+  void _syncFromServices() {
+    if (_authService.currentUser == null) return;
+    final wasVerified = _uiState.isEmailVerified;
+    _applyCurrentUser();
+    if (!wasVerified && _uiState.isEmailVerified) {
+      _uiState = _uiState.copyWith(
+        successMessage: 'Email verified successfully.',
+      );
+    }
+    _notify();
+  }
+
+  void _applyCurrentUser({bool? isLoading}) {
+    final user = _profileService.currentUser;
+    if (user == null) return;
+    final info = _authService.accountInfo;
+    _uiState = _uiState.copyWith(
+      // Keep raw editable data in state. The Profile screen owns the visual
+      // fallback so Edit Profile can correctly show an empty field.
+      fullName: InputValidator.normalizeDisplayName(user.fullName),
+      email: user.email,
+      currency: user.currency,
+      profilePictureUrl: user.profilePicture,
+      cachedProfilePicturePath: user.cachedProfilePicturePath,
+      isEmailVerified: user.isEmailVerified,
+      verificationDaysRemaining: _authService.verificationDaysRemaining,
+      hasPasswordSignIn: info?.hasPasswordSignIn ?? false,
+      isOffline: _authService.isOffline,
+      isLoading: isLoading,
+      clearProfilePicture:
+      user.profilePicture == null || user.profilePicture!.isEmpty,
+      clearCachedProfilePicture: user.cachedProfilePicturePath == null ||
+          user.cachedProfilePicturePath!.isEmpty,
+    );
   }
 
   void consumeLogoutSuccess() {
@@ -186,50 +259,14 @@ class ProfileViewModel extends ChangeNotifier {
     );
   }
 
-  void _syncFromAuthService() {
-    if (_authService.currentUser == null) return;
-    final hadLoadedProfile = _uiState.email.isNotEmpty;
-    final wasEmailVerified = _uiState.isEmailVerified;
-    _applyCurrentUser();
-    _showVerificationSuccessIfNeeded(
-      hadLoadedProfile: hadLoadedProfile,
-      wasEmailVerified: wasEmailVerified,
-    );
-    notifyListeners();
-  }
-
-  void _showVerificationSuccessIfNeeded({
-    required bool hadLoadedProfile,
-    required bool wasEmailVerified,
-  }) {
-    if (hadLoadedProfile &&
-        !wasEmailVerified &&
-        _uiState.isEmailVerified) {
-      _uiState = _uiState.copyWith(
-        successMessage: 'Email verified successfully.',
-        clearErrorMessage: true,
-      );
-    }
-  }
-
-  void _applyCurrentUser({bool? isLoading}) {
-    final user = _authService.currentUser;
-    if (user == null) return;
-    _uiState = _uiState.copyWith(
-      fullName: user.fullName.trim().isEmpty ? 'Tourist' : user.fullName,
-      email: user.email,
-      currency: user.currency,
-      profilePictureUrl: user.profilePicture,
-      isEmailVerified: user.isEmailVerified,
-      isLoading: isLoading,
-      clearProfilePicture:
-      user.profilePicture == null || user.profilePicture!.isEmpty,
-    );
+  void _notify() {
+    if (!_disposed) notifyListeners();
   }
 
   @override
   void dispose() {
-    _authService.removeListener(_syncFromAuthService);
+    _disposed = true;
+    _authService.removeListener(_syncFromServices);
     super.dispose();
   }
 }
@@ -244,6 +281,7 @@ class ProfileViewModelScope extends StatelessWidget {
     return ChangeNotifierProvider(
       create: (_) => ProfileViewModel(
         context.read<IAuthService>(),
+        context.read<IProfileService>(),
       )..load(),
       child: child,
     );

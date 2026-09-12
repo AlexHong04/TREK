@@ -1,69 +1,75 @@
 import 'package:flutter/foundation.dart';
 
-import '../entities/personal_constraint.dart';
 import '../entities/user.dart';
+
+enum AuthDestination {
+  signedOut,
+  normalApp,
+  verificationRequired,
+  passwordRecovery,
+  deletionConfirmation,
+}
 
 class RegistrationResult {
   final bool requiresEmailVerification;
+  final bool verificationEmailSent;
 
-  const RegistrationResult({required this.requiresEmailVerification});
-}
-
-enum ProfileImageSource { gallery, camera }
-
-/// Internal profile contract used by AuthService.
-///
-/// It remains in the existing service-interface file so the architecture does
-/// not gain another interface file.
-abstract interface class IProfileService {
-  Future<void> updateProfile({
-    required String userId,
-    required String fullName,
-    required String currency,
-  });
-
-  Future<String?> pickAndSaveProfilePicture({
-    required String userId,
-    required ProfileImageSource source,
-  });
-
-  Future<void> removeProfilePicture({required String userId});
-
-  Future<List<PersonalConstraint>> getAllConstraints();
-
-  Future<List<PersonalConstraint>> getUserConstraints(String userId);
-
-  Future<void> saveUserConstraints({
-    required String userId,
-    required List<String> constraintIds,
+  const RegistrationResult({
+    required this.requiresEmailVerification,
+    required this.verificationEmailSent,
   });
 }
 
-class PersonalConstraintOptionData {
-  final String id;
-  final String category;
-  final String name;
-  final bool isSelected;
+class AccountInfo {
+  final String accountEmail;
+  final String? googleEmail;
+  final bool hasPasswordSignIn;
+  final bool hasEmailIdentity;
+  final bool hasGoogleIdentity;
+  final bool isEmailVerified;
+  final bool hasRecentOAuthAuthentication;
 
-  const PersonalConstraintOptionData({
-    required this.id,
-    required this.category,
-    required this.name,
-    required this.isSelected,
+  const AccountInfo({
+    required this.accountEmail,
+    this.googleEmail,
+    required this.hasPasswordSignIn,
+    required this.hasEmailIdentity,
+    required this.hasGoogleIdentity,
+    required this.isEmailVerified,
+    required this.hasRecentOAuthAuthentication,
   });
+
+  bool get canUnlinkGoogle =>
+      hasGoogleIdentity &&
+          hasPasswordSignIn &&
+          hasEmailIdentity &&
+          isEmailVerified;
+
+  /// Google created this Auth user and remains its only linked identity.
+  bool get isGoogleManagedAccount => hasGoogleIdentity && !hasEmailIdentity;
 }
 
-/// Public User Management contract used by this module and other TREK modules.
-abstract class IAuthService extends ChangeNotifier {
+/// Public authentication/account contract implemented only by AuthService.
+/// It is a Listenable so Provider can rebuild consumers without coupling them
+/// to the concrete ChangeNotifier implementation.
+abstract interface class IAuthService implements Listenable {
   bool get isLoggedIn;
+
+  bool get isPasswordRecovery;
+
+  bool get isOffline;
+
+  bool get requiresEmailVerification;
+
+  int get verificationDaysRemaining;
+
+  AuthDestination get destination;
 
   String? get currentUserId;
 
   User? get currentUser;
 
-  String get preferredCurrency;
-
-  bool get isPasswordRecovery;
+  AccountInfo? get accountInfo;
 
   Future<void> restoreSession();
 
@@ -77,46 +83,59 @@ abstract class IAuthService extends ChangeNotifier {
 
   Future<void> signInWithGoogle();
 
+  Future<void> linkGoogle();
+
   Future<void> sendMagicLinkForLockedAccount({required String email});
 
   Future<void> sendPasswordResetEmail({required String email});
 
-  Future<void> setNewPassword({required String newPassword});
-
   Future<void> resendVerificationEmail({required String email});
+
+  Future<void> setNewPasswordFromRecovery({required String newPassword});
+
+  Future<void> setPasswordForOAuthUser({required String newPassword});
 
   Future<void> changePassword({
     required String currentPassword,
     required String newPassword,
   });
 
-  Future<List<String>> getSupportedCurrencies();
-
-  Future<double?> convertToPreferredCurrency({
-    required double amount,
-    required String fromCurrency,
+  Future<void> changeAccountEmail({
+    required String newEmail,
+    String? currentPassword,
   });
 
-  Future<void> updateCurrentProfile({
-    required String fullName,
-    required String currency,
-  });
+  Future<void> unlinkGoogle({required String currentPassword});
 
-  Future<String?> updateProfilePicture(ProfileImageSource source);
+  /// Returns true when the app may open the final deletion confirmation now;
+  /// false means the user must first confirm the email that was sent.
+  Future<bool> requestAccountDeletion({String? currentPassword});
 
-  Future<void> removeProfilePicture();
+  Future<void> permanentlyDeleteAccount();
 
-  Future<List<PersonalConstraintOptionData>> loadPersonalConstraintOptions();
-
-  Future<void> savePersonalConstraints(List<String> constraintIds);
+  Future<void> cancelAccountDeletion();
 
   Future<void> refreshCurrentUser();
+
+  Future<void> onAppResumed();
+
+  String? consumeSessionMessage();
 
   Future<void> logout();
 }
 
 class EmailAlreadyExistsException implements Exception {
   const EmailAlreadyExistsException();
+}
+
+class AccountEmailChangeException implements Exception {
+  final String message;
+
+  const AccountEmailChangeException(this.message);
+}
+
+class GoogleManagedAccountException implements Exception {
+  const GoogleManagedAccountException();
 }
 
 class InvalidCredentialsException implements Exception {
@@ -129,10 +148,6 @@ class AccountLockedException implements Exception {
   const AccountLockedException({this.lockedUntil});
 }
 
-class EmailNotVerifiedException implements Exception {
-  const EmailNotVerifiedException();
-}
-
 class IncorrectCurrentPasswordException implements Exception {
   const IncorrectCurrentPasswordException();
 }
@@ -141,10 +156,30 @@ class PasswordReusedException implements Exception {
   const PasswordReusedException();
 }
 
-class ProfileImageTooLargeException implements Exception {
-  const ProfileImageTooLargeException();
+class RecentAuthenticationRequiredException implements Exception {
+  const RecentAuthenticationRequiredException();
 }
 
-class ProfileInvalidImageFormatException implements Exception {
-  const ProfileInvalidImageFormatException();
+class CannotUnlinkGoogleException implements Exception {
+  const CannotUnlinkGoogleException();
+}
+
+class MissingEmailIdentityForGoogleUnlinkException implements Exception {
+  const MissingEmailIdentityForGoogleUnlinkException();
+}
+
+class GoogleIdentityAlreadyLinkedException implements Exception {
+  const GoogleIdentityAlreadyLinkedException();
+}
+
+class ManualIdentityLinkingDisabledException implements Exception {
+  const ManualIdentityLinkingDisabledException();
+}
+
+class GoogleIdentityOperationInProgressException implements Exception {
+  const GoogleIdentityOperationInProgressException();
+}
+
+class AccountDeletionNotConfirmedException implements Exception {
+  const AccountDeletionNotConfirmedException();
 }

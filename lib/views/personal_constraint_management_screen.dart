@@ -27,7 +27,6 @@ class PersonalConstraintManagementScreen extends StatelessWidget {
               context,
               'Personal constraints updated successfully.',
             );
-            Navigator.pop(context, true);
           });
         }
         if (state.errorMessage != null) {
@@ -51,6 +50,33 @@ class PersonalConstraintManagementScreen extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 22, 20, 32),
               children: [
+                if (state.isOffline) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: appTheme.wholeAlertBudgetBg,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.cloud_off_outlined,
+                          color: appTheme.wholeAlertBudgetText,
+                        ),
+                        const SizedBox(width: 9),
+                        Expanded(
+                          child: Text(
+                            'You’re offline. Showing saved information.',
+                            style: TextStyle(
+                              color: appTheme.wholeAlertBudgetText,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                ],
                 for (final category in
                 PersonalConstraintManagementViewModel
                     .requiredOptions.keys) ...[
@@ -62,7 +88,7 @@ class PersonalConstraintManagementScreen extends StatelessWidget {
                           (option) => _ConstraintChip(
                         name: option.name,
                         isSelected: option.isSelected,
-                        isDisabled: option.isDisabled,
+                        isDisabled: option.isDisabled || state.isOffline,
                         onToggle: viewModel.toggle,
                       ),
                     )
@@ -73,6 +99,7 @@ class PersonalConstraintManagementScreen extends StatelessWidget {
                 const SizedBox(height: 10),
                 FilledButton.icon(
                   onPressed: state.isSaving ||
+                      state.isOffline ||
                       state.options.any((option) => option.id.isEmpty)
                       ? null
                       : viewModel.save,
