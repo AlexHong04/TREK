@@ -67,249 +67,259 @@ class ProfileScreen extends StatelessWidget {
           });
         }
 
-        return AnnotatedRegion<SystemUiOverlayStyle>(
-          value: SystemUiOverlayStyle(
-            systemNavigationBarColor: appTheme.gray_50_02,
-            systemNavigationBarIconBrightness: Brightness.dark,
-            systemNavigationBarContrastEnforced: false,
-          ),
-          child: Scaffold(
-            extendBody: false,
-            backgroundColor: appTheme.gray_50_02,
-            appBar: const CustomAppBar(title: 'Profile'),
-            body: state.isLoading && state.email.isEmpty
-                ? Center(
-              child: CircularProgressIndicator(color: appTheme.teal_A700),
-            )
-                : RefreshIndicator(
-              color: appTheme.teal_A700,
-              onRefresh: viewModel.load,
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: EdgeInsets.fromLTRB(
-                  20,
-                  18,
-                  20,
-                  32 + MediaQuery.viewPaddingOf(context).bottom,
-                ),
-                children: [
-                  if (state.isOffline) ...[
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: appTheme.wholeAlertBudgetBg,
-                        borderRadius: BorderRadius.circular(10),
+        final isProfileOperationInProgress = state.isUploadingPicture ||
+            state.isSendingVerification ||
+            state.isLoggingOut;
+        return PopScope(
+          canPop: !isProfileOperationInProgress,
+          child: AnnotatedRegion<SystemUiOverlayStyle>(
+            value: SystemUiOverlayStyle(
+              systemNavigationBarColor: appTheme.gray_50_02,
+              systemNavigationBarIconBrightness: Brightness.dark,
+              systemNavigationBarContrastEnforced: false,
+            ),
+            child: Scaffold(
+              extendBody: false,
+              backgroundColor: appTheme.gray_50_02,
+              appBar: CustomAppBar(
+                title: 'Profile',
+                backEnabled: !isProfileOperationInProgress,
+              ),
+              body: state.isLoading && state.email.isEmpty
+                  ? Center(
+                child: CircularProgressIndicator(color: appTheme.teal_A700),
+              )
+                  : RefreshIndicator(
+                color: appTheme.teal_A700,
+                onRefresh: isProfileOperationInProgress
+                    ? () async {}
+                    : viewModel.load,
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.fromLTRB(
+                    20,
+                    18,
+                    20,
+                    32 + MediaQuery.viewPaddingOf(context).bottom,
+                  ),
+                  children: [
+                    if (state.isOffline) ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: appTheme.wholeAlertBudgetBg,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.cloud_off_outlined,
+                              color: appTheme.wholeAlertBudgetText,
+                            ),
+                            const SizedBox(width: 9),
+                            Expanded(
+                              child: Text(
+                                'You’re offline. Showing saved information.',
+                                style: TextStyle(
+                                  color: appTheme.wholeAlertBudgetText,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
+                      const SizedBox(height: 14),
+                    ],
+                    _ProfilePicture(viewModel: viewModel),
+                    const SizedBox(height: 14),
+                    Text(
+                      state.fullName.isEmpty ? 'Trekker' : state.fullName,
+                      style: TextStyle(
+                        color: appTheme.gray_900,
+                        fontSize: 25,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _InformationCard(
+                      label: 'EMAIL ADDRESS',
+                      headerTrailing: !state.isEmailVerified &&
+                          state.verificationDaysRemaining > 0
+                          ? Text(
+                        '${state.verificationDaysRemaining} day${state.verificationDaysRemaining == 1 ? '' : 's'} left',
+                        style: TextStyle(
+                          color: appTheme.blue_gray_700,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      )
+                          : null,
+                      child: SizedBox(
+                        height: 28,
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.mark_email_read_outlined,
+                              size: 17,
+                              color: appTheme.blue_gray_300,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                physics: const BouncingScrollPhysics(),
+                                child: Text(
+                                  state.email,
+                                  maxLines: 1,
+                                  style: TextStyle(
+                                    color: appTheme.gray_800,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            if (state.isEmailVerified)
+                              Text(
+                                'Verified',
+                                style: TextStyle(
+                                  color: appTheme.teal_700,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              )
+                            else
+                              TextButton(
+                                style: TextButton.styleFrom(
+                                  minimumSize: Size.zero,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  tapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                onPressed: state.isBusy || state.isOffline
+                                    ? null
+                                    : viewModel.sendVerificationEmail,
+                                child: state.isSendingVerification
+                                    ? SizedBox.square(
+                                  dimension: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: appTheme.teal_A700,
+                                  ),
+                                )
+                                    : const Text('Verify email'),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _InformationCard(
+                      label: 'PREFERRED CURRENCY',
                       child: Row(
                         children: [
-                          Icon(
-                            Icons.cloud_off_outlined,
-                            color: appTheme.wholeAlertBudgetText,
+                          Text(
+                            currencyFlag(currencyCode),
+                            style: const TextStyle(fontSize: 24),
                           ),
-                          const SizedBox(width: 9),
-                          Expanded(
-                            child: Text(
-                              'You’re offline. Showing saved information.',
-                              style: TextStyle(
-                                color: appTheme.wholeAlertBudgetText,
-                              ),
+                          const SizedBox(width: 10),
+                          Text(
+                            currencyCode,
+                            style: TextStyle(
+                              color: appTheme.gray_800,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
                       ),
                     ),
                     const SizedBox(height: 14),
+                    _ProfileButton(
+                      label: 'View All Plan',
+                      onPressed: state.isBusy
+                          ? null
+                          : () {
+                        if (onViewAllPlans != null) {
+                          onViewAllPlans!();
+                        } else {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: AllPlansScreen.builder,
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                    _ProfileButton(
+                      label: 'Edit Personal Constraints',
+                      onPressed: state.isBusy
+                          ? null
+                          : () => _openPage(
+                        context,
+                        PersonalConstraintManagementScreen.builder,
+                        viewModel,
+                      ),
+                    ),
+                    _ProfileButton(
+                      label: 'Edit Profile',
+                      onPressed: state.isBusy
+                          ? null
+                          : () => _openPage(
+                        context,
+                        EditProfileScreen.builder,
+                        viewModel,
+                      ),
+                    ),
+                    _ProfileButton(
+                      label: 'Edit Account',
+                      onPressed: state.isBusy
+                          ? null
+                          : () => _openPage(
+                        context,
+                        EditAccountScreen.builder,
+                        viewModel,
+                      ),
+                    ),
+                    _ProfileButton(
+                      label: state.passwordActionLabel,
+                      onPressed: state.isBusy
+                          ? null
+                          : () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: ChangePasswordScreen.builder,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    FilledButton.icon(
+                      onPressed: state.isBusy
+                          ? null
+                          : () => _confirmLogout(context, viewModel),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                        backgroundColor: appTheme.errorRed,
+                        foregroundColor: appTheme.white_A700,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(13),
+                        ),
+                      ),
+                      icon: state.isLoggingOut
+                          ? SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: appTheme.white_A700,
+                        ),
+                      )
+                          : const Icon(Icons.logout_outlined),
+                      label: const Text('Logout'),
+                    ),
                   ],
-                  _ProfilePicture(viewModel: viewModel),
-                  const SizedBox(height: 14),
-                  Text(
-                    state.fullName.isEmpty ? 'Trekker' : state.fullName,
-                    style: TextStyle(
-                      color: appTheme.gray_900,
-                      fontSize: 25,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _InformationCard(
-                    label: 'EMAIL ADDRESS',
-                    headerTrailing: !state.isEmailVerified &&
-                        state.verificationDaysRemaining > 0
-                        ? Text(
-                      '${state.verificationDaysRemaining} day${state.verificationDaysRemaining == 1 ? '' : 's'} left',
-                      style: TextStyle(
-                        color: appTheme.blue_gray_700,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    )
-                        : null,
-                    child: SizedBox(
-                      height: 28,
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.mark_email_read_outlined,
-                            size: 17,
-                            color: appTheme.blue_gray_300,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              physics: const BouncingScrollPhysics(),
-                              child: Text(
-                                state.email,
-                                maxLines: 1,
-                                style: TextStyle(
-                                  color: appTheme.gray_800,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          if (state.isEmailVerified)
-                            Text(
-                              'Verified',
-                              style: TextStyle(
-                                color: appTheme.teal_700,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            )
-                          else
-                            TextButton(
-                              style: TextButton.styleFrom(
-                                minimumSize: Size.zero,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                tapTargetSize:
-                                MaterialTapTargetSize.shrinkWrap,
-                                visualDensity: VisualDensity.compact,
-                              ),
-                              onPressed: state.isSendingVerification ||
-                                  state.isOffline
-                                  ? null
-                                  : viewModel.sendVerificationEmail,
-                              child: state.isSendingVerification
-                                  ? SizedBox.square(
-                                dimension: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: appTheme.teal_A700,
-                                ),
-                              )
-                                  : const Text('Verify email'),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _InformationCard(
-                    label: 'PREFERRED CURRENCY',
-                    child: Row(
-                      children: [
-                        Text(
-                          currencyFlag(currencyCode),
-                          style: const TextStyle(fontSize: 24),
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          currencyCode,
-                          style: TextStyle(
-                            color: appTheme.gray_800,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  _ProfileButton(
-                    label: 'View All Plan',
-                    onPressed: state.isBusy
-                        ? null
-                        : () {
-                      if (onViewAllPlans != null) {
-                        onViewAllPlans!();
-                      } else {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: AllPlansScreen.builder,
-                          ),
-                        );
-                      }
-                    },
-                  ),
-                  _ProfileButton(
-                    label: 'Edit Personal Constraints',
-                    onPressed: state.isBusy
-                        ? null
-                        : () => _openPage(
-                      context,
-                      PersonalConstraintManagementScreen.builder,
-                      viewModel,
-                    ),
-                  ),
-                  _ProfileButton(
-                    label: 'Edit Profile',
-                    onPressed: state.isBusy
-                        ? null
-                        : () => _openPage(
-                      context,
-                      EditProfileScreen.builder,
-                      viewModel,
-                    ),
-                  ),
-                  _ProfileButton(
-                    label: 'Edit Account',
-                    onPressed: state.isBusy
-                        ? null
-                        : () => _openPage(
-                      context,
-                      EditAccountScreen.builder,
-                      viewModel,
-                    ),
-                  ),
-                  _ProfileButton(
-                    label: state.passwordActionLabel,
-                    onPressed: state.isBusy
-                        ? null
-                        : () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: ChangePasswordScreen.builder,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  FilledButton.icon(
-                    onPressed: state.isBusy
-                        ? null
-                        : () => _confirmLogout(context, viewModel),
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size.fromHeight(48),
-                      backgroundColor: appTheme.errorRed,
-                      foregroundColor: appTheme.white_A700,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(13),
-                      ),
-                    ),
-                    icon: state.isLoggingOut
-                        ? SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: appTheme.white_A700,
-                      ),
-                    )
-                        : const Icon(Icons.logout_outlined),
-                    label: const Text('Logout'),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
@@ -415,7 +425,7 @@ class _ProfilePicture extends StatelessWidget {
                   ),
                   padding: const EdgeInsets.all(5),
                   visualDensity: VisualDensity.compact,
-                  onPressed: state.isUploadingPicture
+                  onPressed: state.isBusy
                       ? null
                       : () => _showProfilePictureMenu(
                     buttonContext,

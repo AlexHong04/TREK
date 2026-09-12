@@ -72,120 +72,121 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           });
         }
 
-        return GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-          child: Scaffold(
-            backgroundColor: appTheme.gray_50_02,
-            appBar: CustomAppBar(title: state.title),
-            body: SafeArea(
-              top: false,
-              child: state.mode == PasswordPageMode.loading
-                  ? Center(
-                child: CircularProgressIndicator(color: appTheme.teal_A700),
-              )
-                  : ListView(
-                keyboardDismissBehavior:
-                ScrollViewKeyboardDismissBehavior.manual,
-                padding: const EdgeInsets.fromLTRB(20, 34, 20, 32),
-                children: [
-                  if (state.isOffline) ...[
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: appTheme.wholeAlertBudgetBg,
-                        borderRadius: BorderRadius.circular(10),
+        return PopScope(
+          canPop: !state.isSaving,
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+            child: Scaffold(
+              backgroundColor: appTheme.gray_50_02,
+              appBar: CustomAppBar(
+                title: state.title,
+                backEnabled: !state.isSaving,
+              ),
+              body: SafeArea(
+                top: false,
+                child: state.mode == PasswordPageMode.loading
+                    ? Center(
+                  child: CircularProgressIndicator(color: appTheme.teal_A700),
+                )
+                    : ListView(
+                  keyboardDismissBehavior:
+                  ScrollViewKeyboardDismissBehavior.manual,
+                  padding: const EdgeInsets.fromLTRB(20, 34, 20, 32),
+                  children: [
+                    if (state.isOffline) ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: appTheme.wholeAlertBudgetBg,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          'You’re offline. Password settings are view-only.',
+                          style: TextStyle(color: appTheme.wholeAlertBudgetText),
+                        ),
                       ),
-                      child: Text(
-                        'You’re offline. Password settings are view-only.',
-                        style: TextStyle(color: appTheme.wholeAlertBudgetText),
+                      const SizedBox(height: 18),
+                    ],
+                    if (state.isSetMode) ...[
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: appTheme.teal_50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: appTheme.teal_A700),
+                        ),
+                        child: Text(
+                          state.requiresRecentGoogleAuthentication
+                              ? 'You currently use Google sign-in. Log out and sign in with Google again before setting your first password.'
+                              : 'You currently use Google sign-in. Set a password to also sign in with your account email and password. Google will remain linked.',
+                          style: TextStyle(color: appTheme.teal_800, height: 1.4),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 18),
-                  ],
-                  if (state.isSetMode) ...[
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: appTheme.teal_50,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: appTheme.teal_A700),
+                      const SizedBox(height: 22),
+                    ] else ...[
+                      _PasswordField(
+                        label: 'CURRENT PASSWORD',
+                        hint: 'Enter your current password',
+                        obscure: state.obscureCurrentPassword,
+                        enabled: !state.isSaving && !state.isOffline,
+                        errorText: state.currentPasswordError,
+                        onChanged: viewModel.onCurrentPasswordChanged,
+                        onFocusLost: viewModel.onCurrentPasswordFocusLost,
+                        onToggleVisibility:
+                        viewModel.toggleCurrentPasswordVisibility,
                       ),
-                      child: Text(
-                        state.requiresRecentGoogleAuthentication
-                            ? 'You currently use Google sign-in. Log out and sign in with Google again before setting your first password.'
-                            : 'You currently use Google sign-in. Set a password to also sign in with your account email and password. Google will remain linked.',
-                        style: TextStyle(color: appTheme.teal_800, height: 1.4),
-                      ),
-                    ),
-                    const SizedBox(height: 22),
-                  ] else ...[
+                      const SizedBox(height: 22),
+                    ],
                     _PasswordField(
-                      label: 'CURRENT PASSWORD',
-                      hint: 'Enter your current password',
-                      obscure: state.obscureCurrentPassword,
+                      label: 'NEW PASSWORD',
+                      hint: state.isSetMode
+                          ? 'Create a password'
+                          : 'Enter your new password',
+                      obscure: state.obscureNewPassword,
                       enabled: !state.isSaving && !state.isOffline,
-                      errorText: state.currentPasswordError,
-                      onChanged: viewModel.onCurrentPasswordChanged,
-                      onFocusLost: viewModel.onCurrentPasswordFocusLost,
-                      onToggleVisibility:
-                      viewModel.toggleCurrentPasswordVisibility,
+                      errorText: state.newPasswordError,
+                      onChanged: viewModel.onNewPasswordChanged,
+                      onFocusLost: viewModel.onNewPasswordFocusLost,
+                      onFocusChanged: (hasFocus) {
+                        if (_isNewPasswordFocused != hasFocus) {
+                          setState(() => _isNewPasswordFocused = hasFocus);
+                        }
+                      },
+                      onToggleVisibility: viewModel.toggleNewPasswordVisibility,
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => viewModel.savePassword(),
+                      bottomWidget: PasswordPolicyChecklist(
+                        password: state.newPassword,
+                        isVisible: _isNewPasswordFocused,
+                      ),
                     ),
-                    const SizedBox(height: 22),
+                    const SizedBox(height: 32),
+                    FilledButton(
+                      onPressed:
+                      state.isSaving || state.isOffline
+                          ? null
+                          : viewModel.savePassword,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(52),
+                        backgroundColor: appTheme.teal_A700,
+                        foregroundColor: appTheme.white_A700,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(13),
+                        ),
+                      ),
+                      child: state.isSaving
+                          ? SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: appTheme.white_A700,
+                        ),
+                      )
+                          : Text(state.title),
+                    ),
                   ],
-                  _PasswordField(
-                    label: 'NEW PASSWORD',
-                    hint: state.isSetMode
-                        ? 'Create a password'
-                        : 'Enter your new password',
-                    obscure: state.obscureNewPassword,
-                    enabled: !state.isSaving && !state.isOffline,
-                    errorText: state.newPasswordError,
-                    onChanged: viewModel.onNewPasswordChanged,
-                    onFocusLost: viewModel.onNewPasswordFocusLost,
-                    onFocusChanged: (hasFocus) {
-                      if (_isNewPasswordFocused != hasFocus) {
-                        setState(() => _isNewPasswordFocused = hasFocus);
-                      }
-                    },
-                    onToggleVisibility: viewModel.toggleNewPasswordVisibility,
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: (_) => viewModel.savePassword(),
-                    bottomWidget: PasswordPolicyChecklist(
-                      password: state.newPassword,
-                      isVisible: _isNewPasswordFocused,
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  FilledButton(
-                    onPressed:
-                    state.isSaving || state.isOffline
-                        ? null
-                        : viewModel.savePassword,
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size.fromHeight(52),
-                      backgroundColor: appTheme.teal_A700,
-                      foregroundColor: appTheme.white_A700,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(13),
-                      ),
-                    ),
-                    child: state.isSaving
-                        ? SizedBox.square(
-                      dimension: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: appTheme.white_A700,
-                      ),
-                    )
-                        : Text(state.title),
-                  ),
-                  TextButton(
-                    onPressed:
-                    state.isSaving ? null : () => Navigator.pop(context),
-                    child: const Text('Cancel'),
-                  ),
-                ],
+                ),
               ),
             ),
           ),

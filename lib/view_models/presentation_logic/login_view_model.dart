@@ -187,8 +187,9 @@ class LoginViewModel extends ChangeNotifier {
   void _handleAuthStateChanged() {
     if (!_googleSignInPending || !_authService.isLoggedIn) return;
     _googleSignInPending = false;
-    _uiState = _uiState.copyWith(isLoading: false);
-    _notify();
+    // Keep the page locked until the app-level auth listener replaces this
+    // route. Re-enabling here leaves a short window in which the OAuth session
+    // exists but the Login page can still be edited or submitted again.
   }
 
   Future<void> onSendMagicLinkPressed() async {

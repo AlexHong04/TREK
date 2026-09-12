@@ -3,8 +3,9 @@ import '../theme/app_theme.dart';
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
+  final bool backEnabled;
 
-  const CustomAppBar({super.key, required this.title});
+  const CustomAppBar({super.key, required this.title, this.backEnabled = true,});
 
   @override
   Widget build(BuildContext context) {
@@ -15,8 +16,8 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
       automaticallyImplyLeading: false,
       toolbarHeight: 68,
       leading: IconButton(
-        icon: Icon(Icons.arrow_back, color: appTheme.teal_A700),
-        onPressed: () => Navigator.maybePop(context),
+        icon: Icon(Icons.arrow_back, color: backEnabled ? appTheme.teal_A700 :  appTheme.blue_gray_300),
+        onPressed: backEnabled ? () => Navigator.maybePop(context) : null,
       ),
       title: Text(
         title,

@@ -36,91 +36,92 @@ class EditProfileScreen extends StatelessWidget {
           });
         }
 
-        return GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-          child: Scaffold(
-            backgroundColor: appTheme.gray_50_02,
-            appBar: const CustomAppBar(title: 'Edit Profile'),
-            body: state.isLoading
-                ? Center(
-              child: CircularProgressIndicator(color: appTheme.teal_A700),
-            )
-                : SafeArea(
-              top: false,
-              child: ListView(
-                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: const EdgeInsets.fromLTRB(20, 22, 20, 32),
-                children: [
-                  if (state.isOffline) ...[
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: appTheme.wholeAlertBudgetBg,
-                        borderRadius: BorderRadius.circular(10),
+        return PopScope(
+          canPop: !state.isSaving,
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+            child: Scaffold(
+              backgroundColor: appTheme.gray_50_02,
+              appBar: CustomAppBar(
+                title: 'Edit Profile',
+                backEnabled: !state.isSaving,
+              ),
+              body: state.isLoading
+                  ? Center(
+                child: CircularProgressIndicator(color: appTheme.teal_A700),
+              )
+                  : SafeArea(
+                top: false,
+                child: ListView(
+                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.fromLTRB(20, 22, 20, 32),
+                  children: [
+                    if (state.isOffline) ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: appTheme.wholeAlertBudgetBg,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          'You’re offline. Showing saved information; editing is unavailable.',
+                          style: TextStyle(color: appTheme.wholeAlertBudgetText),
+                        ),
                       ),
-                      child: Text(
-                        'You’re offline. Showing saved information; editing is unavailable.',
-                        style: TextStyle(color: appTheme.wholeAlertBudgetText),
+                      const SizedBox(height: 12),
+                    ],
+                    Focus(
+                      onFocusChange: (focused) {
+                        if (!focused) viewModel.onFullNameFocusLost();
+                      },
+                      child: CustomTextField(
+                        sectionTitle: 'FULL NAME',
+                        hintText: 'Enter your full name (optional)',
+                        prefixIcon: Icons.badge_outlined,
+                        margin: EdgeInsets.zero,
+                        initialValue: state.fullName,
+                        enabled: !state.isSaving && !state.isOffline,
+                        textCapitalization: TextCapitalization.words,
+                        textInputAction: TextInputAction.next,
+                        autofillHints: const [AutofillHints.name],
+                        onChanged: viewModel.onFullNameChanged,
+                        errorText: state.fullNameError,
                       ),
                     ),
                     const SizedBox(height: 12),
-                  ],
-                  Focus(
-                    onFocusChange: (focused) {
-                      if (!focused) viewModel.onFullNameFocusLost();
-                    },
-                    child: CustomTextField(
-                      sectionTitle: 'FULL NAME',
-                      hintText: 'Enter your full name (optional)',
-                      prefixIcon: Icons.badge_outlined,
-                      margin: EdgeInsets.zero,
-                      initialValue: state.fullName,
+                    CurrencyPickerField(
+                      value: state.currency,
+                      currencies: state.availableCurrencies,
+                      errorText: state.currencyError,
                       enabled: !state.isSaving && !state.isOffline,
-                      textCapitalization: TextCapitalization.words,
-                      textInputAction: TextInputAction.next,
-                      autofillHints: const [AutofillHints.name],
-                      onChanged: viewModel.onFullNameChanged,
-                      errorText: state.fullNameError,
+                      onChanged: viewModel.onCurrencyChanged,
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  CurrencyPickerField(
-                    value: state.currency,
-                    currencies: state.availableCurrencies,
-                    errorText: state.currencyError,
-                    enabled: !state.isSaving && !state.isOffline,
-                    onChanged: viewModel.onCurrencyChanged,
-                  ),
-                  const SizedBox(height: 42),
-                  FilledButton.icon(
-                    onPressed:
-                    state.isSaving || state.isOffline ? null : viewModel.save,
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size.fromHeight(52),
-                      backgroundColor: appTheme.teal_A700,
-                      foregroundColor: appTheme.white_A700,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(13),
+                    const SizedBox(height: 42),
+                    FilledButton.icon(
+                      onPressed:
+                      state.isSaving || state.isOffline ? null : viewModel.save,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(52),
+                        backgroundColor: appTheme.teal_A700,
+                        foregroundColor: appTheme.white_A700,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(13),
+                        ),
                       ),
+                      icon: state.isSaving
+                          ? SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: appTheme.white_A700,
+                        ),
+                      )
+                          : const Icon(Icons.save_outlined),
+                      label: const Text('Save'),
                     ),
-                    icon: state.isSaving
-                        ? SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: appTheme.white_A700,
-                      ),
-                    )
-                        : const Icon(Icons.save_outlined),
-                    label: const Text('Save'),
-                  ),
-                  TextButton(
-                    onPressed:
-                    state.isSaving ? null : () => Navigator.pop(context),
-                    child: const Text('Cancel'),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

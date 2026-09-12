@@ -65,247 +65,257 @@ class _EditAccountScreenState extends State<EditAccountScreen>
       builder: (context, viewModel, _) {
         final state = viewModel.uiState;
         final isGoogleManaged = state.isGoogleManagedAccount;
-        return GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-          child: Scaffold(
-            backgroundColor: appTheme.gray_50_02,
-            appBar: const CustomAppBar(title: 'Edit Account'),
-            body: state.isLoading
-                ? Center(
-              child: CircularProgressIndicator(color: appTheme.teal_A700),
-            )
-                : SafeArea(
-              top: false,
-              child: ListView(
-                keyboardDismissBehavior:
-                ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: const EdgeInsets.fromLTRB(20, 18, 20, 32),
-                children: [
-                  if (isGoogleManaged) ...[
-                    const _StatusCard(
-                      icon: Icons.info_outline,
-                      message:
-                      'This account is managed through Google. Its account email and Google sign-in cannot be changed or unlinked in TREK.',
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                  if (state.isOffline) ...[
-                    const _StatusCard(
-                      icon: Icons.cloud_off_outlined,
-                      message:
-                      'You’re offline. Account settings are view-only.',
-                      isError: true,
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                  if (state.successMessage != null) ...[
-                    _StatusCard(
-                      icon: Icons.check_circle_outline,
-                      message: state.successMessage!,
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                  if (state.errorMessage != null) ...[
-                    _StatusCard(
-                      icon: Icons.error_outline,
-                      message: state.errorMessage!,
-                      isError: true,
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                  Focus(
-                    onFocusChange: (focused) {
-                      if (!focused) viewModel.onEmailFocusLost();
-                    },
-                    child: CustomTextField(
-                      key: ValueKey(state.accountEmail),
-                      sectionTitle: 'ACCOUNT EMAIL',
-                      hintText: 'Enter your account email',
-                      prefixIcon: Icons.email_outlined,
-                      margin: EdgeInsets.zero,
-                      initialValue: state.newEmail,
-                      enabled: !state.isBusy &&
-                          !state.isOffline &&
-                          !isGoogleManaged,
-                      keyboardType: TextInputType.emailAddress,
-                      textInputAction: state.hasPasswordSignIn
-                          ? TextInputAction.next
-                          : TextInputAction.done,
-                      autofillHints: const [AutofillHints.email],
-                      autocorrect: false,
-                      enableSuggestions: false,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.deny(RegExp(r'\s')),
-                      ],
-                      onChanged: viewModel.onNewEmailChanged,
-                      onFieldSubmitted:
-                      state.hasPasswordSignIn || isGoogleManaged
-                          ? null
-                          : (_) => viewModel.saveEmail(),
-                      errorText: state.newEmailError,
-                    ),
-                  ),
-                  if (state.hasPasswordSignIn && !isGoogleManaged) ...[
-                    const SizedBox(height: 12),
+        final isAccountOperationInProgress = state.isSavingEmail ||
+            state.isLinkingGoogle ||
+            state.isUnlinkingGoogle ||
+            state.isRequestingDeletion;
+        return PopScope(
+          canPop: !isAccountOperationInProgress,
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+            child: Scaffold(
+              backgroundColor: appTheme.gray_50_02,
+              appBar: CustomAppBar(
+                title: 'Edit Account',
+                backEnabled: !isAccountOperationInProgress,
+              ),
+              body: state.isLoading
+                  ? Center(
+                child: CircularProgressIndicator(color: appTheme.teal_A700),
+              )
+                  : SafeArea(
+                top: false,
+                child: ListView(
+                  keyboardDismissBehavior:
+                  ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 32),
+                  children: [
+                    if (isGoogleManaged) ...[
+                      const _StatusCard(
+                        icon: Icons.info_outline,
+                        message:
+                        'This account is managed through Google. Its account email and Google sign-in cannot be changed or unlinked in TREK.',
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    if (state.isOffline) ...[
+                      const _StatusCard(
+                        icon: Icons.cloud_off_outlined,
+                        message:
+                        'You’re offline. Account settings are view-only.',
+                        isError: true,
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    if (state.successMessage != null) ...[
+                      _StatusCard(
+                        icon: Icons.check_circle_outline,
+                        message: state.successMessage!,
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    if (state.errorMessage != null) ...[
+                      _StatusCard(
+                        icon: Icons.error_outline,
+                        message: state.errorMessage!,
+                        isError: true,
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                     Focus(
                       onFocusChange: (focused) {
-                        if (!focused) viewModel.onCurrentPasswordFocusLost();
+                        if (!focused) viewModel.onEmailFocusLost();
                       },
                       child: CustomTextField(
-                        sectionTitle: 'CURRENT PASSWORD',
-                        hintText: 'Confirm your current password',
-                        prefixIcon: Icons.lock_outline,
+                        key: ValueKey(state.accountEmail),
+                        sectionTitle: 'ACCOUNT EMAIL',
+                        hintText: 'Enter your account email',
+                        prefixIcon: Icons.email_outlined,
                         margin: EdgeInsets.zero,
-                        enabled: !state.isBusy && !state.isOffline,
-                        obscureText: state.obscureCurrentPassword,
+                        initialValue: state.newEmail,
+                        enabled: !state.isBusy &&
+                            !state.isOffline &&
+                            !isGoogleManaged,
+                        keyboardType: TextInputType.emailAddress,
+                        textInputAction: state.hasPasswordSignIn
+                            ? TextInputAction.next
+                            : TextInputAction.done,
+                        autofillHints: const [AutofillHints.email],
                         autocorrect: false,
                         enableSuggestions: false,
-                        textInputAction: TextInputAction.done,
-                        autofillHints: const [AutofillHints.password],
-                        onChanged: viewModel.onCurrentPasswordChanged,
-                        errorText: state.currentPasswordError,
-                        suffixIcon: IconButton(
-                          tooltip: state.obscureCurrentPassword
-                              ? 'Show password'
-                              : 'Hide password',
-                          onPressed: state.isBusy || state.isOffline
-                              ? null
-                              : viewModel.togglePasswordVisibility,
-                          icon: Icon(
-                            state.obscureCurrentPassword
-                                ? Icons.visibility_off_outlined
-                                : Icons.visibility_outlined,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.deny(RegExp(r'\s')),
+                        ],
+                        onChanged: viewModel.onNewEmailChanged,
+                        onFieldSubmitted:
+                        state.hasPasswordSignIn || isGoogleManaged
+                            ? null
+                            : (_) => viewModel.saveEmail(),
+                        errorText: state.newEmailError,
+                      ),
+                    ),
+                    if (state.hasPasswordSignIn && !isGoogleManaged) ...[
+                      const SizedBox(height: 12),
+                      Focus(
+                        onFocusChange: (focused) {
+                          if (!focused) viewModel.onCurrentPasswordFocusLost();
+                        },
+                        child: CustomTextField(
+                          sectionTitle: 'CURRENT PASSWORD',
+                          hintText: 'Confirm your current password',
+                          prefixIcon: Icons.lock_outline,
+                          margin: EdgeInsets.zero,
+                          enabled: !state.isBusy && !state.isOffline,
+                          obscureText: state.obscureCurrentPassword,
+                          autocorrect: false,
+                          enableSuggestions: false,
+                          textInputAction: TextInputAction.done,
+                          autofillHints: const [AutofillHints.password],
+                          onChanged: viewModel.onCurrentPasswordChanged,
+                          errorText: state.currentPasswordError,
+                          suffixIcon: IconButton(
+                            tooltip: state.obscureCurrentPassword
+                                ? 'Show password'
+                                : 'Hide password',
+                            onPressed: state.isBusy || state.isOffline
+                                ? null
+                                : viewModel.togglePasswordVisibility,
+                            icon: Icon(
+                              state.obscureCurrentPassword
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 14),
+                    FilledButton.icon(
+                      onPressed: state.isBusy ||
+                          state.isOffline ||
+                          isGoogleManaged
+                          ? null
+                          : viewModel.saveEmail,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(50),
+                        backgroundColor: appTheme.teal_A700,
+                        foregroundColor: appTheme.white_A700,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(13),
+                        ),
+                      ),
+                      icon: state.isSavingEmail
+                          ? SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: appTheme.white_A700,
+                        ),
+                      )
+                          : const Icon(Icons.mark_email_read_outlined),
+                      label: const Text('Change Email'),
+                    ),
+                    const SizedBox(height: 26),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: IgnorePointer(
+                        ignoring: state.isBusy ||
+                            state.isOffline ||
+                            isGoogleManaged,
+                        child: Opacity(
+                          opacity: state.isBusy ||
+                              state.isOffline ||
+                              isGoogleManaged
+                              ? 0.5
+                              : 1,
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              SignInButton(
+                                Buttons.google,
+                                text: state.isLinkingGoogle
+                                    ? 'Opening Google...'
+                                    : state.isUnlinkingGoogle
+                                    ? 'Unlinking Google...'
+                                    : state.hasGoogleIdentity
+                                    ? 'Google account linked'
+                                    : 'Link Google account',
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(13),
+                                ),
+                                onPressed: isGoogleManaged
+                                    ? () {}
+                                    : state.hasGoogleIdentity
+                                    ? () => _showGoogleDialog(
+                                  context,
+                                  viewModel,
+                                )
+                                    : viewModel.linkGoogle,
+                              ),
+                              Positioned(
+                                right: 14,
+                                top: 0,
+                                bottom: 0,
+                                child: IgnorePointer(
+                                  child: state.isLinkingGoogle ||
+                                      state.isUnlinkingGoogle
+                                      ? const Center(
+                                    child: SizedBox.square(
+                                      dimension: 18,
+                                      child:
+                                      CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Color(0xFF5F6368),
+                                      ),
+                                    ),
+                                  )
+                                      : Icon(
+                                    isGoogleManaged
+                                        ? Icons.lock_outline_rounded
+                                        : state.hasGoogleIdentity
+                                        ? Icons.link_rounded
+                                        : Icons.add_link_rounded,
+                                    size: 20,
+                                    color: const Color(0xFF5F6368),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
                     ),
-                  ],
-                  const SizedBox(height: 14),
-                  FilledButton.icon(
-                    onPressed: state.isBusy ||
-                        state.isOffline ||
-                        isGoogleManaged
-                        ? null
-                        : viewModel.saveEmail,
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size.fromHeight(50),
-                      backgroundColor: appTheme.teal_A700,
-                      foregroundColor: appTheme.white_A700,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(13),
+                    const SizedBox(height: 30),
+                    OutlinedButton.icon(
+                      onPressed: state.isBusy || state.isOffline
+                          ? null
+                          : () => _confirmDeletionRequest(
+                        context,
+                        viewModel,
                       ),
-                    ),
-                    icon: state.isSavingEmail
-                        ? SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: appTheme.white_A700,
-                      ),
-                    )
-                        : const Icon(Icons.mark_email_read_outlined),
-                    label: const Text('Change Email'),
-                  ),
-                  const SizedBox(height: 26),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: IgnorePointer(
-                      ignoring: state.isBusy ||
-                          state.isOffline ||
-                          isGoogleManaged,
-                      child: Opacity(
-                        opacity: state.isBusy ||
-                            state.isOffline ||
-                            isGoogleManaged
-                            ? 0.5
-                            : 1,
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            SignInButton(
-                              Buttons.google,
-                              text: state.isLinkingGoogle
-                                  ? 'Opening Google...'
-                                  : state.isUnlinkingGoogle
-                                  ? 'Unlinking Google...'
-                                  : state.hasGoogleIdentity
-                                  ? 'Google account linked'
-                                  : 'Link Google account',
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(13),
-                              ),
-                              onPressed: isGoogleManaged
-                                  ? () {}
-                                  : state.hasGoogleIdentity
-                                  ? () => _showGoogleDialog(
-                                context,
-                                viewModel,
-                              )
-                                  : viewModel.linkGoogle,
-                            ),
-                            Positioned(
-                              right: 14,
-                              top: 0,
-                              bottom: 0,
-                              child: IgnorePointer(
-                                child: state.isLinkingGoogle ||
-                                    state.isUnlinkingGoogle
-                                    ? const Center(
-                                  child: SizedBox.square(
-                                    dimension: 18,
-                                    child:
-                                    CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Color(0xFF5F6368),
-                                    ),
-                                  ),
-                                )
-                                    : Icon(
-                                  isGoogleManaged
-                                      ? Icons.lock_outline_rounded
-                                      : state.hasGoogleIdentity
-                                      ? Icons.link_rounded
-                                      : Icons.add_link_rounded,
-                                  size: 20,
-                                  color: const Color(0xFF5F6368),
-                                ),
-                              ),
-                            ),
-                          ],
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(46),
+                        foregroundColor: appTheme.errorRed,
+                        side: BorderSide(color: appTheme.errorRed),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
+                      icon: state.isRequestingDeletion
+                          ? SizedBox.square(
+                        dimension: 17,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: appTheme.errorRed,
+                        ),
+                      )
+                          : const Icon(Icons.delete_forever_outlined),
+                      label: const Text('Delete Account'),
                     ),
-                  ),
-                  const SizedBox(height: 30),
-                  OutlinedButton.icon(
-                    onPressed: state.isBusy || state.isOffline
-                        ? null
-                        : () => _confirmDeletionRequest(
-                      context,
-                      viewModel,
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(46),
-                      foregroundColor: appTheme.errorRed,
-                      side: BorderSide(color: appTheme.errorRed),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    icon: state.isRequestingDeletion
-                        ? SizedBox.square(
-                      dimension: 17,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: appTheme.errorRed,
-                      ),
-                    )
-                        : const Icon(Icons.delete_forever_outlined),
-                    label: const Text('Delete Account'),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

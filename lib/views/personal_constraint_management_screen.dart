@@ -38,96 +38,99 @@ class PersonalConstraintManagementScreen extends StatelessWidget {
           });
         }
 
-        return Scaffold(
-          backgroundColor: appTheme.gray_50_02,
-          appBar: const CustomAppBar(title: 'Personal Constraints'),
-          body: state.isLoading
-              ? Center(
-            child: CircularProgressIndicator(color: appTheme.teal_A700),
-          )
-              : SafeArea(
-            top: false,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 22, 20, 32),
-              children: [
-                if (state.isOffline) ...[
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: appTheme.wholeAlertBudgetBg,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.cloud_off_outlined,
-                          color: appTheme.wholeAlertBudgetText,
-                        ),
-                        const SizedBox(width: 9),
-                        Expanded(
-                          child: Text(
-                            'You’re offline. Showing saved information.',
-                            style: TextStyle(
-                              color: appTheme.wholeAlertBudgetText,
+        return PopScope(
+          canPop: !state.isSaving,
+          child: Scaffold(
+            backgroundColor: appTheme.gray_50_02,
+            appBar: CustomAppBar(
+              title: 'Personal Constraints',
+              backEnabled: !state.isSaving,
+            ),
+            body: state.isLoading
+                ? Center(
+              child: CircularProgressIndicator(color: appTheme.teal_A700),
+            )
+                : SafeArea(
+              top: false,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 22, 20, 32),
+                children: [
+                  if (state.isOffline) ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: appTheme.wholeAlertBudgetBg,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.cloud_off_outlined,
+                            color: appTheme.wholeAlertBudgetText,
+                          ),
+                          const SizedBox(width: 9),
+                          Expanded(
+                            child: Text(
+                              'You’re offline. Showing saved information.',
+                              style: TextStyle(
+                                color: appTheme.wholeAlertBudgetText,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 14),
-                ],
-                for (final category in
-                PersonalConstraintManagementViewModel
-                    .requiredOptions.keys) ...[
-                  _ConstraintCard(
-                    title: category.toUpperCase(),
-                    optionWidgets: state.options
-                        .where((option) => option.category == category)
-                        .map(
-                          (option) => _ConstraintChip(
-                        name: option.name,
-                        isSelected: option.isSelected,
-                        isDisabled: option.isDisabled || state.isOffline,
-                        onToggle: viewModel.toggle,
+                    const SizedBox(height: 14),
+                  ],
+                  for (final category in
+                  PersonalConstraintManagementViewModel
+                      .requiredOptions.keys) ...[
+                    _ConstraintCard(
+                      title: category.toUpperCase(),
+                      optionWidgets: state.options
+                          .where((option) => option.category == category)
+                          .map(
+                            (option) => _ConstraintChip(
+                          name: option.name,
+                          isSelected: option.isSelected,
+                          isDisabled: option.isDisabled ||
+                              state.isSaving ||
+                              state.isOffline,
+                          onToggle: viewModel.toggle,
+                        ),
+                      )
+                          .toList(growable: false),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+                  const SizedBox(height: 10),
+                  FilledButton.icon(
+                    onPressed: state.isSaving ||
+                        state.isOffline ||
+                        state.options.any((option) => option.id.isEmpty)
+                        ? null
+                        : viewModel.save,
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(52),
+                      backgroundColor: appTheme.teal_A700,
+                      foregroundColor: appTheme.white_A700,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(13),
+                      ),
+                    ),
+                    icon: state.isSaving
+                        ? SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: appTheme.white_A700,
                       ),
                     )
-                        .toList(growable: false),
+                        : const Icon(Icons.save_outlined),
+                    label: const Text('Save'),
                   ),
-                  const SizedBox(height: 14),
                 ],
-                const SizedBox(height: 10),
-                FilledButton.icon(
-                  onPressed: state.isSaving ||
-                      state.isOffline ||
-                      state.options.any((option) => option.id.isEmpty)
-                      ? null
-                      : viewModel.save,
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(52),
-                    backgroundColor: appTheme.teal_A700,
-                    foregroundColor: appTheme.white_A700,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(13),
-                    ),
-                  ),
-                  icon: state.isSaving
-                      ? SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: appTheme.white_A700,
-                    ),
-                  )
-                      : const Icon(Icons.save_outlined),
-                  label: const Text('Save'),
-                ),
-                TextButton(
-                  onPressed:
-                  state.isSaving ? null : () => Navigator.pop(context),
-                  child: const Text('Cancel'),
-                ),
-              ],
+              ),
             ),
           ),
         );

@@ -154,126 +154,129 @@ class _LoginScreenState extends State<LoginScreen>
         return PopScope(
           canPop: false,
           onPopInvokedWithResult: (didPop, _) {
-            if (!didPop) _handleSystemBack();
+            if (!didPop && !state.isLoading) _handleSystemBack();
           },
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
             onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-            child: AuthPage(
-              title: 'Sign in to your account',
-              child: AutofillGroup(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Focus(
-                      onFocusChange: (hasFocus) {
-                        if (!hasFocus) viewModel.onEmailFocusLost();
-                      },
-                      child: CustomTextField(
-                        sectionTitle: 'EMAIL ADDRESS',
-                        hintText: 'Enter your email address',
-                        prefixIcon: Icons.email_outlined,
-                        margin: EdgeInsets.zero,
-                        initialValue: state.email,
-                        enabled: !state.isLoading,
-                        keyboardType: TextInputType.emailAddress,
-                        textInputAction: TextInputAction.next,
-                        autofillHints: const [AutofillHints.email],
-                        autocorrect: false,
-                        enableSuggestions: false,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.deny(RegExp(r'\s')),
-                        ],
-                        onChanged: viewModel.onEmailChanged,
-                        errorText: state.emailError,
+            child: IgnorePointer(
+              ignoring: state.isLoading,
+              child: AuthPage(
+                title: 'Sign in to your account',
+                child: AutofillGroup(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Focus(
+                        onFocusChange: (hasFocus) {
+                          if (!hasFocus) viewModel.onEmailFocusLost();
+                        },
+                        child: CustomTextField(
+                          sectionTitle: 'EMAIL ADDRESS',
+                          hintText: 'Enter your email address',
+                          prefixIcon: Icons.email_outlined,
+                          margin: EdgeInsets.zero,
+                          initialValue: state.email,
+                          enabled: !state.isLoading,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          autofillHints: const [AutofillHints.email],
+                          autocorrect: false,
+                          enableSuggestions: false,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.deny(RegExp(r'\s')),
+                          ],
+                          onChanged: viewModel.onEmailChanged,
+                          errorText: state.emailError,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 20),
-                    Focus(
-                      onFocusChange: (hasFocus) {
-                        if (!hasFocus) viewModel.onPasswordFocusLost();
-                      },
-                      child: CustomTextField(
-                        sectionTitle: 'PASSWORD',
-                        hintText: 'Enter your password',
-                        prefixIcon: Icons.lock_outline,
-                        margin: EdgeInsets.zero,
-                        enabled: !state.isLoading,
-                        obscureText: state.obscurePassword,
-                        autocorrect: false,
-                        enableSuggestions: false,
-                        textInputAction: TextInputAction.done,
-                        autofillHints: const [AutofillHints.password],
-                        onChanged: viewModel.onPasswordChanged,
-                        onFieldSubmitted: (_) => viewModel.onLoginPressed(),
-                        errorText: state.passwordError,
-                        suffixIcon: IconButton(
-                          tooltip: state.obscurePassword
-                              ? 'Show password'
-                              : 'Hide password',
+                      const SizedBox(height: 20),
+                      Focus(
+                        onFocusChange: (hasFocus) {
+                          if (!hasFocus) viewModel.onPasswordFocusLost();
+                        },
+                        child: CustomTextField(
+                          sectionTitle: 'PASSWORD',
+                          hintText: 'Enter your password',
+                          prefixIcon: Icons.lock_outline,
+                          margin: EdgeInsets.zero,
+                          enabled: !state.isLoading,
+                          obscureText: state.obscurePassword,
+                          autocorrect: false,
+                          enableSuggestions: false,
+                          textInputAction: TextInputAction.done,
+                          autofillHints: const [AutofillHints.password],
+                          onChanged: viewModel.onPasswordChanged,
+                          onFieldSubmitted: (_) => viewModel.onLoginPressed(),
+                          errorText: state.passwordError,
+                          suffixIcon: IconButton(
+                            tooltip: state.obscurePassword
+                                ? 'Show password'
+                                : 'Hide password',
+                            onPressed: state.isLoading
+                                ? null
+                                : viewModel.togglePasswordVisibility,
+                            icon: Icon(
+                              state.obscurePassword
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: state.isLoading ? null : openForgotPassword,
+                          child: const Text('Forgot Password?'),
+                        ),
+                      ),
+                      if (state.showMagicLinkOption)
+                        TextButton(
                           onPressed: state.isLoading
                               ? null
-                              : viewModel.togglePasswordVisibility,
-                          icon: Icon(
-                            state.obscurePassword
-                                ? Icons.visibility_off_outlined
-                                : Icons.visibility_outlined,
+                              : viewModel.onSendMagicLinkPressed,
+                          child: Text(
+                            state.magicLinkSent
+                                ? 'Secure login link sent'
+                                : 'Continue with email (magic link)',
                           ),
                         ),
+                      const SizedBox(height: 22),
+                      AuthPrimaryButton(
+                        label: 'Log in',
+                        isLoading: state.isLoading,
+                        onPressed: viewModel.onLoginPressed,
                       ),
-                    ),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: state.isLoading ? null : openForgotPassword,
-                        child: const Text('Forgot Password?'),
+                      const SizedBox(height: 7),
+                      AuthLinkLine(
+                        text: "Don't have an account? ",
+                        linkText: 'Register with an email.',
+                        onTap: state.isLoading ? null : openRegistration,
                       ),
-                    ),
-                    if (state.showMagicLinkOption)
-                      TextButton(
-                        onPressed: state.isLoading
-                            ? null
-                            : viewModel.onSendMagicLinkPressed,
-                        child: Text(
-                          state.magicLinkSent
-                              ? 'Secure login link sent'
-                              : 'Continue with email (magic link)',
-                        ),
-                      ),
-                    const SizedBox(height: 22),
-                    AuthPrimaryButton(
-                      label: 'Log in',
-                      isLoading: state.isLoading,
-                      onPressed: viewModel.onLoginPressed,
-                    ),
-                    const SizedBox(height: 7),
-                    AuthLinkLine(
-                      text: "Don't have an account? ",
-                      linkText: 'Register with an email.',
-                      onTap: state.isLoading ? null : openRegistration,
-                    ),
-                    const SizedBox(height: 20),
-                    const AuthOrDivider(),
-                    const SizedBox(height: 20),
-                    IgnorePointer(
-                      ignoring: state.isLoading,
-                      child: Opacity(
-                        opacity: state.isLoading ? 0.55 : 1,
-                        child: SizedBox(
-                          width: double.infinity,
-                          height: 56,
-                          child: SignInButton(
-                            Buttons.google,
-                            text: 'Continue with Google',
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
+                      const SizedBox(height: 20),
+                      const AuthOrDivider(),
+                      const SizedBox(height: 20),
+                      IgnorePointer(
+                        ignoring: state.isLoading,
+                        child: Opacity(
+                          opacity: state.isLoading ? 0.55 : 1,
+                          child: SizedBox(
+                            width: double.infinity,
+                            height: 56,
+                            child: SignInButton(
+                              Buttons.google,
+                              text: 'Continue with Google',
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              onPressed: viewModel.onGoogleSignInPressed,
                             ),
-                            onPressed: viewModel.onGoogleSignInPressed,
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),

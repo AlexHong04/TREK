@@ -197,8 +197,9 @@ class RegistrationViewModel extends ChangeNotifier {
   void _handleAuthStateChanged() {
     if (!_googleSignInPending || !_authService.isLoggedIn) return;
     _googleSignInPending = false;
-    _uiState = _uiState.copyWith(isLoading: false);
-    _notify();
+    // Keep the form locked until the app-level auth listener replaces this
+    // route. The profile synchronisation that follows OAuth can take a few
+    // seconds, and controls must not become active during that hand-off.
   }
 
   bool _validate() {
