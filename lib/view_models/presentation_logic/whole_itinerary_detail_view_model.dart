@@ -500,6 +500,42 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
 
       final budgetLimit = stashedMatch?.allocatedBudget ?? 50.0;
 
+      // Derive surrounding activities for geographic coherence.
+      // Find the non-empty, non-transportation activity before and after this slot.
+      String? previousDest;
+      String? nextDest;
+      for (int i = slotIndex - 1; i >= 0; i--) {
+        final a = _uiState.activities[i];
+        if (a.destination.isNotEmpty &&
+            a.activityCategory.toLowerCase() != 'transportation') {
+          previousDest = a.destination;
+          break;
+        }
+      }
+      for (int i = slotIndex + 1; i < _uiState.activities.length; i++) {
+        final a = _uiState.activities[i];
+        if (a.destination.isNotEmpty &&
+            a.activityCategory.toLowerCase() != 'transportation') {
+          nextDest = a.destination;
+          break;
+        }
+      }
+
+      // Derive day number and total days from trip dates
+      int totalDays = 1;
+      int dayNumber = 1;
+      try {
+        final parts = _uiState.datesText.split(' - ');
+        if (parts.length == 2) {
+          final start = DateTime.parse(parts[0].trim());
+          final end = DateTime.parse(parts[1].trim());
+          totalDays = end.difference(start).inDays + 1;
+          dayNumber = targetSlot.date.difference(start).inDays + 1;
+          if (dayNumber < 1) dayNumber = 1;
+          if (dayNumber > totalDays) dayNumber = totalDays;
+        }
+      } catch (_) {}
+
       final newActivity = await _itineraryService.generateAlternativeItinerary(
         destination: destination.isNotEmpty
             ? destination
@@ -512,6 +548,14 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         existingActivityId: slotActivityId,
         dayTripId: targetSlot.dayTripId,
         budgetLimit: budgetLimit,
+        dayNumber: dayNumber,
+        preference: _uiState.preference,
+        constraints: _uiState.constraints,
+        previousActivityDestination: previousDest,
+        nextActivityDestination: nextDest,
+        isFirstDay: dayNumber == 1,
+        isLastDay: dayNumber == totalDays,
+        totalDays: totalDays,
       );
 
       final updatedList = List<Activity>.from(_uiState.activities);

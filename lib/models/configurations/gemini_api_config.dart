@@ -502,32 +502,86 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
     required double budgetLimit,
     required int dayNumber,
     required List<String> existingOrExcludedPlaces,
+    String? preference,
+    List<String>? constraints,
+    String? previousActivityDestination,
+    String? nextActivityDestination,
+    bool isFirstDay = false,
+    bool isLastDay = false,
+    int totalDays = 1,
   }) async {
     final excludedListText = existingOrExcludedPlaces.isNotEmpty
         ? existingOrExcludedPlaces.map((e) => '- "$e"').join('\n')
         : 'None';
 
+    // Build surrounding activities context for geographic coherence
+    final surroundingContext = StringBuffer();
+    if (previousActivityDestination != null &&
+        previousActivityDestination.isNotEmpty) {
+      surroundingContext.write(
+          '    - Previous Activity (before this slot): "$previousActivityDestination"\n');
+    }
+    if (nextActivityDestination != null &&
+        nextActivityDestination.isNotEmpty) {
+      surroundingContext.write(
+          '    - Next Activity (after this slot): "$nextActivityDestination"\n');
+    }
+
+    // Build day position context (arrival/departure awareness)
+    final dayPositionContext = StringBuffer();
+    if (isFirstDay) {
+      dayPositionContext.write('''
+    DAY 1 AWARENESS:
+    - This is the FIRST day of the trip. The traveler may have just arrived.
+    - If this slot is early in the day, suggest activities near common arrival points (airports, train stations, bus terminals) or the hotel area.
+    - Avoid suggesting far-flung locations that require long transit from arrival points.\n''');
+    }
+    if (isLastDay) {
+      dayPositionContext.write('''
+    FINAL DAY AWARENESS:
+    - This is the LAST day (Day $dayNumber of $totalDays) of the trip. The traveler will depart later today.
+    - If this slot is in the afternoon or evening, suggest activities near departure points or the hotel area so the traveler can leave on time.
+    - Avoid suggesting activities far from the city center or transit hubs.\n''');
+    }
+
     final prompt =
         '''
     You are an expert travel planner in Malaysia. A user removed an activity from their Day $dayNumber itinerary in $destinationCity and needs ONE replacement activity to fill the empty time slot.
 
-    Parameters:
+    CONTEXT:
     - City: $destinationCity
-    - Target Area / Neighborhood: $targetAreaOrNeighborhood (Must be located nearby this neighborhood to minimize travel time)
+    - Trip Duration: $totalDays day(s)
+    - Target Area / Neighborhood: $targetAreaOrNeighborhood (The replacement MUST be located nearby this area to minimize travel time)
     - Preferred Category: ${category.isNotEmpty ? category : "Attraction or Restaurant"}
     - Time Slot: $startTime to $endTime
     - Budget Ceiling: MYR ${budgetLimit.toStringAsFixed(2)}
-
+    ${preference != null && preference.isNotEmpty ? '- Trip Theme / Preference: $preference (The replacement activity MUST align with this theme!)' : ''}
+    ${(constraints != null && constraints.isNotEmpty) ? '- Personal Constraints: ${constraints.join(', ')} (You MUST strictly follow these constraints, e.g., dietary restrictions, accessibility needs!)' : ''}
+    ${surroundingContext.isNotEmpty ? '\n    SURROUNDING ACTIVITIES (for geographic coherence):\n$surroundingContext    - The replacement activity MUST be geographically close to these surrounding activities. Do NOT suggest a place on the opposite side of the city.' : ''}
+    $dayPositionContext
     CRITICAL EXCLUSION LIST (DUPLICATES PROHIBITED):
-    The user already has the following places in their itinerary or explicitly rejected them. You MUST NOT suggest any of these places or slight variations of them:
+    The user already has the following places in their itinerary or explicitly rejected them. You MUST NOT suggest any of these places:
     $excludedListText
+    - Do NOT use slight variations of excluded names to bypass this rule (e.g., "Petronas Twin Towers" and "Petronas Towers" are the same venue).
 
-    CRITICAL RULES FOR DESTINATION & BUDGET:
+    CRITICAL RULES FOR DESTINATION:
     - The destination MUST be an EXACT, FULL official business name or landmark on Google Maps (e.g., "Museum of Illusions Kuala Lumpur", "Limapulo: Baba Can Cook"). Do NOT use generic names (e.g., "Local Cafe", "Museum Visit").
+    - Every "destination" MUST be an actual, currently operating, highly popular business or landmark that is guaranteed to have a listing and photos on Google Maps.
+    - We will programmatically verify the destination against Google Places API to fetch its image. If the destination is obscure or NOT found on Google Places, it will be rejected.
+
+    CRITICAL RULES FOR BUDGET & PRICING:
+    - You MUST assign TRUE, REALISTIC market-rate costs for the activity's "allocatedBudget".
+    - Realistic price ranges in Malaysia: meals at hawker stalls MYR 5-15, casual restaurants MYR 15-40, fine dining MYR 50+, attraction tickets MYR 10-80, public transit MYR 1-5, Grab rides MYR 5-20.
+    - NEVER invent fake MYR 0.0 or insanely low prices for restaurants or paid attractions.
     - Public parks, sightseeing of landmarks, walking tours, and free attractions MUST have an "allocatedBudget" of 0.
-    - "Transportation" activities: 0.0 if walking distance, or realistic fare (> 0) if public transit/Grab is required.
     - Only assign costs to food/dining, transportation, and places that explicitly require entrance tickets.
+    - The "allocatedBudget" MUST NOT exceed the Budget Ceiling of MYR ${budgetLimit.toStringAsFixed(2)}.
     - "activityCategory" MUST strictly be one of: "Transportation", "Attraction", or "Restaurant".
+
+    TRANSPORTATION AWARENESS:
+    - Consider how the traveler will get to this activity from the previous one, and from this activity to the next one.
+    - Prefer locations that are within walking distance of the surrounding activities, or easily reachable by MRT/LRT.
+    - Do NOT suggest a location that would require an expensive or time-consuming Grab ride if there are closer alternatives.
 
     Format your response as a valid single JSON object with the following fields:
     {
@@ -535,8 +589,8 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
       "destination": "Exact Business Name or Landmark",
       "imageKeyword": "Famous landmark name or generic food item (e.g. 'Nasi Lemak', 'Aquarium')",
       "description": "Short 1-2 sentence description",
-      "allocatedBudget": 0.0, // Representing the MAX price if there is a price range
-      "minPrice": 0.0, // Representing the MIN price if range, else null
+      "allocatedBudget": 0.0,
+      "minPrice": 0.0,
       "duration": "60-90 min",
       "activityCategory": "Attraction",
       "startTime": "$startTime",

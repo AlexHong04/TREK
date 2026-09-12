@@ -463,6 +463,13 @@ class ItineraryService implements IItineraryService {
     required String dayTripId,
     double budgetLimit = 0.0,
     int dayNumber = 1,
+    String? preference,
+    List<String>? constraints,
+    String? previousActivityDestination,
+    String? nextActivityDestination,
+    bool isFirstDay = false,
+    bool isLastDay = false,
+    int totalDays = 1,
   }) async {
     int retries = 3;
     final List<String> localExcluded = List.from(excludedActivity);
@@ -471,16 +478,26 @@ class ItineraryService implements IItineraryService {
     String imgUrl = '';
     Map<String, dynamic>? place;
 
+    // Derive target area from surrounding activities for better geographic context
+    final targetArea = previousActivityDestination ?? nextActivityDestination ?? destination;
+
     while (retries > 0) {
       final rawJson = await GeminiApiConfig.askGeminiForAlternative(
         destinationCity: destination,
-        targetAreaOrNeighborhood: destination,
+        targetAreaOrNeighborhood: targetArea,
         category: category,
         startTime: startTime,
         endTime: endTime,
         budgetLimit: budgetLimit,
         dayNumber: dayNumber,
         existingOrExcludedPlaces: localExcluded,
+        preference: preference,
+        constraints: constraints,
+        previousActivityDestination: previousActivityDestination,
+        nextActivityDestination: nextActivityDestination,
+        isFirstDay: isFirstDay,
+        isLastDay: isLastDay,
+        totalDays: totalDays,
       );
       try {
         item = jsonDecode(rawJson);

@@ -41,6 +41,13 @@ abstract interface class IItineraryService {
     required String dayTripId,
     double budgetLimit = 0.0,
     int dayNumber = 1,
+    String? preference,
+    List<String>? constraints,
+    String? previousActivityDestination,
+    String? nextActivityDestination,
+    bool isFirstDay = false,
+    bool isLastDay = false,
+    int totalDays = 1,
   });
 
   Future<List<Activity>> regenerateEmptySlotsFromRemainingPlan({

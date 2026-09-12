@@ -1106,17 +1106,25 @@ class _WholeItineraryDetailScreenState
           activity: activity,
           isLast: isLast,
           isReadOnly: isReadOnly,
-          onRemove: () {
+          onRemove: () async {
             final activityName =
                 (activity.destination as String?)?.isNotEmpty == true
                 ? activity.destination as String
                 : 'Activity';
-            viewModel.removeActivity(activity.activitiesId);
-            _showActivityRemovedSnackBar(
-              context,
-              activityName,
-              isReadOnly: isReadOnly,
+            final confirmed = await showConfirmRemoveActivityDialog(
+              context: context,
+              activityName: activityName,
             );
+            if (confirmed) {
+              viewModel.removeActivity(activity.activitiesId);
+              if (context.mounted) {
+                _showActivityRemovedSnackBar(
+                  context,
+                  activityName,
+                  isReadOnly: isReadOnly,
+                );
+              }
+            }
           },
         ),
       );
