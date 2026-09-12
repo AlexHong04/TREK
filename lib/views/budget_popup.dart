@@ -379,20 +379,38 @@ Widget _buildActionButton({
 Widget _buildTopUpCard(
   TextEditingController controller, {
   required String symbol,
+  required double minTopUp,
+  required double shortageAmount,
+      required String? Function({
+      required String value,
+      required double minTopUp,
+      required double shortageAmount,
+      }) validateTopUpAmount,
 }) {
   return ValueListenableBuilder<TextEditingValue>(
     valueListenable: controller,
     builder: (context, value, child) {
       final enteredAmount = double.tryParse(value.text.trim());
 
+      final errorText = validateTopUpAmount(
+        value: value.text,
+        minTopUp: minTopUp,
+        shortageAmount: shortageAmount,
+      );
+
       return CustomTextField(
-        sectionTitle: symbol == 'MYR'? 'TOP-UP AMOUNT (MYR)' : 'TOP-UP AMOUNT ($symbol)',
-        hintText: symbol == 'MYR'? 'Enter Top-Up Amount (MYR)' : 'Enter Top-Up Amount ($symbol)',
+        sectionTitle: symbol == 'MYR'
+            ? 'TOP-UP AMOUNT (MYR)'
+            : 'TOP-UP AMOUNT ($symbol)',
+        hintText: symbol == 'MYR'
+            ? 'Enter Top-Up Amount (MYR)'
+            : 'Enter Top-Up Amount ($symbol)',
         prefixIcon: Icons.account_balance_wallet_outlined,
         prefixIconColor: appTheme.teal_A700,
         controller: controller,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
         margin: EdgeInsets.zero,
+        errorText: errorText,
         bottomWidget:
             (enteredAmount != null && enteredAmount > 0 && symbol != 'MYR')
             ? Container(
@@ -555,9 +573,13 @@ Future<void> showBudgetRecoveryDialog({
   required double minTopUp,
   required double remainingBudget,
   required String warningText,
-  required String symbol,
   VoidCallback? onEndTrip,
   required Future<bool> Function(double amount) onTopUpBudget,
+  required String? Function({
+  required String value,
+  required double minTopUp,
+  required double shortageAmount,
+  }) validateTopUpAmount,
 }) {
   final controller = TextEditingController();
 
@@ -581,7 +603,7 @@ Future<void> showBudgetRecoveryDialog({
 
           warningText: warningText,
 
-          contentCard: _buildTopUpCard(controller, symbol: symbol),
+          contentCard: _buildTopUpCard(controller, symbol: 'MYR', minTopUp: minTopUp, shortageAmount: shortageAmount, validateTopUpAmount: validateTopUpAmount),
 
           actions: Row(
             children: [
@@ -609,7 +631,10 @@ Future<void> showBudgetRecoveryDialog({
                   builder: (context, value, child) {
                     final amount = double.tryParse(value.text.trim());
 
-                    final isValid = amount != null && amount >= minTopUp && amount <= shortageAmount;
+                    final isValid =
+                        amount != null &&
+                        amount >= minTopUp &&
+                        amount <= shortageAmount;
 
                     return _buildActionButton(
                       text: 'Top-up Budget',
@@ -729,6 +754,11 @@ Future<void> showInitialBudgetInsufficientDialog({
   required String warningText,
   VoidCallback? onCancel,
   required Future<bool> Function(double amount) onTopUpBudget,
+  required String? Function({
+  required String value,
+  required double minTopUp,
+  required double shortageAmount,
+  }) validateTopUpAmount,
 }) {
   final controller = TextEditingController();
 
@@ -759,7 +789,7 @@ Future<void> showInitialBudgetInsufficientDialog({
 
         contentCard: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [_buildTopUpCard(controller, symbol: symbol ?? 'MYR')],
+          children: [_buildTopUpCard(controller, symbol: symbol ?? 'MYR', minTopUp: minTopUp, shortageAmount: shortageAmount, validateTopUpAmount: validateTopUpAmount)],
         ),
 
         actions: Row(
@@ -783,7 +813,10 @@ Future<void> showInitialBudgetInsufficientDialog({
                 builder: (context, value, child) {
                   final amount = double.tryParse(value.text.trim());
 
-                  final isValid = amount != null && amount >= minTopUp;
+                  final isValid =
+                      amount != null &&
+                          amount >= minTopUp &&
+                          amount <= shortageAmount;
 
                   return _buildActionButton(
                     text: 'Top-up Budget',
