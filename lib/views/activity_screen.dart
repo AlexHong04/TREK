@@ -411,6 +411,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
     required Future<bool> Function(double amount) onTopUpBudget,
   }) {
     final minTopUp = uiState.shortageAmount * 0.50;
+    final viewModel = context.read<ActivityViewModel>();
+
     showBudgetRecoveryDialog(
       context: context,
       shortageAmount: uiState.shortageAmount,
@@ -418,6 +420,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
       remainingBudget: uiState.remainingBudget,
       warningText:
           'Top-up amount should at least MYR ${minTopUp.toStringAsFixed(2)}, insufficient top-up amount will trigger alternative recommendation directly.',
+      symbol: viewModel.preferredCurrency,
       onEndTrip: () {
         _showEndTripConfirmationDialog(uiState);
       },
@@ -1017,7 +1020,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
               Expanded(
                 child: _buildSubBudgetCard(
                   title: 'SUFFICIENT FOR',
-                  amount: '${uiState.sufficientDays} DAYS',
+                  amount: '${uiState.sufficientDays} DAY(S)',
                   amountColor: appTheme.teal_A700,
                 ),
               ),

@@ -144,7 +144,7 @@ Widget _buildSummaryRow(String label, double value, {Color? valueColor}) {
       DualCurrencyAmount(
         amount: value,
         baseCurrency: 'MYR',
-        baseLabel: 'RM',
+        baseLabel: 'MYR',
         primaryStyle: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.bold,
@@ -230,7 +230,7 @@ Widget _buildSummaryCard({
         DualCurrencyAmount(
           amount: primaryValue,
           baseCurrency: 'MYR',
-          baseLabel: 'RM',
+          baseLabel: 'MYR',
           primaryStyle: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
@@ -315,7 +315,7 @@ Widget _buildWishlistSummaryCard({
         DualCurrencyAmount(
           amount: primaryValue,
           baseCurrency: 'MYR',
-          baseLabel: 'RM',
+          baseLabel: 'MYR',
           primaryStyle: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
@@ -376,21 +376,25 @@ Widget _buildActionButton({
   );
 }
 
-Widget _buildTopUpCard(TextEditingController controller) {
+Widget _buildTopUpCard(
+  TextEditingController controller, {
+  required String symbol,
+}) {
   return ValueListenableBuilder<TextEditingValue>(
     valueListenable: controller,
     builder: (context, value, child) {
       final enteredAmount = double.tryParse(value.text.trim());
 
       return CustomTextField(
-        sectionTitle: 'TOP-UP AMOUNT (MYR)',
-        hintText: 'Enter Top-Up Amount (MYR)',
+        sectionTitle: symbol == 'MYR'? 'TOP-UP AMOUNT (MYR)' : 'TOP-UP AMOUNT ($symbol)',
+        hintText: symbol == 'MYR'? 'Enter Top-Up Amount (MYR)' : 'Enter Top-Up Amount ($symbol)',
         prefixIcon: Icons.account_balance_wallet_outlined,
         prefixIconColor: appTheme.teal_A700,
         controller: controller,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
         margin: EdgeInsets.zero,
-        bottomWidget: (enteredAmount != null && enteredAmount > 0)
+        bottomWidget:
+            (enteredAmount != null && enteredAmount > 0 && symbol != 'MYR')
             ? Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(
@@ -431,7 +435,7 @@ Widget _buildTopUpCard(TextEditingController controller) {
                     DualCurrencyAmount(
                       amount: enteredAmount,
                       baseCurrency: 'MYR',
-                      baseLabel: 'RM',
+                      baseLabel: 'MYR',
                       primaryStyle: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
@@ -551,6 +555,7 @@ Future<void> showBudgetRecoveryDialog({
   required double minTopUp,
   required double remainingBudget,
   required String warningText,
+  required String symbol,
   VoidCallback? onEndTrip,
   required Future<bool> Function(double amount) onTopUpBudget,
 }) {
@@ -576,7 +581,7 @@ Future<void> showBudgetRecoveryDialog({
 
           warningText: warningText,
 
-          contentCard: _buildTopUpCard(controller),
+          contentCard: _buildTopUpCard(controller, symbol: symbol),
 
           actions: Row(
             children: [
@@ -604,7 +609,7 @@ Future<void> showBudgetRecoveryDialog({
                   builder: (context, value, child) {
                     final amount = double.tryParse(value.text.trim());
 
-                    final isValid = amount != null && amount >= minTopUp;
+                    final isValid = amount != null && amount >= minTopUp && amount <= shortageAmount;
 
                     return _buildActionButton(
                       text: 'Top-up Budget',
@@ -720,6 +725,7 @@ Future<void> showInitialBudgetInsufficientDialog({
   required double shortageAmount,
   required double minTopUp,
   int? wishlistCovered,
+  String? symbol,
   required String warningText,
   VoidCallback? onCancel,
   required Future<bool> Function(double amount) onTopUpBudget,
@@ -753,7 +759,7 @@ Future<void> showInitialBudgetInsufficientDialog({
 
         contentCard: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [_buildTopUpCard(controller)],
+          children: [_buildTopUpCard(controller, symbol: symbol ?? 'MYR')],
         ),
 
         actions: Row(
@@ -879,7 +885,11 @@ Future<void> _showTwoButtonsBudgetDialog({
             children: [
               for (int i = 0; i < messages.length; i++) ...[
                 if (i > 0) const SizedBox(height: 16),
-                BaseBudgetDialog._buildWarningRow(messages[i], color: color, icon: icon),
+                BaseBudgetDialog._buildWarningRow(
+                  messages[i],
+                  color: color,
+                  icon: icon,
+                ),
               ],
             ],
           ),
