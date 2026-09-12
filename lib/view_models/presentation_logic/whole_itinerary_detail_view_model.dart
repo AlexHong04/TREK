@@ -68,10 +68,14 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
   );
 
   /// True if extra budget is needed or spent budget exceeds total budget.
-  bool get hasExtraBudgetNeeded =>
-      _uiState.estimatedExtraBudgetNeeded > 0.0 ||
-      (totalBudget > 0 && spentBudget > totalBudget) ||
-      (spentBudget > totalBudget);
+  /// Tolerance of 0.01 is applied to prevent IEEE-754 floating point inaccuracies.
+  bool get hasExtraBudgetNeeded {
+    if (_uiState.estimatedExtraBudgetNeeded > 0.01) return true;
+    if (totalBudget > 0) {
+      return (spentBudget - totalBudget) > 0.01;
+    }
+    return spentBudget > 0.01;
+  }
 
   /// True if wishlist has uncovered items.
   bool get hasUncoveredWishlist {
@@ -287,15 +291,31 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     }
 
     final budget = double.tryParse(_uiState.budgetText) ?? 0.0;
-    final newBudget = budget + amount;
 
-    final remainingShortage = (_uiState.estimatedExtraBudgetNeeded - amount)
-        .clamp(0.0, double.infinity);
+    // Calculate current shortage considering both estimated extra budget and spentBudget vs budget
+    final overspend = (spentBudget - budget).clamp(0.0, double.infinity);
+    final shortage = _uiState.estimatedExtraBudgetNeeded > overspend
+        ? _uiState.estimatedExtraBudgetNeeded
+        : overspend;
 
-    final isSufficient = remainingShortage <= 0.0;
+    // Minimum required top-up is 50% of the shortage
+    final minRequired = double.parse((shortage * 0.50).toStringAsFixed(2));
+
+    // When topup is >= 50% of the shortage (or covers full shortage), it is sufficient
+    final isSufficient =
+        amount >= (minRequired - 0.01) || amount >= (shortage - 0.01);
+
+    // If sufficient (>= 50%), absorb the remaining difference so the confirm button is immediately enabled
+    final double updatedBudget = isSufficient
+        ? (budget + amount < spentBudget ? spentBudget : budget + amount)
+        : (budget + amount);
+
+    final remainingShortage = isSufficient
+        ? 0.0
+        : (shortage - amount).clamp(0.0, double.infinity);
 
     _uiState = _uiState.copyWith(
-      budgetText: newBudget.toStringAsFixed(2),
+      budgetText: updatedBudget.toStringAsFixed(2),
       estimatedExtraBudgetNeeded: remainingShortage,
       showWishlistWarning: false,
       wishlistItemsCoveredCount: isSufficient

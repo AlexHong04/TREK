@@ -136,20 +136,15 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
     - "estimatedExtraBudgetNeeded" MUST be 0.0 since the plan MUST fit within \$$budget.
     ''' : '''
     CRITICAL RULE FOR WISHLIST:
-    - You MUST ALWAYS INCLUDE ALL of these wishlist items in the generated itinerary, NO MATTER how low or insufficient the Budget (\$$budget) is! NEVER exclude them.
-    - Because you forcefully included them with their TRUE realistic prices, the total cost will likely exceed a low budget. You MUST add this excess to "estimatedExtraBudgetNeeded".
-    - For "wishlistItemsCoveredCount", calculate how many wishlist items can realistically be covered by the user's Budget (\$$budget) after prioritizing basic daily meals and transport:
-      * If the Budget (\$$budget) cannot even cover basic meals and transport, or cannot afford any wishlist item at all, return 0 in "wishlistItemsCoveredCount".
-      * If the Budget (\$$budget) can cover basic meals and transport plus SOME of the wishlist items (e.g. 1, 2, or more, but not all), return the exact count of wishlist items that fit in "wishlistItemsCoveredCount".
-      * Only if the Budget (\$$budget) is fully sufficient to cover all activities and all wishlist items without any shortfall, return the total count of all wishlist items in "wishlistItemsCoveredCount".
+    - Wishlist items do NOT all need to be covered!
+    - Include ONLY as many wishlist items as can realistically and comfortably fit into the user's schedule and Budget (\$$budget).
+    - If the budget or schedule cannot accommodate all wishlist items, DO NOT force all of them into the itinerary! You MUST OMIT the ones that do not fit within the budget or schedule.
+    - CRITICAL: Any omitted wishlist item MUST NOT be scheduled anywhere in the "activities" list (neither as a destination nor mentioned in descriptions). Only wishlist items that are genuinely covered should appear in "activities".
+    - Set "wishlistItemsCoveredCount" to the EXACT count of wishlist items actually included in the "activities" schedule (e.g., if only 1 item is included, set to 1; if none fit, set to 0).
+    - If the budget cannot afford ANY wishlist item after prioritizing basic meals and transport, include 0 wishlist items in "activities", and set "wishlistItemsCoveredCount" to 0.
+    - If the budget can afford SOME (e.g., 1 or 2 out of 3), include only those 1 or 2 in "activities", omit the rest, and set "wishlistItemsCoveredCount" to the exact number included.
+    - The omitted wishlist items will be displayed separately to the traveler as "Uncovered Wishlist" so they can review and delete them.
     ''') : '- Wishlist Items: None\n    CRITICAL RULE FOR NO WISHLIST:\n    - The user did NOT provide any wishlist items.\n    - "wishlistItemsCoveredCount" MUST BE EXACTLY 0. Do NOT count general attractions, restaurants, or itinerary activities as wishlist items!'}
-    // ${(wishlist != null && wishlist.isNotEmpty) ? '- Wishlist Items: ' + wishlist.join(', ') + '''
-    // RULE FOR WISHLIST:
-    // - Include as many of these wishlist items as can realistically fit into the user's schedule and Budget (\$$budget).
-    // - If the budget or schedule cannot accommodate all wishlist items, include the ones that fit best and omit the rest. Wishlist items do NOT all need to be covered.
-    // - Set "wishlistItemsCoveredCount" to the number of wishlist items actually included in the schedule.
-    // - If none fit within the budget, "wishlistItemsCoveredCount" is 0.
-    // ''' : '- Wishlist Items: None\n    CRITICAL RULE FOR NO WISHLIST:\n    - The user did NOT provide any wishlist items.\n    - "wishlistItemsCoveredCount" MUST BE EXACTLY 0. Do NOT count general attractions, restaurants, or itinerary activities as wishlist items!'}
 
     Please provide a structured day-by-day itinerary with estimated costs and durations for each activity.
     ${strictBudget ? '''
@@ -246,8 +241,8 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
 
     Field definitions:
     - totalAllocatedBudget (double): The sum of all allocatedBudget.
-    - wishlistItemsCoveredCount (int): Number of user-provided wishlist items covered. If no wishlist items were provided by the user, this MUST BE EXACTLY 0.
-    - estimatedExtraBudgetNeeded (double): If the true realistic cost of the itinerary + wishlist items exceeds the \$$budget, return the shortfall amount here. Return 0.0 ONLY if \$$budget is genuinely sufficient.
+    - wishlistItemsCoveredCount (int): Number of user-provided wishlist items actually included in the activities. If some wishlist items were omitted due to budget or time constraints, do NOT count them. If no wishlist items were provided by the user, this MUST BE EXACTLY 0.
+    - estimatedExtraBudgetNeeded (double): If the true realistic cost of the scheduled activities exceeds the \$$budget, return the shortfall amount here. Return 0.0 ONLY if \$$budget is genuinely sufficient.
     - dayNumber (int): Sequential day (1 for Day 1, 2 for Day 2...).
     - destination (String): EXACT, FULL official business name or landmark on Google Maps. No generic names.
     - imageKeyword (String): Landmark name or generic food type (e.g. "Nasi Lemak" instead of restaurant name).

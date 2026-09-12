@@ -721,7 +721,8 @@ class ItineraryService implements IItineraryService {
 
       final double allocatedBudget =
           (item?['allocatedBudget'] as num?)?.toDouble() ?? 0.0;
-      final category = (item?['activityCategory'] as String?) ??
+      final category =
+          (item?['activityCategory'] as String?) ??
           (slot.activityCategory.isNotEmpty
               ? slot.activityCategory
               : 'Attraction');
@@ -979,13 +980,14 @@ class ItineraryService implements IItineraryService {
         allocatedBudget: allocatedBudget,
         overspendAmount: allocatedBudget > 0 ? 0 : null,
         status: item['status']?.toString() ?? 'pending',
-        startTime: item['startTime']?.toString() ??
+        startTime:
+            item['startTime']?.toString() ??
             originalActivity?.startTime ??
             '09:00',
-        endTime: item['endTime']?.toString() ??
-            originalActivity?.endTime ??
-            '10:00',
-        duration: item['duration']?.toString() ??
+        endTime:
+            item['endTime']?.toString() ?? originalActivity?.endTime ?? '10:00',
+        duration:
+            item['duration']?.toString() ??
             originalActivity?.duration ??
             '60 min',
         activityCategory:
