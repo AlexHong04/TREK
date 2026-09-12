@@ -531,7 +531,7 @@ Future<void> showBudgetExceededThresholdDialog({
           fourthLabel: 'Total Overspent So Far:',
           fourthValue: totalOverspent,
           fifthLabel: 'Estimated Sufficient:',
-          fifthValue: estimatedDays,
+          fifthValue: '$estimatedDays day(s)',
         ),
 
         warningText: warningText1,
