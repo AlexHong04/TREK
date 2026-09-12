@@ -77,44 +77,144 @@ class _AllPlansScreenState extends State<AllPlansScreen> {
           ),
         ],
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'FILTER BY TRIP STATUS',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              fontFamily: 'Inter',
-              color: appTheme.gray_800,
-              letterSpacing: 0.8,
+          // Status filter
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'STATUS',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    fontFamily: 'Inter',
+                    color: appTheme.gray_800,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+                const SizedBox(height: 10.0),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14.0),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10.0),
+                    border: Border.all(color: appTheme.gray_200),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: uiState.selectedStatusFilter,
+                      isExpanded: true,
+                      icon: const Icon(Icons.keyboard_arrow_down),
+                      items: const [
+                        DropdownMenuItem(value: 'All Plans', child: Text('All Plans')),
+                        DropdownMenuItem(value: 'Pending', child: Text('Pending')),
+                        DropdownMenuItem(value: 'Ongoing', child: Text('Ongoing')),
+                        DropdownMenuItem(value: 'Completed', child: Text('Completed')),
+                        DropdownMenuItem(value: 'Terminated', child: Text('Terminated')),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          viewModel.setStatusFilter(value);
+                        }
+                      },
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 10.0),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14.0),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10.0),
-              border: Border.all(color: appTheme.gray_200),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: uiState.selectedStatusFilter,
-                isExpanded: true,
-                icon: const Icon(Icons.keyboard_arrow_down),
-                items: const [
-                  DropdownMenuItem(value: 'All Plans', child: Text('All Plans')),
-                  DropdownMenuItem(value: 'Pending', child: Text('Pending')),
-                  DropdownMenuItem(value: 'Ongoing', child: Text('Ongoing')),
-                  DropdownMenuItem(value: 'Completed', child: Text('Completed')),
-                  DropdownMenuItem(value: 'Terminated', child: Text('Terminated')),
-                ],
-                onChanged: (value) {
-                  if (value != null) {
-                    viewModel.setStatusFilter(value);
-                  }
-                },
-              ),
+          const SizedBox(width: 12.0),
+          // Date filter
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'DATE',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    fontFamily: 'Inter',
+                    color: appTheme.gray_800,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+                const SizedBox(height: 10.0),
+                GestureDetector(
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: uiState.selectedDateFilter ?? DateTime.now(),
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime(2100),
+                      builder: (context, child) {
+                        return Theme(
+                          data: Theme.of(context).copyWith(
+                            colorScheme: ColorScheme.light(
+                              primary: appTheme.teal_A700,
+                              onPrimary: appTheme.white_A700,
+                              surface: appTheme.white_A700,
+                            ),
+                          ),
+                          child: child!,
+                        );
+                      },
+                    );
+                    if (picked != null) {
+                      viewModel.setDateFilter(picked);
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14.0,
+                      vertical: 12.0,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10.0),
+                      border: Border.all(color: appTheme.gray_200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.calendar_today_outlined,
+                          size: 18,
+                          color: appTheme.teal_A700,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            uiState.selectedDateFilter != null
+                                ? DateFormat('dd/MM/yy')
+                                    .format(uiState.selectedDateFilter!)
+                                : 'All',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              fontFamily: 'Inter',
+                              color: uiState.selectedDateFilter != null
+                                  ? appTheme.gray_900
+                                  : appTheme.blue_gray_300,
+                            ),
+                          ),
+                        ),
+                        if (uiState.selectedDateFilter != null)
+                          GestureDetector(
+                            onTap: () {
+                              viewModel.setDateFilter(null);
+                            },
+                            child: Icon(
+                              Icons.close,
+                              size: 18,
+                              color: appTheme.gray_800,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],

@@ -765,6 +765,15 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setDateFilter(DateTime? filterDate) {
+    if (filterDate == null) {
+      _uiState = _uiState.copyWith(clearDateFilter: true);
+    } else {
+      _uiState = _uiState.copyWith(selectedDateFilter: filterDate);
+    }
+    notifyListeners();
+  }
+
   Future<void> loadSavedTrip({required String tripId, WholeTrip? trip}) async {
     final startDateStr = trip?.startDate != null
         ? DateFormat('MMM dd').format(trip!.startDate)
