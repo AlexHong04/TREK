@@ -228,10 +228,10 @@ class _ActivityScreenState extends State<ActivityScreen> {
     showBudgetReallocationFailureDialog(
       context: context,
       onContinue: () async {
-        // 1. Dismiss the failure dialog
-        Navigator.of(context, rootNavigator: true).pop();
+        // The dialog closes itself before invoking onContinue, so there is
+        // nothing left to pop here - popping again would close this screen.
 
-        // 2. Show loading spinner while recovery runs
+        // 1. Show loading spinner while recovery runs
         BuildContext? loadingDialogContext;
         showDialog<void>(
           context: context,
@@ -384,11 +384,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
         if (!mounted) return;
 
-        // Dismiss the threshold dialog (still underneath the loading
-        // dialog we just popped) so we return to the activity screen.
-        if (mounted) {
-          Navigator.of(context, rootNavigator: true).pop();
-        }
+        // The threshold dialog already closed itself before onContinue ran, so
+        // we simply stay on the activity screen once the loading dialog is
+        // dismissed. Popping again here would close this screen.
 
         if (success) {
           showThreeSecondMessage(
@@ -565,10 +563,10 @@ class _ActivityScreenState extends State<ActivityScreen> {
     showInsufficientTopUpBudgetRecoveryDialog(
       context: context,
       onContinue: () async {
-        // 1. Close confirmation dialog
-        Navigator.of(context).pop();
+        // The dialog closes itself before invoking onContinue, so there is
+        // nothing left to pop here - popping again would close this screen.
 
-        // 2. Show loading dialog and capture its reference
+        // 1. Show loading dialog and capture its reference
         BuildContext? loadingDialogContext;
 
         showDialog(
@@ -625,11 +623,10 @@ class _ActivityScreenState extends State<ActivityScreen> {
         } catch (e) {
           debugPrint('Recovery plan error: $e');
         } finally {
-          // 3. Pop using the dialog's specific context if it was mounted
+          // Dismiss only the loading dialog, via its own context. Never fall
+          // back to popping the root navigator - that would close this screen.
           if (loadingDialogContext != null && loadingDialogContext!.mounted) {
             Navigator.of(loadingDialogContext!).pop();
-          } else if (mounted) {
-            Navigator.of(context, rootNavigator: true).pop();
           }
         }
 
