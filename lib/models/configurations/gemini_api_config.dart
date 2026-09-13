@@ -321,10 +321,7 @@ $receiptText
     - Target Total Budget: MYR $budget (Malaysian Ringgit, for the ENTIRE $numberOfDays-day trip)
     - Currency: All activity budgets, prices, and totals MUST be in Malaysian Ringgit (MYR).
     
-    CRITICAL MANDATORY GEOGRAPHIC BOUNDARY RULE:
-    - Target Destination: "$destination", Malaysia.
-    - STRICT ENFORCEMENT: EVERY single activity, attraction, restaurant, cafe, hawker stall, shop, landmark, and transit stop MUST be physically located within "$destination", Malaysia!
-    - STRICT PROHIBITION: NEVER propose places from other states or regions. 100% of all attractions, restaurants, and venues across all days MUST be physically located inside "$destination", Malaysia. Recommending any venue outside "$destination" is strictly invalid.
+    - ABSOLUTELY FORBIDDEN: NEVER include or recommend places from other cities or states (for example, if Destination is "$destination", you MUST ONLY choose places located within "$destination", Malaysia. DO NOT include places from other states outside of "$destination"!).
     - Suggesting places outside "$destination" is strictly forbidden and invalid.
     ${preference != null ? '- Preference: $preference (You MUST heavily prioritize planning activities that strictly match this theme!)' : ''}
     - Traveler Arrival & Day 1 Start Time:
@@ -374,20 +371,21 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
     CRITICAL RULE FOR WISHLIST & BUDGET (BUDGET-CONSTRAINED GENERATION):
     - Target Total Budget: MYR $budget for the entire $numberOfDays-day trip.
     - Wishlist destinations requested by user (${wishlist.length} total): ${wishlist.join(', ')}.
-    - MANDATORY HARD BUDGET LIMIT: The total cost of the generated activities ("totalAllocatedBudget") MUST BE STRICTLY LESS THAN OR EQUAL TO the user's Target Total Budget of MYR $budget! You MUST keep the planned itinerary strictly within MYR $budget (aim for around MYR ${(double.tryParse(budget) ?? 60.0) * 0.9} to $budget, NEVER above $budget!).
-    - WISHLIST SELECTION WITHIN BUDGET:
-      * Allocate the available budget (MYR $budget) to include ONLY as many wishlist items as can realistically fit into the budget, alongside essential affordable meals (MYR 5-12 per meal) and minimal transit.
-      * If MYR $budget is INSUFFICIENT to cover all ${wishlist.length} wishlist items:
-        - NEVER try to squeeze too many wishlist items into the plan if it would make the total cost exceed MYR $budget! For example, if including 3 wishlist items pushes the cost to 67.50, you MUST ONLY include 1 or 2 wishlist items so the total cost stays strictly <= MYR $budget!
-        - ONLY include the wishlist items that can realistically fit into the MYR $budget plan!
-        - DO NOT include the remaining wishlist items that cannot fit into MYR $budget in the activities list! Leave them out of the activities list.
-        - "wishlistItemsCoveredCount" MUST BE EXACTLY the number of wishlist items actually scheduled in the "activities" list (e.g. 1 or 2 out of ${wishlist.length}). NEVER report more than the items actually included!
-        - "estimatedExtraBudgetNeeded": Estimate the realistic extra budget in MYR needed to cover the remaining (${wishlist.length} - wishlistItemsCoveredCount) uncovered wishlist items (including their admission tickets and required transport/meals, e.g. MYR 50.00 - 150.00).
-      * If MYR $budget is SUFFICIENT to cover all ${wishlist.length} wishlist items:
-        - Include ALL ${wishlist.length} wishlist items in the activities.
+    - MANDATORY HARD BUDGET LIMIT:
+      * The total cost of the generated itinerary ("totalAllocatedBudget") MUST BE STRICTLY LESS THAN OR EQUAL TO MYR $budget! (e.g. if budget is 10, totalAllocatedBudget MUST be <= 10.00, NEVER above $budget!).
+      * AI Allocated Budget CANNOT exceed the user's budget ($budget).
+    - BUDGET EVALUATION & WISHLIST INCLUSION:
+      * If MYR $budget is INSUFFICIENT to cover a wishlist item (for example, MYR 10.00 cannot cover admission tickets or cannot fit alongside essential meals):
+        - YOU MUST NOT INCLUDE THAT WISHLIST ITEM in the "activities" list! Leave it OUT of the scheduled activities so it remains UNCOVERED.
+        - Set "wishlistItemsCoveredCount" to 0 (or only count the wishlist items that actually fit within MYR $budget).
+        - Schedule affordable, free, or low-cost activities (such as free public parks, walking heritage streets, temples, beaches) so the sum of all activities stays <= MYR $budget.
+        - Set "estimatedExtraBudgetNeeded" to the realistic additional budget needed to cover the omitted wishlist item(s) (e.g. MYR 30.00 - 45.00).
+      * If MYR $budget IS sufficient to cover the wishlist item(s) and necessary meals:
+        - Include the wishlist item(s) in the "activities" list.
         - "wishlistItemsCoveredCount" = ${wishlist.length}.
         - "estimatedExtraBudgetNeeded" = 0.0.
-    - Wishlist scheduling: For the wishlist items that are included, distribute them appropriately across the trip dates.
+        - "totalAllocatedBudget" MUST be <= MYR $budget.
+    - Wishlist scheduling: For any wishlist items that ARE included, distribute them appropriately across the trip dates.
     ''') : '- Wishlist Items: None\n    CRITICAL RULE FOR NO WISHLIST:\n    - The user did NOT provide any wishlist items.\n    - "wishlistItemsCoveredCount" MUST BE EXACTLY 0. Do NOT count general attractions, restaurants, or itinerary activities as wishlist items!'}
 
     Please provide a structured day-by-day itinerary with estimated costs and durations for each activity.
@@ -402,18 +400,20 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
     - "totalAllocatedBudget" MUST equal the exact mathematical sum of all "allocatedBudget" fields (and MUST be <= MYR $budget).
     - "estimatedExtraBudgetNeeded" MUST be 0.0.
     ''' : '''
-    CRITICAL RULE FOR BUDGET & PRICING (STRICT BUDGET CONSTRAINED):
-    - The user provided a budget cap of MYR $budget for the entire $numberOfDays-day trip.
-    - HARD BUDGET LIMIT: The planned itinerary ("totalAllocatedBudget") MUST NOT exceed MYR $budget. Work strictly within this budget!
+    CRITICAL RULE FOR BUDGET & PRICING (REALISTIC BUDGETING):
+    - The user provided a target budget of MYR $budget for the entire $numberOfDays-day trip.
+    - HARD BUDGET LIMIT: "totalAllocatedBudget" MUST BE LESS THAN OR EQUAL TO MYR $budget (totalAllocatedBudget <= $budget). NEVER exceed MYR $budget!
     - PRICING GUIDELINES:
-      * Meals: Hawker stalls, kopitiams, mamak eateries (MYR 5.00 - 12.00 per meal). EVERY "Restaurant" MUST have allocatedBudget >= 4.0. Food is NEVER free.
-      * Transport: WALKING (MYR 0.0) whenever possible. Public transit (MYR 2.00 - 4.00) only when far.
+      * Meals: Hawker stalls, kopitiams, mamak eateries (MYR 5.00 - 12.00 per meal). Food is NEVER free (minimum MYR 4.00 per meal). If budget is extremely tight, schedule fewer or lighter meals within budget.
+      * Transport: WALKING (MYR 0.0) whenever possible. Public transit (MYR 2.00 - 4.00) only when needed.
       * Non-wishlist attractions: MUST be FREE (public parks, heritage streets, temples, beaches, etc.) with allocatedBudget: 0.0.
-      * Paid wishlist items: Use their realistic admission price, but ONLY include as many wishlist items as can fit within MYR $budget.
-    - "totalAllocatedBudget" MUST ALWAYS equal the exact mathematical sum of all "allocatedBudget" fields in the activities list, and MUST be <= MYR $budget.
-    - SUMMARY OF estimatedExtraBudgetNeeded:
-      * If all wishlist items are covered and totalAllocatedBudget <= $budget → estimatedExtraBudgetNeeded = 0.0
-      * If some wishlist items were omitted due to budget shortage → estimatedExtraBudgetNeeded = realistic extra MYR needed to cover the omitted wishlist items.
+      * Wishlist items: Use realistic standard admission prices. If they do not fit in MYR $budget, DO NOT include them in the activities list.
+    - "totalAllocatedBudget" MUST equal the exact mathematical sum of all "allocatedBudget" fields in the activities list (and MUST be <= MYR $budget).
+    - SHORTFALL & EXTRA BUDGET:
+      * If any wishlist items were omitted due to budget constraints:
+        - "estimatedExtraBudgetNeeded" MUST be the realistic extra amount needed to afford the omitted wishlist items.
+      * If all wishlist items are included and totalAllocatedBudget <= $budget:
+        - "estimatedExtraBudgetNeeded" = 0.0.
     '''}
     
     CRITICAL RULE FOR ROUTING:

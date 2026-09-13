@@ -340,6 +340,61 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  void addTransitLeg() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final defaultArrivalDate = _uiState.startDate != null
+        ? _uiState.startDate!.toLocal().toString().split(' ')[0]
+        : '';
+    final defaultDepartureDate = _uiState.endDate != null
+        ? _uiState.endDate!.toLocal().toString().split(' ')[0]
+        : '';
+
+    final updatedArrivals = List<TransitPoint>.from(_uiState.arrivals)
+      ..add(TransitPoint(
+        id: 'arr_$now',
+        location: '',
+        time: '09:00 AM',
+        type: 'Flight',
+        date: defaultArrivalDate,
+      ));
+    final updatedDepartures = List<TransitPoint>.from(_uiState.departures)
+      ..add(TransitPoint(
+        id: 'dep_$now',
+        location: '',
+        time: '09:00 PM',
+        type: 'Flight',
+        date: defaultDepartureDate,
+      ));
+
+    _uiState = _uiState.copyWith(
+      arrivals: updatedArrivals,
+      departures: updatedDepartures,
+    );
+    notifyListeners();
+  }
+
+  void removeTransitLeg(int index) {
+    final updatedArrivals = List<TransitPoint>.from(_uiState.arrivals);
+    final updatedDepartures = List<TransitPoint>.from(_uiState.departures);
+
+    if (updatedArrivals.length > 1 &&
+        index >= 0 &&
+        index < updatedArrivals.length) {
+      updatedArrivals.removeAt(index);
+    }
+    if (updatedDepartures.length > 1 &&
+        index >= 0 &&
+        index < updatedDepartures.length) {
+      updatedDepartures.removeAt(index);
+    }
+
+    _uiState = _uiState.copyWith(
+      arrivals: updatedArrivals,
+      departures: updatedDepartures,
+    );
+    notifyListeners();
+  }
+
   void addArrival() {
     final newId = 'arr_${DateTime.now().millisecondsSinceEpoch}';
     final defaultDate = _uiState.startDate != null

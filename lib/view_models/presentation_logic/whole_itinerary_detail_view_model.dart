@@ -12,6 +12,7 @@ import 'package:intl/intl.dart';
 
 class WholeItineraryDetailViewModel extends ChangeNotifier {
   final IItineraryService _itineraryService;
+  // ignore: unused_field
   final IAuthService _authService;
   final IProfileService _profileService; // added this
 
@@ -512,7 +513,18 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     final double mathShortfall = (_uiState.totalAllocatedBudget - parsedBudget)
         .clamp(0.0, double.infinity);
 
-    final double newExtraBudget = mathShortfall;
+    final int uncoveredCount =
+        (updatedWishlist.length - coveredCount).clamp(0, updatedWishlist.length);
+
+    double newExtraBudget = mathShortfall;
+    if (uncoveredCount > 0 && _uiState.estimatedExtraBudgetNeeded > 0) {
+      final int prevUncovered = (currentWishlist.length -
+              _uiState.wishlistItemsCoveredCount)
+          .clamp(1, currentWishlist.length);
+      newExtraBudget = (_uiState.estimatedExtraBudgetNeeded *
+          uncoveredCount /
+          prevUncovered);
+    }
 
     _uiState = _uiState.copyWith(
       wishlist: updatedWishlist,
