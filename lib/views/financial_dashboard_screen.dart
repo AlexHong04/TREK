@@ -2878,11 +2878,19 @@ class _AvailableDateDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final viewModel = context.watch<FinancialDashboardViewModel>();
     final uiState = viewModel.uiState;
+    final availableDates = [...uiState.availableDates]..sort();
+    final selectedDateIsAvailable = availableDates.any(
+      (date) => DateUtils.isSameDay(date, uiState.selectedDate),
+    );
+    final initialDate = selectedDateIsAvailable || availableDates.isEmpty
+        ? uiState.selectedDate
+        : availableDates.first;
 
     return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 22),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 12),
       backgroundColor: appTheme.white_A700,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      clipBehavior: Clip.antiAlias,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 360),
         child: Column(
@@ -2890,240 +2898,108 @@ class _AvailableDateDialog extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 8, 10, 8),
-              child: Row(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(
-                      'Available Date',
-                      style: TextStyle(
-                        color: appTheme.black,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                      ),
+                  Text(
+                    'Select date',
+                    style: TextStyle(
+                      color: appTheme.gray_900,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
-                  IconButton(
-                    tooltip: 'Close',
-                    onPressed: () => Navigator.pop(context),
-                    icon: Icon(Icons.close_rounded, color: appTheme.gray_900),
+                  const SizedBox(height: 12),
+                  Text(
+                    intl.DateFormat('EEE, MMM d').format(initialDate),
+                    style: TextStyle(
+                      color: appTheme.gray_900,
+                      fontSize: 28,
+                      fontWeight: FontWeight.w400,
+                    ),
                   ),
                 ],
               ),
             ),
             Divider(color: appTheme.gray_200, height: 1),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 14, 24, 14),
-              child: uiState.isLoadingAvailableDates
-                  ? const SizedBox(
-                      height: 220,
-                      child: Center(child: CircularProgressIndicator()),
-                    )
-                  : uiState.availableDatesErrorMessage != null
-                  ? SizedBox(
-                      height: 220,
-                      child: Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              uiState.availableDatesErrorMessage!,
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 12),
-                            FilledButton(
-                              onPressed: viewModel.loadAvailableDates,
-                              child: const Text('Try Again'),
-                            ),
-                          ],
+            if (uiState.isLoadingAvailableDates)
+              const SizedBox(
+                height: 300,
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (uiState.availableDatesErrorMessage != null)
+              SizedBox(
+                height: 300,
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Text(
+                          uiState.availableDatesErrorMessage!,
+                          textAlign: TextAlign.center,
                         ),
                       ),
-                    )
-                  : uiState.availableDates.isEmpty
-                  ? const SizedBox(
-                      height: 220,
-                      child: Center(
-                        child: Text('No available dates for this trip.'),
+                      const SizedBox(height: 12),
+                      FilledButton(
+                        onPressed: viewModel.loadAvailableDates,
+                        child: const Text('Try Again'),
                       ),
-                    )
-                  : _AvailableDateCalendar(
-                      availableDates: uiState.availableDates,
-                      selectedDate: uiState.selectedDate,
-                      displayedMonth: uiState.displayedCalendarMonth,
-                      onPreviousMonth: viewModel.showPreviousCalendarMonth,
-                      onNextMonth: viewModel.showNextCalendarMonth,
-                      onSelected: (date) => Navigator.pop(context, date),
+                    ],
+                  ),
+                ),
+              )
+            else if (availableDates.isEmpty)
+              const SizedBox(
+                height: 300,
+                child: Center(child: Text('No available dates for this trip.')),
+              )
+            else
+              Theme(
+                data: Theme.of(context).copyWith(
+                  colorScheme: ColorScheme.light(
+                    primary: appTheme.teal_A700,
+                    onPrimary: appTheme.white_A700,
+                    surface: appTheme.white_A700,
+                    onSurface: appTheme.gray_900,
+                  ),
+                ),
+                child: CalendarDatePicker(
+                  initialDate: initialDate,
+                  firstDate: availableDates.first,
+                  lastDate: availableDates.last,
+                  selectableDayPredicate: (date) => availableDates.any(
+                    (availableDate) => DateUtils.isSameDay(availableDate, date),
+                  ),
+                  onDateChanged: (date) => Navigator.pop(context, date),
+                ),
+              ),
+            Divider(color: appTheme.gray_200, height: 1),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: appTheme.teal_A700,
+                    foregroundColor: appTheme.white_A700,
+                    shape: const StadiumBorder(),
+                    textStyle: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
                     ),
+                  ),
+                  child: const Text('Cancel'),
+                ),
+              ),
             ),
           ],
         ),
       ),
     );
-  }
-}
-
-class _AvailableDateCalendar extends StatelessWidget {
-  final List<DateTime> availableDates;
-  final DateTime selectedDate;
-  final DateTime displayedMonth;
-  final VoidCallback onPreviousMonth;
-  final VoidCallback onNextMonth;
-  final ValueChanged<DateTime> onSelected;
-
-  const _AvailableDateCalendar({
-    required this.availableDates,
-    required this.selectedDate,
-    required this.displayedMonth,
-    required this.onPreviousMonth,
-    required this.onNextMonth,
-    required this.onSelected,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final firstDay = displayedMonth;
-    final daysInMonth = DateUtils.getDaysInMonth(
-      displayedMonth.year,
-      displayedMonth.month,
-    );
-    final leadingEmptyCells = firstDay.weekday % 7;
-    final totalCells = leadingEmptyCells + daysInMonth;
-    final rowCount = (totalCells / 7).ceil();
-    final weekdays = List.generate(
-      7,
-      (index) => intl.DateFormat(
-        'EEE',
-      ).format(DateTime(2024, 1, 7 + index)).toUpperCase(),
-    );
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 14, 12, 16),
-      decoration: BoxDecoration(
-        color: appTheme.white_A700,
-        border: Border.all(color: appTheme.gray_200),
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: appTheme.black_900_0c,
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                onPressed: onPreviousMonth,
-                icon: const Icon(Icons.chevron_left),
-              ),
-              Expanded(
-                child: Text(
-                  intl.DateFormat('MMMM yyyy').format(displayedMonth),
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: appTheme.gray_900,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                onPressed: onNextMonth,
-                icon: const Icon(Icons.chevron_right),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: weekdays
-                .map(
-                  (weekday) => Expanded(
-                    child: Center(
-                      child: Text(
-                        weekday,
-                        style: TextStyle(
-                          color: appTheme.gray_400,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                )
-                .toList(),
-          ),
-          const SizedBox(height: 8),
-          for (var row = 0; row < rowCount; row++)
-            Row(
-              children: List.generate(7, (column) {
-                final cellIndex = row * 7 + column;
-                final day = cellIndex - leadingEmptyCells + 1;
-                return Expanded(
-                  child: day < 1 || day > daysInMonth
-                      ? const SizedBox(height: 40)
-                      : _buildDay(
-                          DateTime(
-                            displayedMonth.year,
-                            displayedMonth.month,
-                            day,
-                          ),
-                        ),
-                );
-              }),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDay(DateTime date) {
-    final isSelected = _isSameDate(date, selectedDate);
-    final isAvailable = availableDates.any(
-      (availableDate) => _isSameDate(date, availableDate),
-    );
-    final backgroundColor = isSelected
-        ? appTheme.wholeGoodBudgetProgress
-        : isAvailable
-        ? appTheme.teal_50
-        : appTheme.gray_200;
-    final textColor = isSelected
-        ? appTheme.white_A700
-        : isAvailable
-        ? appTheme.teal_800
-        : appTheme.gray_400;
-
-    return Center(
-      child: GestureDetector(
-        onTap: isAvailable ? () => onSelected(date) : null,
-        child: Container(
-          width: 36,
-          height: 36,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: backgroundColor,
-            shape: BoxShape.circle,
-          ),
-          child: Text(
-            '${date.day}',
-            style: TextStyle(
-              color: textColor,
-              fontSize: 16,
-              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  bool _isSameDate(DateTime first, DateTime second) {
-    return first.year == second.year &&
-        first.month == second.month &&
-        first.day == second.day;
   }
 }
