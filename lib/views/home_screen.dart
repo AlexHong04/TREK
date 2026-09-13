@@ -4,12 +4,14 @@ import 'package:Trek/view_models/presentation_logic/activity_view_model.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../theme/app_theme.dart';
 import '../view_models/presentation_logic/home_view_model.dart';
 import '../widgets/dual_currency_amount.dart';
 import 'financial_dashboard_screen.dart';
 import 'profile_screen.dart';
+import 'user_guide_bottom_sheet.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -26,6 +28,27 @@ class _HomeScreenState extends State<HomeScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
   bool _verificationBannerDismissed = false;
+  bool _guideChecked = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_guideChecked) {
+      _guideChecked = true;
+      _maybeShowUserGuide();
+    }
+  }
+
+  Future<void> _maybeShowUserGuide() async {
+    final prefs = await SharedPreferences.getInstance();
+    final hasSeen = prefs.getBool('hasSeenOnboarding') ?? false;
+    if (!hasSeen && mounted) {
+      // Let the home screen finish its first frame before showing the sheet.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) showUserGuideBottomSheet(context);
+      });
+    }
+  }
 
   @override
   void dispose() {

@@ -1056,6 +1056,82 @@ class ItineraryService implements IItineraryService {
     }
   }
 
+  /// Returns the existing place name that [candidate] duplicates, or null when
+  /// the candidate is a genuinely different venue.
+  ///
+  /// Matching is deliberately conservative so real alternatives are never
+  /// rejected by mistake. Two names are only treated as the same venue when:
+  ///   1. they are identical (ignoring case/punctuation), or
+  ///   2. one is a *distinctive* multi-word part of the other
+  ///      (e.g. "KLCC Park" vs "KLCC Park Fountain"), or
+  ///   3. they are near-identical (>= 80% shared words with >= 2 in common),
+  ///      e.g. "Petronas Twin Towers" vs "Petronas Towers".
+  static String? _findDuplicateMatch(
+    String candidate,
+    List<String> existing,
+  ) {
+    final candidateKey = _normalizePlaceName(candidate);
+    if (candidateKey.isEmpty) return null;
+
+    final candidateTokens = candidateKey
+        .split(' ')
+        .where((t) => t.isNotEmpty)
+        .toSet();
+
+    for (final name in existing) {
+      final key = _normalizePlaceName(name);
+      if (key.isEmpty) continue;
+
+      // 1. Identical name.
+      if (key == candidateKey) return name;
+
+      // 2. Whole-word containment, but only for a distinctive contained name
+      //    (multi-word, or a single word of >= 8 chars). This prevents a short
+      //    generic entry (e.g. a city name or "KLCC") from blocking every
+      //    nearby venue.
+      final shorter = key.length <= candidateKey.length ? key : candidateKey;
+      final longer = key.length <= candidateKey.length ? candidateKey : key;
+      final shorterTokenCount =
+          shorter.split(' ').where((t) => t.isNotEmpty).length;
+      if (' $longer '.contains(' $shorter ') &&
+          (shorterTokenCount >= 2 || shorter.length >= 8)) {
+        return name;
+      }
+
+      // 3. Near-identical names: high token overlap.
+      final existingTokens = key
+          .split(' ')
+          .where((t) => t.isNotEmpty)
+          .toSet();
+      final shared = candidateTokens.intersection(existingTokens);
+      if (shared.length >= 2) {
+        final union = candidateTokens.union(existingTokens).length;
+        if (union > 0 && shared.length / union >= 0.8) return name;
+      }
+    }
+    return null;
+  }
+
+  /// Normalises a place name for duplicate comparison: lower-cased, with all
+  /// punctuation collapsed to single spaces.
+  static String _normalizePlaceName(String value) {
+    return value
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
+        .trim()
+        .replaceAll(RegExp(r'\s+'), ' ');
+  }
+
+  /// Deterministic small index derived from a place name, used to vary the
+  /// LoremFlickr placeholder so different activities don't share one image.
+  static int _stableImageLockIndex(String value) {
+    var hash = 0;
+    for (final unit in value.codeUnits) {
+      hash = (hash * 31 + unit) & 0x7fffffff;
+    }
+    return hash % 1000;
+  }
+
   // weisong
   @override
   Future<Activity> generateAlternativeItinerary({
@@ -1077,7 +1153,7 @@ class ItineraryService implements IItineraryService {
     bool isLastDay = false,
     int totalDays = 1,
   }) async {
-    int retries = 3;
+    int retries = 4;
     final List<String> localExcluded = List.from(excludedActivity);
     Map<String, dynamic>? item;
     String destTitle = '';
@@ -1087,7 +1163,12 @@ class ItineraryService implements IItineraryService {
     // Derive target area from surrounding activities for better geographic context
     final targetArea = previousActivityDestination ?? nextActivityDestination ?? destination;
 
+    // Tracks whether the loop ran out of retries while rejecting duplicates, so
+    // a duplicate is never accidentally accepted as the final result.
+    bool blockedByDuplicate = false;
+
     while (retries > 0) {
+      blockedByDuplicate = false;
       final rawJson = await GeminiApiConfig.askGeminiForAlternative(
         destinationCity: destination,
         targetAreaOrNeighborhood: targetArea,
@@ -1118,6 +1199,20 @@ class ItineraryService implements IItineraryService {
         continue;
       }
 
+      // Hard duplicate guard: never accept a place that is already part of the
+      // generated trip plan (or one already rejected during this run). Gemini
+      // can ignore the exclusion list, so it is enforced here in code.
+      final rawDuplicate = _findDuplicateMatch(destTitle, localExcluded);
+      if (rawDuplicate != null) {
+        developer.log(
+          'Alternative destination "$destTitle" duplicates "$rawDuplicate" already in the itinerary. Exclude and retry...',
+        );
+        localExcluded.add(destTitle);
+        blockedByDuplicate = true;
+        retries--;
+        continue;
+      }
+
       if (GooglePlacesApiConfig.isConfigured) {
         try {
           place = await GooglePlacesApiConfig.searchPlace(destTitle);
@@ -1126,6 +1221,24 @@ class ItineraryService implements IItineraryService {
               'Alternative destination "$destTitle" not found in Google Places. Exclude and retry...',
             );
             localExcluded.add(destTitle);
+            retries--;
+            continue;
+          }
+
+          // Google Places canonicalises aliases, so also compare the resolved
+          // name (e.g. Gemini's "Petronas Towers" -> "Petronas Twin Towers").
+          final String resolvedName = place['name']?.toString() ?? '';
+          final resolvedDuplicate = resolvedName.isEmpty
+              ? null
+              : _findDuplicateMatch(resolvedName, localExcluded);
+          if (resolvedDuplicate != null) {
+            developer.log(
+              'Alternative destination resolved to "$resolvedName" which duplicates "$resolvedDuplicate" already in the itinerary. Exclude and retry...',
+            );
+            localExcluded.add(resolvedName);
+            localExcluded.add(destTitle);
+            place = null;
+            blockedByDuplicate = true;
             retries--;
             continue;
           }
@@ -1139,6 +1252,13 @@ class ItineraryService implements IItineraryService {
       break;
     }
 
+    if (blockedByDuplicate) {
+      throw Exception(
+        'Could not find a new activity for this slot — every suggestion was '
+        'already in your itinerary. Please try again.',
+      );
+    }
+
     if (item == null || destTitle.isEmpty) {
       throw Exception(
         'Failed to generate a valid alternative activity searchable on Google Places.',
@@ -1146,10 +1266,9 @@ class ItineraryService implements IItineraryService {
     }
 
     String finalDestinationTitle = destTitle;
-    bool resolvedByGooglePlaces = false;
 
+    // 1. Preferred source: the Google Places photo for this exact venue.
     if (place != null) {
-      resolvedByGooglePlaces = true;
       if (place['name'] != null && place['name'].toString().isNotEmpty) {
         finalDestinationTitle = place['name'];
       }
@@ -1158,23 +1277,36 @@ class ItineraryService implements IItineraryService {
         final firstPhoto = photos.first as Map<String, dynamic>;
         final photoReference = firstPhoto['photo_reference'] as String?;
         if (photoReference != null && photoReference.isNotEmpty) {
-          imgUrl = GooglePlacesApiConfig.getPhotoUrl(photoReference);
+          final placesPhotoUrl = GooglePlacesApiConfig.getPhotoUrl(
+            photoReference,
+          );
+          if (placesPhotoUrl.isNotEmpty) {
+            imgUrl = placesPhotoUrl;
+          }
         }
       }
     }
 
-    // Fallback image resolvers (Wikipedia -> Wikimedia Commons -> LoremFlickr)
-    if (imgUrl.isEmpty && !resolvedByGooglePlaces) {
-      final imageKeyword =
-          (item['imageKeyword'] ?? item['image_keyword'] ?? destTitle)
-              as String;
+    // 2. Fallback chain (Wikipedia -> Wikimedia Commons -> LoremFlickr).
+    // This MUST also run when Google Places found the venue but had no photo,
+    // otherwise the activity would be left with no image at all.
+    if (imgUrl.isEmpty) {
+      final rawKeyword =
+          (item['imageKeyword'] ?? item['image_keyword'])?.toString() ?? '';
+      final imageKeyword = rawKeyword.trim().isNotEmpty
+          ? rawKeyword.trim()
+          : finalDestinationTitle;
       final resolved = await ImageResolverConfig.resolveImage(
         keyword: imageKeyword,
         fallbackTitle: finalDestinationTitle,
-        lockIndex: 0,
+        lockIndex: _stableImageLockIndex(imageKeyword),
       );
       imgUrl = resolved.imageUrl;
-      finalDestinationTitle = resolved.correctedTitle;
+      // Only adopt Wikipedia's corrected title when Google Places did not
+      // already give us a canonical business name.
+      if (place == null && resolved.correctedTitle.isNotEmpty) {
+        finalDestinationTitle = resolved.correctedTitle;
+      }
     }
 
     final double allocatedBudget =
@@ -1194,6 +1326,108 @@ class ItineraryService implements IItineraryService {
       endTime: endTime,
       duration: item['duration'] as String? ?? '60 min',
       activityCategory: item['activityCategory'] as String? ?? category,
+      isOverspend: false,
+    );
+  }
+
+  @override
+  Future<Activity> regenerateTransportation({
+    required String originPlace,
+    required String destinationPlace,
+    required String city,
+    required String existingActivityId,
+    required String dayTripId,
+    required DateTime date,
+    String? startTime,
+    String? endTime,
+  }) async {
+    final rawJson = await GeminiApiConfig.askGeminiForTransportation(
+      originPlace: originPlace,
+      destinationPlace: destinationPlace,
+      city: city,
+    );
+
+    Map<String, dynamic> item;
+    try {
+      item = jsonDecode(rawJson);
+    } catch (e) {
+      developer.log('Error decoding transportation JSON: $e');
+      // Fallback: simple walking transport
+      item = {
+        'destination': 'Walk to $destinationPlace',
+        'description': 'Commute to the next activity',
+        'duration': '15 min',
+        'allocatedBudget': 0.0,
+      };
+    }
+
+    final destName =
+        item['destination'] as String? ?? 'Walk to $destinationPlace';
+    final imageKeyword =
+        (item['imageKeyword'] ?? item['image_keyword'] ?? destName) as String;
+
+    String imgUrl = '';
+    String finalDestinationTitle = destName;
+    bool resolvedByGooglePlaces = false;
+
+    // Google Places API image resolution
+    if (GooglePlacesApiConfig.isConfigured) {
+      try {
+        final place = await GooglePlacesApiConfig.searchPlace(destName);
+        if (place != null) {
+          resolvedByGooglePlaces = true;
+          if (place['name'] != null &&
+              place['name'].toString().isNotEmpty) {
+            finalDestinationTitle = place['name'];
+          }
+          final photos = place['photos'] as List?;
+          if (photos != null && photos.isNotEmpty) {
+            final firstPhoto = photos.first as Map<String, dynamic>;
+            final photoReference =
+                firstPhoto['photo_reference'] as String?;
+            if (photoReference != null && photoReference.isNotEmpty) {
+              imgUrl = GooglePlacesApiConfig.getPhotoUrl(photoReference);
+            }
+          }
+        }
+      } catch (e) {
+        developer.log(
+          'Google Places resolution error for transport $destName: $e',
+        );
+      }
+    }
+
+    // Fallback image resolvers (Wikipedia -> Wikimedia Commons -> LoremFlickr)
+    if (imgUrl.isEmpty && !resolvedByGooglePlaces) {
+      try {
+        final resolved = await ImageResolverConfig.resolveImage(
+          keyword: imageKeyword,
+          fallbackTitle: finalDestinationTitle,
+          lockIndex: 0,
+        );
+        imgUrl = resolved.imageUrl;
+        finalDestinationTitle = resolved.correctedTitle;
+      } catch (_) {}
+    }
+
+    final double allocatedBudget =
+        (item['allocatedBudget'] as num?)?.toDouble() ?? 0.0;
+
+    return Activity(
+      activitiesId: existingActivityId,
+      dayTripId: dayTripId,
+      date: date,
+      destination: finalDestinationTitle,
+      description:
+          item['description'] as String? ?? 'Commute between activities',
+      activityImgUrl: imgUrl,
+      allocatedBudget: allocatedBudget,
+      overspendAmount: allocatedBudget > 0 ? 0 : null,
+      status: 'pending',
+      startTime: startTime,
+      endTime: endTime,
+      duration: item['duration'] as String? ?? '15 min',
+      activityCategory: 'Transportation',
       isOverspend: false,
     );
   }
