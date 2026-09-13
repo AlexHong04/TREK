@@ -171,6 +171,13 @@ class NotificationSource {
     await _notifications.cancel(id: id);
   }
 
+  /// Clears all local notifications scheduled by the app, for example when
+  /// the tourist logs out so reminders from the previous account do not show.
+  Future<void> cancelAllNotifications() async {
+    await initialize();
+    await _notifications.cancelAll();
+  }
+
   /// Immediately posts a heads-up notification that plays the app's reminder
   /// sound. Used to alert the tourist the moment a recorded expense pushes an
   /// activity over / close to its budget, without waiting for a scheduled
