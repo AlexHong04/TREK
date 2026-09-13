@@ -9,6 +9,7 @@ class LoginUiState {
   final bool loginSucceeded;
   final bool showMagicLinkOption;
   final bool magicLinkSent;
+  final int emailCooldownSeconds;
   final String? emailError;
   final String? passwordError;
   final String? errorMessage;
@@ -22,6 +23,7 @@ class LoginUiState {
     this.loginSucceeded = false,
     this.showMagicLinkOption = false,
     this.magicLinkSent = false,
+    this.emailCooldownSeconds = 0,
     this.emailError,
     this.passwordError,
     this.errorMessage,
@@ -36,6 +38,7 @@ class LoginUiState {
     bool? loginSucceeded,
     bool? showMagicLinkOption,
     bool? magicLinkSent,
+    int? emailCooldownSeconds,
     String? emailError,
     String? passwordError,
     String? errorMessage,
@@ -53,6 +56,8 @@ class LoginUiState {
       loginSucceeded: loginSucceeded ?? this.loginSucceeded,
       showMagicLinkOption: showMagicLinkOption ?? this.showMagicLinkOption,
       magicLinkSent: magicLinkSent ?? this.magicLinkSent,
+      emailCooldownSeconds:
+      emailCooldownSeconds ?? this.emailCooldownSeconds,
       emailError: clearEmailError ? null : (emailError ?? this.emailError),
       passwordError:
       clearPasswordError ? null : (passwordError ?? this.passwordError),

@@ -12,6 +12,9 @@ class VerificationGateViewModel extends ChangeNotifier {
   VerificationGateViewModel(this._authService)
       : _uiState = VerificationGateUiState(
     email: _authService.currentUser?.email ?? '',
+    cooldownSeconds: _authService.emailCooldownSeconds(
+      EmailActionType.verification,
+    ),
   ) {
     _authService.addListener(_syncEmail);
   }
@@ -20,7 +23,9 @@ class VerificationGateViewModel extends ChangeNotifier {
   VerificationGateUiState get uiState => _uiState;
 
   Future<void> sendVerificationLink() async {
-    if (_uiState.isBusy || _authService.isOffline) {
+    if (_uiState.isBusy ||
+        _uiState.cooldownSeconds > 0 ||
+        _authService.isOffline) {
       if (_authService.isOffline) {
         _uiState = _uiState.copyWith(
           errorMessage: 'No internet connection. Check your connection and try again.',
@@ -40,6 +45,12 @@ class VerificationGateViewModel extends ChangeNotifier {
       _uiState = _uiState.copyWith(
         isSending: false,
         errorMessage: 'No internet connection. Check your connection and try again.',
+      );
+    } on EmailRequestRateLimitedException catch (error) {
+      if (_disposed) return;
+      _uiState = _uiState.copyWith(
+        isSending: false,
+        cooldownSeconds: error.retryAfterSeconds,
       );
     } catch (_) {
       if (_disposed) return;
@@ -69,8 +80,20 @@ class VerificationGateViewModel extends ChangeNotifier {
 
   void _syncEmail() {
     final email = _authService.currentUser?.email;
-    if (email == null || email == _uiState.email) return;
-    _uiState = _uiState.copyWith(email: email, linkSent: false);
+    final cooldown = _authService.emailCooldownSeconds(
+      EmailActionType.verification,
+    );
+    if ((email == null || email == _uiState.email) &&
+        cooldown == _uiState.cooldownSeconds) {
+      return;
+    }
+    _uiState = _uiState.copyWith(
+      email: email ?? _uiState.email,
+      linkSent: email == null || email == _uiState.email
+          ? _uiState.linkSent
+          : false,
+      cooldownSeconds: cooldown,
+    );
     _notify();
   }
 

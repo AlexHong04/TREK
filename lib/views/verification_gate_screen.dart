@@ -42,9 +42,15 @@ class VerificationGateScreen extends StatelessWidget {
                   const SizedBox(height: 12),
                 ],
                 AuthPrimaryButton(
-                  label: state.linkSent ? 'Resend Verification Link' : 'Send Verification Link',
+                  label: state.cooldownSeconds > 0
+                      ? 'Send again in ${state.cooldownSeconds}s'
+                      : state.linkSent
+                      ? 'Resend Verification Link'
+                      : 'Send Verification Link',
                   isLoading: state.isSending,
-                  onPressed: state.isBusy ? null : viewModel.sendVerificationLink,
+                  onPressed: state.isBusy || state.cooldownSeconds > 0
+                      ? null
+                      : viewModel.sendVerificationLink,
                 ),
                 const SizedBox(height: 10),
                 OutlinedButton(

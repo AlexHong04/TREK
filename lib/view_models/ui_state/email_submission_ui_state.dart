@@ -5,6 +5,7 @@ class EmailSubmissionUiState {
   final String email;
   final bool isLoading;
   final bool linkSent;
+  final int cooldownSeconds;
   final String? emailError;
   final String? errorMessage;
 
@@ -12,6 +13,7 @@ class EmailSubmissionUiState {
     this.email = '',
     this.isLoading = false,
     this.linkSent = false,
+    this.cooldownSeconds = 0,
     this.emailError,
     this.errorMessage,
   });
@@ -20,6 +22,7 @@ class EmailSubmissionUiState {
     String? email,
     bool? isLoading,
     bool? linkSent,
+    int? cooldownSeconds,
     String? emailError,
     String? errorMessage,
     bool clearEmailError = false,
@@ -29,6 +32,7 @@ class EmailSubmissionUiState {
       email: email ?? this.email,
       isLoading: isLoading ?? this.isLoading,
       linkSent: linkSent ?? this.linkSent,
+      cooldownSeconds: cooldownSeconds ?? this.cooldownSeconds,
       emailError: clearEmailError ? null : (emailError ?? this.emailError),
       errorMessage:
       clearErrorMessage ? null : (errorMessage ?? this.errorMessage),

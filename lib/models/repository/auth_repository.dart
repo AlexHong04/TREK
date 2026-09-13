@@ -18,6 +18,9 @@ class AuthRepository implements IAuthRepository {
 
   static const _recoveryRequestIdKey = 'trek.recovery.request_id';
   static const _recoveryDeviceSecretKey = 'trek.recovery.device_secret';
+  static const _emailLoginRequestIdKey = 'trek.email_login.request_id';
+  static const _emailLoginDeviceSecretKey =
+      'trek.email_login.device_secret';
 
   AuthRepository(
       this._client, {
@@ -172,14 +175,150 @@ class AuthRepository implements IAuthRepository {
   @override
   Future<void> sendMagicLink({required String email}) async {
     try {
-      await _client.auth.signInWithOtp(
-        email: InputValidator.normalizeEmail(email),
-        emailRedirectTo: authCallbackUrl,
-        shouldCreateUser: false,
+      final response = await _client.functions.invoke(
+        'email-action',
+        body: {
+          'action': 'request-verification',
+          'email': InputValidator.normalizeEmail(email),
+        },
       );
+      _throwIfEmailRateLimited(response.status, response.data);
+      if (response.status < 200 || response.status >= 300) {
+        throw StateError(_responseMessage(response.data));
+      }
+    } on RepositoryEmailRateLimitedException {
+      rethrow;
+    } on supabase.FunctionException catch (error) {
+      if (isNetworkUnavailable(error)) {
+        throw const NetworkUnavailableException();
+      }
+      final data = _functionExceptionData(error);
+      _throwIfEmailRateLimited(error.status, data);
+      throw StateError(_responseMessage(data));
     } catch (error) {
       rethrowAsNetworkUnavailable<void>(error);
     }
+  }
+
+  @override
+  Future<void> requestDeviceEmailLogin({required String email}) async {
+    final deviceSecret = _randomSecret();
+    try {
+      final response = await _client.functions.invoke(
+        'email-login',
+        body: {
+          'action': 'request',
+          'email': InputValidator.normalizeEmail(email),
+          'device_secret': deviceSecret,
+        },
+      );
+      _throwIfEmailRateLimited(response.status, response.data);
+      final data = response.data;
+      if (response.status < 200 || response.status >= 300 ||
+          data is! Map || data['request_id'] == null) {
+        throw StateError(_responseMessage(data));
+      }
+      await _secureStorage.write(
+        key: _emailLoginRequestIdKey,
+        value: data['request_id'].toString(),
+      );
+      await _secureStorage.write(
+        key: _emailLoginDeviceSecretKey,
+        value: deviceSecret,
+      );
+    } on RepositoryEmailRateLimitedException {
+      rethrow;
+    } on supabase.FunctionException catch (error) {
+      final data = _functionExceptionData(error);
+      _throwIfEmailRateLimited(error.status, data);
+      throw StateError(_responseMessage(data));
+    } catch (error) {
+      rethrowAsNetworkUnavailable<void>(error);
+    }
+  }
+
+  @override
+  Future<bool> hasPendingDeviceEmailLogin() async {
+    final values = await Future.wait([
+      _secureStorage.read(key: _emailLoginRequestIdKey),
+      _secureStorage.read(key: _emailLoginDeviceSecretKey),
+    ]);
+    return values.every((value) => value?.isNotEmpty == true);
+  }
+
+  @override
+  Future<DeviceEmailLoginStatus> getPendingDeviceEmailLoginStatus() async {
+    final pending = await _pendingEmailLoginValues();
+    if (pending == null) return DeviceEmailLoginStatus.expired;
+    try {
+      final response = await _client.functions.invoke(
+        'email-login',
+        body: {
+          'action': 'status',
+          'request_id': pending.$1,
+          'device_secret': pending.$2,
+        },
+      );
+      if (response.status < 200 || response.status >= 300) {
+        throw StateError(_responseMessage(response.data));
+      }
+      final data = response.data;
+      final status = data is Map ? data['status']?.toString() : null;
+      if (status == 'ready' && data is Map) {
+        final tokenHash = data['token_hash']?.toString() ?? '';
+        if (tokenHash.isEmpty) {
+          throw StateError('The secure email login token is unavailable.');
+        }
+        final authResponse = await _client.auth.verifyOTP(
+          tokenHash: tokenHash,
+          type: supabase.OtpType.email,
+        );
+        if (authResponse.user == null || authResponse.session == null) {
+          throw StateError('The secure email login could not be completed.');
+        }
+        try {
+          await _client.functions.invoke(
+            'email-login',
+            body: {
+              'action': 'complete',
+              'request_id': pending.$1,
+              'device_secret': pending.$2,
+            },
+          );
+        } catch (_) {
+          // Authentication already succeeded. Completion is only server-side
+          // request cleanup and must not discard the valid phone session.
+        }
+        await clearPendingDeviceEmailLogin();
+        return DeviceEmailLoginStatus.signedIn;
+      }
+      return switch (status) {
+        'completed' => DeviceEmailLoginStatus.completed,
+        'expired' => DeviceEmailLoginStatus.expired,
+        _ => DeviceEmailLoginStatus.pending,
+      };
+    } catch (error) {
+      return rethrowAsNetworkUnavailable(error);
+    }
+  }
+
+  @override
+  Future<void> clearPendingDeviceEmailLogin() async {
+    await Future.wait([
+      _secureStorage.delete(key: _emailLoginRequestIdKey),
+      _secureStorage.delete(key: _emailLoginDeviceSecretKey),
+    ]);
+  }
+
+  Future<(String, String)?> _pendingEmailLoginValues() async {
+    final requestId = await _secureStorage.read(key: _emailLoginRequestIdKey);
+    final secret =
+    await _secureStorage.read(key: _emailLoginDeviceSecretKey);
+    if (requestId == null || requestId.isEmpty ||
+        secret == null || secret.isEmpty) {
+      return null;
+    }
+    return (requestId, secret);
   }
 
   @override
@@ -195,6 +334,7 @@ class AuthRepository implements IAuthRepository {
         },
       );
       final data = response.data;
+      _throwIfEmailRateLimited(response.status, data);
       if (response.status < 200 || response.status >= 300 ||
           data is! Map || data['request_id'] == null) {
         throw StateError(_responseMessage(data));
@@ -207,6 +347,12 @@ class AuthRepository implements IAuthRepository {
         key: _recoveryDeviceSecretKey,
         value: deviceSecret,
       );
+    } on RepositoryEmailRateLimitedException {
+      rethrow;
+    } on supabase.FunctionException catch (error) {
+      final data = _functionExceptionData(error);
+      _throwIfEmailRateLimited(error.status, data);
+      throw StateError(_responseMessage(data));
     } catch (error) {
       rethrowAsNetworkUnavailable<void>(error);
     }
@@ -350,6 +496,7 @@ class AuthRepository implements IAuthRepository {
         'request-email-correction',
         body: {'new_email': InputValidator.normalizeEmail(newEmail)},
       );
+      _throwIfEmailRateLimited(response.status, response.data);
       if (response.status < 200 || response.status >= 300) {
         final message = _responseMessage(response.data);
         final normalizedMessage = message.toLowerCase();
@@ -369,6 +516,26 @@ class AuthRepository implements IAuthRepository {
       rethrow;
     } on RepositoryRecentAuthenticationRequiredException {
       rethrow;
+    } on RepositoryEmailRateLimitedException {
+      rethrow;
+    } on supabase.FunctionException catch (error) {
+      if (isNetworkUnavailable(error)) {
+        throw const NetworkUnavailableException();
+      }
+      final data = _functionExceptionData(error);
+      _throwIfEmailRateLimited(error.status, data);
+      final message = _responseMessage(data);
+      final normalizedMessage = message.toLowerCase();
+      if (error.status == 409 &&
+          (normalizedMessage.contains('email_exists') ||
+              normalizedMessage.contains('already registered') ||
+              normalizedMessage.contains('already in use'))) {
+        throw const RepositoryEmailAlreadyExistsException();
+      }
+      if (error.status == 401 && normalizedMessage.contains('recent')) {
+        throw const RepositoryRecentAuthenticationRequiredException();
+      }
+      throw RepositoryEmailChangeException(message);
     } on RepositoryEmailChangeException {
       rethrow;
     } catch (error) {
@@ -507,6 +674,7 @@ class AuthRepository implements IAuthRepository {
         'request-account-deletion',
         body: {'skip_email_confirmation': skipEmailConfirmation},
       );
+      _throwIfEmailRateLimited(response.status, response.data);
       if (response.status < 200 || response.status >= 300) {
         throw RepositoryAccountDeletionException(
           _responseMessage(response.data),
@@ -514,6 +682,15 @@ class AuthRepository implements IAuthRepository {
       }
       final data = response.data;
       return data is Map && data['ready_for_final_confirmation'] == true;
+    } on RepositoryEmailRateLimitedException {
+      rethrow;
+    } on supabase.FunctionException catch (error) {
+      if (isNetworkUnavailable(error)) {
+        throw const NetworkUnavailableException();
+      }
+      final data = _functionExceptionData(error);
+      _throwIfEmailRateLimited(error.status, data);
+      throw RepositoryAccountDeletionException(_responseMessage(data));
     } catch (error) {
       if (isNetworkUnavailable(error)) {
         throw const NetworkUnavailableException();
@@ -615,6 +792,28 @@ class AuthRepository implements IAuthRepository {
       return data['message'].toString();
     }
     return 'The account operation could not be completed.';
+  }
+
+  static void _throwIfEmailRateLimited(int status, Object? data) {
+    if (status != 429) return;
+    final retryAfter = data is Map
+        ? (data['retry_after_seconds'] as num?)?.ceil()
+        : null;
+    throw RepositoryEmailRateLimitedException(
+      retryAfter == null || retryAfter < 1 ? 60 : retryAfter,
+    );
+  }
+
+  static Object? _functionExceptionData(
+      supabase.FunctionException error,
+      ) {
+    final details = error.details;
+    if (details is! String) return details;
+    try {
+      return jsonDecode(details);
+    } catch (_) {
+      return {'message': details};
+    }
   }
 }
 

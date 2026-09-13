@@ -233,13 +233,16 @@ class _LoginScreenState extends State<LoginScreen>
                       ),
                       if (state.showMagicLinkOption)
                         TextButton(
-                          onPressed: state.isLoading
+                          onPressed: state.isLoading ||
+                              state.emailCooldownSeconds > 0
                               ? null
                               : viewModel.onSendMagicLinkPressed,
                           child: Text(
-                            state.magicLinkSent
-                                ? 'Secure login link sent'
-                                : 'Continue with email (magic link)',
+                            state.emailCooldownSeconds > 0
+                                ? 'Send again in ${state.emailCooldownSeconds}s'
+                                : state.magicLinkSent
+                                ? 'Send secure login link again'
+                                : 'Continue with email',
                           ),
                         ),
                       const SizedBox(height: 22),

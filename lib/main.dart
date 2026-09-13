@@ -10,6 +10,7 @@ import 'utils/input_validator.dart';
 
 import 'models/configurations/supabase_config.dart';
 import 'models/configurations/gemini_api_config.dart';
+import 'models/configurations/frankfurter_api_config.dart';
 
 import 'models/repository/auth_repository.dart';
 import 'models/repository/i_auth_repository.dart';
@@ -96,6 +97,8 @@ Future<void> main() async {
   // Initialize Gemini config
   GeminiApiConfig.initialize();
 
+  unawaited(FrankfurterApiConfig.initialize());
+
   final IAuthRepository authRepository = AuthRepository(
     SupabaseConfig.client,
     authCallbackUrl: SupabaseConfig.authCallbackUrl,
@@ -149,6 +152,7 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   AuthDestination? _lastRoutedDestination;
   bool _navigationScheduled = false;
+  String? _pendingSessionMessage;
 
   @override
   void initState() {
@@ -156,6 +160,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _lastRoutedDestination = widget.authService.destination;
     widget.authService.addListener(_scheduleAuthNavigation);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _scheduleAuthNavigation();
+    });
   }
 
   @override
@@ -190,18 +197,49 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       if (!mounted) return;
 
       final destination = widget.authService.destination;
-      if (destination == _lastRoutedDestination) return;
+      _pendingSessionMessage ??= widget.authService.consumeSessionMessage();
       final navigator = NavigatorService.navigatorKey.currentState;
-      if (navigator == null) {
+      if (destination != _lastRoutedDestination && navigator == null) {
         _scheduleAuthNavigation();
         return;
       }
 
-      _lastRoutedDestination = destination;
-      navigator.pushNamedAndRemoveUntil(
-        _routeFor(destination),
-            (_) => false,
-      );
+      if (destination != _lastRoutedDestination) {
+        _lastRoutedDestination = destination;
+        navigator!.pushNamedAndRemoveUntil(
+          _routeFor(destination),
+              (_) => false,
+        );
+      }
+
+      if (_pendingSessionMessage != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final messenger = globalMessengerKey.currentState;
+          if (!mounted) return;
+          if (messenger == null) {
+            _scheduleAuthNavigation();
+            return;
+          }
+          final message = _pendingSessionMessage;
+          if (message == null) return;
+          _pendingSessionMessage = null;
+          messenger
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              SnackBar(
+                content: Text(message),
+                duration: const Duration(seconds: 3),
+                behavior: SnackBarBehavior.floating,
+                backgroundColor: appTheme.teal_700,
+              ),
+            );
+          final next = widget.authService.consumeSessionMessage();
+          if (next != null) {
+            _pendingSessionMessage = next;
+            _scheduleAuthNavigation();
+          }
+        });
+      }
     });
   }
 

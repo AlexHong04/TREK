@@ -200,7 +200,9 @@ class ProfileScreen extends StatelessWidget {
                                   MaterialTapTargetSize.shrinkWrap,
                                   visualDensity: VisualDensity.compact,
                                 ),
-                                onPressed: state.isBusy || state.isOffline
+                                onPressed: state.isBusy ||
+                                    state.isOffline ||
+                                    state.verificationCooldownSeconds > 0
                                     ? null
                                     : viewModel.sendVerificationEmail,
                                 child: state.isSendingVerification
@@ -211,7 +213,11 @@ class ProfileScreen extends StatelessWidget {
                                     color: appTheme.teal_A700,
                                   ),
                                 )
-                                    : const Text('Verify email'),
+                                    : Text(
+                                  state.verificationCooldownSeconds > 0
+                                      ? '${state.verificationCooldownSeconds}s'
+                                      : 'Verify email',
+                                ),
                               ),
                           ],
                         ),
@@ -345,20 +351,36 @@ class ProfileScreen extends StatelessWidget {
       ) async {
     final confirmed = await showDialog<bool>(
       context: context,
+      barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
         icon: Icon(Icons.logout_outlined, color: appTheme.teal_A700),
         title: const Text('Log out of TREK?'),
         content: const Text(
           'You will need to sign in again to access your account.',
         ),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Logout'),
+          SizedBox(
+            width: double.maxFinite,
+            child: Row(
+              children: [
+                Expanded(
+                  child: _LogoutDialogButton(
+                    text: 'Cancel',
+                    backgroundColor: appTheme.errorRed,
+                    onPressed: () => Navigator.pop(dialogContext, false),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _LogoutDialogButton(
+                    text: 'Confirm',
+                    backgroundColor: appTheme.teal_A700,
+                    onPressed: () => Navigator.pop(dialogContext, true),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -366,6 +388,36 @@ class ProfileScreen extends StatelessWidget {
     if (confirmed == true) await viewModel.logout();
   }
 
+}
+
+class _LogoutDialogButton extends StatelessWidget {
+  final String text;
+  final Color backgroundColor;
+  final VoidCallback onPressed;
+
+  const _LogoutDialogButton({
+    required this.text,
+    required this.backgroundColor,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 46,
+      child: FilledButton(
+        onPressed: onPressed,
+        style: FilledButton.styleFrom(
+          backgroundColor: backgroundColor,
+          foregroundColor: appTheme.white_A700,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: Text(text),
+      ),
+    );
+  }
 }
 
 class _ProfilePicture extends StatelessWidget {

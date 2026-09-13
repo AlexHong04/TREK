@@ -199,48 +199,73 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       BuildContext context,
       ChangePasswordViewModel viewModel,
       ) async {
-    final shouldLogout = await showDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
+      barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
         icon: Icon(Icons.security_outlined, color: appTheme.teal_A700),
         title: const Text('Sign in with Google again'),
         content: const Text(
           'For security, log out and sign in with Google again before setting your password.',
         ),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton.icon(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            icon: const Icon(Icons.logout_outlined),
-            label: const Text('Logout'),
-          ),
-        ],
-      ),
-    );
-    if (shouldLogout != true || !context.mounted) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Log out?'),
-        content: const Text(
-          'You will be logged out of TREK and can sign in with Google again.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Logout'),
+          SizedBox(
+            width: double.maxFinite,
+            child: Row(
+              children: [
+                Expanded(
+                  child: _LogoutDialogButton(
+                    text: 'Cancel',
+                    backgroundColor: appTheme.errorRed,
+                    onPressed: () => Navigator.pop(dialogContext, false),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _LogoutDialogButton(
+                    text: 'Confirm',
+                    backgroundColor: appTheme.teal_A700,
+                    onPressed: () => Navigator.pop(dialogContext, true),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
     if (confirmed == true) await viewModel.logoutForGoogleReauthentication();
+  }
+}
+
+class _LogoutDialogButton extends StatelessWidget {
+  final String text;
+  final Color backgroundColor;
+  final VoidCallback onPressed;
+
+  const _LogoutDialogButton({
+    required this.text,
+    required this.backgroundColor,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 46,
+      child: FilledButton(
+        onPressed: onPressed,
+        style: FilledButton.styleFrom(
+          backgroundColor: backgroundColor,
+          foregroundColor: appTheme.white_A700,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: Text(text),
+      ),
+    );
   }
 }
 

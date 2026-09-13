@@ -20,6 +20,9 @@ class LoginViewModel extends ChangeNotifier {
       })
       : _uiState = LoginUiState(
     email: initialEmail.trim(),
+    emailCooldownSeconds: _authService.emailCooldownSeconds(
+      EmailActionType.lockedAccountLogin,
+    ),
     infoMessage: _authService.consumeSessionMessage(),
   ) {
     _authService.addListener(_handleAuthStateChanged);
@@ -185,15 +188,28 @@ class LoginViewModel extends ChangeNotifier {
   }
 
   void _handleAuthStateChanged() {
-    if (!_googleSignInPending || !_authService.isLoggedIn) return;
-    _googleSignInPending = false;
-    // Keep the page locked until the app-level auth listener replaces this
-    // route. Re-enabling here leaves a short window in which the OAuth session
-    // exists but the Login page can still be edited or submitted again.
+    final cooldown = _authService.emailCooldownSeconds(
+      EmailActionType.lockedAccountLogin,
+    );
+    final cooldownChanged = cooldown != _uiState.emailCooldownSeconds;
+    if (cooldownChanged) {
+      _uiState = _uiState.copyWith(emailCooldownSeconds: cooldown);
+    }
+    if (_googleSignInPending && _authService.isLoggedIn) {
+      _googleSignInPending = false;
+      // Keep the page locked until the app-level auth listener replaces this
+      // route. Re-enabling here leaves a short window in which the OAuth
+      // session exists but Login can still be submitted again.
+    }
+    if (cooldownChanged) _notify();
   }
 
   Future<void> onSendMagicLinkPressed() async {
-    if (_uiState.isLoading || !_uiState.showMagicLinkOption) return;
+    if (_uiState.isLoading ||
+        !_uiState.showMagicLinkOption ||
+        _uiState.emailCooldownSeconds > 0) {
+      return;
+    }
     _uiState = _uiState.copyWith(isLoading: true, clearErrorMessage: true);
     _notify();
     try {
@@ -207,6 +223,12 @@ class LoginViewModel extends ChangeNotifier {
       _uiState = _uiState.copyWith(
         isLoading: false,
         errorMessage: 'No internet connection. Check your connection and try again.',
+      );
+    } on EmailRequestRateLimitedException catch (error) {
+      if (_disposed) return;
+      _uiState = _uiState.copyWith(
+        isLoading: false,
+        emailCooldownSeconds: error.retryAfterSeconds,
       );
     } catch (_) {
       if (_disposed) return;

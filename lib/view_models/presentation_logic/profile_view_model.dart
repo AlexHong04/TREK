@@ -153,6 +153,7 @@ class ProfileViewModel extends ChangeNotifier {
   Future<void> sendVerificationEmail() async {
     if (_uiState.isEmailVerified ||
         _uiState.isSendingVerification ||
+        _uiState.verificationCooldownSeconds > 0 ||
         _uiState.isOffline) {
       return;
     }
@@ -176,6 +177,12 @@ class ProfileViewModel extends ChangeNotifier {
         isSendingVerification: false,
         isOffline: true,
         errorMessage: 'No internet connection. Check your connection and try again.',
+      );
+    } on EmailRequestRateLimitedException catch (error) {
+      if (_disposed) return;
+      _uiState = _uiState.copyWith(
+        isSendingVerification: false,
+        verificationCooldownSeconds: error.retryAfterSeconds,
       );
     } catch (_) {
       if (_disposed) return;
@@ -214,13 +221,7 @@ class ProfileViewModel extends ChangeNotifier {
 
   void _syncFromServices() {
     if (_authService.currentUser == null) return;
-    final wasVerified = _uiState.isEmailVerified;
     _applyCurrentUser();
-    if (!wasVerified && _uiState.isEmailVerified) {
-      _uiState = _uiState.copyWith(
-        successMessage: 'Email verified successfully.',
-      );
-    }
     _notify();
   }
 
@@ -238,6 +239,9 @@ class ProfileViewModel extends ChangeNotifier {
       cachedProfilePicturePath: user.cachedProfilePicturePath,
       isEmailVerified: user.isEmailVerified,
       verificationDaysRemaining: _authService.verificationDaysRemaining,
+      verificationCooldownSeconds: _authService.emailCooldownSeconds(
+        EmailActionType.verification,
+      ),
       hasPasswordSignIn: info?.hasPasswordSignIn ?? false,
       isOffline: _authService.isOffline,
       isLoading: isLoading,

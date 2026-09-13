@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../utils/input_validator.dart';
 import '../../utils/network_error.dart';
@@ -18,11 +19,17 @@ class AuthService extends ChangeNotifier implements IAuthService {
   bool _isPasswordRecovery = false;
   bool _hasCrossDeviceRecovery = false;
   bool _recoveryStatusCheckInFlight = false;
+  bool _hasCrossDeviceEmailLogin = false;
+  bool _emailLoginStatusCheckInFlight = false;
   bool _isOffline = false;
   bool _requiresEmailVerification = false;
   int _verificationDaysRemaining = 0;
   AuthDestination _destination = AuthDestination.signedOut;
   String? _sessionMessage;
+  String? _pendingEmailChangeTarget;
+  String? _pendingVerificationAuthId;
+  String? _pendingDeletionAuthId;
+  bool _persistentEmailStateRestored = false;
   bool _disposed = false;
   bool _googleIdentityMutationInProgress = false;
   int _identityMutationVersion = 0;
@@ -30,6 +37,9 @@ class AuthService extends ChangeNotifier implements IAuthService {
   String? _activeAccountAuthId;
   Timer? _verificationDeadlineTimer;
   Timer? _passwordRecoveryTimer;
+  Timer? _emailLoginTimer;
+  Timer? _emailCooldownTimer;
+  final Map<EmailActionType, DateTime> _emailCooldownUntil = {};
   StreamSubscription<AuthSessionSnapshot>? _authSubscription;
   StreamSubscription<User?>? _profileSubscription;
 
@@ -60,6 +70,14 @@ class AuthService extends ChangeNotifier implements IAuthService {
   int get verificationDaysRemaining => _verificationDaysRemaining;
 
   @override
+  int emailCooldownSeconds(EmailActionType action) {
+    final until = _emailCooldownUntil[action];
+    if (until == null) return 0;
+    final milliseconds = until.difference(DateTime.now().toUtc()).inMilliseconds;
+    return milliseconds <= 0 ? 0 : (milliseconds + 999) ~/ 1000;
+  }
+
+  @override
   AuthDestination get destination => _destination;
 
   @override
@@ -73,10 +91,12 @@ class AuthService extends ChangeNotifier implements IAuthService {
 
   @override
   Future<void> restoreSession() async {
+    await _restorePersistentEmailState();
     final authUser = _authRepository.currentUser;
     if (authUser == null) {
       await _clearSessionState(clearCache: false);
       await _restorePasswordRecoveryPolling();
+      await _restoreDeviceEmailLoginPolling();
       return;
     }
     await _loadAuthenticatedAccount(authUser);
@@ -99,17 +119,16 @@ class AuthService extends ChangeNotifier implements IAuthService {
         throw StateError('Registration completed without an Auth session.');
       }
       await _loadAuthenticatedAccount(authUser);
-      var verificationEmailSent = false;
-      try {
-        await _authRepository.sendMagicLink(email: email);
-        verificationEmailSent = true;
-      } catch (_) {
-        // Registration remains successful. The persistent banner and Profile
-        // page let the user resend without risking a duplicate account.
-      }
-      return RegistrationResult(
+      // A verification cooldown belongs to the email address that requested
+      // it. Do not carry an older account's saved countdown into this newly
+      // registered account.
+      await _clearEmailCooldown(EmailActionType.verification);
+      // Registration no longer sends a verification email automatically. The
+      // 60-second resend timer therefore starts only after the user explicitly
+      // presses Verify email on Profile or the verification gate.
+      return const RegistrationResult(
         requiresEmailVerification: true,
-        verificationEmailSent: verificationEmailSent,
+        verificationEmailSent: false,
       );
     } on RepositoryEmailAlreadyExistsException {
       throw const EmailAlreadyExistsException();
@@ -175,20 +194,33 @@ class AuthService extends ChangeNotifier implements IAuthService {
   }
 
   @override
-  Future<void> sendMagicLinkForLockedAccount({required String email}) {
-    return _authRepository.sendMagicLink(email: email);
+  Future<void> sendMagicLinkForLockedAccount({required String email}) async {
+    await _runEmailRequest(
+      EmailActionType.lockedAccountLogin,
+          () => _authRepository.requestDeviceEmailLogin(email: email),
+    );
+    _hasCrossDeviceEmailLogin = true;
+    _startDeviceEmailLoginPolling();
   }
 
   @override
   Future<void> sendPasswordResetEmail({required String email}) async {
-    await _authRepository.sendPasswordResetEmail(email: email);
+    await _runEmailRequest(
+      EmailActionType.passwordRecovery,
+          () => _authRepository.sendPasswordResetEmail(email: email),
+    );
     _hasCrossDeviceRecovery = true;
     _startPasswordRecoveryPolling();
   }
 
   @override
-  Future<void> resendVerificationEmail({required String email}) {
-    return _authRepository.sendMagicLink(email: email);
+  Future<void> resendVerificationEmail({required String email}) async {
+    await _runEmailRequest(
+      EmailActionType.verification,
+          () => _authRepository.sendMagicLink(email: email),
+    );
+    final authId = _currentUser?.authId;
+    if (authId != null) await _rememberPendingVerification(authId);
   }
 
   @override
@@ -294,9 +326,13 @@ class AuthService extends ChangeNotifier implements IAuthService {
     );
 
     try {
-      await _authRepository.requestAccountEmailChange(
-        newEmail: normalizedEmail,
+      await _runEmailRequest(
+        EmailActionType.emailChange,
+            () => _authRepository.requestAccountEmailChange(
+          newEmail: normalizedEmail,
+        ),
       );
+      await _rememberPendingEmailChange(normalizedEmail);
     } on RepositoryEmailAlreadyExistsException {
       throw const EmailAlreadyExistsException();
     } on RepositoryRecentAuthenticationRequiredException {
@@ -356,8 +392,12 @@ class AuthService extends ChangeNotifier implements IAuthService {
       );
     }
 
-    final ready = await _authRepository.requestAccountDeletion(
-      skipEmailConfirmation: !user.isEmailVerified,
+    final ready = await _runEmailRequest(
+      EmailActionType.accountDeletion,
+          () => _authRepository.requestAccountDeletion(
+        skipEmailConfirmation: !user.isEmailVerified,
+      ),
+      startsCooldown: user.isEmailVerified,
     );
     if (ready) {
       _currentUser = user.copyWith(
@@ -366,6 +406,8 @@ class AuthService extends ChangeNotifier implements IAuthService {
       );
       _updateDestination();
       _notifySafely();
+    } else {
+      await _rememberPendingDeletion(user.authId);
     }
     return ready;
   }
@@ -420,6 +462,7 @@ class AuthService extends ChangeNotifier implements IAuthService {
   Future<void> onAppResumed() async {
     if (_authRepository.currentUser == null) {
       await _checkPasswordRecoveryStatus();
+      await _checkDeviceEmailLoginStatus();
       return;
     }
     await refreshCurrentUser();
@@ -471,9 +514,12 @@ class AuthService extends ChangeNotifier implements IAuthService {
       if (authUser == null) {
         await _clearSessionState(clearCache: false);
         if (_hasCrossDeviceRecovery) _startPasswordRecoveryPolling();
+        if (_hasCrossDeviceEmailLogin) _startDeviceEmailLoginPolling();
         return;
       }
 
+      _hasCrossDeviceEmailLogin = false;
+      _emailLoginTimer?.cancel();
       _isPasswordRecovery = false;
       await _loadAuthenticatedAccount(authUser);
     } on NetworkUnavailableException {
@@ -491,6 +537,20 @@ class AuthService extends ChangeNotifier implements IAuthService {
       if (!_hasCrossDeviceRecovery) return;
       await _checkPasswordRecoveryStatus();
       if (!_isPasswordRecovery) _startPasswordRecoveryPolling();
+    } catch (error) {
+      if (isNetworkUnavailable(error)) _setOffline(true);
+    }
+  }
+
+  Future<void> _restoreDeviceEmailLoginPolling() async {
+    try {
+      _hasCrossDeviceEmailLogin =
+      await _authRepository.hasPendingDeviceEmailLogin();
+      if (!_hasCrossDeviceEmailLogin) return;
+      await _checkDeviceEmailLoginStatus();
+      if (_authRepository.currentUser == null && _hasCrossDeviceEmailLogin) {
+        _startDeviceEmailLoginPolling();
+      }
     } catch (error) {
       if (isNetworkUnavailable(error)) _setOffline(true);
     }
@@ -534,6 +594,52 @@ class AuthService extends ChangeNotifier implements IAuthService {
     }
   }
 
+  void _startDeviceEmailLoginPolling() {
+    _emailLoginTimer?.cancel();
+    unawaited(_checkDeviceEmailLoginStatus());
+    _emailLoginTimer = Timer.periodic(
+      const Duration(seconds: 3),
+          (_) => unawaited(_checkDeviceEmailLoginStatus()),
+    );
+  }
+
+  Future<void> _checkDeviceEmailLoginStatus() async {
+    if (!_hasCrossDeviceEmailLogin ||
+        _emailLoginStatusCheckInFlight ||
+        _disposed) {
+      return;
+    }
+    _emailLoginStatusCheckInFlight = true;
+    try {
+      final status =
+      await _authRepository.getPendingDeviceEmailLoginStatus();
+      if (status == DeviceEmailLoginStatus.signedIn) {
+        _emailLoginTimer?.cancel();
+        _hasCrossDeviceEmailLogin = false;
+        _isOffline = false;
+        _sessionMessage = 'Secure email sign-in completed successfully.';
+        final authUser = _authRepository.currentUser;
+        if (authUser != null) await _loadAuthenticatedAccount(authUser);
+      } else if (status == DeviceEmailLoginStatus.expired ||
+          status == DeviceEmailLoginStatus.completed) {
+        _emailLoginTimer?.cancel();
+        await _authRepository.clearPendingDeviceEmailLogin();
+        _hasCrossDeviceEmailLogin = false;
+      } else if (_isOffline) {
+        _setOffline(false);
+      }
+    } on NetworkUnavailableException {
+      _setOffline(true);
+    } catch (_) {
+      // Status polling runs outside the button's Future. A malformed, expired,
+      // or temporarily unavailable token must never escape as an uncaught
+      // asynchronous error. The request remains pending and can retry on the
+      // next timer tick or app resume.
+    } finally {
+      _emailLoginStatusCheckInFlight = false;
+    }
+  }
+
   Future<void> _loadAuthenticatedAccount(AuthUserData authUser) async {
     final active = _activeAccountLoad;
     if (active != null) {
@@ -563,6 +669,7 @@ class AuthService extends ChangeNotifier implements IAuthService {
 
   Future<void> _performAccountLoad(AuthUserData authUser) async {
     if (_authRepository.currentUser?.id != authUser.id) return;
+    final previousUser = _currentUser;
     User? profile;
     AccountAccessData? access;
     var loadedFromCache = false;
@@ -599,6 +706,35 @@ class AuthService extends ChangeNotifier implements IAuthService {
     _currentUser = access == null
         ? profile
         : profile.copyWith(hasPasswordSignIn: access.hasPasswordSignIn);
+    final accountEmailChanged = previousUser != null &&
+        previousUser.email.toLowerCase() != _currentUser!.email.toLowerCase();
+    await _completePendingEmailChangeIfNeeded(
+      _currentUser!,
+      force: accountEmailChanged,
+    );
+    if (_pendingVerificationAuthId == authUser.id &&
+        _currentUser!.isEmailVerified) {
+      await _clearPendingVerification();
+      if (!accountEmailChanged) {
+        _sessionMessage = 'Email verified successfully.';
+      }
+    } else if (!accountEmailChanged &&
+        previousUser != null &&
+        !previousUser.isEmailVerified &&
+        _currentUser!.isEmailVerified) {
+      _sessionMessage = 'Email verified successfully.';
+    }
+    if (_pendingDeletionAuthId == authUser.id &&
+        _currentUser!.isDeletionConfirmed) {
+      await _clearPendingDeletion();
+      _sessionMessage =
+      'Deletion request confirmed. Review the final confirmation.';
+    } else if (previousUser != null &&
+        !previousUser.isDeletionConfirmed &&
+        _currentUser!.isDeletionConfirmed) {
+      _sessionMessage =
+      'Deletion request confirmed. Review the final confirmation.';
+    }
     if (access != null) {
       await _userRepository.cacheUserProfile(_currentUser!);
     }
@@ -707,44 +843,238 @@ class AuthService extends ChangeNotifier implements IAuthService {
     _profileSubscription = _userRepository
         .watchUserProfileByAuthId(authUserId)
         .listen(
-          (fresh) {
-        if (fresh == null || _currentUser?.authId != authUserId) return;
-        final current = _currentUser!;
-        _currentUser = fresh.copyWith(
-          hasPasswordSignIn: current.hasPasswordSignIn,
-          cachedProfilePicturePath:
-          fresh.cachedProfilePicturePath ?? current.cachedProfilePicturePath,
-          personalConstraints: fresh.personalConstraints.isEmpty
-              ? current.personalConstraints
-              : fresh.personalConstraints,
-        );
-        unawaited(_userRepository.cacheUserProfile(_currentUser!));
-        _requiresEmailVerification = _currentUser!.requiresVerificationAt(
-          DateTime.now().toUtc(),
-        );
-        _verificationDaysRemaining = _currentUser!
-            .verificationDaysRemainingAt(DateTime.now().toUtc());
-        _scheduleVerificationDeadline(null);
-        final info = _accountInfo;
-        if (info != null) {
-          _accountInfo = AccountInfo(
-            accountEmail: _currentUser!.email,
-            googleEmail: info.googleEmail,
-            hasPasswordSignIn: info.hasPasswordSignIn,
-            hasEmailIdentity: info.hasEmailIdentity,
-            hasGoogleIdentity: info.hasGoogleIdentity,
-            isEmailVerified: _currentUser!.isEmailVerified,
-            hasRecentOAuthAuthentication:
-            info.hasRecentOAuthAuthentication,
-          );
-        }
-        _updateDestination();
-        _notifySafely();
-      },
+          (fresh) => unawaited(_applyProfileUpdate(authUserId, fresh)),
       onError: (Object error, StackTrace _) {
         if (isNetworkUnavailable(error)) _setOffline(true);
       },
     );
+  }
+
+  Future<void> _applyProfileUpdate(String authUserId, User? fresh) async {
+    if (fresh == null || _currentUser?.authId != authUserId) return;
+    final current = _currentUser!;
+    final becameVerified = !current.isEmailVerified && fresh.isEmailVerified;
+    final emailChanged = current.email.toLowerCase() != fresh.email.toLowerCase();
+    final deletionConfirmed = !current.isDeletionConfirmed &&
+        fresh.isDeletionConfirmed;
+    _currentUser = fresh.copyWith(
+      hasPasswordSignIn: current.hasPasswordSignIn,
+      cachedProfilePicturePath:
+      fresh.cachedProfilePicturePath ?? current.cachedProfilePicturePath,
+      personalConstraints: fresh.personalConstraints.isEmpty
+          ? current.personalConstraints
+          : fresh.personalConstraints,
+    );
+    if (becameVerified) await _clearPendingVerification();
+    if (deletionConfirmed) await _clearPendingDeletion();
+    if (emailChanged) {
+      await _completePendingEmailChangeIfNeeded(_currentUser!, force: true);
+    } else if (deletionConfirmed) {
+      _sessionMessage =
+      'Deletion request confirmed. Review the final confirmation.';
+    } else if (becameVerified) {
+      _sessionMessage = 'Email verified successfully.';
+    }
+    unawaited(_userRepository.cacheUserProfile(_currentUser!));
+    _requiresEmailVerification = _currentUser!.requiresVerificationAt(
+      DateTime.now().toUtc(),
+    );
+    _verificationDaysRemaining = _currentUser!
+        .verificationDaysRemainingAt(DateTime.now().toUtc());
+    _scheduleVerificationDeadline(null);
+    final info = _accountInfo;
+    if (info != null) {
+      _accountInfo = AccountInfo(
+        accountEmail: _currentUser!.email,
+        googleEmail: info.googleEmail,
+        hasPasswordSignIn: info.hasPasswordSignIn,
+        hasEmailIdentity: info.hasEmailIdentity,
+        hasGoogleIdentity: info.hasGoogleIdentity,
+        isEmailVerified: _currentUser!.isEmailVerified,
+        hasRecentOAuthAuthentication: info.hasRecentOAuthAuthentication,
+      );
+    }
+    _updateDestination();
+    _notifySafely();
+  }
+
+  Future<T> _runEmailRequest<T>(
+      EmailActionType action,
+      Future<T> Function() request, {
+        bool startsCooldown = true,
+      }) async {
+    final remaining = emailCooldownSeconds(action);
+    if (remaining > 0) {
+      throw EmailRequestRateLimitedException(remaining);
+    }
+    try {
+      final result = await request();
+      if (startsCooldown) await _setEmailCooldown(action, 60);
+      return result;
+    } on RepositoryEmailRateLimitedException catch (error) {
+      await _setEmailCooldown(action, error.retryAfterSeconds);
+      throw EmailRequestRateLimitedException(error.retryAfterSeconds);
+    }
+  }
+
+  Future<void> _restorePersistentEmailState() async {
+    if (_persistentEmailStateRestored) return;
+    _persistentEmailStateRestored = true;
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      _pendingEmailChangeTarget =
+          preferences.getString('trek.pending_email_change');
+      _pendingVerificationAuthId =
+          preferences.getString('trek.pending_verification_auth_id');
+      _pendingDeletionAuthId =
+          preferences.getString('trek.pending_deletion_auth_id');
+      final now = DateTime.now().toUtc();
+      for (final action in EmailActionType.values) {
+        final key = 'trek.email_cooldown.${action.name}';
+        final milliseconds = preferences.getInt(key);
+        if (milliseconds == null) continue;
+        final until = DateTime.fromMillisecondsSinceEpoch(
+          milliseconds,
+          isUtc: true,
+        );
+        if (until.isAfter(now)) {
+          _emailCooldownUntil[action] = until;
+        } else {
+          await preferences.remove(key);
+        }
+      }
+      _ensureEmailCooldownTimer();
+    } catch (_) {
+      // Cooldowns are still enforced server-side if local persistence fails.
+    }
+  }
+
+  Future<void> _setEmailCooldown(
+      EmailActionType action,
+      int seconds,
+      ) async {
+    final safeSeconds = seconds < 1 ? 1 : seconds;
+    final until = DateTime.now().toUtc().add(Duration(seconds: safeSeconds));
+    _emailCooldownUntil[action] = until;
+    _ensureEmailCooldownTimer();
+    _notifySafely();
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setInt(
+        'trek.email_cooldown.${action.name}',
+        until.millisecondsSinceEpoch,
+      );
+    } catch (_) {
+      // Losing a local countdown cannot bypass the server-side limit.
+    }
+  }
+
+  Future<void> _clearEmailCooldown(EmailActionType action) async {
+    _emailCooldownUntil.remove(action);
+    _ensureEmailCooldownTimer();
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.remove('trek.email_cooldown.${action.name}');
+    } catch (_) {
+      // The in-memory timer is already cleared for the new account.
+    }
+  }
+
+  void _ensureEmailCooldownTimer() {
+    _emailCooldownTimer?.cancel();
+    if (!_emailCooldownUntil.values.any(
+          (until) => until.isAfter(DateTime.now().toUtc()),
+    )) {
+      _emailCooldownTimer = null;
+      return;
+    }
+    _emailCooldownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (_disposed) return;
+      final now = DateTime.now().toUtc();
+      _emailCooldownUntil.removeWhere((_, until) => !until.isAfter(now));
+      if (_emailCooldownUntil.isEmpty) {
+        _emailCooldownTimer?.cancel();
+        _emailCooldownTimer = null;
+      }
+      _notifySafely();
+    });
+  }
+
+  Future<void> _rememberPendingEmailChange(String newEmail) async {
+    _pendingEmailChangeTarget = newEmail.trim().toLowerCase();
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setString(
+        'trek.pending_email_change',
+        _pendingEmailChangeTarget!,
+      );
+    } catch (_) {
+      // Realtime still detects an email change during the current app run.
+    }
+  }
+
+  Future<void> _rememberPendingVerification(String authId) async {
+    _pendingVerificationAuthId = authId;
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setString('trek.pending_verification_auth_id', authId);
+    } catch (_) {
+      // Realtime still detects completion while the app remains open.
+    }
+  }
+
+  Future<void> _clearPendingVerification() async {
+    _pendingVerificationAuthId = null;
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.remove('trek.pending_verification_auth_id');
+    } catch (_) {
+      // The stored marker is scoped to an auth ID and is harmless if retained.
+    }
+  }
+
+  Future<void> _rememberPendingDeletion(String authId) async {
+    _pendingDeletionAuthId = authId;
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setString('trek.pending_deletion_auth_id', authId);
+    } catch (_) {
+      // Realtime still detects completion while the app remains open.
+    }
+  }
+
+  Future<void> _clearPendingDeletion() async {
+    _pendingDeletionAuthId = null;
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.remove('trek.pending_deletion_auth_id');
+    } catch (_) {
+      // The stored marker is scoped to an auth ID and is harmless if retained.
+    }
+  }
+
+  Future<void> _completePendingEmailChangeIfNeeded(
+      User user, {
+        bool force = false,
+      }) async {
+    final target = _pendingEmailChangeTarget;
+    if (!force &&
+        (target == null || user.email.trim().toLowerCase() != target)) {
+      return;
+    }
+    _pendingEmailChangeTarget = null;
+    _sessionMessage = 'Email changed successfully to ${user.email}.';
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.remove('trek.pending_email_change');
+    } catch (_) {
+      // The completed value is harmless and is ignored unless it matches.
+    }
+    try {
+      await _authRepository.refreshSession();
+    } catch (_) {
+      // The profile is authoritative. Session refresh will retry on resume.
+    }
   }
 
   Future<void> _reauthenticateForSensitiveAction({
@@ -849,6 +1179,7 @@ class AuthService extends ChangeNotifier implements IAuthService {
     _profileSubscription = null;
     _verificationDeadlineTimer?.cancel();
     _passwordRecoveryTimer?.cancel();
+    _emailLoginTimer?.cancel();
     _verificationDeadlineTimer = null;
     if (clearCache && authId != null) {
       await _userRepository.clearCachedUserProfile(authId);
@@ -877,6 +1208,9 @@ class AuthService extends ChangeNotifier implements IAuthService {
   void dispose() {
     _disposed = true;
     _verificationDeadlineTimer?.cancel();
+    _passwordRecoveryTimer?.cancel();
+    _emailLoginTimer?.cancel();
+    _emailCooldownTimer?.cancel();
     _authSubscription?.cancel();
     _profileSubscription?.cancel();
     super.dispose();
