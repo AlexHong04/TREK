@@ -18,6 +18,11 @@ class HomeViewModel extends ChangeNotifier {
   bool _disposed = false;
   bool _tripRequestInFlight = false;
 
+  /// True once a trip load has completed (successfully or not). Used so the
+  /// Home card only blocks with the spinner on the very first load, instead of
+  /// flickering between "loading" and "No plans yet" on every refresh.
+  bool _hasLoadedTripOnce = false;
+
   /// Monotonic id for trip loads. Only the newest in-flight request may write
   /// to the UI state, so a slow older response can never overwrite a newer one.
   int _tripRequestId = 0;
@@ -67,11 +72,13 @@ class HomeViewModel extends ChangeNotifier {
 
   // kokhong
   Future<void> fetchLatestTrip() async {
+    _tripRequestInFlight = true;
     final requestId = ++_tripRequestId;
 
-    // Keep the current card visible while refreshing; only block with the
-    // spinner when there is nothing on screen yet.
-    if (_uiState.latestTrip == null) {
+    // Show the blocking spinner only for the very first load. Later refreshes
+    // (including repeated auth notifications) must not toggle the card back to
+    // a spinner - that caused the "keeps loading / No plans yet" flicker.
+    if (!_hasLoadedTripOnce && _uiState.latestTrip == null) {
       _uiState = _uiState.copyWith(isLoading: true);
       notifyListeners();
     }
@@ -111,6 +118,9 @@ class HomeViewModel extends ChangeNotifier {
         isLoading: false,
         errorMessage: e.toString(),
       );
+    } finally {
+      _tripRequestInFlight = false;
+      _hasLoadedTripOnce = true;
     }
     notifyListeners();
   }
@@ -152,10 +162,12 @@ class HomeViewModel extends ChangeNotifier {
 
   // weisong
   Future<void> fetchLatestTripWithCurrentUserId() async {
+    _tripRequestInFlight = true;
     final requestId = ++_tripRequestId;
 
     // Only block with a spinner on the very first load (no trip on screen).
-    if (_uiState.latestTrip == null) {
+    // Repeated refreshes must not toggle the card back to a spinner.
+    if (!_hasLoadedTripOnce && _uiState.latestTrip == null) {
       _uiState = _uiState.copyWith(isLoading: true);
       notifyListeners();
     }
@@ -190,6 +202,9 @@ class HomeViewModel extends ChangeNotifier {
         isLoading: false,
         errorMessage: e.toString(),
       );
+    } finally {
+      _tripRequestInFlight = false;
+      _hasLoadedTripOnce = true;
     }
     notifyListeners();
   }

@@ -1,25 +1,70 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../theme/app_colors.dart';
+import '../utils/preference_keys.dart';
 
-/// A modal bottom-sheet user guide shown once on first login.
+/// Guards against the guide being opened twice - the Home screen and the
+/// route observer both try to show it the moment the tourist reaches Home.
+bool _guideVisible = false;
+
+/// Shows the one-off user guide if it is still queued in SharedPreferences.
 ///
-/// Contains the same six feature pages as the onboarding carousel but
-/// presented as a popup over the home screen instead of a separate route.
-Future<void> showUserGuideBottomSheet(BuildContext context) {
+/// Safe to call from anywhere and as often as needed: the pending flag is the
+/// single source of truth, and [_guideVisible] stops two callers from opening
+/// the sheet at the same time. Callers should not await this in `initState`.
+Future<void> maybeShowUserGuide(BuildContext context) async {
+  if (_guideVisible) return;
+  _guideVisible = true;
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final isPending = prefs.getBool(PreferenceKeys.userGuidePending) ?? false;
+    debugPrint('[UserGuide] called - pending=$isPending');
+    if (!isPending) return;
+    if (!context.mounted) {
+      debugPrint('[UserGuide] skipped - context unmounted.');
+      return;
+    }
+    debugPrint('[UserGuide] showing.');
+    await showUserGuideBottomSheet(
+      context,
+      pendingKey: PreferenceKeys.userGuidePending,
+    );
+  } catch (error, stack) {
+    debugPrint('[UserGuide] failed to show: $error\n$stack');
+  } finally {
+    _guideVisible = false;
+  }
+}
+
+/// A one-off user guide shown on the Home screen right after the tourist has
+/// successfully registered a new account and logged in for the first time.
+///
+/// The steps are shown one at a time: the tourist can tap "Next" through them,
+/// "Skip" at any point, or "Got it" on the last step. [pendingKey] is the
+/// SharedPreferences flag marking the guide as pending - it is cleared once the
+/// tourist finishes or skips, so the guide is shown exactly once.
+Future<void> showUserGuideBottomSheet(
+  BuildContext context, {
+  required String pendingKey,
+}) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     isDismissible: false,
     enableDrag: false,
     backgroundColor: Colors.transparent,
-    builder: (_) => const _UserGuideSheet(),
+    builder: (_) => _UserGuideSheet(pendingKey: pendingKey),
   );
 }
 
 class _UserGuideSheet extends StatefulWidget {
-  const _UserGuideSheet();
+  /// SharedPreferences flag marking that the guide is still pending.
+  final String pendingKey;
+
+  const _UserGuideSheet({required this.pendingKey});
 
   @override
   State<_UserGuideSheet> createState() => _UserGuideSheetState();
@@ -34,17 +79,17 @@ class _UserGuideSheetState extends State<_UserGuideSheet> {
       icon: Icons.person_outline_rounded,
       title: 'Your Profile',
       description:
-          'You can access your profile from the top-right corner of the Home screen.',
+          'You can access your profile from the top-right corner of the home screen.',
     ),
     _GuidePage(
       icon: Icons.dashboard_outlined,
       title: 'Dashboard',
-      description: 'Swipe left to go to the Dashboard.',
+      description: 'Swipe left to go to the dashboard.',
     ),
     _GuidePage(
       icon: Icons.receipt_long_outlined,
       title: 'Log Expenses',
-      description: 'Tap on an activity to log an expense.',
+      description: 'Tap "Activity" to log an expense.',
     ),
     _GuidePage(
       icon: Icons.assignment_outlined,
@@ -56,11 +101,6 @@ class _UserGuideSheetState extends State<_UserGuideSheet> {
       title: 'Plan New Trip',
       description: 'Tap "Plan New" to generate a plan.',
     ),
-    _GuidePage(
-      icon: Icons.play_circle_outline_rounded,
-      title: 'Continue Your Trip',
-      description: 'Continue from where you left off.',
-    ),
   ];
 
   @override
@@ -71,7 +111,8 @@ class _UserGuideSheetState extends State<_UserGuideSheet> {
 
   Future<void> _dismiss() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('hasSeenOnboarding', true);
+    // Clear the "pending" flag so the guide is only shown once.
+    await prefs.remove(widget.pendingKey);
     if (!mounted) return;
     Navigator.of(context).pop();
   }
@@ -231,7 +272,7 @@ class _UserGuideSheetState extends State<_UserGuideSheet> {
                   elevation: 0,
                 ),
                 child: Text(
-                  isLastPage ? 'Get Started' : 'Next',
+                  isLastPage ? 'Got it' : 'Next',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,

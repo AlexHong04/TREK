@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
 import '../../models/services/i_auth_service.dart';
 import '../../models/services/i_profile_service.dart';
 import '../../utils/input_validator.dart';
@@ -116,6 +115,7 @@ class RegistrationViewModel extends ChangeNotifier {
       clearSuccessMessage: true,
     );
     _notify();
+
     try {
       final result = await _authService.register(
         email: InputValidator.normalizeEmail(_uiState.email),
@@ -123,6 +123,7 @@ class RegistrationViewModel extends ChangeNotifier {
         currency: _uiState.currency,
       );
       if (_disposed) return;
+
       _uiState = _uiState.copyWith(
         isLoading: false,
         registrationSucceeded: true,

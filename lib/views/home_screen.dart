@@ -1,12 +1,15 @@
 import 'dart:io';
 
 import 'package:Trek/view_models/presentation_logic/activity_view_model.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/services/i_auth_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/preference_keys.dart';
 import '../view_models/presentation_logic/home_view_model.dart';
 import '../widgets/dual_currency_amount.dart';
 import 'financial_dashboard_screen.dart';
@@ -28,30 +31,75 @@ class _HomeScreenState extends State<HomeScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
   bool _verificationBannerDismissed = false;
-  bool _guideChecked = false;
+
+  late final IAuthService _authService;
+
+  /// True once the one-off user guide has been shown for this Home instance.
+  bool _guideShown = false;
+
+  /// Guards against overlapping guide checks (initState/didChangeDependencies
+  /// plus auth notifications all call the same check).
+  bool _guideCheckRunning = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _authService = context.read<IAuthService>();
+    // React to sign-in / registration so the check runs as soon as the user
+    // becomes available, regardless of exactly when Home gets mounted.
+    _authService.addListener(_handleAuthChanged);
+  }
+
+  void _handleAuthChanged() {
+    _maybeShowUserGuide();
+  }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (!_guideChecked) {
-      _guideChecked = true;
-      _maybeShowUserGuide();
-    }
+    _maybeShowUserGuide();
   }
 
   Future<void> _maybeShowUserGuide() async {
-    final prefs = await SharedPreferences.getInstance();
-    final hasSeen = prefs.getBool('hasSeenOnboarding') ?? false;
-    if (!hasSeen && mounted) {
-      // Let the home screen finish its first frame before showing the sheet.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) showUserGuideBottomSheet(context);
-      });
+    if (_guideShown || _guideCheckRunning) return;
+    _guideCheckRunning = true;
+    try {
+      // The guide is queued when registration succeeds. A few short retries
+      // make this robust if Home happens to mount a moment before the flag is
+      // persisted.
+      for (var attempt = 0; attempt < 6; attempt++) {
+        final prefs = await SharedPreferences.getInstance();
+        final shouldShow =
+            prefs.getBool(PreferenceKeys.userGuidePending) ?? false;
+        if (!mounted) return;
+
+        if (shouldShow) {
+          _guideShown = true;
+          await maybeShowUserGuide(context);
+          return;
+        }
+
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+        if (!mounted) return;
+      }
+    } finally {
+      _guideCheckRunning = false;
     }
+  }
+
+  /// Debug-only helper: re-queue and immediately re-show the one-off user
+  /// guide, so it can be tested without registering a brand-new account.
+  Future<void> _debugShowUserGuide() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(PreferenceKeys.userGuidePending, true);
+    _guideShown = true;
+    if (!mounted) return;
+    await maybeShowUserGuide(context);
   }
 
   @override
   void dispose() {
+    _authService.removeListener(_handleAuthChanged);
     _pageController.dispose();
     super.dispose();
   }
@@ -186,40 +234,60 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          Semantics(
-            button: true,
-            label: 'Open profile',
-            child: Material(
-              color: appTheme.teal_50,
-              shape: CircleBorder(
-                side: BorderSide(color: appTheme.gray_100, width: 1),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                onTap: () => _openProfile(context),
-                child: SizedBox(
-                  width: 40,
-                  height: 40,
-                  child:
-                      cachedProfilePath.isNotEmpty &&
-                          File(cachedProfilePath).existsSync()
-                      ? Image.file(
-                          File(cachedProfilePath),
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => initialAvatar(),
-                        )
-                      : profilePictureUrl?.isNotEmpty == true
-                      ? Image.network(
-                          profilePictureUrl!,
-                          fit: BoxFit.cover,
-                          loadingBuilder: (_, child, loadingProgress) =>
-                              loadingProgress == null ? child : initialAvatar(),
-                          errorBuilder: (_, _, _) => initialAvatar(),
-                        )
-                      : initialAvatar(),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (kDebugMode) ...[
+                // Debug-only shortcut: re-queue and re-show the one-off user
+                // guide so it can be tested without a fresh registration.
+                IconButton(
+                  tooltip: 'Debug: show user guide',
+                  onPressed: _debugShowUserGuide,
+                  icon: Icon(
+                    Icons.help_outline_rounded,
+                    color: appTheme.teal_A700,
+                  ),
+                ),
+                const SizedBox(width: 4),
+              ],
+              Semantics(
+                button: true,
+                label: 'Open profile',
+                child: Material(
+                  color: appTheme.teal_50,
+                  shape: CircleBorder(
+                    side: BorderSide(color: appTheme.gray_100, width: 1),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: () => _openProfile(context),
+                    child: SizedBox(
+                      width: 40,
+                      height: 40,
+                      child:
+                          cachedProfilePath.isNotEmpty &&
+                              File(cachedProfilePath).existsSync()
+                          ? Image.file(
+                              File(cachedProfilePath),
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) => initialAvatar(),
+                            )
+                          : profilePictureUrl?.isNotEmpty == true
+                          ? Image.network(
+                              profilePictureUrl!,
+                              fit: BoxFit.cover,
+                              loadingBuilder: (_, child, loadingProgress) =>
+                                  loadingProgress == null
+                                  ? child
+                                  : initialAvatar(),
+                              errorBuilder: (_, _, _) => initialAvatar(),
+                            )
+                          : initialAvatar(),
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
         ],
       ),
