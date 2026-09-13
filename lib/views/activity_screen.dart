@@ -413,13 +413,14 @@ class _ActivityScreenState extends State<ActivityScreen> {
     ActivityUiState uiState, {
     required VoidCallback onEndTrip,
     required Future<bool> Function(double amount) onTopUpBudget,
-  }) {
+  }) async {
     final minTopUp = uiState.shortageAmount * 0.50;
     final viewModel = context.read<ActivityViewModel>();
 
     showBudgetRecoveryDialog(
       context: context,
       shortageAmount: uiState.shortageAmount,
+      symbol: uiState.displayCurrency ?? 'MYR',
       minTopUp: minTopUp,
       remainingBudget: uiState.remainingBudget,
       warningText:

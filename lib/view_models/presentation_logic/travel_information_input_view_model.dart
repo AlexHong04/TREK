@@ -8,7 +8,7 @@ import '../../models/services/i_auth_service.dart';
 import '../../models/services/i_profile_service.dart'; // added this
 import '../../models/services/i_itinerary_service.dart';
 import '../../models/services/itinerary_service.dart';
-import '../../utils/place_text_validation.dart';
+import '../../utils/explicit_word_validation.dart';
 import '../ui_state/travel_information_ui_state.dart';
 
 class TravelInformationInputViewModel extends ChangeNotifier {
@@ -600,13 +600,19 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     if (hasHotel && _uiState.selectedDestinations.isEmpty) {
       return 'Please select destination state(s) first before entering hotel details';
     }
+    for (final hotel in _uiState.hotels) {
+      final err = validateExplicitWord(hotel.location);
+      if (err != null) return err;
+    }
     return null;
   }
 
-  String? validateWishlist(String? value) {
+  String? validateExplicitWord(String? value) {
     if ((value ?? '').trim().isEmpty) return null;
     return validatePlaceInput(value);
   }
+
+  String? validateWishlist(String? value) => validateExplicitWord(value);
 
   String? generateItinerary({
     String? destination,

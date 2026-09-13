@@ -1,7 +1,8 @@
-/// Validation utilities for place names (wishlist, attractions, destinations).
+/// Validation utilities for place names and explicit word filtering.
 ///
 /// Ensures only valid place name text is allowed and blocks profanity / vulgarities
 /// in English, Malay, and Chinese dialects.
+library;
 
 /// Returns true when text contains profanity, vulgarity, or sexually explicit terms.
 bool containsProhibitedPlaceLanguage(String value) {
@@ -129,13 +130,21 @@ bool containsProhibitedPlaceLanguage(String value) {
     }
   }
 
-  // Direct check for plain word or substring match for Latin words
-  for (final word in prohibitedWords) {
-    if (word.runes.any((r) => r > 127)) continue;
-    if (normalized == word || normalized.contains(word)) return true;
+  // Whitelist of legitimate place names/words that contain substrings of prohibited words
+  // (e.g. "Port Dickson" contains "dick", "Titiwangsa" contains "tit")
+  const allowedSafePlaceWords = [
+    'dickson',
+    'titiwangsa',
+    'cocktail',
+    'peacock',
+  ];
+
+  var sanitized = normalized;
+  for (final safeWord in allowedSafePlaceWords) {
+    sanitized = sanitized.replaceAll(safeWord, ' ');
   }
 
-  // Regex check for Latin characters with potential obfuscation (e.g. f.u.c.k)
+  // Regex check for Latin characters with word boundaries and potential obfuscation (e.g. f.u.c.k)
   for (final word in prohibitedWords) {
     if (word.runes.any((r) => r > 127)) continue;
 
@@ -144,10 +153,10 @@ bool containsProhibitedPlaceLanguage(String value) {
         .map((character) => '${RegExp.escape(character)}+')
         .join(r'[^a-z0-9]*');
     final pattern = RegExp(
-      '(^|[^a-z0-9])${separatedLetters}[a-z]*([^a-z0-9]|\$)',
+      '(^|[^a-z0-9])$separatedLetters([^a-z0-9]|\$)',
       caseSensitive: false,
     );
-    if (pattern.hasMatch(normalized)) return true;
+    if (pattern.hasMatch(sanitized)) return true;
   }
 
   return false;

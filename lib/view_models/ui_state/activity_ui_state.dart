@@ -3,7 +3,6 @@ export '../../models/entities/activity.dart';
 import '../../models/entities/expense.dart';
 import '../../models/entities/expense_item.dart';
 
-
 class ActivityUiState {
   final bool isLoading;
   final String tripId;
@@ -20,6 +19,9 @@ class ActivityUiState {
   final Activity? selectedActivity;
   final List<ExpenseItem> draftExpenseItems;
   final double draftTaxAmount;
+  final double draftDiscountAmount;
+  final double draftRoundingAmount;
+  final bool draftAutoRounding;
   final double draftTotalAmount;
   final String originalCurrency;
   final List<String> availableCurrencies;
@@ -38,6 +40,8 @@ class ActivityUiState {
   final bool ocrDateWasDefaulted;
   final double? ocrExtractedTotal;
   final double? ocrExtractedTax;
+  final double? ocrExtractedDiscount;
+  final double? ocrExtractedRounding;
   final List<String> ocrItemLines;
   final Set<int> ocrDraftItemIndexes;
   final bool draftTaxFromOcr;
@@ -77,6 +81,9 @@ class ActivityUiState {
     this.selectedActivity,
     this.draftExpenseItems = const [],
     this.draftTaxAmount = 0.0,
+    this.draftDiscountAmount = 0.0,
+    this.draftRoundingAmount = 0.0,
+    this.draftAutoRounding = false,
     this.draftTotalAmount = 0.0,
     this.originalCurrency = '',
     this.availableCurrencies = const [],
@@ -95,6 +102,8 @@ class ActivityUiState {
     this.ocrDateWasDefaulted = false,
     this.ocrExtractedTotal,
     this.ocrExtractedTax,
+    this.ocrExtractedDiscount,
+    this.ocrExtractedRounding,
     this.ocrItemLines = const [],
     this.ocrDraftItemIndexes = const {},
     this.draftTaxFromOcr = false,
@@ -113,14 +122,16 @@ class ActivityUiState {
     this.activitySpentMap = const {},
     this.popupAction = '',
     this.budgetAlertMessage = '',
-
   });
 
   double get itemsSubtotal =>
       draftExpenseItems.fold(0.0, (total, item) => total + item.subtotal);
 
   bool get hasOcrDraftData =>
-      ocrDraftItemIndexes.isNotEmpty || draftTaxFromOcr;
+      ocrDraftItemIndexes.isNotEmpty ||
+      draftTaxFromOcr ||
+      ocrExtractedDiscount != null ||
+      ocrExtractedRounding != null;
 
   double get ocrTotalDifference =>
       ocrExtractedTotal == null ? 0.0 : draftTotalAmount - ocrExtractedTotal!;
@@ -130,7 +141,8 @@ class ActivityUiState {
       ocrDraftItemIndexes.isNotEmpty &&
       ocrTotalDifference.abs() > 0.01;
 
-  double get usedPercentageValue => totalBudget <= 0 ? 0.0 : (spentBudget / totalBudget).clamp(0.0, 1.0);
+  double get usedPercentageValue =>
+      totalBudget <= 0 ? 0.0 : (spentBudget / totalBudget).clamp(0.0, 1.0);
 
   String get usedPercentageString => totalBudget <= 0
       ? '0% Used'
@@ -141,8 +153,12 @@ class ActivityUiState {
   int get currentDayIndex {
     if (filterDate == null || availableDates.isEmpty) return -1;
     final target = filterDate!;
-    return availableDates.indexWhere((d) =>
-    d.year == target.year && d.month == target.month && d.day == target.day);
+    return availableDates.indexWhere(
+      (d) =>
+          d.year == target.year &&
+          d.month == target.month &&
+          d.day == target.day,
+    );
   }
 
   bool get canGoToPreviousDay => currentDayIndex > 0;
@@ -165,11 +181,11 @@ class ActivityUiState {
     final filtered = target == null
         ? List<Activity>.from(activities)
         : activities.where((a) {
-      final localActDate = a.date.toLocal();
-      return localActDate.year == target.year &&
-          localActDate.month == target.month &&
-          localActDate.day == target.day;
-    }).toList();
+            final localActDate = a.date.toLocal();
+            return localActDate.year == target.year &&
+                localActDate.month == target.month &&
+                localActDate.day == target.day;
+          }).toList();
 
     filtered.sort((a, b) {
       final dateCompare = a.date.compareTo(b.date);
@@ -218,25 +234,30 @@ class ActivityUiState {
       sufficientDays: (map['sufficientDays'] as num?)?.toInt() ?? 0,
       shortageAmount: (map['shortageAmount'] as num?)?.toDouble() ?? 0.0,
       exceededAmount: (map['exceededAmount'] as num?)?.toDouble() ?? 0.0,
-      activitySpentMap: (map['activitySpentMap'] as Map<String, dynamic>?)?.map(
+      activitySpentMap:
+          (map['activitySpentMap'] as Map<String, dynamic>?)?.map(
             (key, value) => MapEntry(key, (value as num).toDouble()),
-      ) ??
+          ) ??
           const {},
-      activities: (map['activities'] as List<dynamic>?)
-          ?.map((item) => Activity.fromJson(item as Map<String, dynamic>))
-          .toList() ??
+      activities:
+          (map['activities'] as List<dynamic>?)
+              ?.map((item) => Activity.fromJson(item as Map<String, dynamic>))
+              .toList() ??
           const [],
-      allActivities: (map['allActivities'] as List<dynamic>?)
-          ?.map((item) => Activity.fromJson(item as Map<String, dynamic>))
-          .toList() ??
+      allActivities:
+          (map['allActivities'] as List<dynamic>?)
+              ?.map((item) => Activity.fromJson(item as Map<String, dynamic>))
+              .toList() ??
           const [],
-      availableDates: (map['availableDates'] as List<dynamic>?)
-          ?.map((item) => DateTime.parse(item as String))
-          .toList() ??
+      availableDates:
+          (map['availableDates'] as List<dynamic>?)
+              ?.map((item) => DateTime.parse(item as String))
+              .toList() ??
           const [],
-      recordedExpenses: (map['recordedExpenses'] as List<dynamic>?)
-          ?.map((item) => Expense.fromJson(item as Map<String, dynamic>))
-          .toList() ??
+      recordedExpenses:
+          (map['recordedExpenses'] as List<dynamic>?)
+              ?.map((item) => Expense.fromJson(item as Map<String, dynamic>))
+              .toList() ??
           const [],
     );
   }
@@ -256,6 +277,9 @@ class ActivityUiState {
     Activity? selectedActivity,
     List<ExpenseItem>? draftExpenseItems,
     double? draftTaxAmount,
+    double? draftDiscountAmount,
+    double? draftRoundingAmount,
+    bool? draftAutoRounding,
     double? draftTotalAmount,
     String? originalCurrency,
     List<String>? availableCurrencies,
@@ -274,6 +298,8 @@ class ActivityUiState {
     bool? ocrDateWasDefaulted,
     double? ocrExtractedTotal,
     double? ocrExtractedTax,
+    double? ocrExtractedDiscount,
+    double? ocrExtractedRounding,
     List<String>? ocrItemLines,
     Set<int>? ocrDraftItemIndexes,
     bool? draftTaxFromOcr,
@@ -313,6 +339,9 @@ class ActivityUiState {
       selectedActivity: selectedActivity ?? this.selectedActivity,
       draftExpenseItems: draftExpenseItems ?? this.draftExpenseItems,
       draftTaxAmount: draftTaxAmount ?? this.draftTaxAmount,
+      draftDiscountAmount: draftDiscountAmount ?? this.draftDiscountAmount,
+      draftRoundingAmount: draftRoundingAmount ?? this.draftRoundingAmount,
+      draftAutoRounding: draftAutoRounding ?? this.draftAutoRounding,
       draftTotalAmount: draftTotalAmount ?? this.draftTotalAmount,
       originalCurrency: originalCurrency ?? this.originalCurrency,
       availableCurrencies: availableCurrencies ?? this.availableCurrencies,
@@ -341,6 +370,12 @@ class ActivityUiState {
       ocrExtractedTax: clearOcrData || clearOcrExtractedTax
           ? null
           : ocrExtractedTax ?? this.ocrExtractedTax,
+      ocrExtractedDiscount: clearOcrData
+          ? null
+          : ocrExtractedDiscount ?? this.ocrExtractedDiscount,
+      ocrExtractedRounding: clearOcrData
+          ? null
+          : ocrExtractedRounding ?? this.ocrExtractedRounding,
       ocrItemLines: clearOcrData ? const [] : ocrItemLines ?? this.ocrItemLines,
       ocrDraftItemIndexes: clearOcrData
           ? const {}
@@ -352,11 +387,11 @@ class ActivityUiState {
       successMessage: successMessage ?? this.successMessage,
       recordedExpenses: recordedExpenses ?? this.recordedExpenses,
       isLoadingRecordedExpenses:
-      isLoadingRecordedExpenses ?? this.isLoadingRecordedExpenses,
+          isLoadingRecordedExpenses ?? this.isLoadingRecordedExpenses,
       selectedRecordedExpenseItems:
-      selectedRecordedExpenseItems ?? this.selectedRecordedExpenseItems,
+          selectedRecordedExpenseItems ?? this.selectedRecordedExpenseItems,
       isLoadingRecordedExpenseItems:
-      isLoadingRecordedExpenseItems ?? this.isLoadingRecordedExpenseItems,
+          isLoadingRecordedExpenseItems ?? this.isLoadingRecordedExpenseItems,
       totalBudget: totalBudget ?? this.totalBudget,
       spentBudget: spentBudget ?? this.spentBudget,
       overspentBudget: overspentBudget ?? this.overspentBudget,
