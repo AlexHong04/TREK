@@ -15,9 +15,7 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   static Widget builder(BuildContext context) {
-    return const HomeViewModelScope(
-      child: HomeScreen(),
-    );
+    return const HomeViewModelScope(child: HomeScreen());
   }
 
   @override
@@ -37,85 +35,88 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return PageView(
-      controller: _pageController,
-      onPageChanged: (page) => setState(() => _currentPage = page),
-      children: [
-        _buildHomePage(context),
-        FinancialDashboardScreen.builder(
-          context,
-          onHomeSelected: () => _goToPage(0),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildHomePage(BuildContext context) {
-    final state = context.watch<HomeViewModel>().uiState;
     return Scaffold(
       backgroundColor: appTheme.gray_50_02,
       body: SafeArea(
         child: Column(
           children: [
             _buildTopBar(context),
-            if (context.watch<HomeViewModel>().uiState.isOffline)
-              const _HomeStatusBanner(
-                icon: Icons.cloud_off_outlined,
-                text: 'You’re offline. Showing saved information.',
-                isWarning: true,
-              ),
-            if (!state.isEmailVerified && !_verificationBannerDismissed)
-              _HomeStatusBanner(
-                icon: Icons.mark_email_unread_outlined,
-                text: _verificationBannerText(
-                  state.verificationDaysRemaining,
-                ),
-                onClose: () => setState(
-                      () => _verificationBannerDismissed = true,
-                ),
-              ),
+            const SizedBox(height: 18),
+            _buildPageIndicator(),
             Expanded(
-              child: RefreshIndicator(
-                onRefresh: () => context
-                    .read<HomeViewModel>()
-                    .fetchLatestTripWithCurrentUserId(),
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 24.0),
-                        _buildPageIndicator(),
-                        const SizedBox(height: 20.0),
-                        _buildGreeting(context),
-                        const SizedBox(height: 32.0),
-                        _buildPlanCard(context),
-                        const SizedBox(height: 24.0),
-                      ],
-                    ),
+              child: PageView(
+                controller: _pageController,
+                onPageChanged: (page) => setState(() => _currentPage = page),
+                children: [
+                  _buildHomePage(context),
+                  FinancialDashboardScreen.builder(
+                    context,
+                    showNavigationHeader: false,
                   ),
-                ),
+                ],
               ),
             ),
-            _buildBottomButtons(context),
           ],
         ),
       ),
     );
   }
 
+  Widget _buildHomePage(BuildContext context) {
+    final state = context.watch<HomeViewModel>().uiState;
+    return Column(
+      children: [
+        if (state.isOffline)
+          const _HomeStatusBanner(
+            icon: Icons.cloud_off_outlined,
+            text: 'You’re offline. Showing saved information.',
+            isWarning: true,
+          ),
+        if (!state.isEmailVerified && !_verificationBannerDismissed)
+          _HomeStatusBanner(
+            icon: Icons.mark_email_unread_outlined,
+            text: _verificationBannerText(state.verificationDaysRemaining),
+            onClose: () => setState(() => _verificationBannerDismissed = true),
+          ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: () => context
+                .read<HomeViewModel>()
+                .fetchLatestTripWithCurrentUserId(),
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 20.0),
+                    _buildGreeting(context),
+                    const SizedBox(height: 32.0),
+                    _buildPlanCard(context),
+                    const SizedBox(height: 24.0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        _buildBottomButtons(context),
+      ],
+    );
+  }
+
   Widget _buildTopBar(BuildContext context) {
     final profilePictureUrl = context.select<HomeViewModel, String?>(
-          (viewModel) => viewModel.uiState.profilePictureUrl,
+      (viewModel) => viewModel.uiState.profilePictureUrl,
     );
     final profileName = context.select<HomeViewModel, String?>(
-          (viewModel) => viewModel.uiState.userName,
+      (viewModel) => viewModel.uiState.userName,
     );
     final cachedProfilePicturePath = context.select<HomeViewModel, String?>(
-          (viewModel) => viewModel.uiState.cachedProfilePicturePath,
+      (viewModel) => viewModel.uiState.cachedProfilePicturePath,
     );
+    final cachedProfilePath = cachedProfilePicturePath ?? '';
     final trimmedName = profileName?.trim() ?? '';
     final initial = trimmedName.isEmpty ? 'T' : trimmedName[0].toUpperCase();
 
@@ -175,21 +176,22 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: SizedBox(
                   width: 40,
                   height: 40,
-                  child: cachedProfilePicturePath?.isNotEmpty == true &&
-                      File(cachedProfilePicturePath!).existsSync()
+                  child:
+                      cachedProfilePath.isNotEmpty &&
+                          File(cachedProfilePath).existsSync()
                       ? Image.file(
-                    File(cachedProfilePicturePath!),
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => initialAvatar(),
-                  )
+                          File(cachedProfilePath),
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => initialAvatar(),
+                        )
                       : profilePictureUrl?.isNotEmpty == true
                       ? Image.network(
-                    profilePictureUrl!,
-                    fit: BoxFit.cover,
-                    loadingBuilder: (_, child, loadingProgress) =>
-                    loadingProgress == null ? child : initialAvatar(),
-                    errorBuilder: (_, __, ___) => initialAvatar(),
-                  )
+                          profilePictureUrl!,
+                          fit: BoxFit.cover,
+                          loadingBuilder: (_, child, loadingProgress) =>
+                              loadingProgress == null ? child : initialAvatar(),
+                          errorBuilder: (_, _, _) => initialAvatar(),
+                        )
                       : initialAvatar(),
                 ),
               ),
@@ -209,9 +211,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _openProfile(BuildContext context) async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (routeContext) => ProfileScreen.builder(
-          routeContext,
-        ),
+        builder: (routeContext) => ProfileScreen.builder(routeContext),
       ),
     );
     if (context.mounted) {
@@ -340,7 +340,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     final trip = state.latestTrip!;
-    final startDateStr = DateFormat('MMM dd').format( trip.startDate);
+    final startDateStr = DateFormat('MMM dd').format(trip.startDate);
     final endDateStr = DateFormat('MMM dd, yyyy').format(trip.endDate);
 
     final status = trip.computedStatus.toLowerCase();
@@ -349,7 +349,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final bool isTerminated = status == 'terminated';
 
     // Prioritize resolved banner from state, falling back to trip.imgUrl
-    final String? activeImageUrl = (state.bannerImgUrl?.trim().isNotEmpty == true)
+    final String? activeImageUrl =
+        (state.bannerImgUrl?.trim().isNotEmpty == true)
         ? state.bannerImgUrl!.trim()
         : (trip.imgUrl?.trim().isNotEmpty == true ? trip.imgUrl!.trim() : null);
 
@@ -374,8 +375,7 @@ class _HomeScreenState extends State<HomeScreen> {
           onTap: () async {
             await Navigator.of(context).pushNamed(
               '/activityScreen',
-              arguments: {'trip': trip, 'isReadOnly': state.isOffline
-              },
+              arguments: {'trip': trip, 'isReadOnly': state.isOffline},
             );
             // Refresh trip status when returning (e.g. trip was ended).
             if (context.mounted) {
@@ -435,7 +435,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             Text(
                               status.isNotEmpty
                                   ? status[0].toUpperCase() +
-                                  status.substring(1)
+                                        status.substring(1)
                                   : 'Pending',
                               style: TextStyle(
                                 fontSize: 12,
@@ -568,12 +568,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 borderRadius: BorderRadius.circular(14),
                 boxShadow: isStartEnabled
                     ? [
-                  BoxShadow(
-                    color: appTheme.teal_50,
-                    offset: const Offset(0, 4),
-                    blurRadius: 8,
-                  ),
-                ]
+                        BoxShadow(
+                          color: appTheme.teal_50,
+                          offset: const Offset(0, 4),
+                          blurRadius: 8,
+                        ),
+                      ]
                     : [],
               ),
               child: Material(
@@ -582,24 +582,24 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: InkWell(
                   onTap: isStartEnabled
                       ? () async {
-                    final now = DateTime.now();
-                    final deviceDate = DateTime(
-                      now.year,
-                      now.month,
-                      now.day,
-                    );
-                    await Navigator.of(context).pushNamed(
-                      '/activityScreen',
-                      arguments: {
-                        'trip': trip,
-                        'isReadOnly': false,
-                        'filterDate': deviceDate,
-                      },
-                    );
-                    if (context.mounted) {
-                      viewModel.fetchLatestTripWithCurrentUserId();
-                    }
-                  }
+                          final now = DateTime.now();
+                          final deviceDate = DateTime(
+                            now.year,
+                            now.month,
+                            now.day,
+                          );
+                          await Navigator.of(context).pushNamed(
+                            '/activityScreen',
+                            arguments: {
+                              'trip': trip,
+                              'isReadOnly': false,
+                              'filterDate': deviceDate,
+                            },
+                          );
+                          if (context.mounted) {
+                            viewModel.fetchLatestTripWithCurrentUserId();
+                          }
+                        }
                       : null,
                   borderRadius: BorderRadius.circular(14),
                   child: Padding(
@@ -607,16 +607,17 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Center(
                       child: Text(
                         'Start Plan',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          fontFamily: 'Inter',
-                        ).copyWith(
-                          color: isStartEnabled
-                              ? appTheme.white_A700
-                              : appTheme.blue_gray_300,
-                          height: 22 / 18,
-                        ),
+                        style:
+                            const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: 'Inter',
+                            ).copyWith(
+                              color: isStartEnabled
+                                  ? appTheme.white_A700
+                                  : appTheme.blue_gray_300,
+                              height: 22 / 18,
+                            ),
                       ),
                     ),
                   ),
@@ -645,12 +646,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: InkWell(
                   onTap: () async {
                     viewModel.prepareNewPlan();
-                    await Navigator.of(context).pushNamed(
-                      '/travelInformationInputScreen',
-                    );
+                    await Navigator.of(
+                      context,
+                    ).pushNamed('/travelInformationInputScreen');
                     if (context.mounted) {
+                      final activityViewModel = context
+                          .read<ActivityViewModel>();
                       await viewModel.fetchLatestTripWithCurrentUserId();
-                      await context.read<ActivityViewModel>().initialize();
+                      await activityViewModel.initialize();
                     }
                   },
                   borderRadius: BorderRadius.circular(14),
@@ -663,10 +666,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
                           fontFamily: 'Inter',
-                        ).copyWith(
-                          color: appTheme.white_A700,
-                          height: 22 / 18,
-                        ),
+                        ).copyWith(color: appTheme.white_A700, height: 22 / 18),
                       ),
                     ),
                   ),
@@ -751,10 +751,12 @@ class _HomeStatusBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final background =
-    isWarning ? appTheme.wholeAlertBudgetBg : appTheme.teal_50;
-    final foreground =
-    isWarning ? appTheme.wholeAlertBudgetText : appTheme.teal_800;
+    final background = isWarning
+        ? appTheme.wholeAlertBudgetBg
+        : appTheme.teal_50;
+    final foreground = isWarning
+        ? appTheme.wholeAlertBudgetText
+        : appTheme.teal_800;
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.fromLTRB(20, 0, 20, 8),
@@ -783,10 +785,7 @@ class _HomeStatusBanner extends StatelessWidget {
               onPressed: onClose,
               tooltip: 'Dismiss verification reminder',
               visualDensity: VisualDensity.compact,
-              constraints: const BoxConstraints(
-                minWidth: 32,
-                minHeight: 32,
-              ),
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               padding: EdgeInsets.zero,
               icon: Icon(Icons.close_rounded, size: 18, color: foreground),
             ),

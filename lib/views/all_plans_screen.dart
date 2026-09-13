@@ -6,6 +6,7 @@ import '../models/services/i_profile_service.dart'; // added this
 import '../theme/app_theme.dart';
 import '../view_models/presentation_logic/whole_itinerary_detail_view_model.dart';
 import '../view_models/ui_state/whole_itinerary_ui_state.dart';
+import '../widgets/app_date_picker.dart';
 import '../widgets/custom_app_bar.dart';
 import '../widgets/dual_currency_amount.dart';
 
@@ -216,23 +217,11 @@ class _AllPlansScreenState extends State<AllPlansScreen> {
                 const SizedBox(height: 10.0),
                 GestureDetector(
                   onTap: () async {
-                    final picked = await showDatePicker(
+                    final picked = await showAppDatePicker(
                       context: context,
                       initialDate: uiState.selectedDateFilter ?? DateTime.now(),
                       firstDate: DateTime(2020),
                       lastDate: DateTime(2100),
-                      builder: (context, child) {
-                        return Theme(
-                          data: Theme.of(context).copyWith(
-                            colorScheme: ColorScheme.light(
-                              primary: appTheme.teal_A700,
-                              onPrimary: appTheme.white_A700,
-                              surface: appTheme.white_A700,
-                            ),
-                          ),
-                          child: child!,
-                        );
-                      },
                     );
                     if (picked != null) {
                       viewModel.setDateFilter(picked);

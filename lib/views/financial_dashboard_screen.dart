@@ -9,21 +9,34 @@ import '../theme/app_theme.dart';
 import '../models/services/i_auth_service.dart';
 import '../models/services/i_profile_service.dart';
 import '../view_models/presentation_logic/financial_dashboard_view_model.dart';
+import '../widgets/app_date_picker.dart';
 import 'profile_screen.dart';
 import 'trip_summary_screen.dart';
 
 class FinancialDashboardScreen extends StatelessWidget {
   final VoidCallback? onHomeSelected;
+  final bool showNavigationHeader;
 
-  const FinancialDashboardScreen({super.key, this.onHomeSelected});
+  const FinancialDashboardScreen({
+    super.key,
+    this.onHomeSelected,
+    this.showNavigationHeader = true,
+  });
 
-  static Widget builder(BuildContext context, {VoidCallback? onHomeSelected}) {
+  static Widget builder(
+    BuildContext context, {
+    VoidCallback? onHomeSelected,
+    bool showNavigationHeader = true,
+  }) {
     return ChangeNotifierProvider<FinancialDashboardViewModel>(
       create: (providerContext) => FinancialDashboardViewModel(
         authService: providerContext.read<IAuthService>(),
         profileService: providerContext.read<IProfileService>(),
       )..loadCurrentDay(),
-      child: FinancialDashboardScreen(onHomeSelected: onHomeSelected),
+      child: FinancialDashboardScreen(
+        onHomeSelected: onHomeSelected,
+        showNavigationHeader: showNavigationHeader,
+      ),
     );
   }
 
@@ -32,67 +45,74 @@ class FinancialDashboardScreen extends StatelessWidget {
     final viewModel = context.watch<FinancialDashboardViewModel>();
     final uiState = viewModel.uiState;
 
+    final content = Column(
+      children: [
+        if (showNavigationHeader) _buildTopBar(context, viewModel),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              18,
+              showNavigationHeader ? 22 : 20,
+              18,
+              30,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (showNavigationHeader) ...[
+                  _buildPageIndicator(context),
+                  const SizedBox(height: 20),
+                ],
+                Center(
+                  child: Text(
+                    'Dashboard',
+                    style: TextStyle(
+                      color: appTheme.teal_A700,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 22),
+                if (uiState.isLoading)
+                  const Center(child: CircularProgressIndicator())
+                else if (uiState.errorMessage != null)
+                  _buildErrorState(context, viewModel, uiState.errorMessage!)
+                else ...[
+                  _buildSummaryCard(uiState),
+                  if (uiState.isConvertingCurrency ||
+                      uiState.currencyConversionErrorMessage != null) ...[
+                    const SizedBox(height: 8),
+                    _FinancialCurrencyConversionStatus(
+                      isLoading: uiState.isConvertingCurrency,
+                      preferredCurrency: uiState.preferredCurrency,
+                      errorMessage: uiState.currencyConversionErrorMessage,
+                      onRetry: viewModel.retryCurrencyConversion,
+                    ),
+                  ],
+                  const SizedBox(height: 18),
+                  _buildDateFilter(context, uiState),
+                  const SizedBox(height: 34),
+                  _buildCategoryChart(viewModel, uiState),
+                  const SizedBox(height: 26),
+                  _buildExpenseChart(uiState),
+                  const SizedBox(height: 24),
+                  _buildBreakdownCard(uiState),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+
+    if (!showNavigationHeader) {
+      return ColoredBox(color: appTheme.gray_50_02, child: content);
+    }
+
     return Scaffold(
       backgroundColor: appTheme.gray_50_02,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildTopBar(context, viewModel),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(18, 22, 18, 30),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildPageIndicator(context),
-                    const SizedBox(height: 20),
-                    Center(
-                      child: Text(
-                        'Dashboard',
-                        style: TextStyle(
-                          color: appTheme.teal_A700,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 22),
-                    if (uiState.isLoading)
-                      const Center(child: CircularProgressIndicator())
-                    else if (uiState.errorMessage != null)
-                      _buildErrorState(
-                        context,
-                        viewModel,
-                        uiState.errorMessage!,
-                      )
-                    else ...[
-                      _buildSummaryCard(uiState),
-                      if (uiState.isConvertingCurrency ||
-                          uiState.currencyConversionErrorMessage != null) ...[
-                        const SizedBox(height: 8),
-                        _FinancialCurrencyConversionStatus(
-                          isLoading: uiState.isConvertingCurrency,
-                          preferredCurrency: uiState.preferredCurrency,
-                          errorMessage: uiState.currencyConversionErrorMessage,
-                          onRetry: viewModel.retryCurrencyConversion,
-                        ),
-                      ],
-                      const SizedBox(height: 18),
-                      _buildDateFilter(context, uiState),
-                      const SizedBox(height: 34),
-                      _buildCategoryChart(viewModel, uiState),
-                      const SizedBox(height: 26),
-                      _buildExpenseChart(uiState),
-                      const SizedBox(height: 24),
-                      _buildBreakdownCard(uiState),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+      body: SafeArea(child: content),
     );
   }
 
@@ -550,21 +570,40 @@ class FinancialDashboardScreen extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Wrap(
-            alignment: WrapAlignment.center,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 14,
-            runSpacing: 8,
+          Column(
             children: [
-              _ColumnHeading(color: appTheme.blue_gray_700, label: 'Budget'),
-              _ColumnHeading(
-                color: appTheme.warningPopupHeader,
-                label: 'Expense',
+              Row(
+                children: [
+                  Expanded(
+                    child: _ColumnHeading(
+                      color: appTheme.blue_gray_700,
+                      label: 'Budget',
+                    ),
+                  ),
+                  Expanded(
+                    child: _ColumnHeading(
+                      color: appTheme.warningPopupHeader,
+                      label: 'Expense',
+                    ),
+                  ),
+                ],
               ),
-              _ColumnHeading(color: appTheme.teal_A700, label: 'Remaining'),
-              _ColumnHeading(
-                color: appTheme.expenseOverspendText,
-                label: 'Over Budget',
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _ColumnHeading(
+                      color: appTheme.teal_A700,
+                      label: 'Remaining',
+                    ),
+                  ),
+                  Expanded(
+                    child: _ColumnHeading(
+                      color: appTheme.expenseOverspendText,
+                      label: 'Over Budget',
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -1909,7 +1948,7 @@ class _SummaryRow extends StatelessWidget {
             ),
           ),
           SizedBox(
-            width: amount < 0 ? 140 : 126,
+            width: 140,
             child: amount < 0
                 ? Container(
                     padding: const EdgeInsets.symmetric(
@@ -1948,14 +1987,17 @@ class _SummaryRow extends StatelessWidget {
                       ],
                     ),
                   )
-                : _CurrencyAmountPairText(
-                    primaryText: primaryAmountText,
-                    secondaryText: secondaryAmountText,
-                    primaryStyle: _amountStyle.copyWith(color: amountColor),
-                    secondaryStyle: TextStyle(
-                      color: appTheme.white_A700.withValues(alpha: 0.88),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
+                : Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: _CurrencyAmountPairText(
+                      primaryText: primaryAmountText,
+                      secondaryText: secondaryAmountText,
+                      primaryStyle: _amountStyle.copyWith(color: amountColor),
+                      secondaryStyle: TextStyle(
+                        color: appTheme.white_A700.withValues(alpha: 0.88),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
           ),
@@ -2147,29 +2189,34 @@ class _ColumnHeading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 10,
-            height: 10,
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(3),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+        const SizedBox(width: 5),
+        Flexible(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              label,
+              maxLines: 1,
+              style: TextStyle(
+                color: appTheme.blue_gray_700,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: TextStyle(
-              color: appTheme.blue_gray_700,
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -2895,6 +2942,19 @@ class _AvailableDateDialog extends StatelessWidget {
         ? uiState.selectedDate
         : availableDates.first;
 
+    if (!uiState.isLoadingAvailableDates &&
+        uiState.availableDatesErrorMessage == null &&
+        availableDates.isNotEmpty) {
+      return AppDatePickerDialog(
+        initialDate: initialDate,
+        firstDate: availableDates.first,
+        lastDate: availableDates.last,
+        selectableDayPredicate: (date) => availableDates.any(
+          (availableDate) => DateUtils.isSameDay(availableDate, date),
+        ),
+      );
+    }
+
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 12),
       backgroundColor: appTheme.white_A700,
@@ -2960,30 +3020,10 @@ class _AvailableDateDialog extends StatelessWidget {
                   ),
                 ),
               )
-            else if (availableDates.isEmpty)
+            else
               const SizedBox(
                 height: 300,
                 child: Center(child: Text('No available dates for this trip.')),
-              )
-            else
-              Theme(
-                data: Theme.of(context).copyWith(
-                  colorScheme: ColorScheme.light(
-                    primary: appTheme.teal_A700,
-                    onPrimary: appTheme.white_A700,
-                    surface: appTheme.white_A700,
-                    onSurface: appTheme.gray_900,
-                  ),
-                ),
-                child: CalendarDatePicker(
-                  initialDate: initialDate,
-                  firstDate: availableDates.first,
-                  lastDate: availableDates.last,
-                  selectableDayPredicate: (date) => availableDates.any(
-                    (availableDate) => DateUtils.isSameDay(availableDate, date),
-                  ),
-                  onDateChanged: (date) => Navigator.pop(context, date),
-                ),
               ),
             Divider(color: appTheme.gray_200, height: 1),
             Padding(
