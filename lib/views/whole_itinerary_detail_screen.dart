@@ -279,18 +279,27 @@ class _WholeItineraryDetailScreenState
   }
 
   String _formatDisplayTime(dynamic activity) {
-    final startTime = activity.startTime as String?;
-    if (startTime != null && startTime
-        .trim()
-        .isNotEmpty) {
-      try {
-        final parsed = DateFormat('HH:mm').parse(startTime.trim());
-        return DateFormat('hh:mm a').format(parsed);
-      } catch (_) {
-        return startTime;
-      }
+    final start = _to12HourTime(activity.startTime as String?);
+    final end = _to12HourTime(activity.endTime as String?);
+
+    if (start != null && end != null && start != end) {
+      return '$start - $end';
     }
+    if (start != null) return start;
+    if (end != null) return end;
     return DateFormat('hh:mm a').format(activity.date);
+  }
+
+  /// Converts a stored time value ("HH:mm" or "hh:mm a") into "hh:mm a".
+  String? _to12HourTime(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return null;
+    final value = raw.trim();
+    try {
+      final parsed = DateFormat('HH:mm').parse(value);
+      return DateFormat('hh:mm a').format(parsed);
+    } catch (_) {
+      return value;
+    }
   }
 
   Future<bool> _handleTopUp({
@@ -1152,21 +1161,13 @@ class _WholeItineraryDetailScreenState
                       activities[i + 1].date.month != actDate.month ||
                       activities[i + 1].date.year != actDate.year));
 
-      final String actCategory =
-        (activity.activityCategory as String?) ?? '';
-    final bool isFixedActivity =
-        actCategory == 'Arrival' ||
-        actCategory == 'Departure' ||
-        actCategory == 'Transportation';
-
-    children.add(
+      children.add(
         _buildTimelineItem(
           context: context,
           viewModel: viewModel,
           activity: activity,
           isLast: isLast,
           isReadOnly: isReadOnly,
-          isFixedActivity: isFixedActivity,
           onRemove: () async {
             final activityName =
             (activity.destination as String?)?.isNotEmpty == true
@@ -1204,7 +1205,6 @@ class _WholeItineraryDetailScreenState
     required bool isLast,
     required VoidCallback onRemove,
     required bool isReadOnly,
-    bool isFixedActivity = false,
   }) {
     final bool isActivityNonEmpty =
         activity.status != 'empty' && activity.destination.isNotEmpty;
@@ -1230,7 +1230,7 @@ class _WholeItineraryDetailScreenState
                       color: appTheme.gray_800,
                     ).copyWith(height: 1.2),
                   ),
-                  if (!isReadOnly && isActivityNonEmpty && !isFixedActivity)
+                  if (!isReadOnly && isActivityNonEmpty)
                     GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: onRemove,
@@ -1632,7 +1632,7 @@ class _WholeItineraryDetailScreenState
                     ),
                     onPressed: () async {
                       final confirmed =
-                          await showConfirmGenerateAlternativeDialog(
+                      await showConfirmGenerateAlternativeDialog(
                         context: context,
                       );
                       if (!confirmed) return;

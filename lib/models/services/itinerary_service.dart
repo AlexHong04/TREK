@@ -735,6 +735,12 @@ class ItineraryService implements IItineraryService {
         await Future.delayed(const Duration(milliseconds: 300));
       }
 
+      // Sort chronologically. Activity.date already embeds the slot's start
+      // time, so this orders by day and then by time, keeping the timeline (and
+      // the UI's day grouping) correct even when Gemini returns the slots out
+      // of sequence - e.g. an arrival listed after a restaurant.
+      newActivities.sort((a, b) => a.date.compareTo(b.date));
+
       // Ensure departure is covered if user specified departure points
       final resolvedDepList = (departures != null && departures.isNotEmpty)
           ? departures.where((d) => d.location.trim().isNotEmpty).toList()

@@ -21,8 +21,8 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     required IAuthService authService,
     required IProfileService profileService, // added this
   }) : _itineraryService = itineraryService ?? ItineraryService(),
-       _authService = authService,
-       _profileService = profileService; // added this
+        _authService = authService,
+        _profileService = profileService; // added this
 
   WholeItineraryUiState _uiState = const WholeItineraryUiState();
 
@@ -67,8 +67,8 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
   /// True while any time slot is still empty (deleted, or not yet filled),
   /// which blocks confirming the plan.
   bool get hasEmptyActivitySlots => _uiState.activities.any(
-    (a) =>
-        a.status == 'empty' ||
+        (a) =>
+    a.status == 'empty' ||
         (a.destination.trim().isEmpty && a.description.trim().isEmpty),
   );
 
@@ -105,10 +105,10 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
   }
 
   static bool _matchesWishlist(
-    String wishlistName,
-    String destinationName, [
-    String description = '',
-  ]) {
+      String wishlistName,
+      String destinationName, [
+        String description = '',
+      ]) {
     final wLower = wishlistName.toLowerCase().trim();
     final dLower = destinationName.toLowerCase().trim();
     final descLower = description.toLowerCase().trim();
@@ -150,7 +150,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
 
     return wishlist.where((item) {
       return activeActivities.any(
-        (a) => _matchesWishlist(item, a.destination, a.description),
+            (a) => _matchesWishlist(item, a.destination, a.description),
       );
     }).toList();
   }
@@ -369,7 +369,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     final budget = double.tryParse(_uiState.budgetText) ?? 0.0;
     final myrAmount =
         await _profileService.convertPreferredCurrencyToMyr(amount: amount) ??
-        amount;
+            amount;
 
     final shortfall = spentBudget - budget;
     final shortage = _uiState.estimatedExtraBudgetNeeded > shortfall
@@ -381,7 +381,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         await _profileService.convertPreferredCurrencyToMyr(
           amount: minRequired,
         ) ??
-        minRequired;
+            minRequired;
 
     final isSufficient =
         shortage <= 0.0 || myrAmount >= shortage || myrAmount >= myrMinRequired;
@@ -503,7 +503,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         .toList();
     for (final w in updatedWishlist) {
       if (activeActivities.any(
-        (a) => _matchesWishlist(w, a.destination, a.description),
+            (a) => _matchesWishlist(w, a.destination, a.description),
       )) {
         coveredCount++;
       }
@@ -542,7 +542,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     required String destination,
   }) async {
     final slotIndex = _uiState.activities.indexWhere(
-      (a) => a.activitiesId == slotActivityId,
+          (a) => a.activitiesId == slotActivityId,
     );
     if (slotIndex == -1) return;
 
@@ -562,7 +562,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
       // and are skipped to avoid false matches.
       bool isRealVenue(Activity a) =>
           a.destination.isNotEmpty &&
-          a.activityCategory.toLowerCase() != 'transportation';
+              a.activityCategory.toLowerCase() != 'transportation';
 
       final excludedActivity = <String>[
         ..._uiState.stashedActivities
@@ -677,15 +677,15 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         transportFutures.add(
           _itineraryService
               .regenerateTransportation(
-                originPlace: origin,
-                destinationPlace: newDest,
-                city: city,
-                existingActivityId: transport.activitiesId,
-                dayTripId: transport.dayTripId,
-                date: transport.date,
-                startTime: transport.startTime,
-                endTime: transport.endTime,
-              )
+            originPlace: origin,
+            destinationPlace: newDest,
+            city: city,
+            existingActivityId: transport.activitiesId,
+            dayTripId: transport.dayTripId,
+            date: transport.date,
+            startTime: transport.startTime,
+            endTime: transport.endTime,
+          )
               .then((updated) => updatedList[slotIndex - 1] = updated)
               .catchError((e) {
             debugPrint('Failed to regenerate preceding transport: $e');
@@ -711,15 +711,15 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         transportFutures.add(
           _itineraryService
               .regenerateTransportation(
-                originPlace: newDest,
-                destinationPlace: nextPlace,
-                city: city,
-                existingActivityId: transport.activitiesId,
-                dayTripId: transport.dayTripId,
-                date: transport.date,
-                startTime: transport.startTime,
-                endTime: transport.endTime,
-              )
+            originPlace: newDest,
+            destinationPlace: nextPlace,
+            city: city,
+            existingActivityId: transport.activitiesId,
+            dayTripId: transport.dayTripId,
+            date: transport.date,
+            startTime: transport.startTime,
+            endTime: transport.endTime,
+          )
               .then((updated) => updatedList[slotIndex + 1] = updated)
               .catchError((e) {
             debugPrint('Failed to regenerate following transport: $e');
@@ -751,9 +751,9 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     final emptySlots = _uiState.activities
         .where(
           (a) =>
-              a.status == 'empty' ||
-              (a.destination.trim().isEmpty && a.description.trim().isEmpty),
-        )
+      a.status == 'empty' ||
+          (a.destination.trim().isEmpty && a.description.trim().isEmpty),
+    )
         .toList();
     if (emptySlots.isEmpty) return;
 
@@ -785,15 +785,15 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
 
       final newFilledActivities = await _itineraryService
           .regenerateEmptySlotsFromRemainingPlan(
-            destination: _uiState.destinationTitle,
-            remainingBudget: effectiveRemainingBudget,
-            remainingActivities: activeActivities,
-            emptySlots: emptySlots,
-            excludedPlaces: excludedPlaces,
-            uncoveredWishlist: uncoveredWishlistItems,
-            preference: _uiState.preference,
-            constraints: _uiState.constraints,
-          );
+        destination: _uiState.destinationTitle,
+        remainingBudget: effectiveRemainingBudget,
+        remainingActivities: activeActivities,
+        emptySlots: emptySlots,
+        excludedPlaces: excludedPlaces,
+        uncoveredWishlist: uncoveredWishlistItems,
+        preference: _uiState.preference,
+        constraints: _uiState.constraints,
+      );
 
       final Map<String, Activity> filledMap = {
         for (final act in newFilledActivities) act.activitiesId: act,
@@ -808,7 +808,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
 
       final newTotalAllocated = updatedList.fold(
         0.0,
-        (sum, a) => sum + a.allocatedBudget,
+            (sum, a) => sum + a.allocatedBudget,
       );
       final mathShortfall = (newTotalAllocated - totalBudget).clamp(
         0.0,
@@ -822,11 +822,11 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         final activeActivities = updatedList
             .where(
               (a) => a.status != 'empty' && a.destination.trim().isNotEmpty,
-            )
+        )
             .toList();
         for (final w in wishlist) {
           if (activeActivities.any(
-            (a) => _matchesWishlist(w, a.destination, a.description),
+                (a) => _matchesWishlist(w, a.destination, a.description),
           )) {
             coveredCount++;
           }
