@@ -340,6 +340,61 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  void addTransitLeg() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final defaultArrivalDate = _uiState.startDate != null
+        ? _uiState.startDate!.toLocal().toString().split(' ')[0]
+        : '';
+    final defaultDepartureDate = _uiState.endDate != null
+        ? _uiState.endDate!.toLocal().toString().split(' ')[0]
+        : '';
+
+    final updatedArrivals = List<TransitPoint>.from(_uiState.arrivals)
+      ..add(TransitPoint(
+        id: 'arr_$now',
+        location: '',
+        time: '09:00 AM',
+        type: 'Flight',
+        date: defaultArrivalDate,
+      ));
+    final updatedDepartures = List<TransitPoint>.from(_uiState.departures)
+      ..add(TransitPoint(
+        id: 'dep_$now',
+        location: '',
+        time: '09:00 PM',
+        type: 'Flight',
+        date: defaultDepartureDate,
+      ));
+
+    _uiState = _uiState.copyWith(
+      arrivals: updatedArrivals,
+      departures: updatedDepartures,
+    );
+    notifyListeners();
+  }
+
+  void removeTransitLeg(int index) {
+    final updatedArrivals = List<TransitPoint>.from(_uiState.arrivals);
+    final updatedDepartures = List<TransitPoint>.from(_uiState.departures);
+
+    if (updatedArrivals.length > 1 &&
+        index >= 0 &&
+        index < updatedArrivals.length) {
+      updatedArrivals.removeAt(index);
+    }
+    if (updatedDepartures.length > 1 &&
+        index >= 0 &&
+        index < updatedDepartures.length) {
+      updatedDepartures.removeAt(index);
+    }
+
+    _uiState = _uiState.copyWith(
+      arrivals: updatedArrivals,
+      departures: updatedDepartures,
+    );
+    notifyListeners();
+  }
+
   void addArrival() {
     final newId = 'arr_${DateTime.now().millisecondsSinceEpoch}';
     final defaultDate = _uiState.startDate != null
@@ -456,20 +511,46 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     }
   }
 
+  void updateArrivalHub(
+    int index, {
+    required String type,
+    required String location,
+  }) {
+    if (index >= 0 && index < _uiState.arrivals.length) {
+      final updated = List<TransitPoint>.from(_uiState.arrivals);
+      updated[index] = updated[index].copyWith(type: type, location: location);
+      _uiState = _uiState.copyWith(arrivals: updated);
+      notifyListeners();
+    }
+  }
+
+  void updateDepartureHub(
+    int index, {
+    required String type,
+    required String location,
+  }) {
+    if (index >= 0 && index < _uiState.departures.length) {
+      final updated = List<TransitPoint>.from(_uiState.departures);
+      updated[index] = updated[index].copyWith(type: type, location: location);
+      _uiState = _uiState.copyWith(departures: updated);
+      notifyListeners();
+    }
+  }
+
   void syncTransitType(String type, {int? index}) {
     final updatedArrivals = _uiState.arrivals.asMap().entries.map((e) {
-      if (index == null || e.key == index || _uiState.arrivals.length == 1) {
+      if (index == null || e.key == index) {
         if (e.value.type != type) {
-          return e.value.copyWith(type: type, location: '');
+          return e.value.copyWith(type: type);
         }
       }
       return e.value;
     }).toList();
 
     final updatedDepartures = _uiState.departures.asMap().entries.map((e) {
-      if (index == null || e.key == index || _uiState.departures.length == 1) {
+      if (index == null || e.key == index) {
         if (e.value.type != type) {
-          return e.value.copyWith(type: type, location: '');
+          return e.value.copyWith(type: type);
         }
       }
       return e.value;

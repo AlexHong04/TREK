@@ -93,7 +93,7 @@ class FinancialDashboardScreen extends StatelessWidget {
                   const SizedBox(height: 18),
                   _buildDateFilter(context, uiState),
                   const SizedBox(height: 34),
-                  _buildCategoryChart(viewModel, uiState),
+                  _buildCategoryChart(context, viewModel, uiState),
                   const SizedBox(height: 26),
                   _buildExpenseChart(uiState),
                   const SizedBox(height: 24),
@@ -427,6 +427,7 @@ class FinancialDashboardScreen extends StatelessWidget {
   }
 
   Widget _buildCategoryChart(
+    BuildContext context,
     FinancialDashboardViewModel viewModel,
     FinancialDashboardUiState uiState,
   ) {
@@ -437,7 +438,10 @@ class FinancialDashboardScreen extends StatelessWidget {
           height: 240,
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final chartSize = Size(constraints.maxWidth, 260);
+              final chartSize = Size(
+                constraints.maxWidth,
+                constraints.maxHeight,
+              );
               return GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTapUp: (details) => _handleDonutTap(
@@ -487,6 +491,8 @@ class FinancialDashboardScreen extends StatelessWidget {
                 (item) => _LegendChip(
                   label: item.name,
                   color: dashboardCategoryColor(item.name),
+                  onTap: () =>
+                      _openCategoryExpenseDetail(context, item, uiState),
                 ),
               )
               .toList(),
@@ -582,7 +588,7 @@ class FinancialDashboardScreen extends StatelessWidget {
                   ),
                   Expanded(
                     child: _ColumnHeading(
-                      color: appTheme.warningPopupHeader,
+                      color: appTheme.teal_800,
                       label: 'Expense',
                     ),
                   ),
@@ -593,7 +599,7 @@ class FinancialDashboardScreen extends StatelessWidget {
                 children: [
                   Expanded(
                     child: _ColumnHeading(
-                      color: appTheme.teal_A700,
+                      color: appTheme.warningPopupHeader,
                       label: 'Remaining',
                     ),
                   ),
@@ -646,7 +652,9 @@ class FinancialDashboardScreen extends StatelessWidget {
   ) {
     final center = Offset(size.width / 2, size.height / 2);
     final distance = (position - center).distance;
-    if (distance < 42 || distance > 74) return;
+    // Include the ring, leader lines, and amount labels in the touch target.
+    // This keeps very small slices usable without changing their appearance.
+    if (distance < 32 || distance > 120) return;
 
     final totalExpense = chartCategories.fold<double>(
       0,
@@ -663,24 +671,32 @@ class FinancialDashboardScreen extends StatelessWidget {
       if (chartCategory.expense <= 0) continue;
       final sweep = math.pi * 2 * chartCategory.expense / totalExpense;
       if (tapAngle >= accumulatedAngle && tapAngle < accumulatedAngle + sweep) {
-        final viewModel = context.read<FinancialDashboardViewModel>();
-        viewModel.clearExpenseSearch();
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ChangeNotifierProvider.value(
-              value: viewModel,
-              child: _FinancialExpenseDetailView(
-                category: chartCategory,
-                date: uiState.selectedDate,
-              ),
-            ),
-          ),
-        );
+        _openCategoryExpenseDetail(context, chartCategory, uiState);
         return;
       }
       accumulatedAngle += sweep;
     }
+  }
+
+  void _openCategoryExpenseDetail(
+    BuildContext context,
+    DashboardCategoryUiState category,
+    FinancialDashboardUiState uiState,
+  ) {
+    final viewModel = context.read<FinancialDashboardViewModel>();
+    viewModel.clearExpenseSearch();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChangeNotifierProvider.value(
+          value: viewModel,
+          child: _FinancialExpenseDetailView(
+            category: category,
+            date: uiState.selectedDate,
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -2016,25 +2032,36 @@ class _SummaryRow extends StatelessWidget {
 class _LegendChip extends StatelessWidget {
   final String label;
   final Color color;
+  final VoidCallback? onTap;
 
-  const _LegendChip({required this.label, required this.color});
+  const _LegendChip({required this.label, required this.color, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
+    return Semantics(
+      button: onTap != null,
+      label: onTap == null ? label : 'View $label expense details',
+      child: Material(
         color: appTheme.white_A700,
-        border: Border.all(color: appTheme.gray_200),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(width: 8, height: 8, color: color),
-          const SizedBox(width: 10),
-          Text(label),
-        ],
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(4),
+          side: BorderSide(color: appTheme.gray_200),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(width: 8, height: 8, color: color),
+                const SizedBox(width: 10),
+                Text(label),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -2290,7 +2317,7 @@ class _BreakdownRow extends StatelessWidget {
             _MoneyCell(
               amount: category.expense,
               percentage: percentage,
-              color: appTheme.warningPopupHeader,
+              color: appTheme.teal_800,
             ),
             _MoneyCell(
               amount: remaining,
@@ -2299,7 +2326,7 @@ class _BreakdownRow extends StatelessWidget {
                   : remaining / category.budget * 100,
               color: category.isOverspent
                   ? appTheme.errorRed
-                  : appTheme.teal_A700,
+                  : appTheme.warningPopupHeader,
             ),
           ],
         ),
@@ -2441,7 +2468,7 @@ class _CompletedTripDialogState extends State<_CompletedTripDialog> {
                     child: Text(
                       'Trip',
                       style: TextStyle(
-                        color: appTheme.warningPopupHeader,
+                        color: appTheme.gray_900,
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
                       ),

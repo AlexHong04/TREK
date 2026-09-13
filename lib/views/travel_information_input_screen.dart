@@ -95,20 +95,15 @@ class _TravelInformationInputScreenState
     super.dispose();
   }
 
-  void _addArrival(TravelInformationInputViewModel viewModel) {
-    viewModel.addArrival();
+  void _addArrivalAndDeparture(TravelInformationInputViewModel viewModel) {
+    viewModel.addTransitLeg();
   }
 
-  void _removeArrival(int index, TravelInformationInputViewModel viewModel) {
-    viewModel.removeArrival(index);
-  }
-
-  void _addDeparture(TravelInformationInputViewModel viewModel) {
-    viewModel.addDeparture();
-  }
-
-  void _removeDeparture(int index, TravelInformationInputViewModel viewModel) {
-    viewModel.removeDeparture(index);
+  void _removeArrivalAndDeparture(
+    int index,
+    TravelInformationInputViewModel viewModel,
+  ) {
+    viewModel.removeTransitLeg(index);
   }
 
   void _syncHotelControllers(List<HotelStay> hotels) {
@@ -669,6 +664,7 @@ class _TravelInformationInputScreenState
               // RenderFlex overflow in the confirmation dialog.
               FocusScope.of(context).unfocus();
               await Future.delayed(const Duration(milliseconds: 100));
+              if (!mounted) return;
 
               if (_formKey.currentState?.validate() ?? false) {
                 final destination = viewModel.uiState.selectedDestinations.join(
@@ -1293,7 +1289,7 @@ class _TravelInformationInputScreenState
                                         Text(
                                           'Add',
                                           style: TextStyle(
-                                            fontSize: 13,
+                                            fontSize: 14,
                                             fontWeight: FontWeight.w600,
                                             fontFamily: 'Inter',
                                             color: appTheme.teal_A700,
@@ -1347,7 +1343,7 @@ class _TravelInformationInputScreenState
           Text(
             destination,
             style: TextStyle(
-              fontSize: 13,
+              fontSize: 14,
               fontWeight: FontWeight.w700,
               fontFamily: 'Inter',
               color: appTheme.teal_A700,
@@ -1683,6 +1679,9 @@ class _TravelInformationInputScreenState
   ) {
     final arrivals = viewModel.uiState.arrivals;
     final departures = viewModel.uiState.departures;
+    final transitCount = arrivals.length > departures.length
+        ? arrivals.length
+        : departures.length;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -1702,14 +1701,16 @@ class _TravelInformationInputScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ARRIVALS HEADER
+          // MAIN TRANSIT (ARRIVAL & DEPARTURE) HEADER
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 children: [
                   Text(
-                    arrivals.length > 1 ? 'ARRIVALS' : 'ARRIVAL',
+                    transitCount > 1
+                        ? 'ARRIVALS & DEPARTURES'
+                        : 'ARRIVAL & DEPARTURE',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w800,
@@ -1719,7 +1720,7 @@ class _TravelInformationInputScreenState
                       height: 1.2,
                     ),
                   ),
-                  if (arrivals.length > 1) ...[
+                  if (transitCount > 1) ...[
                     const SizedBox(width: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -1731,7 +1732,7 @@ class _TravelInformationInputScreenState
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        '${arrivals.length}',
+                        '$transitCount',
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
@@ -1744,7 +1745,7 @@ class _TravelInformationInputScreenState
                 ],
               ),
               InkWell(
-                onTap: () => _addArrival(viewModel),
+                onTap: () => _addArrivalAndDeparture(viewModel),
                 borderRadius: BorderRadius.circular(8.0),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
@@ -1775,448 +1776,344 @@ class _TravelInformationInputScreenState
               ),
             ],
           ),
-          const SizedBox(height: 8.0),
+          const SizedBox(height: 10.0),
 
-          // ARRIVALS LIST
-          ...arrivals.asMap().entries.map((entry) {
-            final index = entry.key;
-            final arrival = entry.value;
+          // TRANSIT LEGS (PAIRED ARRIVAL & DEPARTURE)
+          ...List.generate(transitCount, (index) {
+            final arrival = index < arrivals.length ? arrivals[index] : arrivals.first;
+            final departure = index < departures.length ? departures[index] : departures.first;
 
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: index == arrivals.length - 1 ? 0.0 : 14.0,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (arrivals.length > 1) ...[
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'ARRIVAL ${index + 1}',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            fontFamily: 'Inter',
-                            color: appTheme.blue_gray_300,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        InkWell(
-                          onTap: () => _removeArrival(index, viewModel),
-                          borderRadius: BorderRadius.circular(8.0),
-                          child: Padding(
-                            padding: const EdgeInsets.all(4.0),
-                            child: Icon(
-                              Icons.close_rounded,
-                              size: 18.0,
-                              color: appTheme.blue_gray_300,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6.0),
-                  ],
-                  InkWell(
-                    onTap: () => _showTransitHubSelectionModal(
-                      context,
-                      viewModel,
-                      isArrival: true,
-                      index: index,
-                    ),
-                    borderRadius: BorderRadius.circular(10.0),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12.0,
-                        vertical: 10.0,
-                      ),
-                      decoration: BoxDecoration(
-                        color: appTheme.gray_50_01,
-                        borderRadius: BorderRadius.circular(10.0),
-                        border: Border.all(
-                          color: arrival.location.isNotEmpty
-                              ? appTheme.teal_A700.withValues(alpha: 0.35)
-                              : appTheme.gray_200,
-                          width: 1.0,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            _getArrivalTransitIcon(arrival.type),
-                            color: appTheme.teal_A700,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 8.0),
-                          Expanded(
-                            child: Text(
-                              arrival.location.isNotEmpty
-                                  ? arrival.location
-                                  : _getArrivalPlaceholder(
-                                      arrival.type,
-                                      index,
-                                      arrivals.length,
-                                    ),
-                              style: TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: arrival.location.isNotEmpty
-                                    ? FontWeight.w600
-                                    : FontWeight.w400,
-                                fontFamily: 'Inter',
-                                color: arrival.location.isNotEmpty
-                                    ? appTheme.gray_800
-                                    : appTheme.blue_gray_300,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 4.0),
-                          Icon(
-                            Icons.keyboard_arrow_down_rounded,
-                            color: appTheme.blue_gray_300,
-                            size: 18.0,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8.0),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'DATE',
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w700,
-                                fontFamily: 'Inter',
-                                color: appTheme.blue_gray_300,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                            const SizedBox(height: 4.0),
-                            _buildDatePickerButton(
-                              context: context,
-                              date: arrival.date,
-                              isFullWidth: true,
-                              onTap: () => _pickTransitDate(
-                                context: context,
-                                viewModel: viewModel,
-                                isArrival: true,
-                                initialDateString: arrival.date,
-                                onDatePicked: (d) =>
-                                    viewModel.updateArrivalDate(index, d),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 10.0),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'TIME',
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w700,
-                                fontFamily: 'Inter',
-                                color: appTheme.blue_gray_300,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                            const SizedBox(height: 4.0),
-                            _buildTimePickerButton(
-                              context: context,
-                              time: arrival.time,
-                              isFullWidth: true,
-                              onTap: () => _pickTime(
-                                context: context,
-                                initialTimeString: arrival.time,
-                                onTimePicked: (t) =>
-                                    viewModel.updateArrivalTime(index, t),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (index < arrivals.length - 1) ...[
-                    const SizedBox(height: 14.0),
-                    Divider(color: appTheme.gray_100, height: 1.0),
-                  ],
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (index > 0) ...[
+                  const SizedBox(height: 14.0),
+                  Divider(color: appTheme.gray_100, height: 1.0),
+                  const SizedBox(height: 14.0),
                 ],
-              ),
-            );
-          }),
 
-          const SizedBox(height: 14.0),
-          Divider(color: appTheme.gray_100, height: 1.0),
-          const SizedBox(height: 14.0),
-
-          // DEPARTURES HEADER
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    departures.length > 1 ? 'DEPARTURES' : 'DEPARTURE',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      fontFamily: 'Inter',
-                      color: appTheme.blue_gray_300,
-                      letterSpacing: 1,
-                      height: 1.2,
-                    ),
-                  ),
-                  if (departures.length > 1) ...[
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 1.5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: appTheme.gray_100,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        '${departures.length}',
+                // TRANSIT LEG HEADER (with a SINGLE delete button for the leg!)
+                if (transitCount > 1) ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'TRANSIT ${index + 1}',
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize: 11,
                           fontWeight: FontWeight.w700,
                           fontFamily: 'Inter',
-                          color: appTheme.teal_A700,
+                          color: appTheme.teal_700,
+                          letterSpacing: 0.5,
                         ),
                       ),
-                    ),
-                  ],
-                ],
-              ),
-              InkWell(
-                onTap: () => _addDeparture(viewModel),
-                borderRadius: BorderRadius.circular(8.0),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6.0,
-                    vertical: 2.0,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.add_circle_outline_rounded,
-                        size: 14.0,
-                        color: appTheme.teal_A700,
-                      ),
-                      const SizedBox(width: 4.0),
-                      Text(
-                        'Add',
-                        style: TextStyle(
-                          fontSize: 12.0,
-                          fontWeight: FontWeight.w600,
-                          fontFamily: 'Inter',
-                          color: appTheme.teal_A700,
+                      InkWell(
+                        onTap: () => _removeArrivalAndDeparture(index, viewModel),
+                        borderRadius: BorderRadius.circular(8.0),
+                        child: Padding(
+                          padding: const EdgeInsets.all(4.0),
+                          child: Icon(
+                            Icons.close_rounded,
+                            size: 18.0,
+                            color: appTheme.blue_gray_300,
+                          ),
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 8.0),
+                ],
+
+                // --- ARRIVAL SUB-SECTION ---
+                Text(
+                  transitCount > 1 ? 'ARRIVAL (TRANSIT ${index + 1})' : 'ARRIVAL',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: 'Inter',
+                    color: appTheme.blue_gray_300,
+                    letterSpacing: 0.5,
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8.0),
-
-          // DEPARTURES LIST
-          ...departures.asMap().entries.map((entry) {
-            final index = entry.key;
-            final departure = entry.value;
-
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: index == departures.length - 1 ? 0.0 : 14.0,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (departures.length > 1) ...[
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                const SizedBox(height: 6.0),
+                InkWell(
+                  onTap: () => _showTransitHubSelectionModal(
+                    context,
+                    viewModel,
+                    isArrival: true,
+                    index: index,
+                  ),
+                  borderRadius: BorderRadius.circular(10.0),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12.0,
+                      vertical: 10.0,
+                    ),
+                    decoration: BoxDecoration(
+                      color: appTheme.gray_50_01,
+                      borderRadius: BorderRadius.circular(10.0),
+                      border: Border.all(
+                        color: arrival.location.isNotEmpty
+                            ? appTheme.teal_A700.withValues(alpha: 0.35)
+                            : appTheme.gray_200,
+                        width: 1.0,
+                      ),
+                    ),
+                    child: Row(
                       children: [
-                        Text(
-                          'DEPARTURE ${index + 1}',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            fontFamily: 'Inter',
-                            color: appTheme.blue_gray_300,
-                            letterSpacing: 0.5,
+                        Icon(
+                          _getArrivalTransitIcon(arrival.type),
+                          color: appTheme.teal_A700,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8.0),
+                        Expanded(
+                          child: Text(
+                            arrival.location.isNotEmpty
+                                ? arrival.location
+                                : _getArrivalPlaceholder(
+                                    arrival.type,
+                                    index,
+                                    arrivals.length,
+                                  ),
+                            style: TextStyle(
+                              fontSize: 16.0,
+                              fontWeight: arrival.location.isNotEmpty
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
+                              fontFamily: 'Inter',
+                              color: arrival.location.isNotEmpty
+                                  ? appTheme.gray_800
+                                  : appTheme.blue_gray_300,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        InkWell(
-                          onTap: () => _removeDeparture(index, viewModel),
-                          borderRadius: BorderRadius.circular(8.0),
-                          child: Padding(
-                            padding: const EdgeInsets.all(4.0),
-                            child: Icon(
-                              Icons.close_rounded,
-                              size: 18.0,
-                              color: appTheme.blue_gray_300,
-                            ),
-                          ),
+                        const SizedBox(width: 4.0),
+                        Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          color: appTheme.blue_gray_300,
+                          size: 18.0,
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6.0),
-                  ],
-                  InkWell(
-                    onTap: () => _showTransitHubSelectionModal(
-                      context,
-                      viewModel,
-                      isArrival: false,
-                      index: index,
-                    ),
-                    borderRadius: BorderRadius.circular(10.0),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12.0,
-                        vertical: 10.0,
-                      ),
-                      decoration: BoxDecoration(
-                        color: appTheme.gray_50_01,
-                        borderRadius: BorderRadius.circular(10.0),
-                        border: Border.all(
-                          color: departure.location.isNotEmpty
-                              ? appTheme.teal_A700.withValues(alpha: 0.35)
-                              : appTheme.gray_200,
-                          width: 1.0,
-                        ),
-                      ),
-                      child: Row(
+                  ),
+                ),
+                const SizedBox(height: 8.0),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(
-                            _getDepartureTransitIcon(departure.type),
-                            color: appTheme.teal_A700,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 8.0),
-                          Expanded(
-                            child: Text(
-                              departure.location.isNotEmpty
-                                  ? departure.location
-                                  : _getDeparturePlaceholder(
-                                      departure.type,
-                                      index,
-                                      departures.length,
-                                    ),
-                              style: TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: departure.location.isNotEmpty
-                                    ? FontWeight.w600
-                                    : FontWeight.w400,
-                                fontFamily: 'Inter',
-                                color: departure.location.isNotEmpty
-                                    ? appTheme.gray_800
-                                    : appTheme.blue_gray_300,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                          Text(
+                            'DATE',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: 'Inter',
+                              color: appTheme.blue_gray_300,
+                              letterSpacing: 0.5,
                             ),
                           ),
-                          const SizedBox(width: 4.0),
-                          Icon(
-                            Icons.keyboard_arrow_down_rounded,
-                            color: appTheme.blue_gray_300,
-                            size: 18.0,
+                          const SizedBox(height: 4.0),
+                          _buildDatePickerButton(
+                            context: context,
+                            date: arrival.date,
+                            isFullWidth: true,
+                            onTap: () => _pickTransitDate(
+                              context: context,
+                              viewModel: viewModel,
+                              isArrival: true,
+                              initialDateString: arrival.date,
+                              onDatePicked: (d) =>
+                                  viewModel.updateArrivalDate(index, d),
+                            ),
                           ),
                         ],
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 8.0),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'DATE',
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w700,
-                                fontFamily: 'Inter',
-                                color: appTheme.blue_gray_300,
-                                letterSpacing: 0.5,
-                              ),
+                    const SizedBox(width: 10.0),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'TIME',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: 'Inter',
+                              color: appTheme.blue_gray_300,
+                              letterSpacing: 0.5,
                             ),
-                            const SizedBox(height: 4.0),
-                            _buildDatePickerButton(
+                          ),
+                          const SizedBox(height: 4.0),
+                          _buildTimePickerButton(
+                            context: context,
+                            time: arrival.time,
+                            isFullWidth: true,
+                            onTap: () => _pickTime(
                               context: context,
-                              date: departure.date,
-                              isFullWidth: true,
-                              onTap: () => _pickTransitDate(
-                                context: context,
-                                viewModel: viewModel,
-                                isArrival: false,
-                                initialDateString: departure.date,
-                                onDatePicked: (d) =>
-                                    viewModel.updateDepartureDate(index, d),
-                              ),
+                              initialTimeString: arrival.time,
+                              onTimePicked: (t) =>
+                                  viewModel.updateArrivalTime(index, t),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 10.0),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'TIME',
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w700,
-                                fontFamily: 'Inter',
-                                color: appTheme.blue_gray_300,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                            const SizedBox(height: 4.0),
-                            _buildTimePickerButton(
-                              context: context,
-                              time: departure.time,
-                              isFullWidth: true,
-                              onTap: () => _pickTime(
-                                context: context,
-                                initialTimeString: departure.time,
-                                onTimePicked: (t) =>
-                                    viewModel.updateDepartureTime(index, t),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (index < departures.length - 1) ...[
-                    const SizedBox(height: 14.0),
-                    Divider(color: appTheme.gray_100, height: 1.0),
+                    ),
                   ],
-                ],
-              ),
+                ),
+
+                const SizedBox(height: 12.0),
+
+                // --- DEPARTURE SUB-SECTION ---
+                Text(
+                  transitCount > 1 ? 'DEPARTURE (TRANSIT ${index + 1})' : 'DEPARTURE',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: 'Inter',
+                    color: appTheme.blue_gray_300,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 6.0),
+                InkWell(
+                  onTap: () => _showTransitHubSelectionModal(
+                    context,
+                    viewModel,
+                    isArrival: false,
+                    index: index,
+                  ),
+                  borderRadius: BorderRadius.circular(10.0),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12.0,
+                      vertical: 10.0,
+                    ),
+                    decoration: BoxDecoration(
+                      color: appTheme.gray_50_01,
+                      borderRadius: BorderRadius.circular(10.0),
+                      border: Border.all(
+                        color: departure.location.isNotEmpty
+                            ? appTheme.teal_A700.withValues(alpha: 0.35)
+                            : appTheme.gray_200,
+                        width: 1.0,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _getDepartureTransitIcon(departure.type),
+                          color: appTheme.teal_A700,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8.0),
+                        Expanded(
+                          child: Text(
+                            departure.location.isNotEmpty
+                                ? departure.location
+                                : _getDeparturePlaceholder(
+                                    departure.type,
+                                    index,
+                                    departures.length,
+                                  ),
+                            style: TextStyle(
+                              fontSize: 16.0,
+                              fontWeight: departure.location.isNotEmpty
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
+                              fontFamily: 'Inter',
+                              color: departure.location.isNotEmpty
+                                  ? appTheme.gray_800
+                                  : appTheme.blue_gray_300,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 4.0),
+                        Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          color: appTheme.blue_gray_300,
+                          size: 18.0,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8.0),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'DATE',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: 'Inter',
+                              color: appTheme.blue_gray_300,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 4.0),
+                          _buildDatePickerButton(
+                            context: context,
+                            date: departure.date,
+                            isFullWidth: true,
+                            onTap: () => _pickTransitDate(
+                              context: context,
+                              viewModel: viewModel,
+                              isArrival: false,
+                              initialDateString: departure.date,
+                              onDatePicked: (d) =>
+                                  viewModel.updateDepartureDate(index, d),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10.0),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'TIME',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: 'Inter',
+                              color: appTheme.blue_gray_300,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 4.0),
+                          _buildTimePickerButton(
+                            context: context,
+                            time: departure.time,
+                            isFullWidth: true,
+                            onTap: () => _pickTime(
+                              context: context,
+                              initialTimeString: departure.time,
+                              onTimePicked: (t) =>
+                                  viewModel.updateDepartureTime(index, t),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             );
           }),
         ],
@@ -2436,7 +2333,7 @@ class _TravelInformationInputScreenState
                     onChanged: (text) =>
                         viewModel.onHotelLocationChanged(index, text),
                     style: TextStyle(
-                      fontSize: 15,
+                      fontSize: 16,
                       fontWeight: FontWeight.w400,
                       fontFamily: 'Inter',
                       color: hasDestinations
@@ -2450,7 +2347,7 @@ class _TravelInformationInputScreenState
                                 ? 'Hotel ${index + 1} name or area'
                                 : 'Hotel name or area (e.g. George Town)'),
                       hintStyle: TextStyle(
-                        fontSize: 14,
+                        fontSize: 16,
                         fontWeight: FontWeight.w400,
                         fontFamily: 'Inter',
                         color: appTheme.blue_gray_300,
@@ -3082,7 +2979,11 @@ class _TravelInformationInputScreenState
                               setModalState(() {
                                 activeMode = 'Flight';
                               });
-                              viewModel.syncTransitType('Flight', index: index);
+                              if (isArrival) {
+                                viewModel.updateArrivalType(index, 'Flight');
+                              } else {
+                                viewModel.updateDepartureType(index, 'Flight');
+                              }
                             },
                           ),
                           const SizedBox(width: 4.0),
@@ -3094,7 +2995,11 @@ class _TravelInformationInputScreenState
                               setModalState(() {
                                 activeMode = 'Train';
                               });
-                              viewModel.syncTransitType('Train', index: index);
+                              if (isArrival) {
+                                viewModel.updateArrivalType(index, 'Train');
+                              } else {
+                                viewModel.updateDepartureType(index, 'Train');
+                              }
                             },
                           ),
                           const SizedBox(width: 4.0),
@@ -3106,7 +3011,11 @@ class _TravelInformationInputScreenState
                               setModalState(() {
                                 activeMode = 'Bus';
                               });
-                              viewModel.syncTransitType('Bus', index: index);
+                              if (isArrival) {
+                                viewModel.updateArrivalType(index, 'Bus');
+                              } else {
+                                viewModel.updateDepartureType(index, 'Bus');
+                              }
                             },
                           ),
                         ],
@@ -3230,19 +3139,17 @@ class _TravelInformationInputScreenState
                                 InkWell(
                                   onTap: () {
                                     final customName = searchQuery.trim();
-                                    viewModel.syncTransitType(
-                                      activeMode,
-                                      index: index,
-                                    );
                                     if (isArrival) {
-                                      viewModel.updateArrivalLocation(
+                                      viewModel.updateArrivalHub(
                                         index,
-                                        customName,
+                                        type: activeMode,
+                                        location: customName,
                                       );
                                     } else {
-                                      viewModel.updateDepartureLocation(
+                                      viewModel.updateDepartureHub(
                                         index,
-                                        customName,
+                                        type: activeMode,
+                                        location: customName,
                                       );
                                     }
                                     Navigator.pop(context);
@@ -3274,7 +3181,7 @@ class _TravelInformationInputScreenState
                                           child: Text(
                                             'Use "${searchQuery.trim()}" as $typeLabel',
                                             style: TextStyle(
-                                              fontSize: 13.5,
+                                              fontSize: 14,
                                               fontWeight: FontWeight.w600,
                                               fontFamily: 'Inter',
                                               color: appTheme.teal_A700,
@@ -3325,19 +3232,17 @@ class _TravelInformationInputScreenState
                                       isSelected: isSelected,
                                       isRecommended: true,
                                       onTap: () {
-                                        viewModel.syncTransitType(
-                                          activeMode,
-                                          index: index,
-                                        );
                                         if (isArrival) {
-                                          viewModel.updateArrivalLocation(
+                                          viewModel.updateArrivalHub(
                                             index,
-                                            hub,
+                                            type: activeMode,
+                                            location: hub,
                                           );
                                         } else {
-                                          viewModel.updateDepartureLocation(
+                                          viewModel.updateDepartureHub(
                                             index,
-                                            hub,
+                                            type: activeMode,
+                                            location: hub,
                                           );
                                         }
                                         Navigator.pop(context);
@@ -3374,19 +3279,17 @@ class _TravelInformationInputScreenState
                                       isSelected: isSelected,
                                       isRecommended: false,
                                       onTap: () {
-                                        viewModel.syncTransitType(
-                                          activeMode,
-                                          index: index,
-                                        );
                                         if (isArrival) {
-                                          viewModel.updateArrivalLocation(
+                                          viewModel.updateArrivalHub(
                                             index,
-                                            hub,
+                                            type: activeMode,
+                                            location: hub,
                                           );
                                         } else {
-                                          viewModel.updateDepartureLocation(
+                                          viewModel.updateDepartureHub(
                                             index,
-                                            hub,
+                                            type: activeMode,
+                                            location: hub,
                                           );
                                         }
                                         Navigator.pop(context);
@@ -3566,7 +3469,7 @@ class _TravelInformationInputScreenState
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 13.5,
+                fontSize: 14.0,
                 fontFamily: 'Inter',
                 fontWeight: FontWeight.w500,
                 color: appTheme.gray_800,
