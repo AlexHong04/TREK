@@ -1929,9 +1929,36 @@ class _TravelInformationInputScreenState
                             onTap: () {
                               DateTime? minDate;
                               if (index > 0 && index - 1 < departures.length) {
-                                final prevDepDate = departures[index - 1].date;
-                                if (prevDepDate.isNotEmpty) {
-                                  minDate = DateTime.tryParse(prevDepDate);
+                                final prevDep = departures[index - 1];
+                                final durationMin =
+                                    TransitScheduleHelper.getEstimatedDurationMinutes(
+                                  transitType: arrival.type.isNotEmpty
+                                      ? arrival.type
+                                      : prevDep.type,
+                                  fromLocation: prevDep.location,
+                                  toLocation: arrival.location,
+                                  selectedDestinations:
+                                      viewModel.uiState.selectedDestinations,
+                                );
+                                final depDate = prevDep.date.isNotEmpty
+                                    ? prevDep.date
+                                    : (viewModel.uiState.startDate
+                                            ?.toLocal()
+                                            .toString()
+                                            .split(' ')[0] ??
+                                        DateTime.now()
+                                            .toLocal()
+                                            .toString()
+                                            .split(' ')[0]);
+                                final calculated =
+                                    TransitScheduleHelper.calculateArrivalDateTime(
+                                  departureDate: depDate,
+                                  departureTimeStr: prevDep.time,
+                                  minutesToAdd: durationMin,
+                                );
+                                final minDateStr = calculated['date'] as String;
+                                if (minDateStr.isNotEmpty) {
+                                  minDate = DateTime.tryParse(minDateStr);
                                 }
                               }
                               _pickTransitDate(
@@ -1975,18 +2002,50 @@ class _TravelInformationInputScreenState
                               String? constraintLabel;
                               if (index > 0 && index - 1 < departures.length) {
                                 final prevDep = departures[index - 1];
-                                minAllowedDate = prevDep.date;
-                                minAllowedTime = prevDep.time;
+                                final durationMin =
+                                    TransitScheduleHelper.getEstimatedDurationMinutes(
+                                  transitType: arrival.type.isNotEmpty
+                                      ? arrival.type
+                                      : prevDep.type,
+                                  fromLocation: prevDep.location,
+                                  toLocation: arrival.location,
+                                  selectedDestinations:
+                                      viewModel.uiState.selectedDestinations,
+                                );
+                                final depDate = prevDep.date.isNotEmpty
+                                    ? prevDep.date
+                                    : (viewModel.uiState.startDate
+                                            ?.toLocal()
+                                            .toString()
+                                            .split(' ')[0] ??
+                                        DateTime.now()
+                                            .toLocal()
+                                            .toString()
+                                            .split(' ')[0]);
+                                final calculated =
+                                    TransitScheduleHelper.calculateArrivalDateTime(
+                                  departureDate: depDate,
+                                  departureTimeStr: prevDep.time,
+                                  minutesToAdd: durationMin,
+                                );
+                                minAllowedDate = calculated['date'] as String;
+                                minAllowedTime = calculated['time'] as String;
+                                final durStr =
+                                    TransitScheduleHelper.formatDuration(
+                                        durationMin);
                                 constraintLabel =
-                                    'Transit ${index + 1} arrival time cannot be earlier than Transit $index departure time (${prevDep.time}).';
+                                    'Transit ${index + 1} arrival cannot be earlier than $minAllowedTime ($durStr travel duration from Transit $index departure).';
                               }
                               _pickTime(
                                 context: context,
                                 initialTimeString: arrival.time,
-                                compareDate: arrival.date,
+                                compareDate: arrival.date.isNotEmpty
+                                    ? arrival.date
+                                    : minAllowedDate,
                                 minAllowedDate: minAllowedDate,
                                 minAllowedTimeString: minAllowedTime,
                                 constraintLabel: constraintLabel,
+                                autoSyncOnInvalid: index > 0,
                                 onTimePicked: (t) =>
                                     viewModel.updateArrivalTime(index, t),
                               );
@@ -2206,6 +2265,18 @@ class _TravelInformationInputScreenState
       selectedDestinations: viewModel.uiState.selectedDestinations,
     );
     final durationStr = TransitScheduleHelper.formatDuration(durationMin);
+
+    final depDate = prevDep.date.isNotEmpty
+        ? prevDep.date
+        : (viewModel.uiState.startDate?.toLocal().toString().split(' ')[0] ??
+            DateTime.now().toLocal().toString().split(' ')[0]);
+    final calculated = TransitScheduleHelper.calculateArrivalDateTime(
+      departureDate: depDate,
+      departureTimeStr: prevDep.time,
+      minutesToAdd: durationMin,
+    );
+    final isSynced = curArr.time == calculated['time'] &&
+        (curArr.date.isEmpty || curArr.date == calculated['date']);
 
     final depLoc = prevDep.location.isNotEmpty
         ? prevDep.location
@@ -2470,13 +2541,15 @@ class _TravelInformationInputScreenState
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        Icons.sync_rounded,
+                        isSynced
+                            ? Icons.check_circle_rounded
+                            : Icons.sync_rounded,
                         size: 12.0,
                         color: appTheme.teal_700,
                       ),
                       const SizedBox(width: 3.0),
                       Text(
-                        'Sync Arrival',
+                        isSynced ? 'Auto-Synced' : 'Auto-Sync Arrival',
                         style: TextStyle(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w600,
@@ -3237,6 +3310,7 @@ class _TravelInformationInputScreenState
     String? minAllowedDate,
     String? minAllowedTimeString,
     String? constraintLabel,
+    bool autoSyncOnInvalid = false,
   }) async {
     TimeOfDay initialTime = const TimeOfDay(hour: 9, minute: 0);
     try {
@@ -3273,29 +3347,67 @@ class _TravelInformationInputScreenState
     );
 
     if (picked != null) {
-      if (compareDate != null &&
-          compareDate.isNotEmpty &&
-          minAllowedDate != null &&
-          minAllowedDate.isNotEmpty &&
-          compareDate == minAllowedDate &&
-          minAllowedTimeString != null &&
-          minAllowedTimeString.isNotEmpty) {
-        final pickedMinutes = picked.hour * 60 + picked.minute;
-        final minMinutes = _parseTimeToMinutes(minAllowedTimeString);
-        if (minMinutes != null && pickedMinutes < minMinutes) {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  constraintLabel ??
-                      'Time cannot be earlier than $minAllowedTimeString.',
-                ),
-                backgroundColor: appTheme.redButton,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
+      if (minAllowedTimeString != null && minAllowedTimeString.isNotEmpty) {
+        bool isEarlier = false;
+        final chosenD = (compareDate != null && compareDate.isNotEmpty)
+            ? DateTime.tryParse(compareDate)
+            : null;
+        final minD = (minAllowedDate != null && minAllowedDate.isNotEmpty)
+            ? DateTime.tryParse(minAllowedDate)
+            : null;
+
+        if (chosenD != null && minD != null) {
+          final cDay = DateTime(chosenD.year, chosenD.month, chosenD.day);
+          final mDay = DateTime(minD.year, minD.month, minD.day);
+          if (cDay.isBefore(mDay)) {
+            isEarlier = true;
+          } else if (cDay.isAtSameMomentAs(mDay)) {
+            final pickedMinutes = picked.hour * 60 + picked.minute;
+            final minMinutes = _parseTimeToMinutes(minAllowedTimeString);
+            if (minMinutes != null && pickedMinutes < minMinutes) {
+              isEarlier = true;
+            }
           }
-          return;
+        } else {
+          final pickedMinutes = picked.hour * 60 + picked.minute;
+          final minMinutes = _parseTimeToMinutes(minAllowedTimeString);
+          if (minMinutes != null && pickedMinutes < minMinutes) {
+            isEarlier = true;
+          }
+        }
+
+        if (isEarlier) {
+          if (autoSyncOnInvalid) {
+            // AUTOMATIC CHECK: Auto-sync arrival to minimum valid calculated time!
+            onTimePicked(minAllowedTimeString);
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Selected time was too early for travel duration. Auto-synced arrival to $minAllowedTimeString.',
+                  ),
+                  backgroundColor: appTheme.teal_A700,
+                  duration: const Duration(seconds: 3),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+            return;
+          } else {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    constraintLabel ??
+                        'Time cannot be earlier than $minAllowedTimeString.',
+                  ),
+                  backgroundColor: appTheme.redButton,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+            return;
+          }
         }
       }
 
