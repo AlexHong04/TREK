@@ -10,10 +10,66 @@ import '../entities/expense_item.dart';
 import '../repository/expense_repository.dart';
 import '../repository/itinerary_repository.dart';
 import '../repository/i_itinerary_repository.dart';
-import '../../utils/expense_text_validation.dart';
+import '../../utils/explicit_word_validation.dart';
 import 'budget_service.dart';
 import 'i_profile_service.dart';
 import 'i_itinerary_service.dart';
+
+String? _validateExpenseText(String fieldName, String value) {
+  if (!containsProhibitedPlaceLanguage(value)) return null;
+  return '$fieldName contains inappropriate language. Please remove it.';
+}
+
+String? _validateExpenseItemName(String value) {
+  final trimmed = value.trim();
+  if (trimmed.length > 30) {
+    return 'Item name cannot exceed 30 characters.';
+  }
+  if (!RegExp(r'^[A-Za-z0-9 -]+$').hasMatch(trimmed)) {
+    return 'Item name may only contain letters, numbers, spaces, and dashes.';
+  }
+  return _validateExpenseText('Item name', trimmed);
+}
+
+String? _validateExpenseDescription(String value) {
+  final trimmed = value.trim();
+  if (trimmed.length > 60) {
+    return 'Item description cannot exceed 60 characters.';
+  }
+  final symbolError = _validateOptionalExpenseTextSymbols(
+    'Item description',
+    trimmed,
+  );
+  if (symbolError != null) return symbolError;
+  return _validateExpenseText('Item description', trimmed);
+}
+
+String? _validateExpenseMerchantName(String value) {
+  final trimmed = value.trim();
+  if (trimmed.length > 50) {
+    return 'Merchant name cannot exceed 50 characters.';
+  }
+  final symbolError = _validateOptionalExpenseTextSymbols(
+    'Merchant name',
+    trimmed,
+  );
+  if (symbolError != null) return symbolError;
+  return _validateExpenseText('Merchant name', trimmed);
+}
+
+String? _validateOptionalExpenseTextSymbols(String fieldName, String value) {
+  if (value.isEmpty) return null;
+  if (!RegExp(r'[A-Za-z0-9]').hasMatch(value)) {
+    return '$fieldName must contain at least one letter or number.';
+  }
+  if (!RegExp(r"^[A-Za-z0-9 .,!?&'()/-]+$").hasMatch(value)) {
+    return "$fieldName contains an unsupported symbol. Use only . , ! ? & ' ( ) / or -.";
+  }
+  if (RegExp(r"([^A-Za-z0-9\s])\1{3,}").hasMatch(value)) {
+    return '$fieldName cannot contain the same symbol more than 3 times in a row.';
+  }
+  return null;
+}
 
 class _ExtractedReceiptItem {
   final String name;
@@ -1658,9 +1714,9 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       }
 
       final validationMessages = <String?>[
-        validateExpenseItemName(item.itemName),
-        validateExpenseDescription(item.itemDescription ?? ''),
-        validateExpenseMerchantName(item.merchantName ?? ''),
+        _validateExpenseItemName(item.itemName),
+        _validateExpenseDescription(item.itemDescription ?? ''),
+        _validateExpenseMerchantName(item.merchantName ?? ''),
       ];
       for (final validationMessage in validationMessages) {
         if (validationMessage != null) {

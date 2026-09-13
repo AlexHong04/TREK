@@ -10,7 +10,7 @@ import '../models/entities/activity.dart';
 import '../models/entities/expense.dart';
 import '../models/entities/expense_item.dart';
 import '../theme/app_theme.dart';
-import '../utils/expense_text_validation.dart';
+import '../utils/explicit_word_validation.dart';
 import '../view_models/presentation_logic/activity_view_model.dart';
 import '../view_models/ui_state/activity_ui_state.dart';
 import '../widgets/app_date_picker.dart';
@@ -19,6 +19,62 @@ import '../widgets/converted_amount_text.dart';
 
 String _formatExpenseCurrencyAmount(String currency, double amount) =>
     formatCurrencyAmount(currency, amount, displayMyrAsCode: true);
+
+String? _validateExpenseText(String fieldName, String value) {
+  if (!containsProhibitedPlaceLanguage(value)) return null;
+  return '$fieldName contains inappropriate language. Please remove it.';
+}
+
+String? _validateExpenseItemName(String value) {
+  final trimmed = value.trim();
+  if (trimmed.length > 30) {
+    return 'Item name cannot exceed 30 characters.';
+  }
+  if (!RegExp(r'^[A-Za-z0-9 -]+$').hasMatch(trimmed)) {
+    return 'Item name may only contain letters, numbers, spaces, and dashes.';
+  }
+  return _validateExpenseText('Item name', trimmed);
+}
+
+String? _validateExpenseDescription(String value) {
+  final trimmed = value.trim();
+  if (trimmed.length > 60) {
+    return 'Item description cannot exceed 60 characters.';
+  }
+  final symbolError = _validateOptionalExpenseTextSymbols(
+    'Item description',
+    trimmed,
+  );
+  if (symbolError != null) return symbolError;
+  return _validateExpenseText('Item description', trimmed);
+}
+
+String? _validateExpenseMerchantName(String value) {
+  final trimmed = value.trim();
+  if (trimmed.length > 50) {
+    return 'Merchant name cannot exceed 50 characters.';
+  }
+  final symbolError = _validateOptionalExpenseTextSymbols(
+    'Merchant name',
+    trimmed,
+  );
+  if (symbolError != null) return symbolError;
+  return _validateExpenseText('Merchant name', trimmed);
+}
+
+String? _validateOptionalExpenseTextSymbols(String fieldName, String value) {
+  if (value.isEmpty) return null;
+  if (!RegExp(r'[A-Za-z0-9]').hasMatch(value)) {
+    return '$fieldName must contain at least one letter or number.';
+  }
+  if (!RegExp(r"^[A-Za-z0-9 .,!?&'()/-]+$").hasMatch(value)) {
+    return "$fieldName contains an unsupported symbol. Use only . , ! ? & ' ( ) / or -.";
+  }
+  if (RegExp(r"([^A-Za-z0-9\s])\1{3,}").hasMatch(value)) {
+    return '$fieldName cannot contain the same symbol more than 3 times in a row.';
+  }
+  return null;
+}
 
 /// Opens the Expense form for the Activity selected from the itinerary.
 Future<void> showExpenseBottomSheet({
@@ -2471,9 +2527,9 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
       return;
     }
     for (final validationMessage in <String?>[
-      validateExpenseItemName(name),
-      validateExpenseDescription(description),
-      validateExpenseMerchantName(merchantName),
+      _validateExpenseItemName(name),
+      _validateExpenseDescription(description),
+      _validateExpenseMerchantName(merchantName),
     ]) {
       if (validationMessage != null) {
         widget.onValidationError(validationMessage);
