@@ -739,6 +739,25 @@ class ActivityViewModel extends ChangeNotifier {
     );
   }
 
+  ({DateTime start, DateTime? nextStart})? get selectedExpenseTimeWindow {
+    final selected = _uiState.selectedActivity;
+    if (selected == null) return null;
+    final start = _activityDateTime(selected);
+    DateTime? nextStart;
+    final schedule = _uiState.allActivities.isNotEmpty
+        ? _uiState.allActivities
+        : _uiState.activities;
+    for (final activity in schedule) {
+      if (activity.activitiesId == selected.activitiesId) continue;
+      final candidate = _activityDateTime(activity);
+      if (candidate.isAfter(start) &&
+          (nextStart == null || candidate.isBefore(nextStart))) {
+        nextStart = candidate;
+      }
+    }
+    return (start: start, nextStart: nextStart);
+  }
+
   DateTime? _resolveAmbiguousReceiptDateTime(
     DateTime? parsedDateTime,
     Activity selectedActivity,
@@ -805,6 +824,12 @@ class ActivityViewModel extends ChangeNotifier {
         transactionDateTime.isBefore(_activityDateTime(selectedActivity))) {
       throw ArgumentError(
         'Transaction date and time cannot be before the selected activity starts.',
+      );
+    }
+    final nextStart = selectedExpenseTimeWindow?.nextStart;
+    if (nextStart != null && !transactionDateTime.isBefore(nextStart)) {
+      throw ArgumentError(
+        'Transaction date and time must be before the next activity starts.',
       );
     }
     final bounds = _tripDateBounds();

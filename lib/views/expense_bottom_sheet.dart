@@ -14,6 +14,7 @@ import '../utils/expense_text_validation.dart';
 import '../view_models/presentation_logic/activity_view_model.dart';
 import '../view_models/ui_state/activity_ui_state.dart';
 import '../widgets/app_date_picker.dart';
+import '../widgets/app_time_picker.dart';
 import '../widgets/converted_amount_text.dart';
 
 String _formatExpenseCurrencyAmount(String currency, double amount) =>
@@ -2372,7 +2373,8 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
   }
 
   Future<void> _pickDate() async {
-    final uiState = context.read<ActivityViewModel>().uiState;
+    final viewModel = context.read<ActivityViewModel>();
+    final uiState = viewModel.uiState;
     DateTime dateOnly(DateTime date) =>
         DateTime(date.year, date.month, date.day);
     final activityDate = uiState.selectedActivity?.date;
@@ -2387,6 +2389,13 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
     final tripEndDate = uiState.tripEndDate;
     if (tripEndDate != null && dateOnly(tripEndDate).isBefore(lastDate)) {
       lastDate = dateOnly(tripEndDate);
+    }
+    final nextStart = viewModel.selectedExpenseTimeWindow?.nextStart;
+    if (nextStart != null) {
+      final lastBeforeNext = dateOnly(
+        nextStart.subtract(const Duration(microseconds: 1)),
+      );
+      if (lastBeforeNext.isBefore(lastDate)) lastDate = lastBeforeNext;
     }
     if (firstDate.isAfter(lastDate)) {
       widget.onValidationError(
@@ -2413,9 +2422,35 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
   }
 
   Future<void> _pickTime() async {
-    final time = await showTimePicker(
+    final window = context.read<ActivityViewModel>().selectedExpenseTimeWindow;
+    if (window == null) return;
+    final now = DateTime.now();
+    bool isSelectable(TimeOfDay time) {
+      final candidate = DateTime(
+        _selectedDate.year,
+        _selectedDate.month,
+        _selectedDate.day,
+        time.hour,
+        time.minute,
+      );
+      return !candidate.isBefore(window.start) &&
+          (window.nextStart == null || candidate.isBefore(window.nextStart!)) &&
+          !candidate.isAfter(now);
+    }
+
+    if (!List.generate(
+      1440,
+      (index) => TimeOfDay(hour: index ~/ 60, minute: index % 60),
+    ).any(isSelectable)) {
+      widget.onValidationError(
+        'No times are available for this activity on the selected date.',
+      );
+      return;
+    }
+    final time = await showAppTimePicker(
       context: context,
       initialTime: _selectedTime,
+      isSelectable: isSelectable,
     );
     if (time != null && mounted) {
       setState(() => _selectedTime = time);
