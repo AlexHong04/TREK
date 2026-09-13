@@ -749,29 +749,43 @@ class ActivityViewModel extends ChangeNotifier {
   }
 
   DateTime _activityDateTime(Activity activity) {
+    return _activityDateTimeFromRawTime(activity, activity.startTime) ??
+        DateTime(
+          activity.date.year,
+          activity.date.month,
+          activity.date.day,
+          activity.date.hour,
+          activity.date.minute,
+        );
+  }
+
+  DateTime? _activityDateTimeFromRawTime(Activity activity, String? rawTime) {
     var hour = activity.date.hour;
     var minute = activity.date.minute;
-    final startTime = activity.startTime?.trim().toUpperCase() ?? '';
+    final startTime = rawTime?.trim().toUpperCase() ?? '';
     final match = RegExp(
       r'^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?$',
     ).firstMatch(startTime);
-    if (match != null) {
-      final parsedHour = int.tryParse(match.group(1)!);
-      final parsedMinute = int.tryParse(match.group(2)!);
-      final period = match.group(3);
-      if (parsedHour != null &&
-          parsedMinute != null &&
-          parsedMinute < 60 &&
-          ((period == null && parsedHour < 24) ||
-              (period != null && parsedHour >= 1 && parsedHour <= 12))) {
-        hour = period == 'PM' && parsedHour < 12
-            ? parsedHour + 12
-            : period == 'AM' && parsedHour == 12
-            ? 0
-            : parsedHour;
-        minute = parsedMinute;
-      }
+    if (match == null) return null;
+
+    final parsedHour = int.tryParse(match.group(1)!);
+    final parsedMinute = int.tryParse(match.group(2)!);
+    final period = match.group(3);
+    if (parsedHour == null ||
+        parsedMinute == null ||
+        parsedMinute >= 60 ||
+        (period == null && parsedHour >= 24) ||
+        (period != null && (parsedHour < 1 || parsedHour > 12))) {
+      return null;
     }
+
+    hour = period == 'PM' && parsedHour < 12
+        ? parsedHour + 12
+        : period == 'AM' && parsedHour == 12
+        ? 0
+        : parsedHour;
+    minute = parsedMinute;
+
     return DateTime(
       activity.date.year,
       activity.date.month,
@@ -785,6 +799,11 @@ class ActivityViewModel extends ChangeNotifier {
     final selected = _uiState.selectedActivity;
     if (selected == null) return null;
     final start = _activityDateTime(selected);
+    final end = _activityDateTimeFromRawTime(selected, selected.endTime);
+    if (end != null && end.isAfter(start)) {
+      return (start: start, nextStart: end);
+    }
+
     DateTime? nextStart;
     final schedule = _uiState.allActivities.isNotEmpty
         ? _uiState.allActivities
@@ -871,7 +890,7 @@ class ActivityViewModel extends ChangeNotifier {
     final nextStart = selectedExpenseTimeWindow?.nextStart;
     if (nextStart != null && !transactionDateTime.isBefore(nextStart)) {
       throw ArgumentError(
-        'Transaction date and time must be before the next activity starts.',
+        'Transaction date and time must be before the selected activity ends.',
       );
     }
     final bounds = _tripDateBounds();
@@ -1583,34 +1602,7 @@ class ActivityViewModel extends ChangeNotifier {
   /// Combines the database activity date with a stored HH:mm end time.
   /// Activities without a valid end time cannot have an end-time reminder.
   DateTime? _activityEndDateTime(Activity activity) {
-    final endTime = activity.endTime;
-    if (endTime == null || endTime.trim().isEmpty) {
-      return null;
-    }
-
-    final timeParts = endTime.trim().split(':');
-    if (timeParts.length < 2) {
-      return null;
-    }
-
-    final hour = int.tryParse(timeParts[0]);
-    final minute = int.tryParse(timeParts[1]);
-    if (hour == null ||
-        minute == null ||
-        hour < 0 ||
-        hour > 23 ||
-        minute < 0 ||
-        minute > 59) {
-      return null;
-    }
-
-    return DateTime(
-      activity.date.year,
-      activity.date.month,
-      activity.date.day,
-      hour,
-      minute,
-    );
+    return _activityDateTimeFromRawTime(activity, activity.endTime);
   }
 
   bool _isSameDate(DateTime first, DateTime second) {
