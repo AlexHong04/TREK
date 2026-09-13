@@ -52,7 +52,10 @@ class WholeItineraryDetailScreen extends StatefulWidget {
 
     return ChangeNotifierProvider<WholeItineraryDetailViewModel>(
       create: (context) {
-        final vm = WholeItineraryDetailViewModel(authService: authService, profileService: profileService); // changed this
+        final vm = WholeItineraryDetailViewModel(
+          authService: authService,
+          profileService: profileService,
+        ); // changed this
         final resolvedTripId = tripId ?? trip?.tripId ?? '';
 
         if (isReadOnly && (tripId != null || trip != null)) {
@@ -293,9 +296,7 @@ class _WholeItineraryDetailScreenState
     required double amount,
     required double minTopUp,
   }) async {
-    final myrAmt = await viewModel.convertAmountToMYR(
-      amount: amount,
-    );
+    final myrAmt = await viewModel.convertAmountToMYR(amount: amount);
 
     final symbol = viewModel.preferredCurrency;
 
@@ -370,8 +371,8 @@ class _WholeItineraryDetailScreenState
   }
 
   Future<void> _showWishlistWarningDialog(
-      WholeItineraryDetailViewModel viewModel,
-      ) async {
+    WholeItineraryDetailViewModel viewModel,
+  ) async {
     if (_wishlistWarningShowing) return;
 
     _wishlistWarningShowing = true;
@@ -393,28 +394,22 @@ class _WholeItineraryDetailScreenState
 
       final wishlist = viewModel.uiState.wishlist;
 
-      final hasWishlist =
-          wishlist != null && wishlist.isNotEmpty;
+      final hasWishlist = wishlist != null && wishlist.isNotEmpty;
 
       final hasUncoveredWishlist =
           hasWishlist &&
-              viewModel.uiState.wishlistItemsCoveredCount < wishlist.length;
+          viewModel.uiState.wishlistItemsCoveredCount < wishlist.length;
 
       final hasBudgetShortfall =
           viewModel.uiState.estimatedExtraBudgetNeeded > 0;
 
       if (viewModel.preferredCurrency != 'MYR') {
         validationMinTopUp = roundCurrency(
-          await viewModel.convertAmountToCurrency(
-            amount: minTopUp,
-          ) ??
-              minTopUp,
+          await viewModel.convertAmountToCurrency(amount: minTopUp) ?? minTopUp,
         );
 
         validationShortageAmount = roundCurrency(
-          await viewModel.convertAmountToCurrency(
-            amount: shortageAmount,
-          ) ??
+          await viewModel.convertAmountToCurrency(amount: shortageAmount) ??
               shortageAmount,
         );
       }
@@ -431,21 +426,22 @@ class _WholeItineraryDetailScreenState
               : null,
           symbol: viewModel.preferredCurrency,
           warningText:
-          'Insufficient top-up amount will trigger '
+              'Insufficient top-up amount will trigger '
               'alternative recommendation directly.',
-          validateTopUpAmount: ({
-            String? symbol,
-            required String value,
-            required double minTopUp,
-            required double shortageAmount,
-          }) {
-            return viewModel.validateTopUpAmount(
-              symbol: symbol,
-              value: value,
-              minTopUp: validationMinTopUp,
-              shortageAmount: validationShortageAmount,
-            );
-          },
+          validateTopUpAmount:
+              ({
+                String? symbol,
+                required String value,
+                required double minTopUp,
+                required double shortageAmount,
+              }) {
+                return viewModel.validateTopUpAmount(
+                  symbol: symbol,
+                  value: value,
+                  minTopUp: validationMinTopUp,
+                  shortageAmount: validationShortageAmount,
+                );
+              },
 
           onCancel: () {},
 
@@ -1442,8 +1438,30 @@ class _WholeItineraryDetailScreenState
                               onTap: viewModel.canConfirmItinerary
                                   ? () async {
                                       // Wishlist does NOT block confirm; only check if actually overspent
-                                      if (viewModel.spentBudget >
-                                          viewModel.totalBudget) {
+                                      // if (viewModel.spentBudget >
+                                      //     viewModel.totalBudget) {
+                                      //   await _showWishlistWarningDialog(
+                                      //     viewModel,
+                                      //   );
+                                      //   return;
+                                      // }
+                                      final wishlist =
+                                          viewModel.uiState.wishlist;
+
+                                      final hasUncoveredWishlist =
+                                          wishlist != null &&
+                                          wishlist.isNotEmpty &&
+                                          viewModel
+                                                  .uiState
+                                                  .wishlistItemsCoveredCount <
+                                              wishlist.length;
+
+                                      final isOverBudget =
+                                          viewModel.spentBudget >
+                                          viewModel.totalBudget;
+
+                                      if (isOverBudget ||
+                                          hasUncoveredWishlist) {
                                         await _showWishlistWarningDialog(
                                           viewModel,
                                         );
