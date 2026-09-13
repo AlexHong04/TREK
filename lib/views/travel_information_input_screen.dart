@@ -1923,14 +1923,24 @@ class _TravelInformationInputScreenState
                             context: context,
                             date: arrival.date,
                             isFullWidth: true,
-                            onTap: () => _pickTransitDate(
-                              context: context,
-                              viewModel: viewModel,
-                              isArrival: true,
-                              initialDateString: arrival.date,
-                              onDatePicked: (d) =>
-                                  viewModel.updateArrivalDate(index, d),
-                            ),
+                            onTap: () {
+                              DateTime? minDate;
+                              if (index > 0 && index - 1 < departures.length) {
+                                final prevDepDate = departures[index - 1].date;
+                                if (prevDepDate.isNotEmpty) {
+                                  minDate = DateTime.tryParse(prevDepDate);
+                                }
+                              }
+                              _pickTransitDate(
+                                context: context,
+                                viewModel: viewModel,
+                                isArrival: true,
+                                initialDateString: arrival.date,
+                                minAllowedDate: minDate,
+                                onDatePicked: (d) =>
+                                    viewModel.updateArrivalDate(index, d),
+                              );
+                            },
                           ),
                         ],
                       ),
@@ -1955,12 +1965,28 @@ class _TravelInformationInputScreenState
                             context: context,
                             time: arrival.time,
                             isFullWidth: true,
-                            onTap: () => _pickTime(
-                              context: context,
-                              initialTimeString: arrival.time,
-                              onTimePicked: (t) =>
-                                  viewModel.updateArrivalTime(index, t),
-                            ),
+                            onTap: () {
+                              String? minAllowedDate;
+                              String? minAllowedTime;
+                              String? constraintLabel;
+                              if (index > 0 && index - 1 < departures.length) {
+                                final prevDep = departures[index - 1];
+                                minAllowedDate = prevDep.date;
+                                minAllowedTime = prevDep.time;
+                                constraintLabel =
+                                    'Transit ${index + 1} arrival time cannot be earlier than Transit $index departure time (${prevDep.time}).';
+                              }
+                              _pickTime(
+                                context: context,
+                                initialTimeString: arrival.time,
+                                compareDate: arrival.date,
+                                minAllowedDate: minAllowedDate,
+                                minAllowedTimeString: minAllowedTime,
+                                constraintLabel: constraintLabel,
+                                onTimePicked: (t) =>
+                                    viewModel.updateArrivalTime(index, t),
+                              );
+                            },
                           ),
                         ],
                       ),
@@ -2069,14 +2095,24 @@ class _TravelInformationInputScreenState
                             context: context,
                             date: departure.date,
                             isFullWidth: true,
-                            onTap: () => _pickTransitDate(
-                              context: context,
-                              viewModel: viewModel,
-                              isArrival: false,
-                              initialDateString: departure.date,
-                              onDatePicked: (d) =>
-                                  viewModel.updateDepartureDate(index, d),
-                            ),
+                            onTap: () {
+                              DateTime? minDate;
+                              if (index < arrivals.length) {
+                                final curArrDate = arrivals[index].date;
+                                if (curArrDate.isNotEmpty) {
+                                  minDate = DateTime.tryParse(curArrDate);
+                                }
+                              }
+                              _pickTransitDate(
+                                context: context,
+                                viewModel: viewModel,
+                                isArrival: false,
+                                initialDateString: departure.date,
+                                minAllowedDate: minDate,
+                                onDatePicked: (d) =>
+                                    viewModel.updateDepartureDate(index, d),
+                              );
+                            },
                           ),
                         ],
                       ),
@@ -2101,12 +2137,28 @@ class _TravelInformationInputScreenState
                             context: context,
                             time: departure.time,
                             isFullWidth: true,
-                            onTap: () => _pickTime(
-                              context: context,
-                              initialTimeString: departure.time,
-                              onTimePicked: (t) =>
-                                  viewModel.updateDepartureTime(index, t),
-                            ),
+                            onTap: () {
+                              String? minAllowedDate;
+                              String? minAllowedTime;
+                              String? constraintLabel;
+                              if (index < arrivals.length) {
+                                final curArr = arrivals[index];
+                                minAllowedDate = curArr.date;
+                                minAllowedTime = curArr.time;
+                                constraintLabel =
+                                    'Departure time cannot be earlier than arrival time (${curArr.time}).';
+                              }
+                              _pickTime(
+                                context: context,
+                                initialTimeString: departure.time,
+                                compareDate: departure.date,
+                                minAllowedDate: minAllowedDate,
+                                minAllowedTimeString: minAllowedTime,
+                                constraintLabel: constraintLabel,
+                                onTimePicked: (t) =>
+                                    viewModel.updateDepartureTime(index, t),
+                              );
+                            },
                           ),
                         ],
                       ),
@@ -2593,6 +2645,7 @@ class _TravelInformationInputScreenState
     required bool isArrival,
     required String initialDateString,
     required ValueChanged<String> onDatePicked,
+    DateTime? minAllowedDate,
   }) async {
     final startDate = viewModel.uiState.startDate;
     final endDate = viewModel.uiState.endDate;
@@ -2609,33 +2662,48 @@ class _TravelInformationInputScreenState
       return;
     }
 
-    final firstAllowed = startDate.subtract(const Duration(days: 1));
+    final tripFirstAllowed = startDate.subtract(const Duration(days: 1));
+    final firstAllowed =
+        (minAllowedDate != null && minAllowedDate.isAfter(tripFirstAllowed))
+            ? minAllowedDate
+            : tripFirstAllowed;
     final lastAllowed = endDate.add(const Duration(days: 1));
+    final effectiveFirstAllowed =
+        firstAllowed.isAfter(lastAllowed) ? lastAllowed : firstAllowed;
 
     DateTime initialDate = isArrival ? startDate : endDate;
     if (initialDateString.trim().isNotEmpty) {
       final parsed = DateTime.tryParse(initialDateString.trim());
       if (parsed != null) {
-        if (parsed.isBefore(firstAllowed)) {
-          initialDate = firstAllowed;
-        } else if (parsed.isAfter(lastAllowed)) {
-          initialDate = lastAllowed;
-        } else {
-          initialDate = parsed;
-        }
+        initialDate = parsed;
       }
+    }
+    if (initialDate.isBefore(effectiveFirstAllowed)) {
+      initialDate = effectiveFirstAllowed;
+    } else if (initialDate.isAfter(lastAllowed)) {
+      initialDate = lastAllowed;
     }
 
     final picked = await showDatePicker(
       context: context,
       initialDate: initialDate,
-      firstDate: firstAllowed,
+      firstDate: effectiveFirstAllowed,
       lastDate: lastAllowed,
       helpText: isArrival
           ? 'SELECT ARRIVAL DATE (±1 DAY OF TRIP)'
           : 'SELECT DEPARTURE DATE (±1 DAY OF TRIP)',
       selectableDayPredicate: (day) {
         final checkDate = DateTime(day.year, day.month, day.day);
+        if (minAllowedDate != null) {
+          final minDateOnly = DateTime(
+            minAllowedDate.year,
+            minAllowedDate.month,
+            minAllowedDate.day,
+          );
+          if (checkDate.isBefore(minDateOnly)) {
+            return false;
+          }
+        }
         // Dates strictly within this trip are always valid
         if (!checkDate.isBefore(startDate) && !checkDate.isAfter(endDate)) {
           return true;
@@ -2672,6 +2740,27 @@ class _TravelInformationInputScreenState
     if (picked != null) {
       final formatted = picked.toLocal().toString().split(' ')[0];
       onDatePicked(formatted);
+    }
+  }
+
+  int? _parseTimeToMinutes(String timeStr) {
+    try {
+      final trimmed = timeStr.trim();
+      if (trimmed.isEmpty) return null;
+      final parts = trimmed.split(' ');
+      final timeParts = parts[0].split(':');
+      int hour = int.parse(timeParts[0]);
+      final minute = int.parse(timeParts[1]);
+      if (parts.length > 1 && parts[1].toUpperCase() == 'PM' && hour < 12) {
+        hour += 12;
+      } else if (parts.length > 1 &&
+          parts[1].toUpperCase() == 'AM' &&
+          hour == 12) {
+        hour = 0;
+      }
+      return hour * 60 + minute;
+    } catch (_) {
+      return null;
     }
   }
 
@@ -2722,6 +2811,10 @@ class _TravelInformationInputScreenState
     required BuildContext context,
     required String initialTimeString,
     required ValueChanged<String> onTimePicked,
+    String? compareDate,
+    String? minAllowedDate,
+    String? minAllowedTimeString,
+    String? constraintLabel,
   }) async {
     TimeOfDay initialTime = const TimeOfDay(hour: 9, minute: 0);
     try {
@@ -2758,6 +2851,32 @@ class _TravelInformationInputScreenState
     );
 
     if (picked != null) {
+      if (compareDate != null &&
+          compareDate.isNotEmpty &&
+          minAllowedDate != null &&
+          minAllowedDate.isNotEmpty &&
+          compareDate == minAllowedDate &&
+          minAllowedTimeString != null &&
+          minAllowedTimeString.isNotEmpty) {
+        final pickedMinutes = picked.hour * 60 + picked.minute;
+        final minMinutes = _parseTimeToMinutes(minAllowedTimeString);
+        if (minMinutes != null && pickedMinutes < minMinutes) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  constraintLabel ??
+                      'Time cannot be earlier than $minAllowedTimeString.',
+                ),
+                backgroundColor: appTheme.redButton,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+          return;
+        }
+      }
+
       final hour = picked.hourOfPeriod == 0 ? 12 : picked.hourOfPeriod;
       final minute = picked.minute.toString().padLeft(2, '0');
       final period = picked.period == DayPeriod.am ? 'AM' : 'PM';
