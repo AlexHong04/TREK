@@ -10,6 +10,14 @@ enum AuthDestination {
   deletionConfirmation,
 }
 
+enum EmailActionType {
+  verification,
+  lockedAccountLogin,
+  passwordRecovery,
+  emailChange,
+  accountDeletion,
+}
+
 class RegistrationResult {
   final bool requiresEmailVerification;
   final bool verificationEmailSent;
@@ -62,6 +70,8 @@ abstract interface class IAuthService implements Listenable {
   bool get requiresEmailVerification;
 
   int get verificationDaysRemaining;
+
+  int emailCooldownSeconds(EmailActionType action);
 
   AuthDestination get destination;
 
@@ -182,4 +192,10 @@ class GoogleIdentityOperationInProgressException implements Exception {
 
 class AccountDeletionNotConfirmedException implements Exception {
   const AccountDeletionNotConfirmedException();
+}
+
+class EmailRequestRateLimitedException implements Exception {
+  final int retryAfterSeconds;
+
+  const EmailRequestRateLimitedException(this.retryAfterSeconds);
 }

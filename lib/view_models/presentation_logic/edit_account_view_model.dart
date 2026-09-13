@@ -205,7 +205,11 @@ class EditAccountViewModel extends ChangeNotifier {
 
   Future<void> saveEmail() async {
     if (_uiState.isGoogleManagedAccount) return;
-    if (_uiState.isBusy || !_requireOnline()) return;
+    if (_uiState.isBusy ||
+        _uiState.emailChangeCooldownSeconds > 0 ||
+        !_requireOnline()) {
+      return;
+    }
     _emailTouched = true;
     final emailError = InputValidator.validateEmail(_uiState.newEmail);
     final passwordError = _requiredPasswordError();
@@ -254,6 +258,12 @@ class EditAccountViewModel extends ChangeNotifier {
     } on NetworkUnavailableException {
       _showOfflineError(isSavingEmail: true);
       return;
+    } on EmailRequestRateLimitedException catch (error) {
+      if (_disposed) return;
+      _uiState = _uiState.copyWith(
+        isSavingEmail: false,
+        emailChangeCooldownSeconds: error.retryAfterSeconds,
+      );
     } on EmailAlreadyExistsException {
       if (_disposed) return;
       _uiState = _uiState.copyWith(
@@ -379,7 +389,12 @@ class EditAccountViewModel extends ChangeNotifier {
   /// The screen owns the first destructive warning. Call this only after that
   /// dialog has been accepted.
   Future<void> requestDeletion() async {
-    if (_uiState.isBusy || !_requireOnline()) return;
+    if (_uiState.isBusy ||
+        (_uiState.isEmailVerified &&
+            _uiState.deletionCooldownSeconds > 0) ||
+        !_requireOnline()) {
+      return;
+    }
     // A verified account confirms deletion through its one-time email link.
     // Only an unverified account, which skips that email step, needs immediate
     // password/OAuth reauthentication here.
@@ -419,6 +434,12 @@ class EditAccountViewModel extends ChangeNotifier {
     } on NetworkUnavailableException {
       _showOfflineError(isRequestingDeletion: true);
       return;
+    } on EmailRequestRateLimitedException catch (error) {
+      if (_disposed) return;
+      _uiState = _uiState.copyWith(
+        isRequestingDeletion: false,
+        deletionCooldownSeconds: error.retryAfterSeconds,
+      );
     } on IncorrectCurrentPasswordException {
       if (_disposed) return;
       _uiState = _uiState.copyWith(
@@ -500,6 +521,12 @@ class EditAccountViewModel extends ChangeNotifier {
       hasEmailIdentity: info.hasEmailIdentity,
       hasGoogleIdentity: info.hasGoogleIdentity,
       canUnlinkGoogle: info.canUnlinkGoogle,
+      emailChangeCooldownSeconds: _authService.emailCooldownSeconds(
+        EmailActionType.emailChange,
+      ),
+      deletionCooldownSeconds: _authService.emailCooldownSeconds(
+        EmailActionType.accountDeletion,
+      ),
       isLinkingGoogle:
       googleWasJustLinked ? false : _uiState.isLinkingGoogle,
       isOffline: _authService.isOffline,

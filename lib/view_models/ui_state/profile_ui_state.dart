@@ -14,6 +14,7 @@ class ProfileUiState {
   final bool isLoading;
   final bool isUploadingPicture;
   final bool isSendingVerification;
+  final int verificationCooldownSeconds;
   final bool isLoggingOut;
   final bool logoutSucceeded;
   final String? successMessage;
@@ -32,6 +33,7 @@ class ProfileUiState {
     this.isLoading = false,
     this.isUploadingPicture = false,
     this.isSendingVerification = false,
+    this.verificationCooldownSeconds = 0,
     this.isLoggingOut = false,
     this.logoutSucceeded = false,
     this.successMessage,
@@ -60,6 +62,7 @@ class ProfileUiState {
     bool? isLoading,
     bool? isUploadingPicture,
     bool? isSendingVerification,
+    int? verificationCooldownSeconds,
     bool? isLoggingOut,
     bool? logoutSucceeded,
     String? successMessage,
@@ -89,6 +92,8 @@ class ProfileUiState {
       isUploadingPicture: isUploadingPicture ?? this.isUploadingPicture,
       isSendingVerification:
       isSendingVerification ?? this.isSendingVerification,
+      verificationCooldownSeconds:
+      verificationCooldownSeconds ?? this.verificationCooldownSeconds,
       isLoggingOut: isLoggingOut ?? this.isLoggingOut,
       logoutSucceeded: logoutSucceeded ?? this.logoutSucceeded,
       successMessage: clearSuccessMessage

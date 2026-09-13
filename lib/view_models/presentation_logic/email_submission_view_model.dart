@@ -14,7 +14,14 @@ class EmailSubmissionViewModel extends ChangeNotifier {
   EmailSubmissionViewModel(
       this._authService, {
         String initialEmail = '',
-      }) : _uiState = EmailSubmissionUiState(email: initialEmail.trim());
+      }) : _uiState = EmailSubmissionUiState(
+    email: initialEmail.trim(),
+    cooldownSeconds: _authService.emailCooldownSeconds(
+      EmailActionType.passwordRecovery,
+    ),
+  ) {
+    _authService.addListener(_syncCooldown);
+  }
 
   EmailSubmissionUiState _uiState;
   EmailSubmissionUiState get uiState => _uiState;
@@ -42,7 +49,7 @@ class EmailSubmissionViewModel extends ChangeNotifier {
   }
 
   Future<void> onSendPressed() async {
-    if (_uiState.isLoading) return;
+    if (_uiState.isLoading || _uiState.cooldownSeconds > 0) return;
     _emailTouched = true;
     final error = InputValidator.validateEmail(_uiState.email);
     if (error != null) {
@@ -71,6 +78,12 @@ class EmailSubmissionViewModel extends ChangeNotifier {
         isLoading: false,
         errorMessage: 'No internet connection. Check your connection and try again.',
       );
+    } on EmailRequestRateLimitedException catch (error) {
+      if (_disposed) return;
+      _uiState = _uiState.copyWith(
+        isLoading: false,
+        cooldownSeconds: error.retryAfterSeconds,
+      );
     } catch (_) {
       if (_disposed) return;
       _uiState = _uiState.copyWith(
@@ -86,12 +99,25 @@ class EmailSubmissionViewModel extends ChangeNotifier {
   void onUseAnotherEmailPressed() {
     if (_uiState.isLoading) return;
     _emailTouched = false;
-    _uiState = const EmailSubmissionUiState();
+    _uiState = EmailSubmissionUiState(
+      cooldownSeconds: _authService.emailCooldownSeconds(
+        EmailActionType.passwordRecovery,
+      ),
+    );
     _notify();
   }
 
   void consumeErrorMessage() {
     _uiState = _uiState.copyWith(clearErrorMessage: true);
+  }
+
+  void _syncCooldown() {
+    final seconds = _authService.emailCooldownSeconds(
+      EmailActionType.passwordRecovery,
+    );
+    if (seconds == _uiState.cooldownSeconds) return;
+    _uiState = _uiState.copyWith(cooldownSeconds: seconds);
+    _notify();
   }
 
   void _notify() {
@@ -101,6 +127,7 @@ class EmailSubmissionViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _authService.removeListener(_syncCooldown);
     super.dispose();
   }
 }

@@ -17,6 +17,8 @@ class EditAccountUiState {
   final bool isLinkingGoogle;
   final bool isUnlinkingGoogle;
   final bool isRequestingDeletion;
+  final int emailChangeCooldownSeconds;
+  final int deletionCooldownSeconds;
   final bool emailChangeRequested;
   final bool googleUnlinked;
   final bool deletionEmailSent;
@@ -43,6 +45,8 @@ class EditAccountUiState {
     this.isLinkingGoogle = false,
     this.isUnlinkingGoogle = false,
     this.isRequestingDeletion = false,
+    this.emailChangeCooldownSeconds = 0,
+    this.deletionCooldownSeconds = 0,
     this.emailChangeRequested = false,
     this.googleUnlinked = false,
     this.deletionEmailSent = false,
@@ -81,6 +85,8 @@ class EditAccountUiState {
     bool? isLinkingGoogle,
     bool? isUnlinkingGoogle,
     bool? isRequestingDeletion,
+    int? emailChangeCooldownSeconds,
+    int? deletionCooldownSeconds,
     bool? emailChangeRequested,
     bool? googleUnlinked,
     bool? deletionEmailSent,
@@ -115,6 +121,10 @@ class EditAccountUiState {
       isUnlinkingGoogle: isUnlinkingGoogle ?? this.isUnlinkingGoogle,
       isRequestingDeletion:
       isRequestingDeletion ?? this.isRequestingDeletion,
+      emailChangeCooldownSeconds:
+      emailChangeCooldownSeconds ?? this.emailChangeCooldownSeconds,
+      deletionCooldownSeconds:
+      deletionCooldownSeconds ?? this.deletionCooldownSeconds,
       emailChangeRequested:
       emailChangeRequested ?? this.emailChangeRequested,
       googleUnlinked: googleUnlinked ?? this.googleUnlinked,

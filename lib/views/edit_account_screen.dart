@@ -194,6 +194,7 @@ class _EditAccountScreenState extends State<EditAccountScreen>
                     FilledButton.icon(
                       onPressed: state.isBusy ||
                           state.isOffline ||
+                          state.emailChangeCooldownSeconds > 0 ||
                           isGoogleManaged
                           ? null
                           : viewModel.saveEmail,
@@ -214,7 +215,11 @@ class _EditAccountScreenState extends State<EditAccountScreen>
                         ),
                       )
                           : const Icon(Icons.mark_email_read_outlined),
-                      label: const Text('Change Email'),
+                      label: Text(
+                        state.emailChangeCooldownSeconds > 0
+                            ? 'Send again in ${state.emailChangeCooldownSeconds}s'
+                            : 'Change Email',
+                      ),
                     ),
                     const SizedBox(height: 26),
                     SizedBox(
@@ -289,7 +294,10 @@ class _EditAccountScreenState extends State<EditAccountScreen>
                     ),
                     const SizedBox(height: 30),
                     OutlinedButton.icon(
-                      onPressed: state.isBusy || state.isOffline
+                      onPressed: state.isBusy ||
+                          state.isOffline ||
+                          (state.isEmailVerified &&
+                              state.deletionCooldownSeconds > 0)
                           ? null
                           : () => _confirmDeletionRequest(
                         context,
@@ -312,7 +320,12 @@ class _EditAccountScreenState extends State<EditAccountScreen>
                         ),
                       )
                           : const Icon(Icons.delete_forever_outlined),
-                      label: const Text('Delete Account'),
+                      label: Text(
+                        state.isEmailVerified &&
+                            state.deletionCooldownSeconds > 0
+                            ? 'Send again in ${state.deletionCooldownSeconds}s'
+                            : 'Delete Account',
+                      ),
                     ),
                   ],
                 ),

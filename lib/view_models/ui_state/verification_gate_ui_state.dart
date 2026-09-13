@@ -6,6 +6,7 @@ class VerificationGateUiState {
   final bool isSending;
   final bool isLoggingOut;
   final bool linkSent;
+  final int cooldownSeconds;
   final String? errorMessage;
 
   const VerificationGateUiState({
@@ -13,6 +14,7 @@ class VerificationGateUiState {
     this.isSending = false,
     this.isLoggingOut = false,
     this.linkSent = false,
+    this.cooldownSeconds = 0,
     this.errorMessage,
   });
 
@@ -23,6 +25,7 @@ class VerificationGateUiState {
     bool? isSending,
     bool? isLoggingOut,
     bool? linkSent,
+    int? cooldownSeconds,
     String? errorMessage,
     bool clearErrorMessage = false,
   }) {
@@ -31,6 +34,7 @@ class VerificationGateUiState {
       isSending: isSending ?? this.isSending,
       isLoggingOut: isLoggingOut ?? this.isLoggingOut,
       linkSent: linkSent ?? this.linkSent,
+      cooldownSeconds: cooldownSeconds ?? this.cooldownSeconds,
       errorMessage:
       clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
     );

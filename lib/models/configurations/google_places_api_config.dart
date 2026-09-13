@@ -36,7 +36,8 @@ class GooglePlacesApiConfig {
     final Map<String, String> headers = {
       'Content-Type': 'application/json',
       'X-Goog-Api-Key': _apiKey,
-      'X-Goog-FieldMask': 'places.displayName,places.photos',
+      'X-Goog-FieldMask':
+          'places.displayName,places.photos,places.formattedAddress',
     };
 
     // if (!kIsWeb) {
@@ -63,6 +64,7 @@ class GooglePlacesApiConfig {
             final raw = places.first as Map<String, dynamic>;
             return {
               'name': raw['displayName']?['text'],
+              'address': raw['formattedAddress'] as String?,
               'photos': (raw['photos'] as List?)
                   ?.map(
                     (p) => {
@@ -98,6 +100,7 @@ class GooglePlacesApiConfig {
             final raw = places.first as Map<String, dynamic>;
             return {
               'name': raw['displayName']?['text'],
+              'address': raw['formattedAddress'] as String?,
               'photos': (raw['photos'] as List?)
                   ?.map((p) => {'photo_reference': p['name']})
                   .toList(),
@@ -176,7 +179,9 @@ class GooglePlacesApiConfig {
     final Set<String> combined = {};
     for (final list in resultsList) {
       for (final item in list) {
-        combined.add(item);
+        if (!isParkingText(item)) {
+          combined.add(item);
+        }
       }
     }
 
@@ -184,11 +189,72 @@ class GooglePlacesApiConfig {
     if (combined.length < 3) {
       final fallback = await _fetchAutocomplete(trimmedQuery);
       for (final item in fallback) {
-        combined.add(item);
+        if (!isParkingText(item)) {
+          combined.add(item);
+        }
       }
     }
 
     return combined.take(6).toList();
+  }
+
+  /// Extracts place suggestion names excluding any parking facilities or parking lots.
+  static List<String> _extractNonParkingSuggestions(List suggestions) {
+    final List<String> results = [];
+    for (final s in suggestions) {
+      final placePrediction = s['placePrediction'];
+      if (placePrediction == null) continue;
+
+      if (_isParkingPrediction(placePrediction)) continue;
+
+      final structured = placePrediction['structuredFormat'];
+      final mainText = structured?['mainText']?['text'] as String?;
+      final fullText = placePrediction['text']?['text'] as String?;
+      final text = mainText?.trim() ?? fullText?.trim();
+      if (text != null && text.isNotEmpty && !isParkingText(text)) {
+        results.add(text);
+      }
+    }
+    return results.take(5).toList();
+  }
+
+  /// Determines if a place prediction represents a parking facility based on types or naming.
+  static bool _isParkingPrediction(dynamic placePrediction) {
+    if (placePrediction is! Map) return false;
+
+    // 1. Check Google Places types
+    final types = (placePrediction['types'] as List?)
+            ?.map((t) => t.toString().toLowerCase())
+            .toList() ??
+        const [];
+    const parkingTypes = {
+      'parking',
+      'parking_lot',
+      'parking_garage',
+      'valet_parking',
+    };
+    if (types.any((t) => parkingTypes.contains(t) || t.contains('parking'))) {
+      return true;
+    }
+
+    // 2. Check mainText and fullText
+    final structured = placePrediction['structuredFormat'];
+    final mainText = structured?['mainText']?['text'] as String?;
+    final fullText = placePrediction['text']?['text'] as String?;
+
+    return isParkingText(mainText) || isParkingText(fullText);
+  }
+
+  /// Checks if a string indicates a parking location (car park, parking lot, etc.)
+  static bool isParkingText(String? text) {
+    if (text == null || text.trim().isEmpty) return false;
+    final lower = text.trim().toLowerCase();
+
+    final parkingPattern = RegExp(
+      r'(\bparking\b|\bcar\s*parks?\b|\bmotorcycle\s*parks?\b|\bparkir\b|\b(tempat|tapak)\s+letak\s+kereta\b|\bvalet\s+parking\b|停车场|泊车场|停车楼)',
+      caseSensitive: false,
+    );
+    return parkingPattern.hasMatch(lower);
   }
 
   static Future<List<String>> _fetchAutocomplete(String inputQuery) async {
@@ -220,19 +286,7 @@ class GooglePlacesApiConfig {
           final data = jsonDecode(response.body);
           final suggestions = data['suggestions'] as List?;
           if (suggestions != null) {
-            return suggestions
-                .map((s) {
-                  final mainText =
-                      s['placePrediction']?['structuredFormat']?['mainText']?['text']
-                          as String?;
-                  final fullText =
-                      s['placePrediction']?['text']?['text'] as String?;
-                  return mainText ?? fullText;
-                })
-                .where((text) => text != null)
-                .cast<String>()
-                .take(5)
-                .toList();
+            return _extractNonParkingSuggestions(suggestions);
           }
         } else {
           debugPrint(
@@ -249,19 +303,7 @@ class GooglePlacesApiConfig {
           final data = jsonDecode(response.body);
           final suggestions = data['suggestions'] as List?;
           if (suggestions != null) {
-            return suggestions
-                .map((s) {
-                  final mainText =
-                      s['placePrediction']?['structuredFormat']?['mainText']?['text']
-                          as String?;
-                  final fullText =
-                      s['placePrediction']?['text']?['text'] as String?;
-                  return mainText ?? fullText;
-                })
-                .where((text) => text != null)
-                .cast<String>()
-                .take(5)
-                .toList();
+            return _extractNonParkingSuggestions(suggestions);
           }
         } else {
           try {

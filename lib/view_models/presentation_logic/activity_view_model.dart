@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 
+import '../../models/configurations/gemini_api_config.dart';
 import '../../models/entities/expense_item.dart';
 import '../../models/local_data_source/camera_source.dart';
 import '../../models/local_data_source/gallery_source.dart';
@@ -53,7 +54,7 @@ class ActivityViewModel extends ChangeNotifier {
            ExpenseTrackingService(profileService: profileService),
        _expenseRepository = expenseRepository ?? ExpenseRepository(),
        _authService = authService,
-        _profileService = profileService,
+       _profileService = profileService,
        _cachedActivity = cachedActivity ?? GetCachedActivities() {
     _uiState = _uiState.copyWith(
       originalCurrency: _expenseCurrency,
@@ -91,6 +92,10 @@ class ActivityViewModel extends ChangeNotifier {
       selectedActivity: activity,
       currentActivityId: activity.activitiesId,
       draftExpenseItems: const [],
+      draftTaxAmount: 0.0,
+      draftDiscountAmount: 0.0,
+      draftRoundingAmount: 0.0,
+      draftAutoRounding: false,
       ocrDraftItemIndexes: const {},
       draftTaxFromOcr: false,
       draftTotalAmount: 0.0,
@@ -210,6 +215,9 @@ class ActivityViewModel extends ChangeNotifier {
     _uiState = _uiState.copyWith(
       draftExpenseItems: const [],
       draftTaxAmount: 0.0,
+      draftDiscountAmount: 0.0,
+      draftRoundingAmount: 0.0,
+      draftAutoRounding: false,
       draftTotalAmount: 0.0,
       ocrDraftItemIndexes: const {},
       draftTaxFromOcr: false,
@@ -219,20 +227,68 @@ class ActivityViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setDraftTaxAmount(double taxAmount) {
+  void setDraftAdjustments(
+    double taxAmount,
+    double discountAmount,
+    double roundingAmount,
+  ) {
     final normalizedTax = taxAmount < 0 ? 0.0 : taxAmount;
+    final effectiveRounding = _uiState.draftAutoRounding
+        ? _fiveSenRounding(
+            _uiState.draftExpenseItems,
+            normalizedTax,
+            discountAmount,
+          )
+        : roundingAmount;
     final total = _expenseTrackingService.calculateTotalExpense(
       _uiState.draftExpenseItems,
       normalizedTax,
+      discountAmount,
+      effectiveRounding,
     );
     _uiState = _uiState.copyWith(
       draftTaxAmount: normalizedTax,
+      draftDiscountAmount: discountAmount,
+      draftRoundingAmount: effectiveRounding,
       draftTotalAmount: total,
       draftTaxFromOcr: false,
       errorMessage: '',
       successMessage: '',
     );
     notifyListeners();
+  }
+
+  void setDraftAutoRounding(bool enabled, {double manualRounding = 0.0}) {
+    final rounding = enabled
+        ? _fiveSenRounding(
+            _uiState.draftExpenseItems,
+            _uiState.draftTaxAmount,
+            _uiState.draftDiscountAmount,
+          )
+        : manualRounding;
+    _uiState = _uiState.copyWith(
+      draftAutoRounding: enabled,
+      draftRoundingAmount: rounding,
+      draftTotalAmount: _expenseTrackingService.calculateTotalExpense(
+        _uiState.draftExpenseItems,
+        _uiState.draftTaxAmount,
+        _uiState.draftDiscountAmount,
+        rounding,
+      ),
+      errorMessage: '',
+    );
+    notifyListeners();
+  }
+
+  double _fiveSenRounding(
+    List<ExpenseItem> items,
+    double tax,
+    double discount,
+  ) {
+    final itemTotal = items.fold<double>(0, (sum, item) => sum + item.subtotal);
+    final baseCents = ((itemTotal + tax - discount) * 100).round();
+    final nearestFiveSenCents = (baseCents / 5).round() * 5;
+    return (nearestFiveSenCents - baseCents) / 100;
   }
 
   void setOriginalCurrency(String currency) {
@@ -421,6 +477,9 @@ class ActivityViewModel extends ChangeNotifier {
       clearOcrData: true,
       draftExpenseItems: retainedItems,
       draftTaxAmount: 0.0,
+      draftDiscountAmount: 0.0,
+      draftRoundingAmount: 0.0,
+      draftAutoRounding: false,
       draftTotalAmount: _expenseTrackingService.calculateTotalExpense(
         retainedItems,
         0.0,
@@ -440,16 +499,20 @@ class ActivityViewModel extends ChangeNotifier {
       return 0;
     }
 
-    final expenseItems = _expenseTrackingService
-        .buildDraftExpenseItemsFromReceipt(
-          receiptText: _uiState.ocrRawText,
-          merchantName: _uiState.ocrMerchantName,
-          transactionDateTime: _uiState.ocrTransactionDateTime,
-        );
+    final expenseItems = _uiState.ocrParsedItems.isNotEmpty
+        ? List<ExpenseItem>.from(_uiState.ocrParsedItems)
+        : _expenseTrackingService.buildDraftExpenseItemsFromReceipt(
+            receiptText: _uiState.ocrRawText,
+            merchantName: _uiState.ocrMerchantName,
+            transactionDateTime: _uiState.ocrTransactionDateTime,
+          );
     if (expenseItems.isEmpty) {
       final detectedTax = _uiState.ocrExtractedTax ?? 0.0;
       final extractedTotal = _uiState.ocrExtractedTotal ?? 0.0;
-      final itemAmount = extractedTotal - detectedTax;
+      final detectedDiscount = _uiState.ocrExtractedDiscount ?? 0.0;
+      final detectedRounding = _uiState.ocrExtractedRounding ?? 0.0;
+      final itemAmount =
+          extractedTotal - detectedTax + detectedDiscount - detectedRounding;
       final selectedActivity = _uiState.selectedActivity;
       if (itemAmount <= 0 || selectedActivity == null) return 0;
       final unknownItem = ExpenseItem(
@@ -467,6 +530,8 @@ class ActivityViewModel extends ChangeNotifier {
       _updateDraftExpenseItems(
         [unknownItem],
         newTaxAmount: detectedTax,
+        newDiscountAmount: detectedDiscount,
+        newRoundingAmount: detectedRounding,
         ocrItemIndexes: const {0},
         taxFromOcr: _uiState.ocrExtractedTax != null,
       );
@@ -478,6 +543,8 @@ class ActivityViewModel extends ChangeNotifier {
     _updateDraftExpenseItems(
       expenseItems,
       newTaxAmount: detectedTax,
+      newDiscountAmount: _uiState.ocrExtractedDiscount ?? 0.0,
+      newRoundingAmount: _uiState.ocrExtractedRounding ?? 0.0,
       ocrItemIndexes: Set<int>.from(
         List<int>.generate(expenseItems.length, (index) => index),
       ),
@@ -511,7 +578,11 @@ class ActivityViewModel extends ChangeNotifier {
       0.0,
       (total, item) => total + item.subtotal,
     );
-    final inferredTax = receiptTotal - itemsSubtotal;
+    final inferredTax =
+        receiptTotal -
+        itemsSubtotal +
+        (_uiState.ocrExtractedDiscount ?? 0.0) -
+        (_uiState.ocrExtractedRounding ?? 0.0);
     final maximumReasonableTax = receiptTotal * 0.20;
     if (inferredTax <= 0 || inferredTax > maximumReasonableTax) {
       return 0.0;
@@ -541,22 +612,36 @@ class ActivityViewModel extends ChangeNotifier {
         receiptLocalPath,
       );
       debugPrint('[Receipt OCR raw text]\n$receiptText');
+      final geminiParse = await GeminiApiConfig.parseReceiptOcrText(
+        receiptText: receiptText,
+      );
       final extractedTotal = _expenseTrackingService.extractReceiptTotal(
         receiptText,
       );
+      final effectiveTotal = geminiParse?.totalAmount ?? extractedTotal;
       final detectedTax = _expenseTrackingService.extractReceiptTax(
         receiptText,
       );
+      final effectiveTax = geminiParse?.taxAmount ?? detectedTax;
       final extractedTax =
-          detectedTax != null &&
-              extractedTotal != null &&
-              detectedTax >= 0 &&
-              detectedTax <= extractedTotal * 0.20
-          ? detectedTax
+          effectiveTax != null &&
+              effectiveTotal != null &&
+              effectiveTax >= 0 &&
+              effectiveTax <= effectiveTotal * 0.20
+          ? effectiveTax
           : null;
-      final parsedDateTime = _expenseTrackingService.extractReceiptDateTime(
-        receiptText,
-      );
+      final extractedDiscount =
+          geminiParse?.discountAmount ??
+          _expenseTrackingService.extractReceiptDiscount(receiptText);
+      final extractedRounding =
+          geminiParse?.roundingAmount ??
+          _expenseTrackingService.extractReceiptRounding(receiptText);
+      final parsedDateTime =
+          geminiParse?.transactionDateTime ??
+          _expenseTrackingService.extractReceiptDateTime(receiptText);
+      final merchantName = geminiParse?.merchantName.trim().isNotEmpty == true
+          ? geminiParse!.merchantName.trim()
+          : _expenseTrackingService.extractMerchantName(receiptText) ?? '';
       final detectedCurrency = _expenseTrackingService.extractReceiptCurrency(
         receiptText,
       );
@@ -576,16 +661,20 @@ class ActivityViewModel extends ChangeNotifier {
       final effectiveTransactionDateTime =
           extractedDateTime ?? _activityDateTime(selectedActivity);
       _validateTransactionDateTime(effectiveTransactionDateTime);
-      final extractedItems = _expenseTrackingService
-          .buildDraftExpenseItemsFromReceipt(
-            receiptText: receiptText,
-            merchantName: _expenseTrackingService.extractMerchantName(
-              receiptText,
-            ),
-            transactionDateTime: effectiveTransactionDateTime,
-          );
+      final geminiItems = _buildExpenseItemsFromGeminiParse(
+        geminiParse,
+        merchantName,
+        effectiveTransactionDateTime,
+      );
+      final extractedItems = geminiItems.isNotEmpty
+          ? geminiItems
+          : _expenseTrackingService.buildDraftExpenseItemsFromReceipt(
+              receiptText: receiptText,
+              merchantName: merchantName,
+              transactionDateTime: effectiveTransactionDateTime,
+            );
       if (!_expenseTrackingService.isLikelyReceiptText(receiptText) ||
-          extractedTotal == null) {
+          effectiveTotal == null) {
         throw Exception(
           'Unable to read the receipt. Please try another image or continue with the manual entry.',
         );
@@ -594,9 +683,9 @@ class ActivityViewModel extends ChangeNotifier {
           ? 'No purchased item details were found on this receipt. Please enter the expense item manually.'
           : '';
 
-      if (extractedTotal != null) {
+      if (effectiveTotal != null) {
         try {
-          _expenseTrackingService.validateTotalAmount(extractedTotal);
+          _expenseTrackingService.validateTotalAmount(effectiveTotal);
         } on ArgumentError {
           extractedTotalError =
               'The extracted amount is invalid. Please correct it.';
@@ -606,18 +695,22 @@ class ActivityViewModel extends ChangeNotifier {
       _uiState = _uiState.copyWith(
         isScanningReceipt: false,
         ocrRawText: receiptText,
-        ocrMerchantName:
-            _expenseTrackingService.extractMerchantName(receiptText) ?? '',
+        ocrMerchantName: merchantName,
         ocrTransactionDateTime: effectiveTransactionDateTime,
         ocrDateWasDefaulted: extractedDateTime == null,
         originalCurrency: _expenseCurrency,
-        ocrExtractedTotal: extractedTotal,
-        clearOcrExtractedTotal: extractedTotal == null,
+        ocrExtractedTotal: effectiveTotal,
+        clearOcrExtractedTotal: effectiveTotal == null,
         ocrExtractedTax: extractedTax,
         clearOcrExtractedTax: extractedTax == null,
-        ocrItemLines: _expenseTrackingService.extractReceiptItemLines(
-          receiptText,
-        ),
+        ocrExtractedDiscount: extractedDiscount,
+        ocrExtractedRounding: extractedRounding,
+        ocrItemLines: extractedItems
+            .map(
+              (item) => '${item.itemName} ${item.unitPrice.toStringAsFixed(2)}',
+            )
+            .toList(),
+        ocrParsedItems: extractedItems,
         errorMessage: extractedTotalError,
       );
     } catch (error) {
@@ -629,13 +722,53 @@ class ActivityViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  List<ExpenseItem> _buildExpenseItemsFromGeminiParse(
+    GeminiReceiptParseResult? parse,
+    String merchantName,
+    DateTime transactionDateTime,
+  ) {
+    if (parse == null || parse.items.isEmpty) return const [];
+    return parse.items
+        .where((item) => item.name.trim().isNotEmpty && item.unitPrice > 0)
+        .map<ExpenseItem>(
+          (item) => ExpenseItem(
+            itemName: item.name.trim(),
+            itemDescription: null,
+            merchantName: merchantName.trim().isEmpty
+                ? null
+                : merchantName.trim(),
+            expenseDateTime: transactionDateTime,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            subtotal: item.quantity * item.unitPrice,
+          ),
+        )
+        .toList();
+  }
+
   DateTime _activityDateTime(Activity activity) {
     var hour = activity.date.hour;
     var minute = activity.date.minute;
-    final timeParts = activity.startTime?.split(':');
-    if (timeParts != null && timeParts.length >= 2) {
-      hour = int.tryParse(timeParts[0]) ?? hour;
-      minute = int.tryParse(timeParts[1]) ?? minute;
+    final startTime = activity.startTime?.trim().toUpperCase() ?? '';
+    final match = RegExp(
+      r'^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?$',
+    ).firstMatch(startTime);
+    if (match != null) {
+      final parsedHour = int.tryParse(match.group(1)!);
+      final parsedMinute = int.tryParse(match.group(2)!);
+      final period = match.group(3);
+      if (parsedHour != null &&
+          parsedMinute != null &&
+          parsedMinute < 60 &&
+          ((period == null && parsedHour < 24) ||
+              (period != null && parsedHour >= 1 && parsedHour <= 12))) {
+        hour = period == 'PM' && parsedHour < 12
+            ? parsedHour + 12
+            : period == 'AM' && parsedHour == 12
+            ? 0
+            : parsedHour;
+        minute = parsedMinute;
+      }
     }
     return DateTime(
       activity.date.year,
@@ -644,6 +777,25 @@ class ActivityViewModel extends ChangeNotifier {
       hour,
       minute,
     );
+  }
+
+  ({DateTime start, DateTime? nextStart})? get selectedExpenseTimeWindow {
+    final selected = _uiState.selectedActivity;
+    if (selected == null) return null;
+    final start = _activityDateTime(selected);
+    DateTime? nextStart;
+    final schedule = _uiState.allActivities.isNotEmpty
+        ? _uiState.allActivities
+        : _uiState.activities;
+    for (final activity in schedule) {
+      if (activity.activitiesId == selected.activitiesId) continue;
+      final candidate = _activityDateTime(activity);
+      if (candidate.isAfter(start) &&
+          (nextStart == null || candidate.isBefore(nextStart))) {
+        nextStart = candidate;
+      }
+    }
+    return (start: start, nextStart: nextStart);
   }
 
   DateTime? _resolveAmbiguousReceiptDateTime(
@@ -707,6 +859,19 @@ class ActivityViewModel extends ChangeNotifier {
         'Transaction date and time cannot be later than the current time.',
       );
     }
+    final selectedActivity = _uiState.selectedActivity;
+    if (selectedActivity != null &&
+        transactionDateTime.isBefore(_activityDateTime(selectedActivity))) {
+      throw ArgumentError(
+        'Transaction date and time cannot be before the selected activity starts.',
+      );
+    }
+    final nextStart = selectedExpenseTimeWindow?.nextStart;
+    if (nextStart != null && !transactionDateTime.isBefore(nextStart)) {
+      throw ArgumentError(
+        'Transaction date and time must be before the next activity starts.',
+      );
+    }
     final bounds = _tripDateBounds();
     if (bounds != null &&
         (transactionDateTime.isBefore(bounds.start) ||
@@ -716,6 +881,15 @@ class ActivityViewModel extends ChangeNotifier {
         '${DateFormat('dd MMM yyyy').format(bounds.start)} to '
         '${DateFormat('dd MMM yyyy').format(bounds.end)}.',
       );
+    }
+  }
+
+  String? expenseDateTimeError(DateTime dateTime) {
+    try {
+      _validateTransactionDateTime(dateTime);
+      return null;
+    } catch (error) {
+      return _readableError(error);
     }
   }
 
@@ -741,6 +915,10 @@ class ActivityViewModel extends ChangeNotifier {
         throw ArgumentError('Please select the original expense currency.');
       }
       _expenseTrackingService.validateTaxAmount(_uiState.draftTaxAmount);
+      _expenseTrackingService.validateExpenseAdjustments(
+        _uiState.draftDiscountAmount,
+        _uiState.draftRoundingAmount,
+      );
       _expenseTrackingService.validateExpenseItems(_uiState.draftExpenseItems);
       _validateDraftExpenseDates();
       _expenseTrackingService.validateTotalAmount(_uiState.draftTotalAmount);
@@ -773,6 +951,10 @@ class ActivityViewModel extends ChangeNotifier {
 
     try {
       _expenseTrackingService.validateTaxAmount(_uiState.draftTaxAmount);
+      _expenseTrackingService.validateExpenseAdjustments(
+        _uiState.draftDiscountAmount,
+        _uiState.draftRoundingAmount,
+      );
       _expenseTrackingService.validateExpenseItems(_uiState.draftExpenseItems);
       _validateDraftExpenseDates();
       _expenseTrackingService.validateTotalAmount(_uiState.draftTotalAmount);
@@ -801,6 +983,8 @@ class ActivityViewModel extends ChangeNotifier {
         paymentMethod: _uiState.paymentMethod.trim(),
         currency: _uiState.originalCurrency,
         taxAmount: _uiState.draftTaxAmount,
+        discountAmount: _uiState.draftDiscountAmount,
+        roundingAmount: _uiState.draftRoundingAmount,
         receiptLocalPath: _uiState.receiptLocalPath.isEmpty
             ? null
             : _uiState.receiptLocalPath,
@@ -818,6 +1002,9 @@ class ActivityViewModel extends ChangeNotifier {
         isSavingExpense: false,
         draftExpenseItems: const [],
         draftTaxAmount: 0.0,
+        draftDiscountAmount: 0.0,
+        draftRoundingAmount: 0.0,
+        draftAutoRounding: false,
         draftTotalAmount: 0.0,
         ocrDraftItemIndexes: const {},
         draftTaxFromOcr: false,
@@ -922,10 +1109,14 @@ class ActivityViewModel extends ChangeNotifier {
   void _updateDraftExpenseItems(
     List<ExpenseItem> items, {
     double? newTaxAmount,
+    double? newDiscountAmount,
+    double? newRoundingAmount,
     Set<int>? ocrItemIndexes,
     bool? taxFromOcr,
   }) {
     final tax = newTaxAmount ?? _uiState.draftTaxAmount;
+    final discount = newDiscountAmount ?? _uiState.draftDiscountAmount;
+    var rounding = newRoundingAmount ?? _uiState.draftRoundingAmount;
     final itemsWithCalculatedSubtotals = items
         .map(
           (item) => item.copyWith(
@@ -936,13 +1127,20 @@ class ActivityViewModel extends ChangeNotifier {
           ),
         )
         .toList();
+    if (_uiState.draftAutoRounding) {
+      rounding = _fiveSenRounding(itemsWithCalculatedSubtotals, tax, discount);
+    }
 
     _uiState = _uiState.copyWith(
       draftExpenseItems: itemsWithCalculatedSubtotals,
       draftTaxAmount: tax,
+      draftDiscountAmount: discount,
+      draftRoundingAmount: rounding,
       draftTotalAmount: _expenseTrackingService.calculateTotalExpense(
         itemsWithCalculatedSubtotals,
         tax,
+        discount,
+        rounding,
       ),
       ocrDraftItemIndexes: ocrItemIndexes ?? _uiState.ocrDraftItemIndexes,
       draftTaxFromOcr: taxFromOcr ?? _uiState.draftTaxFromOcr,

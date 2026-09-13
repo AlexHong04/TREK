@@ -33,7 +33,7 @@ class TravelInformationUiState {
   String get departureLocation =>
       departures.isNotEmpty ? departures.first.location : '';
   String get departureTime =>
-      departures.isNotEmpty ? departures.first.time : '06:00 PM';
+      departures.isNotEmpty ? departures.first.time : '09:00 PM';
   String get departureDate =>
       departures.isNotEmpty ? departures.first.date : '';
   DateTime? get allowedTransitStartDate =>
@@ -70,7 +70,7 @@ class TravelInformationUiState {
       TransitPoint(id: 'arr_0', location: '', time: '09:00 AM', type: 'Flight', date: ''),
     ],
     this.departures = const [
-      TransitPoint(id: 'dep_0', location: '', time: '06:00 PM', type: 'Flight', date: ''),
+      TransitPoint(id: 'dep_0', location: '', time: '09:00 PM', type: 'Flight', date: ''),
     ],
     this.hotels = const [
       HotelStay(

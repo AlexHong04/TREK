@@ -61,9 +61,13 @@ class EmailSubmissionScreen extends StatelessWidget {
                   children: [
                     const SizedBox(height: 44),
                     AuthPrimaryButton(
-                      label: 'Resend',
+                      label: state.cooldownSeconds > 0
+                          ? 'Resend in ${state.cooldownSeconds}s'
+                          : 'Resend',
                       isLoading: state.isLoading,
-                      onPressed: viewModel.onResendPressed,
+                      onPressed: state.cooldownSeconds > 0
+                          ? null
+                          : viewModel.onResendPressed,
                     ),
                     const SizedBox(height: 7),
                     AuthLinkLine(
@@ -111,9 +115,13 @@ class EmailSubmissionScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 42),
                       AuthPrimaryButton(
-                        label: 'Send',
+                        label: state.cooldownSeconds > 0
+                            ? 'Send in ${state.cooldownSeconds}s'
+                            : 'Send',
                         isLoading: state.isLoading,
-                        onPressed: viewModel.onSendPressed,
+                        onPressed: state.cooldownSeconds > 0
+                            ? null
+                            : viewModel.onSendPressed,
                       ),
                       const SizedBox(height: 7),
                       AuthLinkLine(

@@ -10,14 +10,71 @@ import '../models/entities/activity.dart';
 import '../models/entities/expense.dart';
 import '../models/entities/expense_item.dart';
 import '../theme/app_theme.dart';
-import '../utils/expense_text_validation.dart';
+import '../utils/explicit_word_validation.dart';
 import '../view_models/presentation_logic/activity_view_model.dart';
 import '../view_models/ui_state/activity_ui_state.dart';
 import '../widgets/app_date_picker.dart';
+import '../widgets/app_time_picker.dart';
 import '../widgets/converted_amount_text.dart';
 
 String _formatExpenseCurrencyAmount(String currency, double amount) =>
     formatCurrencyAmount(currency, amount, displayMyrAsCode: true);
+
+String? _validateExpenseText(String fieldName, String value) {
+  if (!containsProhibitedPlaceLanguage(value)) return null;
+  return '$fieldName contains inappropriate language. Please remove it.';
+}
+
+String? _validateExpenseItemName(String value) {
+  final trimmed = value.trim();
+  if (trimmed.length > 30) {
+    return 'Item name cannot exceed 30 characters.';
+  }
+  if (!RegExp(r'^[A-Za-z0-9 -]+$').hasMatch(trimmed)) {
+    return 'Item name may only contain letters, numbers, spaces, and dashes.';
+  }
+  return _validateExpenseText('Item name', trimmed);
+}
+
+String? _validateExpenseDescription(String value) {
+  final trimmed = value.trim();
+  if (trimmed.length > 60) {
+    return 'Item description cannot exceed 60 characters.';
+  }
+  final symbolError = _validateOptionalExpenseTextSymbols(
+    'Item description',
+    trimmed,
+  );
+  if (symbolError != null) return symbolError;
+  return _validateExpenseText('Item description', trimmed);
+}
+
+String? _validateExpenseMerchantName(String value) {
+  final trimmed = value.trim();
+  if (trimmed.length > 50) {
+    return 'Merchant name cannot exceed 50 characters.';
+  }
+  final symbolError = _validateOptionalExpenseTextSymbols(
+    'Merchant name',
+    trimmed,
+  );
+  if (symbolError != null) return symbolError;
+  return _validateExpenseText('Merchant name', trimmed);
+}
+
+String? _validateOptionalExpenseTextSymbols(String fieldName, String value) {
+  if (value.isEmpty) return null;
+  if (!RegExp(r'[A-Za-z0-9]').hasMatch(value)) {
+    return '$fieldName must contain at least one letter or number.';
+  }
+  if (!RegExp(r"^[A-Za-z0-9 .,!?&'()/-]+$").hasMatch(value)) {
+    return "$fieldName contains an unsupported symbol. Use only . , ! ? & ' ( ) / or -.";
+  }
+  if (RegExp(r"([^A-Za-z0-9\s])\1{3,}").hasMatch(value)) {
+    return '$fieldName cannot contain the same symbol more than 3 times in a row.';
+  }
+  return null;
+}
 
 /// Opens the Expense form for the Activity selected from the itinerary.
 Future<void> showExpenseBottomSheet({
@@ -52,6 +109,10 @@ class ExpenseBottomSheet extends StatefulWidget {
 
 class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   final TextEditingController _taxController = TextEditingController();
+  final TextEditingController _discountController = TextEditingController();
+  final TextEditingController _roundingController = TextEditingController();
+  String _manualRoundingText = '';
+  bool _showAdjustments = false;
   int? _editingItemIndex;
   bool _showItemForm = false;
   bool _isRecordingNewExpense = false;
@@ -65,6 +126,8 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   void dispose() {
     _topMessageTimer?.cancel();
     _taxController.dispose();
+    _discountController.dispose();
+    _roundingController.dispose();
     super.dispose();
   }
 
@@ -81,28 +144,34 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         !_isRecordingNewExpense;
     final isExpenseFormMode =
         !uiState.isLoadingRecordedExpenses && !showRecordedExpenses;
-    final hasOneRecordedExpense = uiState.recordedExpenses.length == 1;
     final hasMoreRecordedExpensesThanFit = uiState.recordedExpenses.length >= 3;
     final canExpandSheet = isExpenseFormMode || hasMoreRecordedExpensesThanFit;
-    final recordedExpensesHeight = hasOneRecordedExpense ? 0.65 : 0.74;
+    final recordedExpensesHeight = 0.80;
 
     return MediaQuery.removeViewInsets(
       context: context,
       removeBottom: true,
       child: DraggableScrollableSheet(
-        initialChildSize: isExpenseFormMode ? 0.78 : recordedExpensesHeight,
+        key: ValueKey(
+          widget.viewOnly
+              ? 'view-only'
+              : isExpenseFormMode
+              ? 'new-expense'
+              : 'history',
+        ),
+        expand: widget.viewOnly || showRecordedExpenses,
+        initialChildSize: isExpenseFormMode ? 0.88 : recordedExpensesHeight,
         minChildSize: 0.10,
         maxChildSize: canExpandSheet ? 0.90 : recordedExpensesHeight,
         snap: !isExpenseFormMode,
         snapSizes: isExpenseFormMode
             ? null
             : hasMoreRecordedExpensesThanFit
-            ? [0.50, 0.74, 0.90]
-            : hasOneRecordedExpense
-            ? [0.50, 0.65]
-            : [0.50, 0.74],
+            ? [0.50, 0.80, 0.90]
+            : [0.50, 0.80],
         shouldCloseOnMinExtent: true,
         builder: (context, scrollController) => Stack(
+          fit: StackFit.expand,
           children: [
             ClipRRect(
               borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -211,7 +280,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
       children: [
         _buildExpenseItemsSection(uiState),
         SizedBox(height: 10),
-        _buildTaxSection(uiState),
+        _buildAdjustmentsSection(uiState),
         SizedBox(height: 10),
         _buildTotalAmountSection(uiState),
         SizedBox(height: 10),
@@ -234,7 +303,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         SizedBox(
           width: double.infinity,
           height: 60,
-          child: ElevatedButton.icon(
+          child: ElevatedButton(
             onPressed: uiState.isSavingExpense
                 ? null
                 : _showConfirmExpenseDialog,
@@ -245,17 +314,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                 borderRadius: BorderRadius.circular(16),
               ),
             ),
-            icon: uiState.isSavingExpense
-                ? SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      color: appTheme.white_A700,
-                      strokeWidth: 2,
-                    ),
-                  )
-                : Icon(Icons.save_outlined),
-            label: Text(
+            child: Text(
               uiState.isSavingExpense ? 'Saving Expense...' : 'Confirm Expense',
               style: TextStyle(
                 fontFamily: 'Inter',
@@ -441,12 +500,6 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     }
 
     final expenseItems = viewModel.uiState.selectedRecordedExpenseItems;
-    final itemsSubtotal = expenseItems.fold<double>(
-      0.0,
-      (total, item) => total + item.subtotal,
-    );
-    final inferredTax = expense.totalAmount - itemsSubtotal;
-    final taxAmount = inferredTax > 0.005 ? inferredTax : 0.0;
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -486,24 +539,36 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                         ),
                       ),
                       SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.receipt_outlined,
-                            color: appTheme.teal_700,
-                            size: 15,
-                          ),
-                          SizedBox(width: 6),
-                          Text(
-                            'Tax included: ${_formatExpenseCurrencyAmount(currency, taxAmount)}',
-                            style: TextStyle(
-                              color: appTheme.teal_800,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                      if (expense.taxAmount != 0 ||
+                          expense.discountAmount != 0 ||
+                          expense.roundingAmount != 0) ...[
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.receipt_outlined,
+                              color: appTheme.teal_700,
+                              size: 15,
                             ),
+                            SizedBox(width: 6),
+                            Text(
+                              'Tax: ${_formatExpenseCurrencyAmount(currency, expense.taxAmount)}',
+                              style: TextStyle(
+                                color: appTheme.teal_800,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (expense.discountAmount != 0)
+                          Text(
+                            'Discount: -${_formatExpenseCurrencyAmount(currency, expense.discountAmount)}',
                           ),
-                        ],
-                      ),
+                        if (expense.roundingAmount != 0)
+                          Text(
+                            'Rounding: ${expense.roundingAmount > 0 ? '+' : ''}${_formatExpenseCurrencyAmount(currency, expense.roundingAmount)}',
+                          ),
+                      ],
                     ],
                   ),
                 ),
@@ -659,6 +724,10 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     return RepaintBoundary(
       child: Card(
         margin: EdgeInsets.only(bottom: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: appTheme.gray_200),
+        ),
         child: ListTile(
           onTap: () => _showExpenseItemDetails(item, currency),
           leading: CircleAvatar(
@@ -1096,8 +1165,14 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     );
   }
 
-  Widget _buildTaxSection(ActivityUiState uiState) {
+  Widget _buildAdjustmentsSection(ActivityUiState uiState) {
     final currency = _activeExpenseCurrency(uiState);
+    if (uiState.draftAutoRounding) {
+      final autoAmount = uiState.draftRoundingAmount.toStringAsFixed(2);
+      if (_roundingController.text != autoAmount) {
+        _roundingController.text = autoAmount;
+      }
+    }
     if (_taxController.text.isEmpty && uiState.draftTaxAmount > 0) {
       _taxController.text = uiState.draftTaxAmount.toStringAsFixed(2);
     }
@@ -1112,47 +1187,143 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'TAX (OPTIONAL)',
-                style: TextStyle(
-                  color: appTheme.blue_gray_300,
-                  fontFamily: 'Inter',
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1,
+          InkWell(
+            onTap: () => setState(() => _showAdjustments = !_showAdjustments),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  _showAdjustments
+                      ? 'ADJUSTMENTS (OPTIONAL)'
+                      : 'ADD ADJUSTMENTS (OPTIONAL)',
+                  style: TextStyle(
+                    color: appTheme.blue_gray_300,
+                    fontFamily: 'Inter',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1,
+                  ),
                 ),
-              ),
-            ],
-          ),
-          SizedBox(height: 8),
-          TextField(
-            controller: _taxController,
-            keyboardType: TextInputType.numberWithOptions(decimal: true),
-            inputFormatters: [
-              _ThousandsSeparatorInputFormatter(
-                maximumIntegerDigits: 5,
-                decimalDigits: 2,
-                allowZero: true,
-              ),
-            ],
-            onSubmitted: (_) => _confirmTaxAmount(),
-            decoration: _fieldDecoration('0.00').copyWith(
-              prefixText: '$currency ',
-              prefixStyle: TextStyle(
-                color: appTheme.gray_900,
-                fontWeight: FontWeight.w600,
-              ),
-              suffixIcon: IconButton(
-                onPressed: _confirmTaxAmount,
-                icon: Icon(Icons.check, color: appTheme.teal_A700),
-                tooltip: 'Confirm tax amount',
-              ),
+                Icon(
+                  _showAdjustments ? Icons.expand_less : Icons.expand_more,
+                  color: appTheme.teal_A700,
+                ),
+              ],
             ),
           ),
+          if (_showAdjustments) ...[
+            SizedBox(height: 12),
+            Text('TAX', style: _fieldLabelStyle),
+            SizedBox(height: 6),
+            TextField(
+              controller: _taxController,
+              style: TextStyle(color: appTheme.gray_900),
+              keyboardType: TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                _ThousandsSeparatorInputFormatter(
+                  maximumIntegerDigits: 5,
+                  decimalDigits: 2,
+                  allowZero: true,
+                  maximumValue: 99999,
+                ),
+              ],
+              onChanged: (_) => _updateDraftAdjustments(),
+              onSubmitted: (_) => _confirmAdjustments(),
+              decoration: _fieldDecoration('0.00').copyWith(
+                prefixIcon: _adjustmentCurrencyPrefix(currency),
+                prefixIconConstraints: BoxConstraints(
+                  minWidth: 0,
+                  minHeight: 0,
+                ),
+              ),
+            ),
+            SizedBox(height: 10),
+            Text('DISCOUNT', style: _fieldLabelStyle),
+            SizedBox(height: 6),
+            TextField(
+              controller: _discountController,
+              style: TextStyle(color: appTheme.gray_900),
+              keyboardType: TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                _ThousandsSeparatorInputFormatter(
+                  maximumIntegerDigits: 5,
+                  decimalDigits: 2,
+                  allowZero: true,
+                  maximumValue: 99999,
+                ),
+              ],
+              onChanged: (_) => _updateDraftAdjustments(),
+              onSubmitted: (_) => _confirmAdjustments(),
+              decoration: _fieldDecoration('0.00').copyWith(
+                prefixIcon: _adjustmentCurrencyPrefix(currency),
+                prefixIconConstraints: BoxConstraints(
+                  minWidth: 0,
+                  minHeight: 0,
+                ),
+              ),
+            ),
+            SizedBox(height: 10),
+            Text('ROUNDING', style: _fieldLabelStyle),
+            SizedBox(height: 6),
+            TextField(
+              controller: _roundingController,
+              readOnly: uiState.draftAutoRounding,
+              style: TextStyle(color: appTheme.gray_900),
+              keyboardType: TextInputType.numberWithOptions(
+                decimal: true,
+                signed: true,
+              ),
+              inputFormatters: [
+                TextInputFormatter.withFunction(
+                  (oldValue, newValue) =>
+                      RegExp(
+                        r'^-?(?:0(?:\.\d{0,2})?|1(?:\.0{0,2})?)?$',
+                      ).hasMatch(newValue.text)
+                      ? newValue
+                      : oldValue,
+                ),
+              ],
+              onChanged: (_) => _updateDraftAdjustments(),
+              onSubmitted: (_) => _confirmAdjustments(),
+              decoration: _fieldDecoration('0.00').copyWith(
+                prefixIcon: _adjustmentCurrencyPrefix(currency),
+                prefixIconConstraints: BoxConstraints(
+                  minWidth: 0,
+                  minHeight: 0,
+                ),
+                suffixIcon: Switch(
+                  value: uiState.draftAutoRounding,
+                  onChanged: _toggleAutoRounding,
+                  activeColor: appTheme.teal_A700,
+                ),
+              ),
+            ),
+            SizedBox(height: 4),
+            Text(
+              uiState.draftAutoRounding
+                  ? 'Auto: nearest 5 sen on the final total'
+                  : 'Auto off · enter receipt rounding manually',
+              style: TextStyle(color: appTheme.blue_gray_300, fontSize: 11),
+            ),
+          ],
         ],
+      ),
+    );
+  }
+
+  Widget _adjustmentCurrencyPrefix(String currency) {
+    return Padding(
+      padding: EdgeInsets.only(left: 12, right: 6),
+      child: Center(
+        widthFactor: 1,
+        heightFactor: 1,
+        child: Text(
+          currency,
+          style: TextStyle(
+            color: appTheme.gray_900,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ),
     );
   }
@@ -1171,7 +1342,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'TOTAL (INCLUDING TAX)',
+            'TOTAL (AFTER ADJUSTMENTS)',
             style: TextStyle(
               color: appTheme.blue_gray_300,
               fontFamily: 'Inter',
@@ -1599,14 +1770,50 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     }
   }
 
-  void _confirmTaxAmount() {
+  void _updateDraftAdjustments() {
     final tax = _parsePrice(_taxController.text) ?? 0.0;
-    if (tax > 99999) {
-      _showValidationMessage('Tax amount must be between 0 and 99,999.');
+    final discount = _parsePrice(_discountController.text) ?? 0.0;
+    final rounding = _parsePrice(_roundingController.text) ?? 0.0;
+    if (tax > 99999 || discount > 99999 || rounding.abs() > 1) return;
+    context.read<ActivityViewModel>().setDraftAdjustments(
+      tax,
+      discount,
+      rounding,
+    );
+  }
+
+  void _toggleAutoRounding(bool enabled) {
+    final viewModel = context.read<ActivityViewModel>();
+    if (enabled) {
+      _manualRoundingText = _roundingController.text;
+      viewModel.setDraftAutoRounding(true);
+    } else {
+      _roundingController.text = _manualRoundingText;
+      viewModel.setDraftAutoRounding(
+        false,
+        manualRounding: _parsePrice(_manualRoundingText) ?? 0.0,
+      );
+    }
+  }
+
+  void _confirmAdjustments() {
+    final tax = _parsePrice(_taxController.text) ?? 0.0;
+    final discount = _parsePrice(_discountController.text) ?? 0.0;
+    final rounding = _parsePrice(_roundingController.text) ?? 0.0;
+    if (tax > 99999 || discount > 99999 || rounding.abs() > 1) {
+      _showValidationMessage(
+        'Tax and discount must be at most 99,999; rounding must be within -1.00 to 1.00.',
+      );
       return;
     }
     _taxController.text = tax > 0 ? tax.toStringAsFixed(2) : '';
-    context.read<ActivityViewModel>().setDraftTaxAmount(tax);
+    _discountController.text = discount > 0 ? discount.toStringAsFixed(2) : '';
+    _roundingController.text = rounding != 0 ? rounding.toStringAsFixed(2) : '';
+    context.read<ActivityViewModel>().setDraftAdjustments(
+      tax,
+      discount,
+      rounding,
+    );
     FocusScope.of(context).unfocus();
   }
 
@@ -1694,6 +1901,9 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     }
 
     if (uiState.ocrRawText.isNotEmpty) {
+      final shouldApplyOcr = await _showOcrApplyDialog(uiState);
+      if (!shouldApplyOcr || !mounted) return;
+
       var reviewReceiptDate = false;
       if (viewModel.ocrDateDiffersFromSelectedActivity) {
         final useReceiptDate = await _showConfirmationDialog(
@@ -1715,6 +1925,18 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
       _taxController.text = detectedTax > 0
           ? detectedTax.toStringAsFixed(2)
           : '';
+      _discountController.text = updatedState.draftDiscountAmount > 0
+          ? updatedState.draftDiscountAmount.toStringAsFixed(2)
+          : '';
+      _roundingController.text = updatedState.draftRoundingAmount != 0
+          ? updatedState.draftRoundingAmount.toStringAsFixed(2)
+          : '';
+      _manualRoundingText = _roundingController.text;
+      if (_taxController.text.isNotEmpty ||
+          _discountController.text.isNotEmpty ||
+          _roundingController.text.isNotEmpty) {
+        setState(() => _showAdjustments = true);
+      }
       if (itemCount > 0) {
         setState(() {
           _editingItemIndex = reviewReceiptDate || hasUnknownItem ? 0 : null;
@@ -1734,6 +1956,172 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         );
       }
     }
+  }
+
+  Future<bool> _showOcrApplyDialog(ActivityUiState uiState) async {
+    final currency = _activeExpenseCurrency(uiState);
+    final itemCount = uiState.ocrParsedItems.isNotEmpty
+        ? uiState.ocrParsedItems.length
+        : uiState.ocrItemLines.length;
+    final merchant = uiState.ocrMerchantName.isEmpty
+        ? 'Merchant not detected'
+        : uiState.ocrMerchantName;
+    final dateText = uiState.ocrTransactionDateTime == null
+        ? 'Date not detected'
+        : DateFormat(
+            'dd MMM yyyy, hh:mm a',
+          ).format(uiState.ocrTransactionDateTime!);
+    final totalText = uiState.ocrExtractedTotal == null
+        ? 'Total not detected'
+        : _formatExpenseCurrencyAmount(currency, uiState.ocrExtractedTotal!);
+    final taxText = uiState.ocrExtractedTax == null
+        ? 'Not detected'
+        : _formatExpenseCurrencyAmount(currency, uiState.ocrExtractedTax!);
+    final discountText = uiState.ocrExtractedDiscount == null
+        ? 'Not detected'
+        : _formatExpenseCurrencyAmount(currency, uiState.ocrExtractedDiscount!);
+    final roundingText = uiState.ocrExtractedRounding == null
+        ? 'Not detected'
+        : _formatExpenseCurrencyAmount(currency, uiState.ocrExtractedRounding!);
+
+    final shouldApply = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: appTheme.white_A700,
+        insetPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: 500),
+          child: SingleChildScrollView(
+            padding: EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Receipt Scanned',
+                  style: TextStyle(
+                    color: appTheme.black,
+                    fontFamily: 'Inter',
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: 14),
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: appTheme.teal_50,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: appTheme.teal_A200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildOcrSummaryLine('Merchant', merchant),
+                      _buildOcrSummaryLine('Date', dateText),
+                      _buildOcrSummaryLine('Total', totalText),
+                      _buildOcrSummaryLine('Items', '$itemCount detected'),
+                      _buildOcrSummaryLine('Tax', taxText),
+                      _buildOcrSummaryLine('Discount', discountText),
+                      _buildOcrSummaryLine('Rounding', roundingText),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 10),
+                Text(
+                  'OCR/AI may make mistakes. Please review before applying.',
+                  style: TextStyle(
+                    color: appTheme.blue_gray_300,
+                    fontSize: 12,
+                    height: 1.35,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(dialogContext, false),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: appTheme.white_A700,
+                          backgroundColor: appTheme.errorRed,
+                          minimumSize: Size.fromHeight(48),
+                          side: BorderSide(color: appTheme.errorRed),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                        ),
+                        child: Text(
+                          'Cancel',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(dialogContext, true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: appTheme.teal_A700,
+                          foregroundColor: appTheme.white_A700,
+                          minimumSize: Size.fromHeight(48),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                        ),
+                        child: Text(
+                          'Apply',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    return shouldApply ?? false;
+  }
+
+  Widget _buildOcrSummaryLine(String label, String value) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 7),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 76,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: appTheme.blue_gray_300,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                color: appTheme.gray_900,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _chooseReceipt() async {
@@ -1788,6 +2176,10 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
 
     context.read<ActivityViewModel>().removeReceiptAndOcrData();
     _taxController.clear();
+    _discountController.clear();
+    _roundingController.clear();
+    _manualRoundingText = '';
+    setState(() => _showAdjustments = false);
     if (mounted) {
       setState(() => _hasAppliedOcrValues = false);
     }
@@ -1870,6 +2262,14 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   }
 
   Future<void> _showConfirmExpenseDialog() async {
+    if (_showItemForm && _hasUnfinishedItemFormChanges) {
+      _showValidationMessage(
+        _editingItemIndex == null
+            ? 'Tap Save Item before confirming the expense.'
+            : 'Tap Update Item before confirming the expense.',
+      );
+      return;
+    }
     final viewModel = context.read<ActivityViewModel>();
     if (!viewModel.validateExpenseDraftBeforeConfirmation()) {
       _showValidationMessage(viewModel.uiState.errorMessage);
@@ -2064,7 +2464,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   InputDecoration _fieldDecoration(String? hint) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: TextStyle(color: Color(0xFFBFC4CC)),
+      hintStyle: TextStyle(color: appTheme.blue_gray_300),
       filled: true,
       fillColor: appTheme.gray_50,
       contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -2198,24 +2598,88 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
   }
 
   Future<void> _pickDate() async {
+    final viewModel = context.read<ActivityViewModel>();
+    final uiState = viewModel.uiState;
+    DateTime dateOnly(DateTime date) =>
+        DateTime(date.year, date.month, date.day);
+    final activityDate = uiState.selectedActivity?.date;
+    var firstDate = dateOnly(
+      activityDate ?? uiState.tripStartDate ?? DateTime(2020),
+    );
+    final tripStartDate = uiState.tripStartDate;
+    if (tripStartDate != null && dateOnly(tripStartDate).isAfter(firstDate)) {
+      firstDate = dateOnly(tripStartDate);
+    }
+    var lastDate = dateOnly(DateTime.now());
+    final tripEndDate = uiState.tripEndDate;
+    if (tripEndDate != null && dateOnly(tripEndDate).isBefore(lastDate)) {
+      lastDate = dateOnly(tripEndDate);
+    }
+    final nextStart = viewModel.selectedExpenseTimeWindow?.nextStart;
+    if (nextStart != null) {
+      final lastBeforeNext = dateOnly(
+        nextStart.subtract(const Duration(microseconds: 1)),
+      );
+      if (lastBeforeNext.isBefore(lastDate)) lastDate = lastBeforeNext;
+    }
+    if (firstDate.isAfter(lastDate)) {
+      widget.onValidationError(
+        'No expense dates are available for this activity yet.',
+      );
+      return;
+    }
+    final selectedDate = dateOnly(_selectedDate);
+    final initialDate = selectedDate.isBefore(firstDate)
+        ? firstDate
+        : selectedDate.isAfter(lastDate)
+        ? lastDate
+        : selectedDate;
     final date = await showAppDatePicker(
       context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
+      initialDate: initialDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
     );
     if (date != null && mounted) {
       setState(() => _selectedDate = date);
+      widget.onChanged(true);
     }
   }
 
   Future<void> _pickTime() async {
-    final time = await showTimePicker(
+    final window = context.read<ActivityViewModel>().selectedExpenseTimeWindow;
+    if (window == null) return;
+    final now = DateTime.now();
+    bool isSelectable(TimeOfDay time) {
+      final candidate = DateTime(
+        _selectedDate.year,
+        _selectedDate.month,
+        _selectedDate.day,
+        time.hour,
+        time.minute,
+      );
+      return !candidate.isBefore(window.start) &&
+          (window.nextStart == null || candidate.isBefore(window.nextStart!)) &&
+          !candidate.isAfter(now);
+    }
+
+    if (!List.generate(
+      1440,
+      (index) => TimeOfDay(hour: index ~/ 60, minute: index % 60),
+    ).any(isSelectable)) {
+      widget.onValidationError(
+        'No times are available for this activity on the selected date.',
+      );
+      return;
+    }
+    final time = await showAppTimePicker(
       context: context,
       initialTime: _selectedTime,
+      isSelectable: isSelectable,
     );
     if (time != null && mounted) {
       setState(() => _selectedTime = time);
+      widget.onChanged(true);
     }
   }
 
@@ -2232,9 +2696,9 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
       return;
     }
     for (final validationMessage in <String?>[
-      validateExpenseItemName(name),
-      validateExpenseDescription(description),
-      validateExpenseMerchantName(merchantName),
+      _validateExpenseItemName(name),
+      _validateExpenseDescription(description),
+      _validateExpenseMerchantName(merchantName),
     ]) {
       if (validationMessage != null) {
         widget.onValidationError(validationMessage);
@@ -2269,6 +2733,13 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
       _selectedTime.hour,
       _selectedTime.minute,
     );
+    final dateError = context.read<ActivityViewModel>().expenseDateTimeError(
+      dateTime,
+    );
+    if (dateError != null) {
+      widget.onValidationError(dateError);
+      return;
+    }
 
     widget.onSave(
       ExpenseItem(
@@ -2402,7 +2873,7 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildLimitedFieldLabel(
-                        label: 'Item Entry',
+                        label: 'Item Name',
                         controller: _itemNameController,
                         focusNode: _itemNameFocus,
                         limit: 30,
@@ -2431,7 +2902,11 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildTextField('Item Description', _descriptionController, ''),
+                _buildTextField(
+                  'Item Description (Optional)',
+                  _descriptionController,
+                  '',
+                ),
                 SizedBox(height: 14),
                 _buildTextField(
                   'Merchant Name (Optional)',
@@ -2669,11 +3144,13 @@ class _ThousandsSeparatorInputFormatter extends TextInputFormatter {
   final int maximumIntegerDigits;
   final int decimalDigits;
   final bool allowZero;
+  final double? maximumValue;
 
   const _ThousandsSeparatorInputFormatter({
     required this.maximumIntegerDigits,
     required this.decimalDigits,
     this.allowZero = false,
+    this.maximumValue,
   });
 
   @override
@@ -2692,6 +3169,9 @@ class _ThousandsSeparatorInputFormatter extends TextInputFormatter {
     final integerPart = parts.first;
     if (integerPart.length > maximumIntegerDigits) return oldValue;
     if (integerPart.startsWith('0') && (!allowZero || integerPart.length > 1)) {
+      return oldValue;
+    }
+    if (maximumValue != null && (double.tryParse(raw) ?? 0) > maximumValue!) {
       return oldValue;
     }
 

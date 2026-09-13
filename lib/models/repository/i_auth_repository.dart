@@ -53,6 +53,14 @@ class AuthRegistrationData {
 
 enum PasswordRecoveryStatus { pending, ready, expired, completed }
 
+enum DeviceEmailLoginStatus { pending, signedIn, expired, completed }
+
+class RepositoryEmailRateLimitedException implements Exception {
+  final int retryAfterSeconds;
+
+  const RepositoryEmailRateLimitedException(this.retryAfterSeconds);
+}
+
 class RepositoryEmailAlreadyExistsException implements Exception {
   const RepositoryEmailAlreadyExistsException();
 }
@@ -125,6 +133,14 @@ abstract interface class IAuthRepository {
   Future<void> linkGoogleIdentity();
 
   Future<void> sendMagicLink({required String email});
+
+  Future<void> requestDeviceEmailLogin({required String email});
+
+  Future<bool> hasPendingDeviceEmailLogin();
+
+  Future<DeviceEmailLoginStatus> getPendingDeviceEmailLoginStatus();
+
+  Future<void> clearPendingDeviceEmailLogin();
 
   Future<void> sendPasswordResetEmail({required String email});
 

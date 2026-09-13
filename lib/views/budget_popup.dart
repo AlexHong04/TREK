@@ -78,13 +78,23 @@ class BaseBudgetDialog extends StatelessWidget {
     );
   }
 
-  static Widget _buildWarningRow(String text, {Color? color, bool? icon}) {
+  static Widget _buildWarningRow(
+    String text, {
+    Color? color,
+    Color? iconColor,
+    bool? icon,
+  }) {
     final effectiveColor = color ?? appTheme.popupWarningMsg;
+    final effectiveIconColor = iconColor ?? effectiveColor;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (icon != false)
-          Icon(Icons.warning_amber_rounded, color: effectiveColor, size: 22),
+          Icon(
+            Icons.warning_amber_rounded,
+            color: effectiveIconColor,
+            size: 22,
+          ),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
@@ -1210,6 +1220,61 @@ Future<bool> showConfirmRemoveActivityDialog({
             children: [
               BaseBudgetDialog._buildWarningRow(
                 'Are you sure you want to remove "$activityName" from your itinerary?',
+                color: appTheme.black,
+                iconColor: appTheme.errorRed,
+              ),
+            ],
+          ),
+        ),
+        actions: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Expanded(
+              child: _buildActionButton(
+                text: 'Cancel',
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
+                },
+                backgroundColor: appTheme.errorRed,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildActionButton(
+                text: 'Confirm',
+                onPressed: () {
+                  confirmed = true;
+                  Navigator.of(dialogContext).pop();
+                },
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+  return confirmed;
+}
+
+Future<bool> showConfirmGenerateAlternativeDialog({
+  required BuildContext context,
+}) async {
+  bool confirmed = false;
+  await showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) {
+      return BaseBudgetDialog(
+        title: 'Generate Alternative',
+        titleColor: appTheme.black,
+        contentCard: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 500),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              BaseBudgetDialog._buildWarningRow(
+                'Are you sure you want to generate a new alternative activity for this slot?',
                 color: appTheme.black,
                 icon: false,
               ),

@@ -140,7 +140,10 @@ Future<void> main() async {
 class MyApp extends StatefulWidget {
   final IAuthService authService;
 
-  const MyApp({super.key, required this.authService});
+  const MyApp({
+    super.key,
+    required this.authService,
+  });
 
   @override
   State<MyApp> createState() => _MyAppState();

@@ -50,6 +50,17 @@ abstract interface class IItineraryService {
     int totalDays = 1,
   });
 
+  Future<Activity> regenerateTransportation({
+    required String originPlace,
+    required String destinationPlace,
+    required String city,
+    required String existingActivityId,
+    required String dayTripId,
+    required DateTime date,
+    String? startTime,
+    String? endTime,
+  });
+
   Future<List<Activity>> regenerateEmptySlotsFromRemainingPlan({
     required String destination,
     required double remainingBudget,
@@ -190,6 +201,8 @@ abstract interface class IExpenseTrackingService {
   double? extractReceiptTotal(String receiptText);
 
   double? extractReceiptTax(String receiptText);
+  double? extractReceiptDiscount(String receiptText);
+  double? extractReceiptRounding(String receiptText);
 
   List<String> extractReceiptItemLines(String receiptText);
 
@@ -205,6 +218,8 @@ abstract interface class IExpenseTrackingService {
     required String paymentMethod,
     required String currency,
     double taxAmount = 0.0,
+    double discountAmount = 0.0,
+    double roundingAmount = 0.0,
     String? receiptLocalPath,
   });
 
@@ -213,6 +228,8 @@ abstract interface class IExpenseTrackingService {
   double calculateTotalExpense(
     List<ExpenseItem> expenseItems, [
     double taxAmount = 0.0,
+    double discountAmount = 0.0,
+    double roundingAmount = 0.0,
   ]);
 
   void validateExpenseItems(List<ExpenseItem> expenseItems);
@@ -220,6 +237,7 @@ abstract interface class IExpenseTrackingService {
   void validateTotalAmount(double totalAmount);
 
   void validateTaxAmount(double taxAmount);
+  void validateExpenseAdjustments(double discountAmount, double roundingAmount);
 
   void validateExpenseWithinRemainingBudget({
     required double totalAmount,

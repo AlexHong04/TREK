@@ -1152,13 +1152,21 @@ class _WholeItineraryDetailScreenState
                       activities[i + 1].date.month != actDate.month ||
                       activities[i + 1].date.year != actDate.year));
 
-      children.add(
+      final String actCategory =
+        (activity.activityCategory as String?) ?? '';
+    final bool isFixedActivity =
+        actCategory == 'Arrival' ||
+        actCategory == 'Departure' ||
+        actCategory == 'Transportation';
+
+    children.add(
         _buildTimelineItem(
           context: context,
           viewModel: viewModel,
           activity: activity,
           isLast: isLast,
           isReadOnly: isReadOnly,
+          isFixedActivity: isFixedActivity,
           onRemove: () async {
             final activityName =
             (activity.destination as String?)?.isNotEmpty == true
@@ -1196,6 +1204,7 @@ class _WholeItineraryDetailScreenState
     required bool isLast,
     required VoidCallback onRemove,
     required bool isReadOnly,
+    bool isFixedActivity = false,
   }) {
     final bool isActivityNonEmpty =
         activity.status != 'empty' && activity.destination.isNotEmpty;
@@ -1221,7 +1230,7 @@ class _WholeItineraryDetailScreenState
                       color: appTheme.gray_800,
                     ).copyWith(height: 1.2),
                   ),
-                  if (!isReadOnly && isActivityNonEmpty)
+                  if (!isReadOnly && isActivityNonEmpty && !isFixedActivity)
                     GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: onRemove,
@@ -1622,6 +1631,11 @@ class _WholeItineraryDetailScreenState
                       color: appTheme.blue_gray_300,
                     ),
                     onPressed: () async {
+                      final confirmed =
+                          await showConfirmGenerateAlternativeDialog(
+                        context: context,
+                      );
+                      if (!confirmed) return;
                       await viewModel.generateAlternativeActivity(
                         slotActivityId: activity.activitiesId,
                         destination: activity.destination.isNotEmpty
@@ -1683,6 +1697,27 @@ class _WholeItineraryDetailScreenState
               height: 192,
               width: double.infinity,
               fit: BoxFit.cover,
+              loadingBuilder: (context, child, progress) {
+                if (progress == null) return child;
+                return Container(
+                  height: 192,
+                  width: double.infinity,
+                  color: appTheme.gray_200,
+                  child: const Center(
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                );
+              },
+              errorBuilder: (context, error, stackTrace) => Container(
+                height: 192,
+                width: double.infinity,
+                color: appTheme.gray_200,
+                child: Icon(
+                  Icons.broken_image_outlined,
+                  size: 40,
+                  color: appTheme.blue_gray_300,
+                ),
+              ),
             )
                 : Image.asset(
               activity.activityImgUrl,
