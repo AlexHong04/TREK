@@ -212,10 +212,7 @@ class ItineraryService implements IItineraryService {
           break;
         }
 
-        if (allValid &&
-            strictBudget &&
-            wishlist != null &&
-            wishlist.isNotEmpty) {
+        if (allValid && wishlist != null && wishlist.isNotEmpty) {
           final allWishlistIncluded = wishlist.every((w) {
             return jsonList.any(
               (item) => _isWishlistMatch(
@@ -225,9 +222,24 @@ class ItineraryService implements IItineraryService {
               ),
             );
           });
-          if (!allWishlistIncluded && retries > 1) {
+          if (!allWishlistIncluded && strictBudget && retries > 1) {
             developer.log(
               'Strict budget plan did not include all wishlist items, retrying...',
+            );
+            allValid = false;
+          }
+        }
+
+        if (allValid) {
+          final currentCost = jsonList.fold(
+            0.0,
+            (sum, item) =>
+                sum + ((item['allocatedBudget'] as num?)?.toDouble() ?? 0.0),
+          );
+          final parsedBudget = double.tryParse(budget) ?? 0.0;
+          if (parsedBudget > 0 && currentCost > parsedBudget && retries > 1) {
+            developer.log(
+              'Generated plan cost ($currentCost) exceeds target budget ($parsedBudget), retrying...',
             );
             allValid = false;
           }
@@ -286,11 +298,25 @@ class ItineraryService implements IItineraryService {
 
       for (var item in validatedList) {
         currentActId = IdGenerator.generateNextFormattedId('AC', currentActId);
-        final allocatedBudget =
+        final rawAllocated =
             (item['allocatedBudget'] as num?)?.toDouble() ?? 0.0;
-        final minPriceLocal = item['minPrice'] != null
+        final rawCategory =
+            (item['activityCategory'] as String? ?? 'General').trim();
+        final isRestaurant = rawCategory.toLowerCase() == 'restaurant';
+
+        final rawMinPrice = item['minPrice'] != null
             ? (item['minPrice'] as num).toDouble()
             : null;
+
+        // Defensive realism: Food in Malaysia is never free
+        final double allocatedBudget = (isRestaurant && rawAllocated <= 0.0)
+            ? (rawMinPrice != null && rawMinPrice > 0 ? rawMinPrice : 8.0)
+            : rawAllocated;
+
+        final double? minPriceLocal =
+            isRestaurant && (rawMinPrice == null || rawMinPrice <= 0.0)
+                ? 5.0
+                : rawMinPrice;
 
         final destName = item['destination'] as String? ?? 'Activity';
         final imageKeyword = item['imageKeyword'] as String? ?? destName;
@@ -386,6 +412,179 @@ class ItineraryService implements IItineraryService {
         await Future.delayed(const Duration(milliseconds: 300));
       }
 
+      // Ensure departure is covered if user specified departure points
+      final resolvedDepList = (departures != null && departures.isNotEmpty)
+          ? departures.where((d) => d.location.trim().isNotEmpty).toList()
+          : (departureLocation != null && departureLocation.trim().isNotEmpty)
+              ? [TransitPoint(id: 'dep_0', location: departureLocation, time: departureTime ?? '18:00')]
+              : <TransitPoint>[];
+
+      if (resolvedDepList.isNotEmpty && newActivities.isNotEmpty) {
+        final lastDep = resolvedDepList.last;
+        final depLocLower = lastDep.location.toLowerCase().trim();
+        final bool departureCovered = newActivities.any((a) {
+          final dest = a.destination.toLowerCase();
+          final desc = a.description.toLowerCase();
+          return dest.contains(depLocLower) ||
+              desc.contains(depLocLower) ||
+              depLocLower.contains(dest);
+        });
+
+        if (!departureCovered) {
+          final lastActivity = newActivities.last;
+          DateTime lastDate = lastActivity.date;
+          String depTimeStr = lastDep.time;
+          String formattedEndTime = '18:00';
+          try {
+            final tParts = depTimeStr.trim().split(RegExp(r'[:\s]'));
+            if (tParts.length >= 2) {
+              int h = int.parse(tParts[0]);
+              int m = int.parse(tParts[1]);
+              final isPm = depTimeStr.toLowerCase().contains('pm');
+              final isAm = depTimeStr.toLowerCase().contains('am');
+              if (isPm && h < 12) h += 12;
+              if (isAm && h == 12) h = 0;
+              formattedEndTime = '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
+            }
+          } catch (_) {
+            formattedEndTime = depTimeStr;
+          }
+
+          String formattedStartTime = '17:00';
+          try {
+            final parts = formattedEndTime.split(':');
+            int h = int.parse(parts[0]);
+            int m = int.parse(parts[1]);
+            int totalM = h * 60 + m - 60;
+            if (totalM < 0) totalM = 0;
+            formattedStartTime = '${(totalM ~/ 60).toString().padLeft(2, '0')}:${(totalM % 60).toString().padLeft(2, '0')}';
+          } catch (_) {}
+
+          final depActId = 'AC${index.toString().padLeft(4, '0')}';
+          newActivities.add(
+            Activity(
+              activitiesId: depActId,
+              dayTripId: lastActivity.dayTripId,
+              destination: lastDep.location,
+              description: 'Travel to ${lastDep.location} for departure (${lastDep.type})',
+              activityImgUrl: 'assets/logo.png',
+              date: DateTime(
+                lastDate.year,
+                lastDate.month,
+                lastDate.day,
+                int.tryParse(formattedStartTime.split(':')[0]) ?? 17,
+                int.tryParse(formattedStartTime.split(':')[1]) ?? 0,
+              ),
+              allocatedBudget: 0.0,
+              overspendAmount: null,
+              status: 'pending',
+              startTime: formattedStartTime,
+              endTime: formattedEndTime,
+              duration: '60 min',
+              activityCategory: 'Transportation',
+              isOverspend: false,
+              minAllocatedBudget: 0.0,
+            ),
+          );
+          index++;
+        }
+      }
+
+      final double parsedBudget = double.tryParse(budget) ?? 0.0;
+
+      // Defensive budget cap: ensure total cost NEVER exceeds parsedBudget in ANY mode
+      if (parsedBudget > 0) {
+        double currentTotal =
+            newActivities.fold(0.0, (sum, a) => sum + a.allocatedBudget);
+        if (currentTotal > parsedBudget) {
+          double excess = currentTotal - parsedBudget;
+
+          // Pass 1: Trim restaurant costs down towards minimum allowed
+          for (int i = 0; i < newActivities.length; i++) {
+            if (excess <= 0.001) break;
+            final a = newActivities[i];
+            if (a.activityCategory.toLowerCase() == 'restaurant') {
+              final minAllowed =
+                  (a.minAllocatedBudget != null && a.minAllocatedBudget! > 0)
+                      ? a.minAllocatedBudget!
+                      : 4.0;
+              final reducible = a.allocatedBudget - minAllowed;
+              if (reducible > 0) {
+                final reduction = reducible > excess ? excess : reducible;
+                final newBudget = double.parse(
+                  (a.allocatedBudget - reduction).toStringAsFixed(2),
+                );
+                newActivities[i] = a.copyWith(allocatedBudget: newBudget);
+                excess -= reduction;
+              }
+            }
+          }
+
+          // Pass 2: Trim non-wishlist paid activities and transportation
+          if (excess > 0.001) {
+            for (int i = 0; i < newActivities.length; i++) {
+              if (excess <= 0.001) break;
+              final a = newActivities[i];
+              final bool isWishlistItem =
+                  wishlist != null &&
+                  wishlist.any(
+                    (w) => _isWishlistMatch(w, a.destination, a.description),
+                  );
+              if (!isWishlistItem && a.allocatedBudget > 0) {
+                final reduction =
+                    a.allocatedBudget > excess ? excess : a.allocatedBudget;
+                final newBudget = double.parse(
+                  (a.allocatedBudget - reduction).toStringAsFixed(2),
+                );
+                newActivities[i] = a.copyWith(allocatedBudget: newBudget);
+                excess -= reduction;
+              }
+            }
+          }
+
+          // Pass 3: If STILL exceeding budget:
+          if (excess > 0.001) {
+            if (!strictBudget && wishlist != null && wishlist.isNotEmpty) {
+              // In initial mode, drop the excess wishlist item
+              for (int i = newActivities.length - 1; i >= 0; i--) {
+                if (excess <= 0.001) break;
+                final a = newActivities[i];
+                final bool isWishlistItem = wishlist.any(
+                  (w) => _isWishlistMatch(w, a.destination, a.description),
+                );
+                if (isWishlistItem && a.allocatedBudget > 0) {
+                  final reduction =
+                      a.allocatedBudget > excess ? excess : a.allocatedBudget;
+                  final newBudget = double.parse(
+                    (a.allocatedBudget - reduction).toStringAsFixed(2),
+                  );
+                  newActivities[i] = a.copyWith(
+                    allocatedBudget: newBudget,
+                    minAllocatedBudget: 0.0,
+                  );
+                  excess -= reduction;
+                }
+              }
+            } else {
+              // In strictBudget (top-up) mode, proportionally scale down paid activities to fit parsedBudget strictly
+              for (int i = 0; i < newActivities.length; i++) {
+                if (excess <= 0.001) break;
+                final a = newActivities[i];
+                if (a.allocatedBudget > 0.0) {
+                  final reduction =
+                      a.allocatedBudget > excess ? excess : a.allocatedBudget;
+                  final newBudget = double.parse(
+                    (a.allocatedBudget - reduction).toStringAsFixed(2),
+                  );
+                  newActivities[i] = a.copyWith(allocatedBudget: newBudget);
+                  excess -= reduction;
+                }
+              }
+            }
+          }
+        }
+      }
+
       // Calculate actual total cost from activities
       final double calculatedTotalCost = newActivities.fold(
         0.0,
@@ -396,19 +595,13 @@ class ItineraryService implements IItineraryService {
           : responseTotalAllocatedBudget;
 
       // Calculate mathematical budget shortfall
-      final double parsedBudget = double.tryParse(budget) ?? 0.0;
       final double mathShortfall = (resolvedTotalAllocatedBudget - parsedBudget)
           .clamp(0.0, double.infinity);
-
-      double resolvedExtraBudget = responseEstimatedExtraBudgetNeeded;
-      if (mathShortfall > resolvedExtraBudget) {
-        resolvedExtraBudget = mathShortfall;
-      }
 
       // Resolve wishlist coverage from activities and Gemini estimation
       int resolvedWishlistCovered = 0;
       if (wishlist != null && wishlist.isNotEmpty) {
-        resolvedWishlistCovered = responseWishlistItemsCoveredCount;
+        // Count how many wishlist items are actually matched in activities
         int matchedCount = 0;
         for (final item in wishlist) {
           final isMatched = newActivities.any(
@@ -420,25 +613,46 @@ class ItineraryService implements IItineraryService {
         }
 
         if (strictBudget) {
+          // In strict budget (top-up) mode, all wishlist items are guaranteed covered
           resolvedWishlistCovered = wishlist.length;
-          resolvedExtraBudget = 0.0;
         } else {
-          // If matched count in activities is higher than Gemini reported count, prefer matched count
-          if (matchedCount > resolvedWishlistCovered) {
-            resolvedWishlistCovered = matchedCount;
+          // Use the higher of matched count vs Gemini's reported count
+          resolvedWishlistCovered = matchedCount;
+          if (responseWishlistItemsCoveredCount > resolvedWishlistCovered) {
+            resolvedWishlistCovered = responseWishlistItemsCoveredCount;
           }
           resolvedWishlistCovered = resolvedWishlistCovered.clamp(
             0,
             wishlist.length,
           );
         }
+      }
 
-        // When wishlist is incomplete, ensure there is a realistic estimated shortfall for missing items
-        final bool wishlistIncomplete =
-            resolvedWishlistCovered < wishlist.length;
-        if (!strictBudget && wishlistIncomplete && resolvedExtraBudget <= 0.0) {
-          final uncoveredCount = wishlist.length - resolvedWishlistCovered;
-          resolvedExtraBudget = uncoveredCount * 30.0;
+      // Calculate final resolved extra budget needed:
+      double resolvedExtraBudget = 0.0;
+
+      if (strictBudget) {
+        // Strict budget (top-up) mode: plan was designed to fit, no extra needed
+        resolvedExtraBudget = 0.0;
+      } else {
+        // 1. Extra budget reported by Gemini for uncovered wishlist items or shortfall
+        if (responseEstimatedExtraBudgetNeeded > 0) {
+          resolvedExtraBudget = responseEstimatedExtraBudgetNeeded;
+        }
+
+        // 2. If some wishlist items are uncovered, ensure extra budget needed reflects the shortage
+        if (wishlist != null && wishlist.isNotEmpty) {
+          final int uncoveredCount =
+              (wishlist.length - resolvedWishlistCovered).clamp(0, wishlist.length);
+          if (uncoveredCount > 0 && resolvedExtraBudget <= 0.0) {
+            // Default estimate: RM30.00 per uncovered wishlist item
+            resolvedExtraBudget = uncoveredCount * 30.0;
+          }
+        }
+
+        // 3. Mathematical shortfall if activities cost more than user's budget
+        if (mathShortfall > resolvedExtraBudget) {
+          resolvedExtraBudget = mathShortfall;
         }
       }
 

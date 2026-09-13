@@ -88,16 +88,20 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     return _uiState.wishlistItemsCoveredCount < wishlist.length;
   }
 
-  /// True if budget is insufficient or wishlist is not fully covered.
-  bool get needsTopUp => hasExtraBudgetNeeded || hasUncoveredWishlist;
+  /// True if budget is insufficient or overspent.
+  bool get needsTopUp => hasExtraBudgetNeeded || (spentBudget > totalBudget);
 
   /// Confirm is only allowed once every time slot has been filled, we are
-  /// not busy generating, and no extra budget is needed.
-  bool get canConfirmItinerary =>
-      !_uiState.isLoading &&
-      _uiState.activities.isNotEmpty &&
-      !hasEmptyActivitySlots &&
-      !(spentBudget > totalBudget);
+  /// not busy generating, no extra budget is needed, and all wishlist items are covered.
+  bool get canConfirmItinerary {
+    return !_uiState.isLoading &&
+        !_uiState.isRegeneratingPlan &&
+        _uiState.activities.isNotEmpty &&
+        !hasEmptyActivitySlots &&
+        !(spentBudget > totalBudget) &&
+        !needsTopUp &&
+        !hasUncoveredWishlist;
+  }
 
   static bool _matchesWishlist(
     String wishlistName,
@@ -308,7 +312,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     try {
       final result = await _profileService.convertToPreferredCurrency(
         amount: amount,
-        fromCurrency: 'MYR'
+        fromCurrency: 'MYR',
       );
       return result;
     } catch (_) {
@@ -320,7 +324,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
   Future<double?> convertAmountToMYR({required double amount}) async {
     try {
       final result = await _profileService.convertPreferredCurrencyToMyr(
-          amount: amount,
+        amount: amount,
       );
       return result;
     } catch (_) {
@@ -362,9 +366,9 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     }
 
     final budget = double.tryParse(_uiState.budgetText) ?? 0.0;
-    final myrAmount = await _profileService.convertPreferredCurrencyToMyr(
-      amount: amount,
-    ); // changed this
+    final myrAmount =
+        await _profileService.convertPreferredCurrencyToMyr(amount: amount) ??
+        amount;
 
     final shortfall = spentBudget - budget;
     final shortage = _uiState.estimatedExtraBudgetNeeded > shortfall
@@ -372,26 +376,26 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         : shortfall;
 
     final minRequired = double.parse((shortage * 0.50).toStringAsFixed(2));
-    final myrMinRequired = await _profileService.convertPreferredCurrencyToMyr(amount: minRequired) ?? minRequired;
-    final myrShortfall = await _profileService.convertPreferredCurrencyToMyr(amount: shortfall) ?? shortfall;
+    final myrMinRequired =
+        await _profileService.convertPreferredCurrencyToMyr(
+          amount: minRequired,
+        ) ??
+        minRequired;
 
-    final isSufficient = myrAmount! >= myrMinRequired || myrAmount <= myrShortfall;
+    final isSufficient =
+        shortage <= 0.0 || myrAmount >= shortage || myrAmount >= myrMinRequired;
 
-    final double updatedBudget = isSufficient
-        ? (budget + myrAmount < spentBudget ? spentBudget : budget + myrAmount)
-        : (budget + myrAmount);
+    final double updatedBudget = budget + myrAmount;
 
-    final remainingShortage = isSufficient
-        ? 0.0
-        : shortage - myrAmount;
+    final remainingShortage = (shortage - myrAmount).clamp(
+      0.0,
+      double.infinity,
+    );
 
     _uiState = _uiState.copyWith(
       budgetText: updatedBudget.toStringAsFixed(2),
       estimatedExtraBudgetNeeded: remainingShortage,
       showWishlistWarning: false,
-      wishlistItemsCoveredCount: isSufficient
-          ? (_uiState.wishlist?.length ?? 0)
-          : _uiState.wishlistItemsCoveredCount,
     );
 
     notifyListeners();
