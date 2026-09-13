@@ -93,27 +93,11 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
 
   /// Confirm is only allowed once every time slot has been filled, we are
   /// not busy generating, and no extra budget is needed.
-  bool get canConfirmItinerary {
-    final wishlist = _uiState.wishlist;
-
-    final hasWishlist =
-        wishlist != null && wishlist.isNotEmpty;
-
-    final hasUncoveredWishlist =
-        hasWishlist &&
-            _uiState.wishlistItemsCoveredCount < wishlist.length;
-
-    final hasExtraBudgetNeeded =
-        _uiState.estimatedExtraBudgetNeeded > 0;
-
-    final hasBudgetIssueWithoutWishlist =
-        hasExtraBudgetNeeded && !hasWishlist;
-
-    return !_uiState.isLoading &&
-        _uiState.activities.isNotEmpty &&
-        !hasEmptyActivitySlots &&
-        !hasBudgetIssueWithoutWishlist;
-  }
+  bool get canConfirmItinerary =>
+      !_uiState.isLoading &&
+      _uiState.activities.isNotEmpty &&
+      !hasEmptyActivitySlots &&
+      !(spentBudget > totalBudget);
 
   static bool _matchesWishlist(
     String wishlistName,

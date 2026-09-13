@@ -1172,6 +1172,24 @@ Future<void> showInitialTopUpConfirmation({
   );
 }
 
+Future<void> showInitialUncoveredWishlistConfirmation({
+  required BuildContext context,
+  required VoidCallback onCancel,
+  required VoidCallback onConfirm,
+}) {
+  return _showTwoButtonsBudgetDialog(
+    context: context,
+    title: 'Wishlist Not Fully Covered',
+    messages: [
+      'Are you sure you want to proceed with the current plan without fully covered wishlist?',
+    ],
+    color: appTheme.black,
+    icon: false,
+    onCancel: onCancel,
+    onConfirm: onConfirm,
+  );
+}
+
 Future<bool> showConfirmRemoveActivityDialog({
   required BuildContext context,
   required String activityName,
