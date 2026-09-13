@@ -19,10 +19,7 @@ class WholeItineraryDetailScreen extends StatefulWidget {
 
   static Widget builder(BuildContext context) {
     final args =
-    ModalRoute
-        .of(context)!
-        .settings
-        .arguments as Map<String, dynamic>?;
+        ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
 
     // For all plan screen
     final isReadOnly = args?['isReadOnly'] as bool? ?? false;
@@ -36,7 +33,7 @@ class WholeItineraryDetailScreen extends StatefulWidget {
         authService.currentUser?.personalConstraints
             .map((c) => '${c.category}: ${c.constraintName}')
             .toList() ??
-            [];
+        [];
 
     final rawArrivals = args?['arrivals'] as List?;
     final arrivals = rawArrivals
@@ -103,14 +100,15 @@ class _WholeItineraryDetailScreenState
   bool _isUncoveredWishlistExpanded = false;
 
   Future<void> _checkWishlistWarning(
-      WholeItineraryDetailViewModel viewModel,) async {
+    WholeItineraryDetailViewModel viewModel,
+  ) async {
     final wishlist = viewModel.uiState.wishlist;
 
     final hasWishlist = wishlist != null && wishlist.isNotEmpty;
 
     final hasUncoveredWishlist =
         hasWishlist &&
-            viewModel.uiState.wishlistItemsCoveredCount < wishlist.length;
+        viewModel.uiState.wishlistItemsCoveredCount < wishlist.length;
 
     final hasExtraBudgetNeeded =
         viewModel.uiState.estimatedExtraBudgetNeeded > 0;
@@ -125,10 +123,11 @@ class _WholeItineraryDetailScreenState
     await _showWishlistWarningDialog(viewModel);
   }
 
-  void _showActivityRemovedSnackBar(BuildContext context,
-      String activityName, {
-        required bool isReadOnly,
-      }) {
+  void _showActivityRemovedSnackBar(
+    BuildContext context,
+    String activityName, {
+    required bool isReadOnly,
+  }) {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -203,10 +202,11 @@ class _WholeItineraryDetailScreenState
     );
   }
 
-  void _showWishlistItemRemovedSnackBar(BuildContext context,
-      String item, {
-        required bool isReadOnly,
-      }) {
+  void _showWishlistItemRemovedSnackBar(
+    BuildContext context,
+    String item, {
+    required bool isReadOnly,
+  }) {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -382,7 +382,8 @@ class _WholeItineraryDetailScreenState
   }
 
   Future<void> _showWishlistWarningDialog(
-      WholeItineraryDetailViewModel viewModel,) async {
+    WholeItineraryDetailViewModel viewModel,
+  ) async {
     if (_wishlistWarningShowing) return;
 
     _wishlistWarningShowing = true;
@@ -408,7 +409,7 @@ class _WholeItineraryDetailScreenState
 
       final hasUncoveredWishlist =
           hasWishlist &&
-              viewModel.uiState.wishlistItemsCoveredCount < wishlist.length;
+          viewModel.uiState.wishlistItemsCoveredCount < wishlist.length;
 
       final hasBudgetShortfall =
           viewModel.uiState.estimatedExtraBudgetNeeded > 0;
@@ -435,22 +436,22 @@ class _WholeItineraryDetailScreenState
               : null,
           symbol: viewModel.preferredCurrency,
           warningText:
-          'Insufficient top-up amount will trigger '
+              'Insufficient top-up amount will trigger '
               'alternative recommendation directly.',
           validateTopUpAmount:
               ({
-            String? symbol,
-            required String value,
-            required double minTopUp,
-            required double shortageAmount,
-          }) {
-            return viewModel.validateTopUpAmount(
-              symbol: symbol,
-              value: value,
-              minTopUp: validationMinTopUp,
-              shortageAmount: validationShortageAmount,
-            );
-          },
+                String? symbol,
+                required String value,
+                double? minTopUp,
+                required double shortageAmount,
+              }) {
+                return viewModel.validateTopUpAmount(
+                  symbol: symbol,
+                  value: value,
+                  minTopUp: hasUncoveredWishlist ? null : validationMinTopUp,
+                  shortageAmount: validationShortageAmount,
+                );
+              },
 
           onCancel: () {},
 
@@ -475,10 +476,7 @@ class _WholeItineraryDetailScreenState
   Widget build(BuildContext context) {
     final viewModel = context.watch<WholeItineraryDetailViewModel>();
     final args =
-    ModalRoute
-        .of(context)
-        ?.settings
-        .arguments as Map<String, dynamic>?;
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     final isReadOnly = args?['isReadOnly'] as bool? ?? false;
 
     return Scaffold(
@@ -514,7 +512,8 @@ class _WholeItineraryDetailScreenState
     );
   }
 
-  Widget _buildOverviewCard(WholeItineraryDetailViewModel viewModel, {
+  Widget _buildOverviewCard(
+    WholeItineraryDetailViewModel viewModel, {
     required bool isReadOnly,
   }) {
     return Container(
@@ -669,7 +668,7 @@ class _WholeItineraryDetailScreenState
             ],
           ),
           if ((viewModel.uiState.wishlist == null ||
-              viewModel.uiState.wishlist!.isEmpty) &&
+                  viewModel.uiState.wishlist!.isEmpty) &&
               (viewModel.spentBudget > viewModel.totalBudget ||
                   viewModel.uiState.estimatedExtraBudgetNeeded > 0)) ...[
             const SizedBox(height: 8.0),
@@ -722,8 +721,7 @@ class _WholeItineraryDetailScreenState
                   ),
                 ),
                 Text(
-                  '${viewModel.uiState.wishlistItemsCoveredCount} / ${viewModel
-                      .uiState.wishlist!.length} Items',
+                  '${viewModel.uiState.wishlistItemsCoveredCount} / ${viewModel.uiState.wishlist!.length} Items',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
@@ -739,7 +737,7 @@ class _WholeItineraryDetailScreenState
                 onTap: () {
                   setState(() {
                     _isUncoveredWishlistExpanded =
-                    !_isUncoveredWishlistExpanded;
+                        !_isUncoveredWishlistExpanded;
                   });
                 },
                 borderRadius: BorderRadius.circular(6.0),
@@ -956,7 +954,8 @@ class _WholeItineraryDetailScreenState
     );
   }
 
-  Widget _buildLocationHeader(WholeItineraryDetailViewModel viewModel, {
+  Widget _buildLocationHeader(
+    WholeItineraryDetailViewModel viewModel, {
     required bool isReadOnly,
   }) {
     return Padding(
@@ -977,13 +976,9 @@ class _WholeItineraryDetailScreenState
     final emptyCount = viewModel.uiState.activities
         .where(
           (a) =>
-      a.status == 'empty' ||
-          (a.destination
-              .trim()
-              .isEmpty && a.description
-              .trim()
-              .isEmpty),
-    )
+              a.status == 'empty' ||
+              (a.destination.trim().isEmpty && a.description.trim().isEmpty),
+        )
         .length;
 
     if (viewModel.uiState.isRegeneratingPlan) {
@@ -1058,9 +1053,7 @@ class _WholeItineraryDetailScreenState
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Plan Incomplete ($emptyCount empty slot${emptyCount > 1
-                      ? 's'
-                      : ''})',
+                  'Plan Incomplete ($emptyCount empty slot${emptyCount > 1 ? 's' : ''})',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
@@ -1086,10 +1079,11 @@ class _WholeItineraryDetailScreenState
     );
   }
 
-  Widget _buildTimeline(BuildContext context,
-      WholeItineraryDetailViewModel viewModel, {
-        required bool isReadOnly,
-      }) {
+  Widget _buildTimeline(
+    BuildContext context,
+    WholeItineraryDetailViewModel viewModel, {
+    required bool isReadOnly,
+  }) {
     if (viewModel.uiState.isLoading) {
       return Center(
         child: CircularProgressIndicator(color: appTheme.teal_A700),
@@ -1156,10 +1150,10 @@ class _WholeItineraryDetailScreenState
 
       final bool isLast =
           i == activities.length - 1 ||
-              (i + 1 < activities.length &&
-                  (activities[i + 1].date.day != actDate.day ||
-                      activities[i + 1].date.month != actDate.month ||
-                      activities[i + 1].date.year != actDate.year));
+          (i + 1 < activities.length &&
+              (activities[i + 1].date.day != actDate.day ||
+                  activities[i + 1].date.month != actDate.month ||
+                  activities[i + 1].date.year != actDate.year));
 
       children.add(
         _buildTimelineItem(
@@ -1170,7 +1164,7 @@ class _WholeItineraryDetailScreenState
           isReadOnly: isReadOnly,
           onRemove: () async {
             final activityName =
-            (activity.destination as String?)?.isNotEmpty == true
+                (activity.destination as String?)?.isNotEmpty == true
                 ? activity.destination as String
                 : 'Activity';
             final confirmed = await showConfirmRemoveActivityDialog(
@@ -1277,8 +1271,10 @@ class _WholeItineraryDetailScreenState
     );
   }
 
-  Widget _buildBottomSection(BuildContext context,
-      WholeItineraryDetailViewModel viewModel,) {
+  Widget _buildBottomSection(
+    BuildContext context,
+    WholeItineraryDetailViewModel viewModel,
+  ) {
     final bool hasEmptySlots = viewModel.hasEmptyActivitySlots;
     final bool isRegenerating = viewModel.uiState.isRegeneratingPlan;
     final bool needsTopUp = viewModel.needsTopUp;
@@ -1358,226 +1354,225 @@ class _WholeItineraryDetailScreenState
                 Expanded(
                   child: hasEmptySlots
                       ? Container(
-                    decoration: BoxDecoration(
-                      color: isRegenerating
-                          ? appTheme.gray_400
-                          : appTheme.teal_A700,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: appTheme.teal_50,
-                          offset: const Offset(0, 4),
-                          blurRadius: 6,
-                        ),
-                      ],
-                    ),
-                    child: Material(
-                      color: appTheme.transparentCustom,
-                      borderRadius: BorderRadius.circular(16),
-                      child: InkWell(
-                        onTap: isRegenerating
-                            ? null
-                            : () =>
-                            viewModel.regeneratePlanFromRemaining(),
-                        borderRadius: BorderRadius.circular(16),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 16,
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              if (isRegenerating) ...[
-                                SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: appTheme.white_A700,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Regenerating...',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                    fontFamily: 'Inter',
-                                    color: appTheme.white_A700,
-                                  ).copyWith(height: 22 / 16),
-                                ),
-                              ] else
-                                ...[
-                                  Icon(
-                                    Icons.auto_awesome_rounded,
-                                    size: 20,
-                                    color: appTheme.white_A700,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Regenerate Plan',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700,
-                                      fontFamily: 'Inter',
-                                      color: appTheme.white_A700,
-                                    ).copyWith(height: 22 / 16),
-                                  ),
-                                ],
+                          decoration: BoxDecoration(
+                            color: isRegenerating
+                                ? appTheme.gray_400
+                                : appTheme.teal_A700,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: appTheme.teal_50,
+                                offset: const Offset(0, 4),
+                                blurRadius: 6,
+                              ),
                             ],
                           ),
-                        ),
-                      ),
-                    ),
-                  )
-                      : Container(
-                    decoration: BoxDecoration(
-                      color: viewModel.canConfirmItinerary
-                          ? appTheme.teal_A700
-                          : appTheme.gray_400,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: viewModel.canConfirmItinerary
-                          ? [
-                        BoxShadow(
-                          color: appTheme.teal_50,
-                          offset: const Offset(0, 4),
-                          blurRadius: 6,
-                        ),
-                      ]
-                          : null,
-                    ),
-                    child: Material(
-                      color: appTheme.transparentCustom,
-                      borderRadius: BorderRadius.circular(16),
-                      child: InkWell(
-                        onTap: viewModel.canConfirmItinerary
-                            ? () async {
-                          // Wishlist does NOT block confirm; only check if actually overspent
-                          // if (viewModel.spentBudget >
-                          //     viewModel.totalBudget) {
-                          //   await _showWishlistWarningDialog(
-                          //     viewModel,
-                          //   );
-                          //   return;
-                          // }
-                          final wishlist =
-                              viewModel.uiState.wishlist;
-
-                          final hasUncoveredWishlist =
-                              wishlist != null &&
-                                  wishlist.isNotEmpty &&
-                                  viewModel
-                                      .uiState
-                                      .wishlistItemsCoveredCount <
-                                      wishlist.length;
-
-                          final isOverBudget =
-                              viewModel.spentBudget >
-                                  viewModel.totalBudget;
-
-                          // if (isOverBudget ||
-                          //     hasUncoveredWishlist) {
-                          //   await _showWishlistWarningDialog(
-                          //     viewModel,
-                          //   );
-                          //   return;
-                          // }
-
-                          bool confirmedWishlist = false;
-
-                          if (hasUncoveredWishlist && !isOverBudget) {
-                            await showInitialUncoveredWishlistConfirmation(
-                              context: context,
-                              onConfirm: () {
-                                confirmedWishlist = true;
-                              },
-                              onCancel: () {
-                                confirmedWishlist = false;
-                              },
-                            );
-
-                            if (!confirmedWishlist) {
-                              return;
-                            }
-                          }
-
-                          showDialog(
-                            context: context,
-                            barrierDismissible: false,
-                            builder: (BuildContext context) {
-                              return const Center(
-                                child: CircularProgressIndicator(),
-                              );
-                            },
-                          );
-
-                          final errorMsg = await viewModel
-                              .confirmItinerary();
-
-                          if (context.mounted) {
-                            Navigator.of(context).pop();
-                          }
-
-                          if (errorMsg == null && context.mounted) {
-                            showThreeSecondMessage(
-                              context,
-                              'Itinerary saved to database successfully!',
-                              isError: false,
-                            );
-                            Navigator.pushNamedAndRemoveUntil(
-                              context,
-                              AppRoutes.homeScreen,
-                                  (route) => false,
-                            );
-                          } else if (errorMsg != null &&
-                              context.mounted) {
-                            showDialog(
-                              context: context,
-                              builder: (_) =>
-                                  AlertDialog(
-                                    title: const Text('Save Failed'),
-                                    content: Text(errorMsg),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () =>
-                                            Navigator.pop(context),
-                                        child: const Text('OK'),
+                          child: Material(
+                            color: appTheme.transparentCustom,
+                            borderRadius: BorderRadius.circular(16),
+                            child: InkWell(
+                              onTap: isRegenerating
+                                  ? null
+                                  : () =>
+                                        viewModel.regeneratePlanFromRemaining(),
+                              borderRadius: BorderRadius.circular(16),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    if (isRegenerating) ...[
+                                      SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: appTheme.white_A700,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Regenerating...',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                          fontFamily: 'Inter',
+                                          color: appTheme.white_A700,
+                                        ).copyWith(height: 22 / 16),
+                                      ),
+                                    ] else ...[
+                                      Icon(
+                                        Icons.auto_awesome_rounded,
+                                        size: 20,
+                                        color: appTheme.white_A700,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Regenerate Plan',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                          fontFamily: 'Inter',
+                                          color: appTheme.white_A700,
+                                        ).copyWith(height: 22 / 16),
                                       ),
                                     ],
-                                  ),
-                            );
-                          }
-                        }
-                            : null,
-                        borderRadius: BorderRadius.circular(16),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 16,
+                                  ],
+                                ),
+                              ),
+                            ),
                           ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.description_outlined,
-                                size: 20,
-                                color: appTheme.white_A700,
+                        )
+                      : Container(
+                          decoration: BoxDecoration(
+                            color: viewModel.canConfirmItinerary
+                                ? appTheme.teal_A700
+                                : appTheme.gray_400,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: viewModel.canConfirmItinerary
+                                ? [
+                                    BoxShadow(
+                                      color: appTheme.teal_50,
+                                      offset: const Offset(0, 4),
+                                      blurRadius: 6,
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          child: Material(
+                            color: appTheme.transparentCustom,
+                            borderRadius: BorderRadius.circular(16),
+                            child: InkWell(
+                              onTap: viewModel.canConfirmItinerary
+                                  ? () async {
+                                      // Wishlist does NOT block confirm; only check if actually overspent
+                                      // if (viewModel.spentBudget >
+                                      //     viewModel.totalBudget) {
+                                      //   await _showWishlistWarningDialog(
+                                      //     viewModel,
+                                      //   );
+                                      //   return;
+                                      // }
+                                      final wishlist =
+                                          viewModel.uiState.wishlist;
+
+                                      final hasUncoveredWishlist =
+                                          wishlist != null &&
+                                          wishlist.isNotEmpty &&
+                                          viewModel
+                                                  .uiState
+                                                  .wishlistItemsCoveredCount <
+                                              wishlist.length;
+
+                                      final isOverBudget =
+                                          viewModel.spentBudget >
+                                          viewModel.totalBudget;
+
+                                      // if (isOverBudget ||
+                                      //     hasUncoveredWishlist) {
+                                      //   await _showWishlistWarningDialog(
+                                      //     viewModel,
+                                      //   );
+                                      //   return;
+                                      // }
+
+                                      bool confirmedWishlist = false;
+
+                                      if (hasUncoveredWishlist &&
+                                          !isOverBudget) {
+                                        await showInitialUncoveredWishlistConfirmation(
+                                          context: context,
+                                          onConfirm: () {
+                                            confirmedWishlist = true;
+                                          },
+                                          onCancel: () {
+                                            confirmedWishlist = false;
+                                          },
+                                        );
+
+                                        if (!confirmedWishlist) {
+                                          return;
+                                        }
+                                      }
+
+                                      showDialog(
+                                        context: context,
+                                        barrierDismissible: false,
+                                        builder: (BuildContext context) {
+                                          return const Center(
+                                            child: CircularProgressIndicator(),
+                                          );
+                                        },
+                                      );
+
+                                      final errorMsg = await viewModel
+                                          .confirmItinerary();
+
+                                      if (context.mounted) {
+                                        Navigator.of(context).pop();
+                                      }
+
+                                      if (errorMsg == null && context.mounted) {
+                                        showThreeSecondMessage(
+                                          context,
+                                          'Itinerary saved to database successfully!',
+                                          isError: false,
+                                        );
+                                        Navigator.pushNamedAndRemoveUntil(
+                                          context,
+                                          AppRoutes.homeScreen,
+                                          (route) => false,
+                                        );
+                                      } else if (errorMsg != null &&
+                                          context.mounted) {
+                                        showDialog(
+                                          context: context,
+                                          builder: (_) => AlertDialog(
+                                            title: const Text('Save Failed'),
+                                            content: Text(errorMsg),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () =>
+                                                    Navigator.pop(context),
+                                                child: const Text('OK'),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  : null,
+                              borderRadius: BorderRadius.circular(16),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.description_outlined,
+                                      size: 20,
+                                      color: appTheme.white_A700,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Confirm',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w700,
+                                        fontFamily: 'Inter',
+                                        color: appTheme.white_A700,
+                                      ).copyWith(height: 22 / 18),
+                                    ),
+                                  ],
+                                ),
                               ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Confirm',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                  fontFamily: 'Inter',
-                                  color: appTheme.white_A700,
-                                ).copyWith(height: 22 / 18),
-                              ),
-                            ],
+                            ),
                           ),
                         ),
-                      ),
-                    ),
-                  ),
                 ),
               ],
             ),
@@ -1587,15 +1582,17 @@ class _WholeItineraryDetailScreenState
     );
   }
 
-  Widget _buildActivityCard(BuildContext context,
-      WholeItineraryDetailViewModel viewModel,
-      dynamic activity,) {
+  Widget _buildActivityCard(
+    BuildContext context,
+    WholeItineraryDetailViewModel viewModel,
+    dynamic activity,
+  ) {
     // Check if the activity has been cleared (empty slot state)
     if (activity.status == 'empty' ||
         (activity.destination.isEmpty && activity.description.isEmpty)) {
       final isSlotRegenerating =
           viewModel.uiState.regeneratingSlotId == activity.activitiesId ||
-              viewModel.uiState.isRegeneratingPlan;
+          viewModel.uiState.isRegeneratingPlan;
 
       return Container(
         width: double.infinity,
@@ -1622,46 +1619,44 @@ class _WholeItineraryDetailScreenState
                     color: appTheme.blue_gray_300,
                   ),
                 ),
-              ] else
-                ...[
-                  IconButton(
-                    icon: Icon(
-                      Icons.add_circle_outline,
-                      size: 32,
-                      color: appTheme.blue_gray_300,
-                    ),
-                    onPressed: () async {
-                      final confirmed =
-                      await showConfirmGenerateAlternativeDialog(
-                        context: context,
-                      );
-                      if (!confirmed) return;
-                      await viewModel.generateAlternativeActivity(
-                        slotActivityId: activity.activitiesId,
-                        destination: activity.destination.isNotEmpty
-                            ? activity.destination
-                            : viewModel.uiState.destinationTitle,
-                      );
-                      final error = viewModel.uiState.errorMessage;
-                      if (error != null && error.isNotEmpty &&
-                          context.mounted) {
-                        ScaffoldMessenger.of(
-                          context,
-                        ).showSnackBar(SnackBar(content: Text(error)));
-                      }
-                    },
+              ] else ...[
+                IconButton(
+                  icon: Icon(
+                    Icons.add_circle_outline,
+                    size: 32,
+                    color: appTheme.blue_gray_300,
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Empty Activity Slot',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      fontFamily: 'Inter',
-                      color: appTheme.blue_gray_300,
-                    ),
+                  onPressed: () async {
+                    final confirmed =
+                        await showConfirmGenerateAlternativeDialog(
+                          context: context,
+                        );
+                    if (!confirmed) return;
+                    await viewModel.generateAlternativeActivity(
+                      slotActivityId: activity.activitiesId,
+                      destination: activity.destination.isNotEmpty
+                          ? activity.destination
+                          : viewModel.uiState.destinationTitle,
+                    );
+                    final error = viewModel.uiState.errorMessage;
+                    if (error != null && error.isNotEmpty && context.mounted) {
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text(error)));
+                    }
+                  },
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Empty Activity Slot',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Inter',
+                    color: appTheme.blue_gray_300,
                   ),
-                ],
+                ),
+              ],
             ],
           ),
         ),
@@ -1692,39 +1687,42 @@ class _WholeItineraryDetailScreenState
             ),
             child: activity.activityImgUrl.isNotEmpty
                 ? (activity.activityImgUrl.startsWith('http')
-                ? Image.network(
-              activity.activityImgUrl,
-              height: 192,
-              width: double.infinity,
-              fit: BoxFit.cover,
-              loadingBuilder: (context, child, progress) {
-                if (progress == null) return child;
-                return Container(
-                  height: 192,
-                  width: double.infinity,
-                  color: appTheme.gray_200,
-                  child: const Center(
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                );
-              },
-              errorBuilder: (context, error, stackTrace) => Container(
-                height: 192,
-                width: double.infinity,
-                color: appTheme.gray_200,
-                child: Icon(
-                  Icons.broken_image_outlined,
-                  size: 40,
-                  color: appTheme.blue_gray_300,
-                ),
-              ),
-            )
-                : Image.asset(
-              activity.activityImgUrl,
-              height: 192,
-              width: double.infinity,
-              fit: BoxFit.cover,
-            ))
+                      ? Image.network(
+                          activity.activityImgUrl,
+                          height: 192,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          loadingBuilder: (context, child, progress) {
+                            if (progress == null) return child;
+                            return Container(
+                              height: 192,
+                              width: double.infinity,
+                              color: appTheme.gray_200,
+                              child: const Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            );
+                          },
+                          errorBuilder: (context, error, stackTrace) =>
+                              Container(
+                                height: 192,
+                                width: double.infinity,
+                                color: appTheme.gray_200,
+                                child: Icon(
+                                  Icons.broken_image_outlined,
+                                  size: 40,
+                                  color: appTheme.blue_gray_300,
+                                ),
+                              ),
+                        )
+                      : Image.asset(
+                          activity.activityImgUrl,
+                          height: 192,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                        ))
                 : const SizedBox.shrink(),
           ),
           Padding(
@@ -1868,7 +1866,7 @@ class _WholeItineraryDetailScreenState
         borderRadius: BorderRadius.circular(14),
       ),
       child:
-      child ??
+          child ??
           Text(
             label ?? '',
             style: TextStyle(

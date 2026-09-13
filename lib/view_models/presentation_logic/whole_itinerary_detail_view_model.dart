@@ -336,7 +336,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
   String? validateTopUpAmount({
     String? symbol,
     required String value,
-    required double minTopUp,
+    double? minTopUp,
     required double shortageAmount,
   }) {
     if (value.trim().isEmpty) {
@@ -349,7 +349,15 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
       return 'Please enter a valid amount.';
     }
 
-    if (amount < minTopUp) {
+    if (minTopUp == null) {
+      if (amount != shortageAmount) {
+        return 'Top-up amount should be ${symbol ?? 'MYR'} ${shortageAmount.toStringAsFixed(2)}.';
+      }
+
+      return null;
+    }
+
+    if (amount < minTopUp!) {
       return 'Top-up amount must be at least ${symbol ?? 'MYR'} ${minTopUp.toStringAsFixed(2)}.';
     }
 
