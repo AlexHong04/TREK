@@ -1,5 +1,6 @@
 import '../theme/app_theme.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../view_models/presentation_logic/travel_information_input_view_model.dart';
@@ -7,6 +8,7 @@ import '../view_models/presentation_logic/travel_information_input_view_model.da
 import '../main.dart';
 import '../widgets/custom_app_bar.dart';
 import '../widgets/custom_text_field.dart';
+import '../widgets/destination_spending_rates_dialog.dart';
 import '../utils/malaysia_states.dart';
 import '../view_models/ui_state/travel_information_ui_state.dart';
 
@@ -189,6 +191,24 @@ class _TravelInformationInputScreenState
                       const SizedBox(height: 22.0),
                       CustomTextField(
                         sectionTitle: 'WISHLIST',
+                        titleTrailing:
+                            viewModel.uiState.wishlistItems.isNotEmpty
+                                ? GestureDetector(
+                                    onTap: () {
+                                      _wishlistController.clear();
+                                      viewModel.clearWishlist();
+                                    },
+                                    child: Text(
+                                      'Clear all',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        fontFamily: 'Inter',
+                                        color: appTheme.teal_A700,
+                                      ),
+                                    ),
+                                  )
+                                : null,
                         hintText:
                             viewModel.uiState.selectedDestinations.isNotEmpty
                             ? 'Search places in ${viewModel.uiState.selectedDestinations.join(", ")}...'
@@ -295,53 +315,10 @@ class _TravelInformationInputScreenState
                         prefixIconColor: appTheme.teal_A700,
                         controller: _dateController,
                         readOnly: true,
-                        onTap: () async {
-                          final picked = await showDateRangePicker(
-                            context: context,
-                            firstDate: DateTime.now(),
-                            lastDate: DateTime.now().add(
-                              const Duration(days: 365),
-                            ),
-                            builder: (context, child) {
-                              return Theme(
-                                data: Theme.of(context).copyWith(
-                                  colorScheme: ColorScheme.light(
-                                    primary: appTheme.teal_A700,
-                                    onPrimary: appTheme.white_A700,
-                                    surface: appTheme.white_A700,
-                                    onSurface: appTheme.gray_800,
-                                  ),
-                                ),
-                                child: child!,
-                              );
-                            },
-                            selectableDayPredicate:
-                                (DateTime day, DateTime? start, DateTime? end) {
-                                  final checkDate = DateTime(
-                                    day.year,
-                                    day.month,
-                                    day.day,
-                                  );
-                                  for (final range
-                                      in viewModel
-                                          .uiState
-                                          .unavailableDateRanges) {
-                                    if (checkDate.compareTo(range.start) >= 0 &&
-                                        checkDate.compareTo(range.end) <= 0) {
-                                      return false; // Disable if date falls within an existing trip
-                                    }
-                                  }
-                                  return true;
-                                },
-                          );
-                          if (picked != null) {
-                            _dateController.text = viewModel.formatDateRange(
-                              picked.start,
-                              picked.end,
-                            );
-                            viewModel.updateTripDates(picked.start, picked.end);
-                          }
-                        },
+                        onTap: () => _pickTripDateRange(
+                          context: context,
+                          viewModel: viewModel,
+                        ),
                         validator: viewModel.validateDate,
                       ),
                       const SizedBox(height: 22.0),
@@ -359,6 +336,28 @@ class _TravelInformationInputScreenState
 
                           return CustomTextField(
                             sectionTitle: 'TRIP BUDGET ($preferredCurrency)',
+                            titleTrailing: InkWell(
+                              onTap: () => showDestinationSpendingRatesDialog(
+                                context,
+                                currentDestination:
+                                    viewModel
+                                        .uiState
+                                        .selectedDestinations
+                                        .isNotEmpty
+                                    ? viewModel.uiState.selectedDestinations
+                                          .join(', ')
+                                    : null,
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                              child: Padding(
+                                padding: const EdgeInsets.all(4.0),
+                                child: Icon(
+                                  Icons.info_outline_rounded,
+                                  size: 16,
+                                  color: appTheme.teal_700,
+                                ),
+                              ),
+                            ),
                             hintText: 'Total Trip Budget ($preferredCurrency)',
                             prefixIcon: Icons.account_balance_wallet_outlined,
                             prefixIconColor: appTheme.teal_A700,
@@ -508,14 +507,22 @@ class _TravelInformationInputScreenState
                                                   ),
                                                 ],
                                               ),
-                                              Text(
-                                                'MYR ${enteredAmount.toStringAsFixed(2)}',
-                                                style: TextStyle(
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w800,
-                                                  fontFamily: 'Inter',
-                                                  color: appTheme.teal_800,
-                                                ),
+                                              Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.end,
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Text(
+                                                    'MYR ${enteredAmount.toStringAsFixed(2)}',
+                                                    style: TextStyle(
+                                                      fontSize: 14,
+                                                      fontWeight:
+                                                          FontWeight.w800,
+                                                      fontFamily: 'Inter',
+                                                      color: appTheme.teal_800,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
                                             ],
                                           ),
@@ -658,6 +665,11 @@ class _TravelInformationInputScreenState
           borderRadius: BorderRadius.circular(14),
           child: InkWell(
             onTap: () async {
+              // Dismiss the keyboard first to prevent
+              // RenderFlex overflow in the confirmation dialog.
+              FocusScope.of(context).unfocus();
+              await Future.delayed(const Duration(milliseconds: 100));
+
               if (_formKey.currentState?.validate() ?? false) {
                 final destination = viewModel.uiState.selectedDestinations.join(
                   ', ',
@@ -859,111 +871,120 @@ class _TravelInformationInputScreenState
                     ],
                   ),
                   const SizedBox(height: 18.0),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14.0,
-                      vertical: 12.0,
-                    ),
-                    decoration: BoxDecoration(
-                      color: appTheme.gray_50_02,
-                      borderRadius: BorderRadius.circular(16.0),
-                      border: Border.all(color: appTheme.gray_100, width: 1.0),
-                    ),
-                    child: Column(
-                      children: [
-                        _buildDialogInfoRow(
-                          icon: Icons.location_on_rounded,
-                          label: 'Destination',
-                          value: destination,
-                        ),
-                        Divider(color: appTheme.gray_100, height: 16.0),
-                        _buildDialogInfoRow(
-                          icon: Icons.calendar_today_rounded,
-                          label: 'Dates',
-                          value: dates,
-                        ),
-                        Divider(color: appTheme.gray_100, height: 16.0),
-                        _buildDialogInfoRow(
-                          icon: Icons.account_balance_wallet_rounded,
-                          label: 'Budget',
-                          value:
-                              (currency == 'MYR' ||
-                                  convertedBudgetInMyr == null)
-                              ? '$currency $budget'
-                              : '$currency $budget (≈ MYR ${convertedBudgetInMyr.toStringAsFixed(2)})',
-                        ),
-                        if (preference != null && preference.isNotEmpty) ...[
-                          Divider(color: appTheme.gray_100, height: 16.0),
-                          _buildDialogInfoRow(
-                            icon: Icons.tune_rounded,
-                            label: 'Preference',
-                            value: preference,
-                          ),
-                        ],
-                        if (wishlistCount > 0) ...[
-                          Divider(color: appTheme.gray_100, height: 16.0),
-                          _buildDialogInfoRow(
-                            icon: Icons.favorite_rounded,
-                            label: 'Wishlist',
-                            value: '$wishlistCount item(s)',
-                          ),
-                        ],
-                        if (hotelCount > 0) ...[
-                          Divider(color: appTheme.gray_100, height: 16.0),
-                          _buildDialogInfoRow(
-                            icon: Icons.hotel_rounded,
-                            label: 'Accommodation',
-                            value:
-                                '$hotelCount stay${hotelCount > 1 ? 's' : ''}',
-                          ),
-                        ],
-                        if (arrivalCount > 0 || departureCount > 0) ...[
-                          Divider(color: appTheme.gray_100, height: 16.0),
-                          _buildDialogInfoRow(
-                            icon: Icons.flight_takeoff_rounded,
-                            label: 'Transit',
-                            value:
-                                '${arrivalCount + departureCount} transit hub(s)',
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14.0),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12.0,
-                      vertical: 10.0,
-                    ),
-                    decoration: BoxDecoration(
-                      color: appTheme.teal_50.withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(12.0),
-                      border: Border.all(
-                        color: appTheme.teal_A700.withValues(alpha: 0.2),
-                      ),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.auto_awesome,
-                          size: 16.0,
-                          color: appTheme.teal_700,
-                        ),
-                        const SizedBox(width: 8.0),
-                        Expanded(
-                          child: Text(
-                            'AI will generate a personalized day-by-day itinerary. You can freely edit and customize activities afterwards.',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w500,
-                              fontFamily: 'Inter',
-                              color: appTheme.teal_800,
-                              height: 1.35,
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14.0,
+                              vertical: 12.0,
+                            ),
+                            decoration: BoxDecoration(
+                              color: appTheme.gray_50_02,
+                              borderRadius: BorderRadius.circular(16.0),
+                              border: Border.all(color: appTheme.gray_100, width: 1.0),
+                            ),
+                            child: Column(
+                              children: [
+                                _buildDialogInfoRow(
+                                  icon: Icons.location_on_rounded,
+                                  label: 'Destination',
+                                  value: destination,
+                                ),
+                                Divider(color: appTheme.gray_100, height: 16.0),
+                                _buildDialogInfoRow(
+                                  icon: Icons.calendar_today_rounded,
+                                  label: 'Dates',
+                                  value: dates,
+                                ),
+                                Divider(color: appTheme.gray_100, height: 16.0),
+                                _buildDialogInfoRow(
+                                  icon: Icons.account_balance_wallet_rounded,
+                                  label: 'Budget',
+                                  value:
+                                      (currency == 'MYR' ||
+                                          convertedBudgetInMyr == null)
+                                      ? '$currency $budget'
+                                      : '$currency $budget (≈ MYR ${convertedBudgetInMyr.toStringAsFixed(2)})',
+                                ),
+                                if (preference != null && preference.isNotEmpty) ...[
+                                  Divider(color: appTheme.gray_100, height: 16.0),
+                                  _buildDialogInfoRow(
+                                    icon: Icons.tune_rounded,
+                                    label: 'Preference',
+                                    value: preference,
+                                  ),
+                                ],
+                                if (wishlistCount > 0) ...[
+                                  Divider(color: appTheme.gray_100, height: 16.0),
+                                  _buildDialogInfoRow(
+                                    icon: Icons.favorite_rounded,
+                                    label: 'Wishlist',
+                                    value: '$wishlistCount item(s)',
+                                  ),
+                                ],
+                                if (hotelCount > 0) ...[
+                                  Divider(color: appTheme.gray_100, height: 16.0),
+                                  _buildDialogInfoRow(
+                                    icon: Icons.hotel_rounded,
+                                    label: 'Accommodation',
+                                    value:
+                                        '$hotelCount stay${hotelCount > 1 ? 's' : ''}',
+                                  ),
+                                ],
+                                if (arrivalCount > 0 || departureCount > 0) ...[
+                                  Divider(color: appTheme.gray_100, height: 16.0),
+                                  _buildDialogInfoRow(
+                                    icon: Icons.flight_takeoff_rounded,
+                                    label: 'Transit',
+                                    value:
+                                        '${arrivalCount + departureCount} transit hub(s)',
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 14.0),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12.0,
+                              vertical: 10.0,
+                            ),
+                            decoration: BoxDecoration(
+                              color: appTheme.teal_50.withValues(alpha: 0.5),
+                              borderRadius: BorderRadius.circular(12.0),
+                              border: Border.all(
+                                color: appTheme.teal_A700.withValues(alpha: 0.2),
+                              ),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(
+                                  Icons.auto_awesome,
+                                  size: 16.0,
+                                  color: appTheme.teal_700,
+                                ),
+                                const SizedBox(width: 8.0),
+                                Expanded(
+                                  child: Text(
+                                    'AI will generate a personalized day-by-day itinerary. You can freely edit and customize activities afterwards.',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w500,
+                                      fontFamily: 'Inter',
+                                      color: appTheme.teal_800,
+                                      height: 1.35,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: 20.0),
@@ -2637,6 +2658,38 @@ class _TravelInformationInputScreenState
     );
   }
 
+  Future<void> _pickTripDateRange({
+    required BuildContext context,
+    required TravelInformationInputViewModel viewModel,
+  }) async {
+    await viewModel.refreshExistingTrips();
+    if (!context.mounted) return;
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final maxDate = today.add(const Duration(days: 365));
+
+    final picked = await showDialog<DateTimeRange>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) => _TripDateRangePickerDialog(
+        initialStartDate: viewModel.uiState.startDate,
+        initialEndDate: viewModel.uiState.endDate,
+        firstDate: today,
+        lastDate: maxDate,
+        unavailableDateRanges: viewModel.uiState.unavailableDateRanges,
+      ),
+    );
+
+    if (picked == null) return;
+
+    _dateController.text = viewModel.formatDateRange(picked.start, picked.end);
+    viewModel.updateTripDates(picked.start, picked.end);
+    if (_budgetController.text.trim().isNotEmpty) {
+      _formKey.currentState?.validate();
+    }
+  }
+
   Future<void> _pickTransitDate({
     required BuildContext context,
     required TravelInformationInputViewModel viewModel,
@@ -2684,6 +2737,26 @@ class _TravelInformationInputScreenState
       helpText: isArrival
           ? 'SELECT ARRIVAL DATE (±1 DAY OF TRIP)'
           : 'SELECT DEPARTURE DATE (±1 DAY OF TRIP)',
+      selectableDayPredicate: (day) {
+        final checkDate = DateTime(day.year, day.month, day.day);
+        // Dates strictly within this trip are always valid
+        if (!checkDate.isBefore(startDate) && !checkDate.isAfter(endDate)) {
+          return true;
+        }
+        // For ±1 day buffer, check that it does not overlap another existing trip
+        for (final range in viewModel.uiState.unavailableDateRanges) {
+          final rStart = DateTime(
+            range.start.year,
+            range.start.month,
+            range.start.day,
+          );
+          final rEnd = DateTime(range.end.year, range.end.month, range.end.day);
+          if (!checkDate.isBefore(rStart) && !checkDate.isAfter(rEnd)) {
+            return false;
+          }
+        }
+        return true;
+      },
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -2833,29 +2906,11 @@ class _TravelInformationInputScreenState
   }
 
   String _getArrivalPlaceholder(String type, int index, int total) {
-    final suffix = total > 1 ? ' ${index + 1}' : '';
-    switch (type.toLowerCase()) {
-      case 'train':
-        return 'Select arrival train station$suffix';
-      case 'bus':
-        return 'Select arrival bus terminal$suffix';
-      case 'flight':
-      default:
-        return 'Select arrival airport$suffix';
-    }
+    return 'Select arrival type';
   }
 
   String _getDeparturePlaceholder(String type, int index, int total) {
-    final suffix = total > 1 ? ' ${index + 1}' : '';
-    switch (type.toLowerCase()) {
-      case 'train':
-        return 'Select departure train station$suffix';
-      case 'bus':
-        return 'Select departure bus terminal$suffix';
-      case 'flight':
-      default:
-        return 'Select departure airport$suffix';
-    }
+    return 'Select departure type';
   }
 
   Future<void> _showTransitHubSelectionModal(
@@ -3527,6 +3582,553 @@ class _TravelInformationInputScreenState
             onTap: () => onSelect(suggestion),
           );
         },
+      ),
+    );
+  }
+}
+
+class _TripDateRangePickerDialog extends StatefulWidget {
+  final DateTime? initialStartDate;
+  final DateTime? initialEndDate;
+  final DateTime firstDate;
+  final DateTime lastDate;
+  final List<DateTimeRange> unavailableDateRanges;
+
+  const _TripDateRangePickerDialog({
+    required this.initialStartDate,
+    required this.initialEndDate,
+    required this.firstDate,
+    required this.lastDate,
+    required this.unavailableDateRanges,
+  });
+
+  @override
+  State<_TripDateRangePickerDialog> createState() =>
+      _TripDateRangePickerDialogState();
+}
+
+class _TripDateRangePickerDialogState
+    extends State<_TripDateRangePickerDialog> {
+  late DateTime _visibleMonth;
+  DateTime? _startDate;
+  DateTime? _endDate;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    final start = widget.initialStartDate;
+    final end = widget.initialEndDate;
+
+    if (start != null && !_isUnavailable(start)) {
+      _startDate = DateTime(start.year, start.month, start.day);
+      if (end != null &&
+          !end.isBefore(start) &&
+          !_rangeHasUnavailable(
+            _startDate!,
+            DateTime(end.year, end.month, end.day),
+          )) {
+        _endDate = DateTime(end.year, end.month, end.day);
+      }
+      _visibleMonth = DateTime(_startDate!.year, _startDate!.month, 1);
+    } else {
+      _visibleMonth = DateTime(
+        widget.firstDate.year,
+        widget.firstDate.month,
+        1,
+      );
+    }
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  bool _isUnavailable(DateTime day) {
+    final checkDate = DateTime(day.year, day.month, day.day);
+    if (checkDate.isBefore(widget.firstDate)) return true;
+    if (checkDate.isAfter(widget.lastDate)) return true;
+    for (final range in widget.unavailableDateRanges) {
+      final rStart = DateTime(
+        range.start.year,
+        range.start.month,
+        range.start.day,
+      );
+      final rEnd = DateTime(range.end.year, range.end.month, range.end.day);
+      if (!checkDate.isBefore(rStart) && !checkDate.isAfter(rEnd)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool _rangeHasUnavailable(DateTime start, DateTime end) {
+    DateTime cur = start;
+    while (!cur.isAfter(end)) {
+      if (_isUnavailable(cur)) return true;
+      cur = cur.add(const Duration(days: 1));
+    }
+    return false;
+  }
+
+  bool get _canGoPrev {
+    final prevMonth = DateTime(_visibleMonth.year, _visibleMonth.month - 1, 1);
+    final minMonth = DateTime(widget.firstDate.year, widget.firstDate.month, 1);
+    return !prevMonth.isBefore(minMonth);
+  }
+
+  bool get _canGoNext {
+    final nextMonth = DateTime(_visibleMonth.year, _visibleMonth.month + 1, 1);
+    final maxMonth = DateTime(widget.lastDate.year, widget.lastDate.month, 1);
+    return !nextMonth.isAfter(maxMonth);
+  }
+
+  void _prevMonth() {
+    if (_canGoPrev) {
+      setState(() {
+        _visibleMonth = DateTime(
+          _visibleMonth.year,
+          _visibleMonth.month - 1,
+          1,
+        );
+      });
+    }
+  }
+
+  void _nextMonth() {
+    if (_canGoNext) {
+      setState(() {
+        _visibleMonth = DateTime(
+          _visibleMonth.year,
+          _visibleMonth.month + 1,
+          1,
+        );
+      });
+    }
+  }
+
+  void _onDayTapped(DateTime day) {
+    if (_isUnavailable(day)) return;
+
+    setState(() {
+      _errorMessage = null;
+
+      if (_startDate == null || (_startDate != null && _endDate != null)) {
+        _startDate = day;
+        _endDate = null;
+        return;
+      }
+
+      if (day.isBefore(_startDate!)) {
+        _startDate = day;
+        _endDate = null;
+      } else if (day.isAtSameMomentAs(_startDate!)) {
+        _endDate = day;
+      } else {
+        if (_rangeHasUnavailable(_startDate!, day)) {
+          _errorMessage = 'Selected range overlaps an existing trip';
+          _startDate = day;
+          _endDate = null;
+        } else {
+          _endDate = day;
+        }
+      }
+    });
+  }
+
+  String get _headerDateText {
+    if (_startDate == null) return 'Select date';
+    final startWeekdayStr = DateFormat('EEE, MMM d').format(_startDate!);
+    if (_endDate == null) return startWeekdayStr;
+    if (_isSameDay(_startDate!, _endDate!)) return startWeekdayStr;
+    final startStr = DateFormat('MMM d').format(_startDate!);
+    final endStr = DateFormat('MMM d').format(_endDate!);
+    return '$startStr – $endStr';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: appTheme.white_A700,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28.0)),
+      clipBehavior: Clip.antiAlias,
+      insetPadding: const EdgeInsets.symmetric(
+        horizontal: 16.0,
+        vertical: 24.0,
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 328.0),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeader(),
+              Divider(height: 1.0, thickness: 1.0, color: appTheme.gray_100),
+              _buildMonthNav(),
+              const SizedBox(height: 4.0),
+              _buildWeekdayLabels(),
+              const SizedBox(height: 6.0),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                child: _buildCalendarGrid(),
+              ),
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 8.0),
+                _buildErrorMessage(),
+              ],
+              const SizedBox(height: 8.0),
+              _buildActions(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24.0, 16.0, 12.0, 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'SELECT TRIP DATES',
+            style: TextStyle(
+              fontSize: 12.0,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 0.5,
+              color: appTheme.blue_gray_300,
+              fontFamily: 'Inter',
+            ),
+          ),
+          const SizedBox(height: 12.0),
+          Text(
+            _headerDateText,
+            style: TextStyle(
+              fontSize: 28.0,
+              fontWeight: FontWeight.w400,
+              color: appTheme.gray_800,
+              fontFamily: 'Inter',
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMonthNav() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16.0, 8.0, 4.0, 4.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                DateFormat('MMMM yyyy').format(_visibleMonth),
+                style: TextStyle(
+                  fontSize: 14.0,
+                  fontWeight: FontWeight.w500,
+                  color: appTheme.gray_800,
+                  fontFamily: 'Inter',
+                ),
+              ),
+              const SizedBox(width: 4.0),
+              Icon(Icons.arrow_drop_down, size: 24.0, color: appTheme.gray_800),
+            ],
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.chevron_left, size: 24.0),
+                color: _canGoPrev
+                    ? appTheme.gray_800
+                    : appTheme.blue_gray_300.withValues(alpha: 0.38),
+                onPressed: _canGoPrev ? _prevMonth : null,
+                splashRadius: 20.0,
+              ),
+              IconButton(
+                icon: const Icon(Icons.chevron_right, size: 24.0),
+                color: _canGoNext
+                    ? appTheme.gray_800
+                    : appTheme.blue_gray_300.withValues(alpha: 0.38),
+                onPressed: _canGoNext ? _nextMonth : null,
+                splashRadius: 20.0,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWeekdayLabels() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12.0),
+      child: Row(
+        children: const ['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day) {
+          return Expanded(
+            child: Center(
+              child: Text(
+                day,
+                style: TextStyle(
+                  fontSize: 12.0,
+                  fontWeight: FontWeight.w400,
+                  color: Color(0xFF757575),
+                  fontFamily: 'Inter',
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildCalendarGrid() {
+    final firstDayOfMonth = DateTime(
+      _visibleMonth.year,
+      _visibleMonth.month,
+      1,
+    );
+    final daysInMonth = DateTime(
+      _visibleMonth.year,
+      _visibleMonth.month + 1,
+      0,
+    ).day;
+    final leadEmptyCount = firstDayOfMonth.weekday % 7;
+    final totalCells = leadEmptyCount + daysInMonth;
+    final rowCount = (totalCells / 7).ceil();
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(rowCount, (rowIndex) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 1.0),
+          child: Row(
+            children: List.generate(7, (colIndex) {
+              final cellIndex = rowIndex * 7 + colIndex;
+              if (cellIndex < leadEmptyCount || cellIndex >= totalCells) {
+                return const Expanded(child: SizedBox(height: 40.0));
+              }
+              final dayNum = cellIndex - leadEmptyCount + 1;
+              final cellDate = DateTime(
+                _visibleMonth.year,
+                _visibleMonth.month,
+                dayNum,
+              );
+              return Expanded(child: _buildDayCell(cellDate));
+            }),
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _buildDayCell(DateTime cellDate) {
+    final isUnavailable = _isUnavailable(cellDate);
+    final isToday = _isSameDay(widget.firstDate, cellDate);
+    final isStart = _startDate != null && _isSameDay(_startDate!, cellDate);
+    final isEnd = _endDate != null && _isSameDay(_endDate!, cellDate);
+    final hasRange =
+        _startDate != null &&
+        _endDate != null &&
+        _endDate!.isAfter(_startDate!);
+    final isInRange =
+        hasRange &&
+        cellDate.isAfter(_startDate!) &&
+        cellDate.isBefore(_endDate!);
+    final isRangeStart = isStart && hasRange;
+    final isRangeEnd = isEnd && hasRange;
+
+    final rangeBandColor = appTheme.teal_A700.withValues(alpha: 0.12);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cellWidth = constraints.maxWidth;
+        final halfWidth = cellWidth / 2;
+
+        return SizedBox(
+          height: 40.0,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Continuous range band
+              if (isInRange)
+                Positioned.fill(child: Container(color: rangeBandColor)),
+              if (isRangeStart)
+                Positioned(
+                  left: halfWidth,
+                  right: 0,
+                  top: 0,
+                  bottom: 0,
+                  child: Container(color: rangeBandColor),
+                ),
+              if (isRangeEnd)
+                Positioned(
+                  left: 0,
+                  right: halfWidth,
+                  top: 0,
+                  bottom: 0,
+                  child: Container(color: rangeBandColor),
+                ),
+
+              // Selected Start or End Date (solid Teal 40x40 circle)
+              if (isStart || isEnd)
+                GestureDetector(
+                  onTap: () => _onDayTapped(cellDate),
+                  child: Container(
+                    width: 40.0,
+                    height: 40.0,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: appTheme.teal_A700,
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      '${cellDate.day}',
+                      style: TextStyle(
+                        fontSize: 14.0,
+                        fontWeight: FontWeight.w400,
+                        color: appTheme.white_A700,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                  ),
+                )
+              // Today (unselected) - Teal circle outline
+              else if (isToday && !isInRange)
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: isUnavailable ? null : () => _onDayTapped(cellDate),
+                    borderRadius: BorderRadius.circular(20.0),
+                    child: Container(
+                      width: 40.0,
+                      height: 40.0,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: appTheme.teal_A700,
+                          width: 1.0,
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        '${cellDate.day}',
+                        style: TextStyle(
+                          fontSize: 14.0,
+                          fontWeight: FontWeight.w500,
+                          color: appTheme.teal_A700,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+              // Other days
+              else
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: isUnavailable ? null : () => _onDayTapped(cellDate),
+                    borderRadius: BorderRadius.circular(20.0),
+                    child: Center(
+                      child: Text(
+                        '${cellDate.day}',
+                        style: TextStyle(
+                          fontSize: 14.0,
+                          fontWeight: isInRange
+                              ? FontWeight.w500
+                              : FontWeight.w400,
+                          color: isUnavailable
+                              ? appTheme.gray_800.withValues(alpha: 0.38)
+                              : appTheme.gray_800,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildErrorMessage() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.info_outline, size: 13, color: Colors.red.shade700),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              _errorMessage!,
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.red.shade700,
+                fontWeight: FontWeight.w500,
+                fontFamily: 'Inter',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActions() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16.0, 4.0, 12.0, 12.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                fontSize: 14.0,
+                fontWeight: FontWeight.w500,
+                color: appTheme.teal_A700,
+                fontFamily: 'Inter',
+              ),
+            ),
+          ),
+          const SizedBox(width: 8.0),
+          TextButton(
+            onPressed: _startDate == null
+                ? null
+                : () {
+                    final start = _startDate!;
+                    final end = _endDate ?? _startDate!;
+                    Navigator.of(
+                      context,
+                    ).pop(DateTimeRange(start: start, end: end));
+                  },
+            child: Text(
+              'OK',
+              style: TextStyle(
+                fontSize: 14.0,
+                fontWeight: FontWeight.w500,
+                color: _startDate != null
+                    ? appTheme.teal_A700
+                    : appTheme.teal_A700.withValues(alpha: 0.38),
+                fontFamily: 'Inter',
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

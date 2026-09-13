@@ -43,6 +43,7 @@ class ActivityUiState {
   final double? ocrExtractedDiscount;
   final double? ocrExtractedRounding;
   final List<String> ocrItemLines;
+  final List<ExpenseItem> ocrParsedItems;
   final Set<int> ocrDraftItemIndexes;
   final bool draftTaxFromOcr;
   final String errorMessage;
@@ -105,6 +106,7 @@ class ActivityUiState {
     this.ocrExtractedDiscount,
     this.ocrExtractedRounding,
     this.ocrItemLines = const [],
+    this.ocrParsedItems = const [],
     this.ocrDraftItemIndexes = const {},
     this.draftTaxFromOcr = false,
     this.errorMessage = '',
@@ -301,6 +303,7 @@ class ActivityUiState {
     double? ocrExtractedDiscount,
     double? ocrExtractedRounding,
     List<String>? ocrItemLines,
+    List<ExpenseItem>? ocrParsedItems,
     Set<int>? ocrDraftItemIndexes,
     bool? draftTaxFromOcr,
     bool clearOcrData = false,
@@ -377,6 +380,9 @@ class ActivityUiState {
           ? null
           : ocrExtractedRounding ?? this.ocrExtractedRounding,
       ocrItemLines: clearOcrData ? const [] : ocrItemLines ?? this.ocrItemLines,
+      ocrParsedItems: clearOcrData
+          ? const []
+          : ocrParsedItems ?? this.ocrParsedItems,
       ocrDraftItemIndexes: clearOcrData
           ? const {}
           : ocrDraftItemIndexes ?? this.ocrDraftItemIndexes,

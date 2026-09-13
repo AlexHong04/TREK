@@ -16,6 +16,38 @@ class GeminiApiRequestException implements Exception {
   String toString() => 'Gemini API returned status $statusCode.';
 }
 
+class GeminiReceiptItem {
+  final String name;
+  final int quantity;
+  final double unitPrice;
+
+  const GeminiReceiptItem({
+    required this.name,
+    required this.quantity,
+    required this.unitPrice,
+  });
+}
+
+class GeminiReceiptParseResult {
+  final String merchantName;
+  final DateTime? transactionDateTime;
+  final double? totalAmount;
+  final double? taxAmount;
+  final double? discountAmount;
+  final double? roundingAmount;
+  final List<GeminiReceiptItem> items;
+
+  const GeminiReceiptParseResult({
+    required this.merchantName,
+    required this.transactionDateTime,
+    required this.totalAmount,
+    required this.taxAmount,
+    required this.discountAmount,
+    required this.roundingAmount,
+    required this.items,
+  });
+}
+
 class GeminiApiConfig {
   // Gemini API Key
   static const String _apiKey =
@@ -25,6 +57,159 @@ class GeminiApiConfig {
 
   static void initialize() {
     _model = GenerativeModel(model: 'gemini-3.5-flash-lite', apiKey: _apiKey);
+  }
+
+  static String _formatTo24Hour(String? timeStr, String default24H) {
+    if (timeStr == null || timeStr.trim().isEmpty) return default24H;
+    final trimmed = timeStr.trim();
+    try {
+      final tParts = trimmed.split(RegExp(r'[:\s]'));
+      if (tParts.length >= 2) {
+        int h = int.parse(tParts[0]);
+        int m = int.parse(tParts[1]);
+        final lower = trimmed.toLowerCase();
+        final isPm = lower.contains('pm');
+        final isAm = lower.contains('am');
+        if (isPm && h < 12) h += 12;
+        if (isAm && h == 12) h = 0;
+        return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
+      }
+    } catch (_) {}
+    return trimmed.contains(':') ? trimmed : default24H;
+  }
+
+  static Future<GeminiReceiptParseResult?> parseReceiptOcrText({
+    required String receiptText,
+  }) async {
+    final prompt =
+        '''
+Parse this Malaysian receipt OCR text into expense fields.
+
+Rules:
+- Return only valid JSON. No markdown, no explanation.
+- Use MYR amounts as numbers only.
+- Translate item names to English when they are clearly in another language.
+- Numeric dates like 04/09/2026 must be interpreted as DD/MM/YYYY.
+- Use ISO 8601 local datetime format for transactionDateTime when detected.
+- If tax, discount, or rounding is not clearly shown, return null for that field.
+- Do not infer tax from missing items unless a tax/GST/SST/service tax label exists.
+- Rounding can be positive or negative.
+- Items must be purchased product/service rows only, not subtotal, tax, rounding, total, payment, invoice, cashier, table, address, or thank-you lines.
+- Quantity defaults to 1 only when the item and price are clearly a purchased row.
+
+JSON shape:
+{
+  "merchantName": "string or empty",
+  "transactionDateTime": "YYYY-MM-DDTHH:mm:ss or null",
+  "totalAmount": 0.0,
+  "taxAmount": 0.0 or null,
+  "discountAmount": 0.0 or null,
+  "roundingAmount": 0.0 or null,
+  "items": [
+    {"name": "string", "quantity": 1, "unitPrice": 0.0}
+  ]
+}
+
+OCR text:
+$receiptText
+''';
+
+    try {
+      final response = await http
+          .post(
+            Uri.parse(
+              'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=$_apiKey',
+            ),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'contents': [
+                {
+                  'parts': [
+                    {'text': prompt},
+                  ],
+                },
+              ],
+              'generationConfig': {
+                'temperature': 0.1,
+                'responseMimeType': 'application/json',
+              },
+            }),
+          )
+          .timeout(const Duration(seconds: 20));
+
+      if (response.statusCode != 200) {
+        debugPrint('Gemini receipt OCR parse failed: ${response.statusCode}');
+        return null;
+      }
+
+      final data = jsonDecode(response.body);
+      final candidates = data['candidates'] as List?;
+      if (candidates == null || candidates.isEmpty) return null;
+      final content = candidates[0]['content'];
+      final parts = content?['parts'] as List?;
+      final rawText = parts?.isNotEmpty == true ? parts!.first['text'] : null;
+      if (rawText is! String || rawText.trim().isEmpty) return null;
+
+      final cleaned = rawText
+          .trim()
+          .replaceFirst(RegExp(r'^```(?:json)?\s*'), '')
+          .replaceFirst(RegExp(r'\s*```$'), '');
+      final decoded = jsonDecode(cleaned);
+      if (decoded is! Map<String, dynamic>) return null;
+
+      final itemValues = decoded['items'];
+      final items = <GeminiReceiptItem>[];
+      if (itemValues is List) {
+        for (final item in itemValues) {
+          if (item is! Map) continue;
+          final name = item['name']?.toString().trim() ?? '';
+          final quantity = _intValue(item['quantity']) ?? 1;
+          final unitPrice = _doubleValue(item['unitPrice']);
+          if (name.isEmpty || quantity <= 0 || unitPrice == null) continue;
+          items.add(
+            GeminiReceiptItem(
+              name: name,
+              quantity: quantity,
+              unitPrice: unitPrice,
+            ),
+          );
+        }
+      }
+
+      return GeminiReceiptParseResult(
+        merchantName: decoded['merchantName']?.toString().trim() ?? '',
+        transactionDateTime: _dateTimeValue(decoded['transactionDateTime']),
+        totalAmount: _doubleValue(decoded['totalAmount']),
+        taxAmount: _doubleValue(decoded['taxAmount']),
+        discountAmount: _doubleValue(decoded['discountAmount']),
+        roundingAmount: _doubleValue(decoded['roundingAmount']),
+        items: items,
+      );
+    } catch (error) {
+      debugPrint('Gemini receipt OCR parse error: $error');
+      return null;
+    }
+  }
+
+  static int? _intValue(Object? value) {
+    if (value is int) return value;
+    if (value is num) return value.round();
+    if (value is String) return int.tryParse(value.trim());
+    return null;
+  }
+
+  static double? _doubleValue(Object? value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    if (value is String) {
+      return double.tryParse(value.replaceAll(RegExp(r'[^0-9.\-]'), '').trim());
+    }
+    return null;
+  }
+
+  static DateTime? _dateTimeValue(Object? value) {
+    if (value is! String || value.trim().isEmpty) return null;
+    return DateTime.tryParse(value.trim());
   }
 
   // kokhong
@@ -59,6 +244,29 @@ class GeminiApiConfig {
       }
     } catch (_) {}
 
+    final String rawArrivalTime =
+        (arrivals != null &&
+            arrivals.isNotEmpty &&
+            arrivals.first.time.trim().isNotEmpty)
+        ? arrivals.first.time
+        : (arrivalTime != null && arrivalTime.trim().isNotEmpty
+              ? arrivalTime
+              : '09:00 AM');
+    final String day1StartTime24H = _formatTo24Hour(rawArrivalTime, '09:00');
+
+    final String rawDepartureTime =
+        (departures != null &&
+            departures.isNotEmpty &&
+            departures.last.time.trim().isNotEmpty)
+        ? departures.last.time
+        : (departureTime != null && departureTime.trim().isNotEmpty
+              ? departureTime
+              : '09:00 PM');
+    final String finalDayEndTime24H = _formatTo24Hour(
+      rawDepartureTime,
+      '21:00',
+    );
+
     final List<TransitPoint> resolvedArrivals = [];
     if (arrivals != null && arrivals.isNotEmpty) {
       resolvedArrivals.addAll(
@@ -69,7 +277,7 @@ class GeminiApiConfig {
         TransitPoint(
           id: 'arr_0',
           location: arrivalLocation,
-          time: arrivalTime ?? '09:00 AM',
+          time: rawArrivalTime,
         ),
       );
     }
@@ -85,7 +293,7 @@ class GeminiApiConfig {
         TransitPoint(
           id: 'dep_0',
           location: departureLocation,
-          time: departureTime ?? '06:00 PM',
+          time: rawDepartureTime,
         ),
       );
     }
@@ -112,13 +320,39 @@ class GeminiApiConfig {
     - Dates: $dates (Total: $numberOfDays days)
     - Target Total Budget: MYR $budget (Malaysian Ringgit, for the ENTIRE $numberOfDays-day trip)
     - Currency: All activity budgets, prices, and totals MUST be in Malaysian Ringgit (MYR).
+    
+    CRITICAL MANDATORY GEOGRAPHIC BOUNDARY RULE:
+    - Target Destination: "$destination", Malaysia.
+    - STRICT ENFORCEMENT: EVERY single activity, attraction, restaurant, cafe, hawker stall, shop, landmark, and transit stop MUST be physically located within "$destination", Malaysia!
+    - STRICT PROHIBITION: NEVER propose places from other states or regions. 100% of all attractions, restaurants, and venues across all days MUST be physically located inside "$destination", Malaysia. Recommending any venue outside "$destination" is strictly invalid.
+    - Suggesting places outside "$destination" is strictly forbidden and invalid.
     ${preference != null ? '- Preference: $preference (You MUST heavily prioritize planning activities that strictly match this theme!)' : ''}
-    ${resolvedArrivals.isNotEmpty ? '''- Arrival Details:
-${resolvedArrivals.asMap().entries.map((e) => '      * Arrival ${e.key + 1} (${e.value.type}): ${e.value.location}${e.value.date.isNotEmpty ? ' on ${e.value.date}' : ''} at ${e.value.time}').join('\n')}
-      * CRITICAL FOR DAY 1: Day 1 activities MUST start after the initial arrival time (${resolvedArrivals.first.time}${resolvedArrivals.first.date.isNotEmpty ? ' on ${resolvedArrivals.first.date}' : ''}) at "${resolvedArrivals.first.location}" (arriving via ${resolvedArrivals.first.type}). Route connecting activities accordingly!''' : ''}
-    ${resolvedDepartures.isNotEmpty ? '''- Departure Details:
+    - Traveler Arrival & Day 1 Start Time:
+      * Day 1 Arrival Time: $day1StartTime24H ($rawArrivalTime)${resolvedArrivals.isNotEmpty ? ' at "${resolvedArrivals.first.location}" (${resolvedArrivals.first.type})' : ''}.
+      * CRITICAL FOR DAY 1 START TIME:
+        The traveler only begins Day 1 at $day1StartTime24H ($rawArrivalTime).
+        Therefore, Day 1's very first activity MUST start strictly at $day1StartTime24H ("startTime": "$day1StartTime24H")!
+        ABSOLUTELY DO NOT start Day 1 at 09:00 unless the traveler arrival time is 09:00!
+        NEVER schedule any activity before $day1StartTime24H on Day 1!
+    ${resolvedArrivals.length > 1 ? '''- Additional Arrivals:
+${resolvedArrivals.skip(1).map((a) => '      * Arrival (${a.type}): ${a.location}${a.date.isNotEmpty ? ' on ${a.date}' : ''} at ${a.time}').join('\n')}''' : ''}
+    - Traveler Departure & Final Day End Time:
+      * Final Day (Day $numberOfDays) Departure Time: $finalDayEndTime24H ($rawDepartureTime)${resolvedDepartures.isNotEmpty ? ' at "${resolvedDepartures.last.location}" (${resolvedDepartures.last.type})' : ''}.
+      * CRITICAL FOR FINAL DAY END TIME:
+        All activities on Day $numberOfDays MUST conclude by $finalDayEndTime24H ($rawDepartureTime).
+        ABSOLUTELY DO NOT schedule any activities after $finalDayEndTime24H on Day $numberOfDays!
+    ${resolvedDepartures.isNotEmpty ? '''- Departure Details & Mandatory Departure Activity:
 ${resolvedDepartures.asMap().entries.map((e) => '      * Departure ${e.key + 1} (${e.value.type}): ${e.value.location}${e.value.date.isNotEmpty ? ' on ${e.value.date}' : ''} at ${e.value.time}').join('\n')}
-      * CRITICAL FOR FINAL DAY: Final day schedule MUST finish in time for the traveler to reach "${resolvedDepartures.last.location}" (departing via ${resolvedDepartures.last.type}) before ${resolvedDepartures.last.time}${resolvedDepartures.last.date.isNotEmpty ? ' on ${resolvedDepartures.last.date}' : ''}!''' : ''}
+      * CRITICAL FOR FINAL DAY (MANDATORY DEPARTURE COVERAGE):
+        - The traveler departs from "${resolvedDepartures.last.location}" via ${resolvedDepartures.last.type} at ${resolvedDepartures.last.time}.
+        - YOU MUST EXPLICITLY SCHEDULE A DEDICATED ACTIVITY TO COVER DEPARTURE on the final day (dayNumber: $numberOfDays)!
+        - The absolute LAST activity on the final day MUST be:
+          * "destination": "${resolvedDepartures.last.location}"
+          * "activityCategory": "Transportation"
+          * "description": "Travel to ${resolvedDepartures.last.location} for departure via ${resolvedDepartures.last.type}"
+          * "endTime": "${resolvedDepartures.last.time}"
+          * "startTime": 45-90 minutes before ${resolvedDepartures.last.time} (allowing ample travel and check-in time)
+        - All sightseeing, attractions, and meals on the final day MUST conclude before this departure transfer begins! Do NOT schedule dinner or night markets after this departure!''' : ''}
     ${resolvedHotels.isNotEmpty ? '''- Accommodation / Hotel:
 ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.value.location} (Check-in: ${e.value.checkInTime}, Check-out: ${e.value.checkOutTime})').join('\n')}
       * CRITICAL FOR HOTEL: Daily activities should conveniently route to/from this accommodation area. Factor in hotel check-in on Day 1 (around ${resolvedHotels.first.checkInTime}) and check-out on the final day (around ${resolvedHotels.last.checkOutTime}).''' : ''}
@@ -129,85 +363,93 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
     - The user has topped up their budget specifically so that ALL wishlist items MUST be covered.
     - MANDATORY: You MUST INCLUDE EVERY SINGLE ONE of these wishlist items in the generated itinerary: ${wishlist.join(', ')}.
     - NEVER omit or exclude ANY of these wishlist items under any circumstances! Every single wishlist item MUST appear as a scheduled activity in the itinerary under its actual place name.
-    - To fit the entire plan within the updated Budget (MYR $budget), aggressively economize on all other activities:
-      * Choose affordable local eateries/hawker stalls (e.g. MYR 5-12) for ordinary meals.
+    - MANDATORY HARD BUDGET LIMIT: The total cost of the generated activities ("totalAllocatedBudget") MUST BE STRICTLY LESS THAN OR EQUAL TO MYR $budget! (Aim for around MYR ${(double.tryParse(budget) ?? 85.0) * 0.9} to $budget, NEVER above $budget!). If budget is 85, totalAllocatedBudget CANNOT be 88!
+    - To fit the entire plan strictly within MYR $budget, aggressively economize on all other activities:
+      * Choose affordable local eateries/hawker stalls (e.g. MYR 5-10) for ordinary meals.
       * Choose free public attractions, parks, or walking tours for other non-wishlist slots.
       * Keep transport minimal or walking (MYR 0.0).
     - "wishlistItemsCoveredCount" MUST BE EXACTLY ${wishlist.length} (since 100% of the wishlist items are included).
     - "estimatedExtraBudgetNeeded" MUST be 0.0 since the plan MUST fit within MYR $budget.
     ''' : '''
-    CRITICAL RULE FOR WISHLIST (DYNAMIC BUDGET-CONSTRAINED ALLOCATION):
-    - The user specifically requested to visit these wishlist destinations: ${wishlist.join(', ')}.
-    - MANDATORY PRIORITY: Wishlist items are the highest-priority attractions of the trip. You must prioritize spending the traveler's Budget (MYR $budget) on covering as many of their requested wishlist items as possible!
-    - DYNAMIC WISHLIST ALLOCATION (COVER AS MANY AS BUDGET PERMITS):
-      * Evaluate the realistic cost of each wishlist item (e.g. theme park admission) against the total Budget (MYR $budget), alongside minimal necessary hawker meals (RM 5-12) and public transit (RM 2-4).
-      * If the budget is sufficient for ALL wishlist items (${wishlist.length}), include ALL of them in "activities", and set "wishlistItemsCoveredCount" to ${wishlist.length}.
-      * If the budget is tight and CANNOT afford all wishlist items:
-        - Include as many wishlist items as the budget can realistically accommodate (prioritize the most affordable ones first to maximize the count of covered items).
-        - OMIT the remaining wishlist items that cannot fit within the budget from the "activities" list.
-        - CRITICAL: NEVER omit ALL wishlist items if at least one can be scheduled! Always include at least 1 wishlist item if feasible.
-        - Set "wishlistItemsCoveredCount" to the EXACT integer number of wishlist items actually included in the "activities" schedule.
-      * Any omitted wishlist item MUST NOT be scheduled anywhere in the "activities" list. The omitted items will be clearly presented to the user as "Uncovered Wishlist" so they can top up their budget or remove them.
-      * Only schedule a maximum of 1 major wishlist attraction per day to keep the schedule comfortable.
+    CRITICAL RULE FOR WISHLIST & BUDGET (BUDGET-CONSTRAINED GENERATION):
+    - Target Total Budget: MYR $budget for the entire $numberOfDays-day trip.
+    - Wishlist destinations requested by user (${wishlist.length} total): ${wishlist.join(', ')}.
+    - MANDATORY HARD BUDGET LIMIT: The total cost of the generated activities ("totalAllocatedBudget") MUST BE STRICTLY LESS THAN OR EQUAL TO the user's Target Total Budget of MYR $budget! You MUST keep the planned itinerary strictly within MYR $budget (aim for around MYR ${(double.tryParse(budget) ?? 60.0) * 0.9} to $budget, NEVER above $budget!).
+    - WISHLIST SELECTION WITHIN BUDGET:
+      * Allocate the available budget (MYR $budget) to include ONLY as many wishlist items as can realistically fit into the budget, alongside essential affordable meals (MYR 5-12 per meal) and minimal transit.
+      * If MYR $budget is INSUFFICIENT to cover all ${wishlist.length} wishlist items:
+        - NEVER try to squeeze too many wishlist items into the plan if it would make the total cost exceed MYR $budget! For example, if including 3 wishlist items pushes the cost to 67.50, you MUST ONLY include 1 or 2 wishlist items so the total cost stays strictly <= MYR $budget!
+        - ONLY include the wishlist items that can realistically fit into the MYR $budget plan!
+        - DO NOT include the remaining wishlist items that cannot fit into MYR $budget in the activities list! Leave them out of the activities list.
+        - "wishlistItemsCoveredCount" MUST BE EXACTLY the number of wishlist items actually scheduled in the "activities" list (e.g. 1 or 2 out of ${wishlist.length}). NEVER report more than the items actually included!
+        - "estimatedExtraBudgetNeeded": Estimate the realistic extra budget in MYR needed to cover the remaining (${wishlist.length} - wishlistItemsCoveredCount) uncovered wishlist items (including their admission tickets and required transport/meals, e.g. MYR 50.00 - 150.00).
+      * If MYR $budget is SUFFICIENT to cover all ${wishlist.length} wishlist items:
+        - Include ALL ${wishlist.length} wishlist items in the activities.
+        - "wishlistItemsCoveredCount" = ${wishlist.length}.
+        - "estimatedExtraBudgetNeeded" = 0.0.
+    - Wishlist scheduling: For the wishlist items that are included, distribute them appropriately across the trip dates.
     ''') : '- Wishlist Items: None\n    CRITICAL RULE FOR NO WISHLIST:\n    - The user did NOT provide any wishlist items.\n    - "wishlistItemsCoveredCount" MUST BE EXACTLY 0. Do NOT count general attractions, restaurants, or itinerary activities as wishlist items!'}
 
     Please provide a structured day-by-day itinerary with estimated costs and durations for each activity.
     ${strictBudget ? '''
-    CRITICAL RULE FOR BUDGET & PRICING (STRICT BUDGET MODE):
-    - The user has a HARD budget limit of MYR $budget. The sum of ALL allocatedBudget values MUST be LESS THAN OR EQUAL TO MYR $budget. This is NON-NEGOTIABLE.
-    - You MUST fit the entire itinerary within MYR $budget by choosing AFFORDABLE options: hawker centres instead of fine dining, free parks instead of paid attractions, walking or public transit instead of Grab.
-    - "totalAllocatedBudget" MUST be <= $budget.
+    CRITICAL RULE FOR BUDGET & PRICING (STRICT BUDGET / TOP-UP MODE):
+    - The user has topped up the budget to MYR $budget to cover all wishlist items.
+    - HARD BUDGET CEILING: "totalAllocatedBudget" MUST BE STRICTLY LESS THAN OR EQUAL TO MYR $budget! NEVER exceed MYR $budget. Aim for around MYR ${(double.tryParse(budget) ?? 85.0) * 0.9} to $budget.
+    - You MUST fit the itinerary within MYR $budget:
+      * Choose affordable local eateries/hawkers (MYR 5.00 - 10.00). Food is NEVER free (minimum MYR 4.00).
+      * Free parks/sightseeing/walking tours (0.0).
+      * Walking (0.0) or minimal public transit (MYR 2-4).
+    - "totalAllocatedBudget" MUST equal the exact mathematical sum of all "allocatedBudget" fields (and MUST be <= MYR $budget).
     - "estimatedExtraBudgetNeeded" MUST be 0.0.
-    - Public parks, sightseeing of landmarks, walking tours, and free attractions MUST have an allocatedBudget of 0.
-    - "Transportation" activities: If consecutive activities are close (walking distance), set "allocatedBudget" to 0.0 (Walking). Only assign minimal transit fare (RM2-5) if they are far.
-    - Only assign costs to food/dining, transportation, and places that explicitly require entrance tickets.
     ''' : '''
-    CRITICAL RULE FOR BUDGET & PRICING: 
-    - The user provided a target budget of MYR $budget for the entire $numberOfDays-day trip.
-    - You MUST actively respect the user's budget and keep overall trip spending as close to or within MYR $budget as possible:
-      * Economical Meals: For breakfast, lunch, and dinner, choose authentic, budget-friendly local Malaysian favorites (hawker stalls, food courts, kopitiams, and mamak eateries) where typical meals cost MYR 5.00 - 12.00 (e.g. Roti Canai RM 4, Chicken Rice RM 9, Nasi Lemak RM 6, Char Kway Teow RM 8). NEVER schedule expensive restaurants, luxury cafes, or fine dining unless the user's budget is generous (> MYR 150 per day).
-      * Free Sightseeing for Non-Wishlist Slots: Any attractions in the itinerary other than the user's covered wishlist items MUST be FREE attractions (allocatedBudget: 0.0), such as public parks, landmark sightseeing, cultural streets, and heritage sites (e.g., KLCC Park, Batu Caves, Central Market, Petaling Street Chinatown, Merdeka Square). Do NOT add unnecessary paid non-wishlist attractions!
-      * Low-Cost Transit: Prioritize WALKING between nearby activities (allocatedBudget: 0.0). For longer transfers, use public transit (LRT/MRT tokens cost MYR 2.00 - MYR 4.00). Keep transit costs lean and realistic.
-      * Realistic Wishlist Ticket Pricing: For wishlist items scheduled in "activities", assign their realistic standard admission prices (e.g., Sunway Lagoon ~MYR 130-150, Skyline Luge ~MYR 50-60, SplashMania ~MYR 90-110).
-      * Shortfall & Extra Budget Needed:
-        - "totalAllocatedBudget" MUST ALWAYS perfectly match the mathematical sum of all "allocatedBudget" fields in the activities list.
-        - If some wishlist items were omitted because the budget was insufficient, calculate the estimated additional budget required to cover those omitted items (and any activity shortfall) and return it in "estimatedExtraBudgetNeeded" (e.g., ~MYR 50 - 150 per uncovered item).
-        - If all wishlist items are covered and totalAllocatedBudget <= $budget, set "estimatedExtraBudgetNeeded": 0.0.
-        - If all wishlist items are covered but totalAllocatedBudget > $budget, set "estimatedExtraBudgetNeeded": (totalAllocatedBudget - $budget).
+    CRITICAL RULE FOR BUDGET & PRICING (STRICT BUDGET CONSTRAINED):
+    - The user provided a budget cap of MYR $budget for the entire $numberOfDays-day trip.
+    - HARD BUDGET LIMIT: The planned itinerary ("totalAllocatedBudget") MUST NOT exceed MYR $budget. Work strictly within this budget!
+    - PRICING GUIDELINES:
+      * Meals: Hawker stalls, kopitiams, mamak eateries (MYR 5.00 - 12.00 per meal). EVERY "Restaurant" MUST have allocatedBudget >= 4.0. Food is NEVER free.
+      * Transport: WALKING (MYR 0.0) whenever possible. Public transit (MYR 2.00 - 4.00) only when far.
+      * Non-wishlist attractions: MUST be FREE (public parks, heritage streets, temples, beaches, etc.) with allocatedBudget: 0.0.
+      * Paid wishlist items: Use their realistic admission price, but ONLY include as many wishlist items as can fit within MYR $budget.
+    - "totalAllocatedBudget" MUST ALWAYS equal the exact mathematical sum of all "allocatedBudget" fields in the activities list, and MUST be <= MYR $budget.
+    - SUMMARY OF estimatedExtraBudgetNeeded:
+      * If all wishlist items are covered and totalAllocatedBudget <= $budget → estimatedExtraBudgetNeeded = 0.0
+      * If some wishlist items were omitted due to budget shortage → estimatedExtraBudgetNeeded = realistic extra MYR needed to cover the omitted wishlist items.
     '''}
     
     CRITICAL RULE FOR ROUTING:
-    - Group activities geographically! Each day of the itinerary MUST focus on ONE specific area or neighborhood (e.g., Day 1 is dedicated entirely to "KLCC", Day 2 entirely to "Bukit Bintang").
-    - Do NOT jump across the city on the same day. Every single activity on a given "dayNumber" MUST be found within that day's designated area to minimize travel time.
+    - Group activities geographically within "$destination"! Each day of the itinerary MUST focus on ONE specific area or neighborhood within "$destination" (for example, if "$destination" is Penang, Day 1 could focus on George Town Heritage Zone, Day 2 on Batu Ferringhi / Teluk Bahang, Day 3 on Bayan Lepas; if "$destination" is Melaka, Day 1 on Bandar Hilir / Jonker, Day 2 on Ayer Keroh).
+    - Do NOT jump across distant parts of the city/state on the same day. Every single activity on a given "dayNumber" MUST be found within that day's designated area in "$destination" to minimize travel time.
     - Consecutive activities MUST be close to each other in real life to make routing practical.
 
     CRITICAL RULE FOR TIME SCHEDULING:
     - THIS IS THE MOST IMPORTANT RULE: You MUST generate an itinerary exactly for $numberOfDays day(s). If $numberOfDays is 3, return exactly 3 days. If $numberOfDays is 4, return exactly 4 days. The number of days returned MUST strictly match $numberOfDays!
     - The "dayNumber" MUST go sequentially from 1 up to exactly $numberOfDays. DO NOT generate less or more days than $numberOfDays!
     - Daily schedule timing:
-      * Day 1 starts at ${resolvedArrivals.isNotEmpty ? resolvedArrivals.first.time : '09:00'} (accommodating traveler arrival).
-      * The final day ends at ${resolvedDepartures.isNotEmpty ? resolvedDepartures.last.time : '21:00'} (accommodating traveler departure).
+      * Day 1 starts at $day1StartTime24H (the very first activity on Day 1 MUST have "startTime": "$day1StartTime24H", NEVER 09:00 unless arrival is 09:00)${resolvedArrivals.isNotEmpty ? ' (accommodating traveler arrival at "${resolvedArrivals.first.location}")' : ''}.
+      * The final day ends at $finalDayEndTime24H${resolvedDepartures.isNotEmpty ? ' with the traveler reaching their departure hub "${resolvedDepartures.last.location}"' : ''}.
       * All intermediate days strictly start at 09:00 and end at 21:00.
       * Provide a complete continuous schedule filling the active hours, with connecting transportation between destinations.
     - The endTime of each activity must smoothly connect to the startTime of the next activity without large gaps.
-    - Do not schedule any activities before 09:00 or after 21:00. 
-    - The absolute last activity of EACH day MUST reach the end time specified (or 21:00). If your last activity ends before this time, YOU TRIPLE CHECK AND ADD A NEW SUPPER/NIGHT MARKET ACTIVITY TO REACH THE REQUIRED END TIME.
+    - Do not schedule any activities before $day1StartTime24H on Day 1, or after $finalDayEndTime24H on the final day. 
+    - On intermediate days, the last activity of the day should reach 21:00. On the final day with departure, the final activity MUST be the departure transfer to "${resolvedDepartures.isNotEmpty ? resolvedDepartures.last.location : 'departure point'}" ending at $finalDayEndTime24H.
 
     CRITICAL RULE FOR COMPOSITION & TRANSPORTATION:
-    - EVERY day MUST include at least THREE "Restaurant" category activities (strictly representing Breakfast, Lunch, and Dinner).
+    - Meal planning:
+      * For full days, include THREE "Restaurant" category activities (strictly representing Breakfast, Lunch, and Dinner).
+      * On the final day, only include meals that occur BEFORE the departure time (e.g. if departure is in the afternoon, include Breakfast and Lunch; do NOT force Dinner after the traveler has already departed!).
     - MANDATORY TRANSPORTATION BETWEEN ACTIVITIES (WALK IF CLOSE, VEHICLE IF FAR):
       * Between consecutive destination activities (Attractions and Restaurants), there MUST be a dedicated "Transportation" category activity representing the commute or walk between them.
       * PROXIMITY & TRANSIT MODE RULE:
-        - If two consecutive activities are CLOSE to each other (within walking distance, e.g. < 1km, adjacent streets, or within the same mall/complex like Pavilion KL to Lot 10, or Suria KLCC to KLCC Park):
+        - If two consecutive activities are CLOSE to each other (within walking distance, e.g. < 1km, adjacent streets, or within the same neighborhood/complex in "$destination"):
           + Transit mode is WALKING: set "destination" to "Walk to [Next Destination]" or "Pedestrian Walkway", "description" to "Short 5-10 min walk to the next venue", "duration" to "5-15 min", and "allocatedBudget" to 0.0 (Walking is completely free!).
         - If two consecutive activities are FAR from each other (requiring motorized transit, different neighborhoods, or > 1km):
-          + Transit mode is VEHICULAR (MRT, LRT, Bus, or Grab): set "destination" to the station, terminal, or transit route (e.g. "KLCC LRT Station", "Bukit Bintang MRT Station"), "description" to describe the transit route (e.g. "Take MRT Kajang Line / Grab ride to destination"), "duration" to "15-30 min", and "allocatedBudget" to a realistic fare greater than 0 (e.g. MYR 3.00 - MYR 15.00).
+          + Transit mode is VEHICULAR (Bus, Grab, Taxi, or local transit): set "destination" to the local station, terminal, or transit route within "$destination" (e.g. "Rapid Penang Bus / Grab to next destination"), "description" to describe the local commute within "$destination", "duration" to "15-30 min", and "allocatedBudget" to a realistic fare greater than 0 (e.g. MYR 3.00 - MYR 15.00).
       * "activityCategory" for all of these transfer activities MUST strictly be "Transportation".
 
     CRITICAL RULE FOR DESTINATIONS/RESTAURANTS:
-    - Every destination, restaurant, cafe, or eatery MUST be specified using its full, real-world, specific business or place name.
-    - Do NOT generate generic dish or food names (such as "Nasi Lemak", "Teh Tarik", "Roti Canai", "Satay") as the destination. You must specify the actual restaurant name where it can be eaten (e.g., "Village Park Restaurant", "Nasi Lemak Antarabangsa").
-    - Every "destination" value MUST be an actual, currently operating, highly popular business or landmark that is guaranteed to have a listing and photos on Google Maps. Do NOT invent fictional place names.
+    - Every destination, restaurant, cafe, or eatery MUST be located within "$destination" and specified using its full, real-world, specific business or place name.
+    - Do NOT generate generic dish or food names (such as "Nasi Lemak", "Teh Tarik", "Roti Canai", "Satay") as the destination. You must specify the actual restaurant name where it can be eaten.
+    - Every "destination" value MUST be an actual, currently operating, highly popular business or landmark in "$destination" that is guaranteed to have a listing and photos on Google Maps. Do NOT invent fictional place names.
     - We will programmatically verify each destination against Google Places API to fetch its image. If a destination is obscure or NOT found on Google Places, the itinerary is invalid.
     
     CRITICAL RULE FOR UNIQUENESS (NO DUPLICATES EXCEPT TRANSPORTATION):
@@ -216,44 +458,44 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
       * Do NOT propose the same restaurant, cafe, or eatery more than once across all days. Every breakfast, lunch, and dinner must be at a completely different venue!
       * Do NOT propose the same attraction, museum, theme park, or landmark more than once across all days. If a place is visited on Day 1, it CANNOT be visited again on Day 2, Day 3, or any other day.
       * Do NOT visit the same shopping mall, market, or complex multiple times (e.g. do NOT schedule lunch at a mall and then shopping at the same mall, and do NOT revisit it on another day).
-      * Do NOT use slight variations of the same name to bypass this rule (e.g., "Petronas Twin Towers" and "Petronas Towers", or "Pavilion KL" and "Pavilion Kuala Lumpur" are the same venue and MUST NOT both appear).
+      * Do NOT use slight variations of the same name to bypass this rule.
     - TRANSPORTATION IS THE ONLY EXCEPTION:
-      * Only commute activities with "activityCategory": "Transportation" (e.g., "Walk to ...", "Take MRT from ... to ...") can be repeated between destinations. All other activities must be distinct.
+      * Only commute activities with "activityCategory": "Transportation" (e.g., "Walk to ...", "Local Transit to ...") can be repeated between destinations. All other activities must be distinct.
     ${(avoidPlaces != null && avoidPlaces.isNotEmpty) ? '\nCRITICAL REJECTION LIST FOR RETRY:\nThe following places were previously generated in a prior attempt but COULD NOT be found on Google Places API. You MUST NOT include any of these in your response. Instead, suggest different, verified, operating real-world venues/landmarks that are definitely searchable on Google Places:\n' + avoidPlaces.map((e) => '- "$e"').join('\n') : ''}
     
     Format your response STRICTLY as the following JSON object structure. Do NOT include markdown fences (no ```json ... ```), and do NOT include any extra text:
     
     {
       "totalAllocatedBudget": 200.0,
-      "wishlistItemsCoveredCount": ${(wishlist != null && wishlist.isNotEmpty) ? (strictBudget ? wishlist.length : 1) : 0},
+      "wishlistItemsCoveredCount": ${(wishlist != null && wishlist.isNotEmpty) ? wishlist.length : 0},
       "estimatedExtraBudgetNeeded": 0.0,
       "activities": [
         {
           "dayNumber": 1,
-          "destination": "Actual Google Maps Business/Landmark Name",
-          "imageKeyword": "Petronas Towers",
+          "destination": "Actual Google Maps Business/Landmark Name in $destination",
+          "imageKeyword": "Famous Landmark in $destination",
           "description": "Short description of the activity",
           "allocatedBudget": 50.0,
           "duration": "60-90 min",
           "activityCategory": "Attraction",
-          "startTime": "09:00",
-          "endTime": "11:00",
+          "startTime": "$day1StartTime24H",
+          "endTime": "...",
           "minPrice": 20.0 
         }
       ]
     }
 
     Field definitions:
-    - totalAllocatedBudget (double): The sum of all allocatedBudget in MYR.
-    - wishlistItemsCoveredCount (int): Number of user-provided wishlist items actually scheduled in the activities. If some wishlist items were omitted due to budget, do NOT count them. If all are covered, set to ${(wishlist != null && wishlist.isNotEmpty) ? wishlist.length : 0}. If no wishlist items were provided by the user, this MUST BE EXACTLY 0.
-    - estimatedExtraBudgetNeeded (double): If some wishlist items were omitted due to budget shortage or totalAllocatedBudget > $budget, return the estimated extra budget needed to cover the trip and missing items. Return 0.0 only if all wishlist items are covered and within budget.
+    - totalAllocatedBudget (double): The exact mathematical sum of all "allocatedBudget" in the activities list in MYR. MUST stay within MYR $budget (unless top-up mode).
+    - wishlistItemsCoveredCount (int): Number of user-provided wishlist items actually scheduled as activities in the itinerary. If only some wishlist items fit within the budget, report ONLY the number actually included. If all ${(wishlist != null && wishlist.isNotEmpty) ? wishlist.length : 0} items are included, set to ${(wishlist != null && wishlist.isNotEmpty) ? wishlist.length : 0}. If no wishlist was provided, set to 0.
+    - estimatedExtraBudgetNeeded (double): If not all wishlist items could fit within the MYR $budget, return the estimated additional budget in MYR needed to cover the remaining uncovered wishlist items. Return 0.0 if all wishlist items are covered and totalAllocatedBudget <= $budget.
     - dayNumber (int): Sequential day (1 for Day 1, 2 for Day 2...).
     - destination (String): EXACT, FULL official business name or landmark on Google Maps. No generic names.
     - imageKeyword (String): Landmark name or generic food type (e.g. "Nasi Lemak" instead of restaurant name).
     - allocatedBudget (double): Max estimated cost or fixed price in MYR. 0.0 for free.
     - duration (String): e.g., "60-90 min".
     - activityCategory (String): MUST be "Transportation", "Attraction", or "Restaurant".
-    - startTime/endTime (String): 24-hour format "HH:mm".
+    - startTime/endTime (String): 24-hour format "HH:mm". Note: Day 1's first activity startTime MUST be "$day1StartTime24H".
     - minPrice (double): Min estimated cost in MYR. Set to 0.0 or null if free/fixed.
     ''';
 
@@ -275,7 +517,10 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
                 ],
               },
             ],
-            "generationConfig": {"responseMimeType": "application/json"},
+            "generationConfig": {
+              "responseMimeType": "application/json",
+              "maxOutputTokens": 8192,
+            },
           }),
         );
 
@@ -377,7 +622,10 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
             ],
           },
         ],
-        "generationConfig": {"responseMimeType": "application/json"},
+        "generationConfig": {
+          "responseMimeType": "application/json",
+          "maxOutputTokens": 8192,
+        },
       }),
     );
 
@@ -574,7 +822,7 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
     - Do NOT use slight variations of excluded names to bypass this rule (e.g., "Petronas Twin Towers" and "Petronas Towers" are the same venue).
 
     CRITICAL RULES FOR DESTINATION:
-    - The destination MUST be an EXACT, FULL official business name or landmark on Google Maps (e.g., "Museum of Illusions Kuala Lumpur", "Limapulo: Baba Can Cook"). Do NOT use generic names (e.g., "Local Cafe", "Museum Visit").
+    - The destination MUST be an EXACT, FULL official business name or landmark on Google Maps located in "$destinationCity". Do NOT use generic names (e.g., "Local Cafe", "Museum Visit").
     - Every "destination" MUST be an actual, currently operating, highly popular business or landmark that is guaranteed to have a listing and photos on Google Maps.
     - We will programmatically verify the destination against Google Places API to fetch its image. If the destination is obscure or NOT found on Google Places, it will be rejected.
 
@@ -648,6 +896,82 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
     } catch (e) {
       debugPrint('Gemini API Alternative Error: $e');
       throw Exception('Failed to generate alternative activity: $e');
+    }
+  }
+
+  /// Generates a single transportation activity between two places.
+  /// Used when an attraction is replaced and adjacent transport needs updating.
+  static Future<String> askGeminiForTransportation({
+    required String originPlace,
+    required String destinationPlace,
+    required String city,
+  }) async {
+    final prompt = '''
+    You are an expert travel planner in Malaysia. A user's itinerary has changed and the transportation between two activities needs to be updated.
+
+    CONTEXT:
+    - City: $city
+    - Origin (departing from): $originPlace
+    - Destination (going to): $destinationPlace
+
+    PROXIMITY & TRANSIT MODE RULE:
+    - If the two places are CLOSE to each other (within walking distance, e.g. < 1km, adjacent streets, or within the same mall/complex):
+      + Transit mode is WALKING: set "destination" to "Walk to $destinationPlace", "description" to a short sentence about the walk (e.g. "Short 5-10 min walk to the next venue"), "duration" to "5-15 min", and "allocatedBudget" to 0.0.
+    - If the two places are FAR from each other (requiring motorized transit, different neighborhoods, or > 1km):
+      + Transit mode is VEHICULAR (MRT, LRT, Bus, or Grab): set "destination" to the station, terminal, or transit route (e.g. "KLCC LRT Station", "Bukit Bintang MRT Station"), "description" to describe the transit route (e.g. "Take MRT Kajang Line from ... to ..."), "duration" to "15-30 min", and "allocatedBudget" to a realistic fare (e.g. MYR 1.00 - MYR 15.00).
+
+    Format your response as a valid single JSON object:
+    {
+      "destination": "Walk to ... or Station Name",
+      "imageKeyword": "Station name or landmark name for image lookup (e.g. 'KLCC LRT Station', 'Bukit Bintang MRT Station', 'Pavilion KL')",
+      "description": "Short commute description",
+      "duration": "10 min",
+      "allocatedBudget": 0.0,
+      "activityCategory": "Transportation"
+    }
+
+    Return ONLY the raw JSON object with no markdown fences, no backticks, and no extra commentary.
+    ''';
+
+    final url = Uri.parse(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=$_apiKey',
+    );
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          "contents": [
+            {
+              "parts": [
+                {"text": prompt},
+              ],
+            },
+          ],
+          "generationConfig": {"responseMimeType": "application/json"},
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = jsonDecode(response.body);
+        final candidates = data['candidates'] as List?;
+        if (candidates != null && candidates.isNotEmpty) {
+          final content = candidates[0]['content'];
+          final parts = content['parts'] as List?;
+          if (parts != null && parts.isNotEmpty) {
+            return parts[0]['text'] ?? '{}';
+          }
+        }
+        return '{}';
+      } else {
+        throw Exception(
+          'Gemini Error: ${response.statusCode} - ${response.body}',
+        );
+      }
+    } catch (e) {
+      debugPrint('Gemini API Transportation Error: $e');
+      throw Exception('Failed to generate transportation: $e');
     }
   }
 

@@ -10,14 +10,71 @@ import '../models/entities/activity.dart';
 import '../models/entities/expense.dart';
 import '../models/entities/expense_item.dart';
 import '../theme/app_theme.dart';
-import '../utils/expense_text_validation.dart';
+import '../utils/explicit_word_validation.dart';
 import '../view_models/presentation_logic/activity_view_model.dart';
 import '../view_models/ui_state/activity_ui_state.dart';
 import '../widgets/app_date_picker.dart';
+import '../widgets/app_time_picker.dart';
 import '../widgets/converted_amount_text.dart';
 
 String _formatExpenseCurrencyAmount(String currency, double amount) =>
     formatCurrencyAmount(currency, amount, displayMyrAsCode: true);
+
+String? _validateExpenseText(String fieldName, String value) {
+  if (!containsProhibitedPlaceLanguage(value)) return null;
+  return '$fieldName contains inappropriate language. Please remove it.';
+}
+
+String? _validateExpenseItemName(String value) {
+  final trimmed = value.trim();
+  if (trimmed.length > 30) {
+    return 'Item name cannot exceed 30 characters.';
+  }
+  if (!RegExp(r'^[A-Za-z0-9 -]+$').hasMatch(trimmed)) {
+    return 'Item name may only contain letters, numbers, spaces, and dashes.';
+  }
+  return _validateExpenseText('Item name', trimmed);
+}
+
+String? _validateExpenseDescription(String value) {
+  final trimmed = value.trim();
+  if (trimmed.length > 60) {
+    return 'Item description cannot exceed 60 characters.';
+  }
+  final symbolError = _validateOptionalExpenseTextSymbols(
+    'Item description',
+    trimmed,
+  );
+  if (symbolError != null) return symbolError;
+  return _validateExpenseText('Item description', trimmed);
+}
+
+String? _validateExpenseMerchantName(String value) {
+  final trimmed = value.trim();
+  if (trimmed.length > 50) {
+    return 'Merchant name cannot exceed 50 characters.';
+  }
+  final symbolError = _validateOptionalExpenseTextSymbols(
+    'Merchant name',
+    trimmed,
+  );
+  if (symbolError != null) return symbolError;
+  return _validateExpenseText('Merchant name', trimmed);
+}
+
+String? _validateOptionalExpenseTextSymbols(String fieldName, String value) {
+  if (value.isEmpty) return null;
+  if (!RegExp(r'[A-Za-z0-9]').hasMatch(value)) {
+    return '$fieldName must contain at least one letter or number.';
+  }
+  if (!RegExp(r"^[A-Za-z0-9 .,!?&'()/-]+$").hasMatch(value)) {
+    return "$fieldName contains an unsupported symbol. Use only . , ! ? & ' ( ) / or -.";
+  }
+  if (RegExp(r"([^A-Za-z0-9\s])\1{3,}").hasMatch(value)) {
+    return '$fieldName cannot contain the same symbol more than 3 times in a row.';
+  }
+  return null;
+}
 
 /// Opens the Expense form for the Activity selected from the itinerary.
 Future<void> showExpenseBottomSheet({
@@ -1844,6 +1901,9 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     }
 
     if (uiState.ocrRawText.isNotEmpty) {
+      final shouldApplyOcr = await _showOcrApplyDialog(uiState);
+      if (!shouldApplyOcr || !mounted) return;
+
       var reviewReceiptDate = false;
       if (viewModel.ocrDateDiffersFromSelectedActivity) {
         final useReceiptDate = await _showConfirmationDialog(
@@ -1896,6 +1956,172 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         );
       }
     }
+  }
+
+  Future<bool> _showOcrApplyDialog(ActivityUiState uiState) async {
+    final currency = _activeExpenseCurrency(uiState);
+    final itemCount = uiState.ocrParsedItems.isNotEmpty
+        ? uiState.ocrParsedItems.length
+        : uiState.ocrItemLines.length;
+    final merchant = uiState.ocrMerchantName.isEmpty
+        ? 'Merchant not detected'
+        : uiState.ocrMerchantName;
+    final dateText = uiState.ocrTransactionDateTime == null
+        ? 'Date not detected'
+        : DateFormat(
+            'dd MMM yyyy, hh:mm a',
+          ).format(uiState.ocrTransactionDateTime!);
+    final totalText = uiState.ocrExtractedTotal == null
+        ? 'Total not detected'
+        : _formatExpenseCurrencyAmount(currency, uiState.ocrExtractedTotal!);
+    final taxText = uiState.ocrExtractedTax == null
+        ? 'Not detected'
+        : _formatExpenseCurrencyAmount(currency, uiState.ocrExtractedTax!);
+    final discountText = uiState.ocrExtractedDiscount == null
+        ? 'Not detected'
+        : _formatExpenseCurrencyAmount(currency, uiState.ocrExtractedDiscount!);
+    final roundingText = uiState.ocrExtractedRounding == null
+        ? 'Not detected'
+        : _formatExpenseCurrencyAmount(currency, uiState.ocrExtractedRounding!);
+
+    final shouldApply = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: appTheme.white_A700,
+        insetPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: 500),
+          child: SingleChildScrollView(
+            padding: EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Receipt Scanned',
+                  style: TextStyle(
+                    color: appTheme.black,
+                    fontFamily: 'Inter',
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: 14),
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: appTheme.teal_50,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: appTheme.teal_A200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildOcrSummaryLine('Merchant', merchant),
+                      _buildOcrSummaryLine('Date', dateText),
+                      _buildOcrSummaryLine('Total', totalText),
+                      _buildOcrSummaryLine('Items', '$itemCount detected'),
+                      _buildOcrSummaryLine('Tax', taxText),
+                      _buildOcrSummaryLine('Discount', discountText),
+                      _buildOcrSummaryLine('Rounding', roundingText),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 10),
+                Text(
+                  'OCR/AI may make mistakes. Please review before applying.',
+                  style: TextStyle(
+                    color: appTheme.blue_gray_300,
+                    fontSize: 12,
+                    height: 1.35,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(dialogContext, false),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: appTheme.white_A700,
+                          backgroundColor: appTheme.errorRed,
+                          minimumSize: Size.fromHeight(48),
+                          side: BorderSide(color: appTheme.errorRed),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                        ),
+                        child: Text(
+                          'Cancel',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(dialogContext, true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: appTheme.teal_A700,
+                          foregroundColor: appTheme.white_A700,
+                          minimumSize: Size.fromHeight(48),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                        ),
+                        child: Text(
+                          'Apply',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    return shouldApply ?? false;
+  }
+
+  Widget _buildOcrSummaryLine(String label, String value) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 7),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 76,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: appTheme.blue_gray_300,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                color: appTheme.gray_900,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _chooseReceipt() async {
@@ -2372,7 +2598,8 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
   }
 
   Future<void> _pickDate() async {
-    final uiState = context.read<ActivityViewModel>().uiState;
+    final viewModel = context.read<ActivityViewModel>();
+    final uiState = viewModel.uiState;
     DateTime dateOnly(DateTime date) =>
         DateTime(date.year, date.month, date.day);
     final activityDate = uiState.selectedActivity?.date;
@@ -2387,6 +2614,13 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
     final tripEndDate = uiState.tripEndDate;
     if (tripEndDate != null && dateOnly(tripEndDate).isBefore(lastDate)) {
       lastDate = dateOnly(tripEndDate);
+    }
+    final nextStart = viewModel.selectedExpenseTimeWindow?.nextStart;
+    if (nextStart != null) {
+      final lastBeforeNext = dateOnly(
+        nextStart.subtract(const Duration(microseconds: 1)),
+      );
+      if (lastBeforeNext.isBefore(lastDate)) lastDate = lastBeforeNext;
     }
     if (firstDate.isAfter(lastDate)) {
       widget.onValidationError(
@@ -2413,9 +2647,35 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
   }
 
   Future<void> _pickTime() async {
-    final time = await showTimePicker(
+    final window = context.read<ActivityViewModel>().selectedExpenseTimeWindow;
+    if (window == null) return;
+    final now = DateTime.now();
+    bool isSelectable(TimeOfDay time) {
+      final candidate = DateTime(
+        _selectedDate.year,
+        _selectedDate.month,
+        _selectedDate.day,
+        time.hour,
+        time.minute,
+      );
+      return !candidate.isBefore(window.start) &&
+          (window.nextStart == null || candidate.isBefore(window.nextStart!)) &&
+          !candidate.isAfter(now);
+    }
+
+    if (!List.generate(
+      1440,
+      (index) => TimeOfDay(hour: index ~/ 60, minute: index % 60),
+    ).any(isSelectable)) {
+      widget.onValidationError(
+        'No times are available for this activity on the selected date.',
+      );
+      return;
+    }
+    final time = await showAppTimePicker(
       context: context,
       initialTime: _selectedTime,
+      isSelectable: isSelectable,
     );
     if (time != null && mounted) {
       setState(() => _selectedTime = time);
@@ -2436,9 +2696,9 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
       return;
     }
     for (final validationMessage in <String?>[
-      validateExpenseItemName(name),
-      validateExpenseDescription(description),
-      validateExpenseMerchantName(merchantName),
+      _validateExpenseItemName(name),
+      _validateExpenseDescription(description),
+      _validateExpenseMerchantName(merchantName),
     ]) {
       if (validationMessage != null) {
         widget.onValidationError(validationMessage);

@@ -154,16 +154,16 @@ class TripSummaryScreen extends StatelessWidget {
   Widget _buildBudgetOverview(TripSummaryUiState uiState) {
     final isOverspent = uiState.remainingBudget < 0;
     final isUnhealthy = uiState.financialHealth == 'Unhealthy';
-    final expenseColor = isOverspent
-        ? appTheme.errorRed
-        : appTheme.warningPopupHeader;
-    final actualBudgetColor = appTheme.teal_800;
+    final expenseColor = isOverspent ? appTheme.errorRed : appTheme.teal_800;
+    final actualBudgetColor = appTheme.teal_A700;
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final budgetRings = SizedBox(
-          width: 168,
-          child: Column(
+          width: 250,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               SizedBox(
                 width: 152,
@@ -192,23 +192,32 @@ class TripSummaryScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
-              if (isUnhealthy) ...[
-                _BudgetRingLegend(color: actualBudgetColor, label: 'Actual'),
-                const SizedBox(height: 6),
-              ],
-              _BudgetRingLegend(
-                color: appTheme.blue_gray_700,
-                label: 'Allocated',
+              const SizedBox(width: 14),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (isUnhealthy) ...[
+                    _BudgetRingLegend(
+                      color: actualBudgetColor,
+                      label: 'Actual',
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                  _BudgetRingLegend(
+                    color: appTheme.blue_gray_700,
+                    label: 'Allocated',
+                  ),
+                  const SizedBox(height: 10),
+                  _BudgetRingLegend(color: expenseColor, label: 'Expense'),
+                ],
               ),
-              const SizedBox(height: 6),
-              _BudgetRingLegend(color: expenseColor, label: 'Expense'),
             ],
           ),
         );
         final metrics = _BudgetMetricsCard(uiState: uiState);
 
-        if (constraints.maxWidth < 430) {
+        if (constraints.maxWidth < 520) {
           return Column(
             children: [budgetRings, const SizedBox(height: 20), metrics],
           );
@@ -984,7 +993,7 @@ class _BudgetMetricsCard extends StatelessWidget {
                   label: 'Expense',
                   amountColor: uiState.remainingBudget < 0
                       ? appTheme.errorRed
-                      : appTheme.warningPopupHeader,
+                      : appTheme.teal_800,
                 ),
               ),
             ],
@@ -1009,7 +1018,7 @@ class _BudgetMetricsCard extends StatelessWidget {
             label: 'Remaining',
             amountColor: uiState.remainingBudget < 0
                 ? appTheme.errorRed
-                : appTheme.teal_A700,
+                : appTheme.warningPopupHeader,
           ),
         ],
       ),

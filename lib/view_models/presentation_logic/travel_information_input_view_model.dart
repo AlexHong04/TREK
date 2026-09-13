@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/configurations/frankfurter_api_config.dart';
+import '../../models/configurations/google_places_api_config.dart';
 import '../../models/services/i_auth_service.dart';
 import '../../models/services/i_profile_service.dart'; // added this
 import '../../models/services/i_itinerary_service.dart';
@@ -31,12 +32,35 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     _loadExistingTrips();
   }
 
+  double? _cachedRateToMyr = 1.0;
+  double? get cachedRateToMyr => _cachedRateToMyr;
+
+  int get numberOfDays {
+    if (_uiState.startDate != null && _uiState.endDate != null) {
+      final diff = _uiState.endDate!.difference(_uiState.startDate!).inDays + 1;
+      return diff > 0 ? diff : 1;
+    }
+    return 1;
+  }
+
   void _syncPreferredCurrency() {
-    final currency = _profileService?.preferredCurrency.trim().toUpperCase(); // changed this
-    if (currency != null &&
-        currency.isNotEmpty &&
-        currency != _uiState.preferredCurrency) {
+    final currency = _profileService.preferredCurrency.trim().toUpperCase();
+    if (currency.isNotEmpty && currency != _uiState.preferredCurrency) {
       _uiState = _uiState.copyWith(preferredCurrency: currency);
+    }
+    _updateCachedRateToMyr();
+  }
+
+  void _updateCachedRateToMyr() {
+    final currency = preferredCurrency;
+    if (currency == 'MYR') {
+      _cachedRateToMyr = 1.0;
+    } else {
+      getExchangeRate(fromCurrency: currency, toCurrency: 'MYR').then((rate) {
+        if (rate != null) {
+          _cachedRateToMyr = rate;
+        }
+      }).catchError((_) {});
     }
   }
 
@@ -106,14 +130,22 @@ class TravelInformationInputViewModel extends ChangeNotifier {
   List<TextInputFormatter> get wishlistInputFormatters =>
       _wishlistInputFormatters;
 
+  Future<void> refreshExistingTrips() async {
+    await _loadExistingTrips();
+  }
+
   Future<void> _loadExistingTrips() async {
     try {
       final trips = await _itineraryService.fetchAllTrip();
-      final ranges = trips.map((t) {
+      final ranges = trips
+          .where((t) => t.status.toLowerCase() != 'terminated')
+          .map((t) {
         // We normalize the start and end dates to just year/month/day
+        final localStart = t.startDate.toLocal();
+        final localEnd = t.endDate.toLocal();
         return DateTimeRange(
-          start: DateTime(t.startDate.year, t.startDate.month, t.startDate.day),
-          end: DateTime(t.endDate.year, t.endDate.month, t.endDate.day),
+          start: DateTime(localStart.year, localStart.month, localStart.day),
+          end: DateTime(localEnd.year, localEnd.month, localEnd.day),
         );
       }).toList();
       _uiState = _uiState.copyWith(unavailableDateRanges: ranges);
@@ -250,9 +282,15 @@ class TravelInformationInputViewModel extends ChangeNotifier {
   }
 
   String? validateBudget(String? value) {
-    if ((value ?? '').trim().isEmpty) {
+    final trimmed = (value ?? '').trim();
+    if (trimmed.isEmpty) {
       return 'Please enter a budget';
     }
+    final parsed = double.tryParse(trimmed);
+    if (parsed == null || parsed <= 0) {
+      return 'Please enter a valid positive budget amount';
+    }
+
     return null;
   }
 
@@ -366,7 +404,7 @@ class TravelInformationInputViewModel extends ChangeNotifier {
       ..add(TransitPoint(
         id: newId,
         location: '',
-        time: '06:00 PM',
+        time: '09:00 PM',
         type: 'Flight',
         date: defaultDate,
       ));
@@ -562,6 +600,16 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  void clearWishlist() {
+    _currentWishlistQuery = '';
+    _uiState = _uiState.copyWith(
+      wishlistItems: const [],
+      clearWishlistError: true,
+    );
+    clearSuggestions();
+    notifyListeners();
+  }
+
   String? validateTransitDates() {
     if (_uiState.startDate == null || _uiState.endDate == null) {
       return null;
@@ -711,8 +759,12 @@ class TravelInformationInputViewModel extends ChangeNotifier {
           return;
         }
 
+        final filteredResults = results
+            .where((item) => !GooglePlacesApiConfig.isParkingText(item))
+            .toList();
+
         _uiState = _uiState.copyWith(
-          suggestions: results,
+          suggestions: filteredResults,
           isSearchingSuggestions: false,
         );
         notifyListeners();

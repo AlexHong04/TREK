@@ -88,16 +88,20 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     return _uiState.wishlistItemsCoveredCount < wishlist.length;
   }
 
-  /// True if budget is insufficient or wishlist is not fully covered.
-  bool get needsTopUp => hasExtraBudgetNeeded || hasUncoveredWishlist;
+  /// True if budget is insufficient or overspent.
+  bool get needsTopUp => hasExtraBudgetNeeded || (spentBudget > totalBudget);
 
   /// Confirm is only allowed once every time slot has been filled, we are
-  /// not busy generating, and no extra budget is needed.
-  bool get canConfirmItinerary =>
-      !_uiState.isLoading &&
-      _uiState.activities.isNotEmpty &&
-      !hasEmptyActivitySlots &&
-      !(spentBudget > totalBudget);
+  /// not busy generating, no extra budget is needed, and all wishlist items are covered.
+  bool get canConfirmItinerary {
+    return !_uiState.isLoading &&
+        !_uiState.isRegeneratingPlan &&
+        _uiState.activities.isNotEmpty &&
+        !hasEmptyActivitySlots &&
+        !(spentBudget > totalBudget) &&
+        !needsTopUp &&
+        !hasUncoveredWishlist;
+  }
 
   static bool _matchesWishlist(
     String wishlistName,
@@ -308,7 +312,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     try {
       final result = await _profileService.convertToPreferredCurrency(
         amount: amount,
-        fromCurrency: 'MYR'
+        fromCurrency: 'MYR',
       );
       return result;
     } catch (_) {
@@ -320,7 +324,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
   Future<double?> convertAmountToMYR({required double amount}) async {
     try {
       final result = await _profileService.convertPreferredCurrencyToMyr(
-          amount: amount,
+        amount: amount,
       );
       return result;
     } catch (_) {
@@ -362,9 +366,9 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     }
 
     final budget = double.tryParse(_uiState.budgetText) ?? 0.0;
-    final myrAmount = await _profileService.convertPreferredCurrencyToMyr(
-      amount: amount,
-    ); // changed this
+    final myrAmount =
+        await _profileService.convertPreferredCurrencyToMyr(amount: amount) ??
+        amount;
 
     final shortfall = spentBudget - budget;
     final shortage = _uiState.estimatedExtraBudgetNeeded > shortfall
@@ -372,26 +376,26 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         : shortfall;
 
     final minRequired = double.parse((shortage * 0.50).toStringAsFixed(2));
-    final myrMinRequired = await _profileService.convertPreferredCurrencyToMyr(amount: minRequired) ?? minRequired;
-    final myrShortfall = await _profileService.convertPreferredCurrencyToMyr(amount: shortfall) ?? shortfall;
+    final myrMinRequired =
+        await _profileService.convertPreferredCurrencyToMyr(
+          amount: minRequired,
+        ) ??
+        minRequired;
 
-    final isSufficient = myrAmount! >= myrMinRequired || myrAmount <= myrShortfall;
+    final isSufficient =
+        shortage <= 0.0 || myrAmount >= shortage || myrAmount >= myrMinRequired;
 
-    final double updatedBudget = isSufficient
-        ? (budget + myrAmount < spentBudget ? spentBudget : budget + myrAmount)
-        : (budget + myrAmount);
+    final double updatedBudget = budget + myrAmount;
 
-    final remainingShortage = isSufficient
-        ? 0.0
-        : shortage - myrAmount;
+    final remainingShortage = (shortage - myrAmount).clamp(
+      0.0,
+      double.infinity,
+    );
 
     _uiState = _uiState.copyWith(
       budgetText: updatedBudget.toStringAsFixed(2),
       estimatedExtraBudgetNeeded: remainingShortage,
       showWishlistWarning: false,
-      wishlistItemsCoveredCount: isSufficient
-          ? (_uiState.wishlist?.length ?? 0)
-          : _uiState.wishlistItemsCoveredCount,
     );
 
     notifyListeners();
@@ -540,13 +544,19 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // Every real venue already in the plan (other slots + stashed/removed
+      // ones) is excluded, so the replacement can never duplicate an existing
+      // activity. Derived Transportation rows ("Walk to ...") are not venues
+      // and are skipped to avoid false matches.
+      bool isRealVenue(Activity a) =>
+          a.destination.isNotEmpty &&
+          a.activityCategory.toLowerCase() != 'transportation';
+
       final excludedActivity = <String>[
         ..._uiState.stashedActivities
-            .where((a) => a.destination.isNotEmpty)
+            .where(isRealVenue)
             .map((a) => a.destination),
-        ..._uiState.activities
-            .where((a) => a.destination.isNotEmpty)
-            .map((a) => a.destination),
+        ..._uiState.activities.where(isRealVenue).map((a) => a.destination),
       ];
 
       // Retrieve original budget and category if available in stashed list
@@ -562,12 +572,17 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
 
       // Derive surrounding activities for geographic coherence.
       // Find the non-empty, non-transportation activity before and after this slot.
+      // Also skip the fixed arrival (first) and departure (last) activities —
+      // their airport/station locations would mislead Gemini into suggesting
+      // activities near the arrival/departure point instead of the city area.
       String? previousDest;
       String? nextDest;
+      final lastIdx = _uiState.activities.length - 1;
       for (int i = slotIndex - 1; i >= 0; i--) {
         final a = _uiState.activities[i];
         if (a.destination.isNotEmpty &&
-            a.activityCategory.toLowerCase() != 'transportation') {
+            a.activityCategory.toLowerCase() != 'transportation' &&
+            i != 0) {
           previousDest = a.destination;
           break;
         }
@@ -575,7 +590,8 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
       for (int i = slotIndex + 1; i < _uiState.activities.length; i++) {
         final a = _uiState.activities[i];
         if (a.destination.isNotEmpty &&
-            a.activityCategory.toLowerCase() != 'transportation') {
+            a.activityCategory.toLowerCase() != 'transportation' &&
+            i != lastIdx) {
           nextDest = a.destination;
           break;
         }
@@ -620,6 +636,88 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
 
       final updatedList = List<Activity>.from(_uiState.activities);
       updatedList[slotIndex] = newActivity;
+
+      // ── Regenerate adjacent transportation activities ──
+      // When an attraction is replaced, the transportation slots
+      // leading to / from it still reference the old destination.
+      // Ask Gemini to regenerate them with the correct origin/destination.
+      final newDest = newActivity.destination;
+      final city = destination.isNotEmpty
+          ? destination
+          : _uiState.destinationTitle;
+      final transportFutures = <Future<void>>[];
+
+      // Transportation BEFORE the replaced slot
+      if (slotIndex > 0 &&
+          updatedList[slotIndex - 1].activityCategory.toLowerCase() ==
+              'transportation') {
+        final transport = updatedList[slotIndex - 1];
+        // Find the origin: nearest non-empty, non-transport activity before it
+        String origin = _uiState.destinationTitle;
+        for (int i = slotIndex - 2; i >= 0; i--) {
+          final a = updatedList[i];
+          if (a.destination.isNotEmpty &&
+              a.activityCategory.toLowerCase() != 'transportation') {
+            origin = a.destination;
+            break;
+          }
+        }
+        transportFutures.add(
+          _itineraryService
+              .regenerateTransportation(
+                originPlace: origin,
+                destinationPlace: newDest,
+                city: city,
+                existingActivityId: transport.activitiesId,
+                dayTripId: transport.dayTripId,
+                date: transport.date,
+                startTime: transport.startTime,
+                endTime: transport.endTime,
+              )
+              .then((updated) => updatedList[slotIndex - 1] = updated)
+              .catchError((e) {
+            debugPrint('Failed to regenerate preceding transport: $e');
+          }),
+        );
+      }
+
+      // Transportation AFTER the replaced slot
+      if (slotIndex < updatedList.length - 1 &&
+          updatedList[slotIndex + 1].activityCategory.toLowerCase() ==
+              'transportation') {
+        final transport = updatedList[slotIndex + 1];
+        // Find the destination: nearest non-empty, non-transport activity after it
+        String nextPlace = _uiState.destinationTitle;
+        for (int i = slotIndex + 2; i < updatedList.length; i++) {
+          final a = updatedList[i];
+          if (a.destination.isNotEmpty &&
+              a.activityCategory.toLowerCase() != 'transportation') {
+            nextPlace = a.destination;
+            break;
+          }
+        }
+        transportFutures.add(
+          _itineraryService
+              .regenerateTransportation(
+                originPlace: newDest,
+                destinationPlace: nextPlace,
+                city: city,
+                existingActivityId: transport.activitiesId,
+                dayTripId: transport.dayTripId,
+                date: transport.date,
+                startTime: transport.startTime,
+                endTime: transport.endTime,
+              )
+              .then((updated) => updatedList[slotIndex + 1] = updated)
+              .catchError((e) {
+            debugPrint('Failed to regenerate following transport: $e');
+          }),
+        );
+      }
+
+      if (transportFutures.isNotEmpty) {
+        await Future.wait(transportFutures);
+      }
 
       _uiState = _uiState.copyWith(
         activities: updatedList,
@@ -857,4 +955,5 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
       notifyListeners();
     }
   }
+
 }
