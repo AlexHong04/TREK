@@ -33,6 +33,7 @@ class ActivityViewModel extends ChangeNotifier {
   final IAuthService _authService;
   final IProfileService _profileService;
   final ICachedActivity _cachedActivity;
+  int _receiptScanRunId = 0;
   final CameraSource _cameraSource = CameraSource();
   final GallerySource _gallerySource = GallerySource();
   final NotificationSource _notificationSource = NotificationSource();
@@ -434,37 +435,6 @@ class ActivityViewModel extends ChangeNotifier {
     }
   }
 
-  /// Replaces the temporary receipt path only when the tourist finishes the
-  /// device crop flow. Cancelling leaves the validated original image in use.
-  Future<void> cropSelectedReceipt() async {
-    final originalPath = _uiState.receiptLocalPath;
-    if (originalPath.isEmpty) {
-      _setExpenseError('Choose a receipt image before cropping it.');
-      return;
-    }
-
-    _uiState = _uiState.copyWith(isPickingReceipt: true, errorMessage: '');
-    notifyListeners();
-
-    try {
-      final croppedPath = await _cameraSource.cropReceiptImage(originalPath);
-      if (croppedPath != null) {
-        await _expenseTrackingService.validateReceiptImage(croppedPath);
-      }
-      _uiState = _uiState.copyWith(
-        isPickingReceipt: false,
-        receiptLocalPath: croppedPath ?? originalPath,
-        clearOcrData: croppedPath != null,
-      );
-    } catch (error) {
-      _uiState = _uiState.copyWith(
-        isPickingReceipt: false,
-        errorMessage: _readableError(error),
-      );
-    }
-    notifyListeners();
-  }
-
   void removeReceiptAndOcrData() {
     final retainedItems = <ExpenseItem>[];
     for (var index = 0; index < _uiState.draftExpenseItems.length; index++) {
@@ -599,6 +569,9 @@ class ActivityViewModel extends ChangeNotifier {
       return;
     }
 
+    final scanRunId = ++_receiptScanRunId;
+    bool scanWasCancelled() => scanRunId != _receiptScanRunId;
+
     _uiState = _uiState.copyWith(
       isScanningReceipt: true,
       clearOcrData: true,
@@ -611,10 +584,12 @@ class ActivityViewModel extends ChangeNotifier {
       final receiptText = await _expenseTrackingService.readReceiptText(
         receiptLocalPath,
       );
+      if (scanWasCancelled()) return;
       debugPrint('[Receipt OCR raw text]\n$receiptText');
       final geminiParse = await GeminiApiConfig.parseReceiptOcrText(
         receiptText: receiptText,
       );
+      if (scanWasCancelled()) return;
       final extractedTotal = _expenseTrackingService.extractReceiptTotal(
         receiptText,
       );
@@ -636,9 +611,10 @@ class ActivityViewModel extends ChangeNotifier {
       final extractedRounding =
           geminiParse?.roundingAmount ??
           _expenseTrackingService.extractReceiptRounding(receiptText);
-      final parsedDateTime =
-          geminiParse?.transactionDateTime ??
-          _expenseTrackingService.extractReceiptDateTime(receiptText);
+      final ocrDateTime = _expenseTrackingService.extractReceiptDateTime(
+        receiptText,
+      );
+      final parsedDateTime = ocrDateTime ?? geminiParse?.transactionDateTime;
       final merchantName = geminiParse?.merchantName.trim().isNotEmpty == true
           ? geminiParse!.merchantName.trim()
           : _expenseTrackingService.extractMerchantName(receiptText) ?? '';
@@ -654,13 +630,27 @@ class ActivityViewModel extends ChangeNotifier {
       if (selectedActivity == null) {
         throw ArgumentError('Select an activity before scanning a receipt.');
       }
+      if (!_expenseTrackingService.isLikelyReceiptText(receiptText)) {
+        throw Exception(
+          'This does not look like a valid receipt. Please upload a receipt image with merchant, date/time, items, and total.',
+        );
+      }
+      if (parsedDateTime == null) {
+        throw Exception(
+          'Receipt date and time were not detected. Please upload a clearer receipt or enter the expense manually.',
+        );
+      }
       final extractedDateTime = _resolveAmbiguousReceiptDateTime(
         parsedDateTime,
         selectedActivity,
       );
-      final effectiveTransactionDateTime =
-          extractedDateTime ?? _activityDateTime(selectedActivity);
-      _validateTransactionDateTime(effectiveTransactionDateTime);
+      if (extractedDateTime == null) {
+        throw Exception(
+          'Receipt date and time were not detected. Please upload a clearer receipt or enter the expense manually.',
+        );
+      }
+      _validateTransactionDateTime(extractedDateTime);
+      final effectiveTransactionDateTime = extractedDateTime;
       final geminiItems = _buildExpenseItemsFromGeminiParse(
         geminiParse,
         merchantName,
@@ -673,10 +663,9 @@ class ActivityViewModel extends ChangeNotifier {
               merchantName: merchantName,
               transactionDateTime: effectiveTransactionDateTime,
             );
-      if (!_expenseTrackingService.isLikelyReceiptText(receiptText) ||
-          effectiveTotal == null) {
+      if (effectiveTotal == null) {
         throw Exception(
-          'Unable to read the receipt. Please try another image or continue with the manual entry.',
+          'Receipt total was not detected. Please try a clearer image or enter the total manually.',
         );
       }
       String extractedTotalError = extractedItems.isEmpty
@@ -697,7 +686,7 @@ class ActivityViewModel extends ChangeNotifier {
         ocrRawText: receiptText,
         ocrMerchantName: merchantName,
         ocrTransactionDateTime: effectiveTransactionDateTime,
-        ocrDateWasDefaulted: extractedDateTime == null,
+        ocrDateWasDefaulted: false,
         originalCurrency: _expenseCurrency,
         ocrExtractedTotal: effectiveTotal,
         clearOcrExtractedTotal: effectiveTotal == null,
@@ -714,11 +703,24 @@ class ActivityViewModel extends ChangeNotifier {
         errorMessage: extractedTotalError,
       );
     } catch (error) {
+      if (scanWasCancelled()) return;
       _uiState = _uiState.copyWith(
         isScanningReceipt: false,
         errorMessage: _readableError(error),
       );
     }
+    notifyListeners();
+  }
+
+  void cancelReceiptScan() {
+    _receiptScanRunId++;
+    if (!_uiState.isScanningReceipt) return;
+    _uiState = _uiState.copyWith(
+      isScanningReceipt: false,
+      clearOcrData: true,
+      errorMessage: '',
+      successMessage: '',
+    );
     notifyListeners();
   }
 
@@ -729,20 +731,29 @@ class ActivityViewModel extends ChangeNotifier {
   ) {
     if (parse == null || parse.items.isEmpty) return const [];
     return parse.items
-        .where((item) => item.name.trim().isNotEmpty && item.unitPrice > 0)
-        .map<ExpenseItem>(
-          (item) => ExpenseItem(
+        .where(
+          (item) =>
+              item.name.trim().isNotEmpty &&
+              (item.unitPrice > 0 ||
+                  (item.lineTotal != null && item.lineTotal! > 0)),
+        )
+        .map<ExpenseItem>((item) {
+          final lineTotal = item.lineTotal != null && item.lineTotal! > 0
+              ? item.lineTotal!
+              : item.quantity * item.unitPrice;
+          final quantity = item.quantity <= 0 ? 1 : item.quantity;
+          return ExpenseItem(
             itemName: item.name.trim(),
             itemDescription: null,
             merchantName: merchantName.trim().isEmpty
                 ? null
                 : merchantName.trim(),
             expenseDateTime: transactionDateTime,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            subtotal: item.quantity * item.unitPrice,
-          ),
-        )
+            quantity: quantity,
+            unitPrice: lineTotal / quantity,
+            subtotal: lineTotal,
+          );
+        })
         .toList();
   }
 

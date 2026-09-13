@@ -20,11 +20,13 @@ class GeminiReceiptItem {
   final String name;
   final int quantity;
   final double unitPrice;
+  final double? lineTotal;
 
   const GeminiReceiptItem({
     required this.name,
     required this.quantity,
     required this.unitPrice,
+    this.lineTotal,
   });
 }
 
@@ -89,12 +91,16 @@ Rules:
 - Return only valid JSON. No markdown, no explanation.
 - Use MYR amounts as numbers only.
 - Translate item names to English when they are clearly in another language.
+- Chinese receipt labels may appear, for example 名称=item name, 重/数量=weight/quantity, 单价=unit price, 小计=subtotal, 原价=original subtotal, 应收/实收/合计/总计=total paid.
+- If no currency symbol is printed but the receipt is from a Malaysian expense flow, treat the amounts as MYR.
 - Numeric dates like 04/09/2026 must be interpreted as DD/MM/YYYY.
 - Use ISO 8601 local datetime format for transactionDateTime when detected.
 - If tax, discount, or rounding is not clearly shown, return null for that field.
 - Do not infer tax from missing items unless a tax/GST/SST/service tax label exists.
 - Rounding can be positive or negative.
 - Items must be purchased product/service rows only, not subtotal, tax, rounding, total, payment, invoice, cashier, table, address, or thank-you lines.
+- For receipt table rows like weight/quantity + unit price + subtotal, unitPrice is the per-unit price and lineTotal is the row subtotal.
+- If quantity is decimal or measured by kg, set quantity to 1 and unitPrice to the row subtotal, then also set lineTotal to the same row subtotal because this app only supports whole-number item quantity.
 - Quantity defaults to 1 only when the item and price are clearly a purchased row.
 
 JSON shape:
@@ -106,7 +112,7 @@ JSON shape:
   "discountAmount": 0.0 or null,
   "roundingAmount": 0.0 or null,
   "items": [
-    {"name": "string", "quantity": 1, "unitPrice": 0.0}
+    {"name": "string", "quantity": 1, "unitPrice": 0.0, "lineTotal": 0.0}
   ]
 }
 
@@ -171,6 +177,7 @@ $receiptText
               name: name,
               quantity: quantity,
               unitPrice: unitPrice,
+              lineTotal: _doubleValue(item['lineTotal']),
             ),
           );
         }
@@ -906,7 +913,8 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
     required String destinationPlace,
     required String city,
   }) async {
-    final prompt = '''
+    final prompt =
+        '''
     You are an expert travel planner in Malaysia. A user's itinerary has changed and the transportation between two activities needs to be updated.
 
     CONTEXT:

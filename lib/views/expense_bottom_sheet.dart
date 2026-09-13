@@ -269,6 +269,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                   onClose: _dismissTopMessage,
                 ),
               ),
+            if (uiState.isScanningReceipt) _buildScanningReceiptOverlay(),
           ],
         ),
       ),
@@ -287,7 +288,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         _buildPaymentMethodSection(uiState),
         SizedBox(height: 10),
         _buildReceiptSection(uiState),
-        if (uiState.isScanningReceipt || uiState.ocrRawText.isNotEmpty) ...[
+        if (_hasAppliedOcrValues && uiState.ocrRawText.isNotEmpty) ...[
           SizedBox(height: 10),
           _buildOcrReviewSection(uiState),
         ],
@@ -502,125 +503,131 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     final expenseItems = viewModel.uiState.selectedRecordedExpenseItems;
     await showDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-        titlePadding: EdgeInsets.fromLTRB(20, 18, 12, 0),
-        title: _buildDetailDialogHeader(
-          title: 'Expense #$expenseNumber',
-          icon: Icons.receipt_long_outlined,
-        ),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: SingleChildScrollView(
+        backgroundColor: appTheme.white_A700,
+        insetPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 20),
+        child: SizedBox(
+          width: MediaQuery.sizeOf(dialogContext).width * 0.92,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(18, 18, 18, 18),
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: appTheme.teal_50,
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildDialogSectionLabel('TOTAL EXPENSE'),
-                      SizedBox(height: 8),
-                      ConvertedAmountText(
-                        amount: expense.totalAmount,
-                        originalCurrency: currency,
-                        displayMyrAsCode: true,
-                        primaryStyle: TextStyle(
-                          color: appTheme.gray_900,
-                          fontSize: 25,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      SizedBox(height: 8),
-                      if (expense.taxAmount != 0 ||
-                          expense.discountAmount != 0 ||
-                          expense.roundingAmount != 0) ...[
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.receipt_outlined,
-                              color: appTheme.teal_700,
-                              size: 15,
-                            ),
-                            SizedBox(width: 6),
-                            Text(
-                              'Tax: ${_formatExpenseCurrencyAmount(currency, expense.taxAmount)}',
-                              style: TextStyle(
-                                color: appTheme.teal_800,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (expense.discountAmount != 0)
-                          Text(
-                            'Discount: -${_formatExpenseCurrencyAmount(currency, expense.discountAmount)}',
-                          ),
-                        if (expense.roundingAmount != 0)
-                          Text(
-                            'Rounding: ${expense.roundingAmount > 0 ? '+' : ''}${_formatExpenseCurrencyAmount(currency, expense.roundingAmount)}',
-                          ),
-                      ],
-                    ],
-                  ),
+                _buildDetailDialogHeader(
+                  title: 'Expense #$expenseNumber',
+                  icon: Icons.receipt_long_outlined,
                 ),
-                SizedBox(height: 14),
-                Container(
-                  padding: EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: appTheme.gray_200),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Column(
-                    children: [
-                      _buildExpenseInfoRow(
-                        Icons.credit_card_outlined,
-                        'Payment Method',
-                        expense.paymentMethod ?? 'Not specified',
-                      ),
-                      _buildExpenseInfoRow(
-                        Icons.schedule_outlined,
-                        'Recorded',
-                        expense.createdAt == null
-                            ? 'Date and time unavailable'
-                            : DateFormat(
-                                'dd MMM yyyy, hh:mm a',
-                              ).format(expense.createdAt!.toLocal()),
-                      ),
-                      if (expense.receiptImageUrl?.trim().isNotEmpty == true)
-                        _buildReceiptThumbnailRow(expense.receiptImageUrl!)
-                      else
-                        _buildExpenseInfoRow(
-                          Icons.attach_file,
-                          'Receipt',
-                          'Not attached',
-                          showDivider: false,
+                SizedBox(height: 18),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: double.infinity,
+                          padding: EdgeInsets.all(18),
+                          decoration: BoxDecoration(
+                            color: appTheme.teal_50,
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildDialogSectionLabel('TOTAL EXPENSE'),
+                              SizedBox(height: 8),
+                              ConvertedAmountText(
+                                amount: expense.totalAmount,
+                                originalCurrency: currency,
+                                displayMyrAsCode: true,
+                                primaryStyle: TextStyle(
+                                  color: appTheme.gray_900,
+                                  fontSize: 25,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              SizedBox(height: 8),
+                              if (expense.taxAmount != 0 ||
+                                  expense.discountAmount != 0 ||
+                                  expense.roundingAmount != 0) ...[
+                                _buildRecordedAdjustmentLine(
+                                  'Tax',
+                                  _formatExpenseCurrencyAmount(
+                                    currency,
+                                    expense.taxAmount,
+                                  ),
+                                ),
+                                if (expense.discountAmount != 0)
+                                  _buildRecordedAdjustmentLine(
+                                    'Discount',
+                                    '-${_formatExpenseCurrencyAmount(currency, expense.discountAmount)}',
+                                  ),
+                                if (expense.roundingAmount != 0)
+                                  _buildRecordedAdjustmentLine(
+                                    'Rounding',
+                                    '${expense.roundingAmount > 0 ? '+' : ''}${_formatExpenseCurrencyAmount(currency, expense.roundingAmount)}',
+                                  ),
+                              ],
+                            ],
+                          ),
                         ),
-                    ],
+                        SizedBox(height: 14),
+                        Container(
+                          padding: EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: appTheme.gray_200),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
+                            children: [
+                              _buildExpenseInfoRow(
+                                Icons.credit_card_outlined,
+                                'Payment Method',
+                                expense.paymentMethod ?? 'Not specified',
+                              ),
+                              _buildExpenseInfoRow(
+                                Icons.schedule_outlined,
+                                'Recorded',
+                                expense.createdAt == null
+                                    ? 'Date and time unavailable'
+                                    : DateFormat(
+                                        'dd MMM yyyy, hh:mm a',
+                                      ).format(expense.createdAt!.toLocal()),
+                              ),
+                              if (expense.receiptImageUrl?.trim().isNotEmpty ==
+                                  true)
+                                _buildReceiptThumbnailRow(
+                                  expense.receiptImageUrl!,
+                                )
+                              else
+                                _buildExpenseInfoRow(
+                                  Icons.attach_file,
+                                  'Receipt',
+                                  'Not attached',
+                                  showDivider: false,
+                                ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: 18),
+                        _buildDialogSectionLabel('EXPENSE ITEMS'),
+                        SizedBox(height: 10),
+                        if (expenseItems.isEmpty)
+                          Text('No expense items were found.')
+                        else
+                          for (final item in expenseItems)
+                            _buildRecordedItemDetailCard(item, currency),
+                      ],
+                    ),
                   ),
                 ),
                 SizedBox(height: 18),
-                _buildDialogSectionLabel('EXPENSE ITEMS'),
-                SizedBox(height: 10),
-                if (expenseItems.isEmpty)
-                  Text('No expense items were found.')
-                else
-                  for (final item in expenseItems)
-                    _buildRecordedItemDetailCard(item, currency),
+                _buildDialogCancelButton(dialogContext),
               ],
             ),
           ),
         ),
-        actionsPadding: EdgeInsets.fromLTRB(20, 0, 20, 18),
-        actions: [_buildDialogCancelButton(dialogContext)],
       ),
     );
   }
@@ -1054,6 +1061,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   }
 
   Widget _buildRecordedItemDetailCard(ExpenseItem item, String currency) {
+    final subtotal = _formatExpenseCurrencyAmount(currency, item.subtotal);
     return InkWell(
       onTap: () => _showExpenseItemDetails(item, currency),
       borderRadius: BorderRadius.circular(16),
@@ -1067,6 +1075,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             CircleAvatar(
               radius: 19,
@@ -1082,47 +1091,100 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    item.itemName,
-                    style: TextStyle(
-                      color: appTheme.gray_900,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.itemName,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: appTheme.gray_900,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            height: 1.18,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 10),
+                      Text(
+                        subtotal,
+                        style: TextStyle(
+                          color: appTheme.gray_900,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      SizedBox(width: 2),
+                      Icon(
+                        Icons.chevron_right,
+                        color: appTheme.gray_400,
+                        size: 20,
+                      ),
+                    ],
                   ),
-                  SizedBox(height: 4),
-                  Text(
-                    DateFormat(
-                      'dd MMM yyyy, hh:mm a',
-                    ).format(item.expenseDateTime),
-                    style: TextStyle(
-                      color: appTheme.blue_gray_300,
-                      fontSize: 12,
-                    ),
+                  SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 3,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        '${item.quantity} x ${_formatExpenseCurrencyAmount(currency, item.unitPrice)}',
+                        style: TextStyle(
+                          color: appTheme.blue_gray_300,
+                          fontSize: 12,
+                        ),
+                      ),
+                      Text(
+                        DateFormat(
+                          'dd MMM yyyy, hh:mm a',
+                        ).format(item.expenseDateTime),
+                        style: TextStyle(
+                          color: appTheme.blue_gray_300,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ),
-                  Text(
-                    '${item.quantity} x ${_formatExpenseCurrencyAmount(currency, item.unitPrice)}',
-                    style: TextStyle(
-                      color: appTheme.blue_gray_300,
-                      fontSize: 12,
+                  if (item.itemDescription?.trim().isNotEmpty == true) ...[
+                    SizedBox(height: 4),
+                    Text(
+                      item.itemDescription!.trim(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: appTheme.blue_gray_300,
+                        fontSize: 12,
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
-            SizedBox(width: 8),
-            Text(
-              _formatExpenseCurrencyAmount(currency, item.subtotal),
-              style: TextStyle(
-                color: appTheme.gray_900,
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            SizedBox(width: 4),
-            Icon(Icons.chevron_right, color: appTheme.gray_400, size: 20),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildRecordedAdjustmentLine(String label, String value) {
+    return Padding(
+      padding: EdgeInsets.only(top: 4),
+      child: Row(
+        children: [
+          Icon(Icons.receipt_outlined, color: appTheme.teal_700, size: 15),
+          SizedBox(width: 6),
+          Text(
+            '$label: $value',
+            style: TextStyle(
+              color: appTheme.teal_800,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1485,22 +1547,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   }
 
   Widget _buildOcrReviewSection(ActivityUiState uiState) {
-    if (uiState.isScanningReceipt) {
-      return _ExpenseSectionCard(
-        title: 'RECEIPT OCR',
-        child: Row(
-          children: [
-            SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-            SizedBox(width: 12),
-            Text('Reading receipt text...'),
-          ],
-        ),
-      );
-    }
+    if (!_hasAppliedOcrValues) return SizedBox.shrink();
 
     final hasOcrDateTime = uiState.ocrTransactionDateTime != null;
     final hasOcrTotal = uiState.ocrExtractedTotal != null;
@@ -1511,213 +1558,96 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
           uiState.draftExpenseItems[index].itemName.trim().toLowerCase() !=
               'unknown';
     }).length;
-    if (_hasAppliedOcrValues) {
-      final merchant = uiState.ocrMerchantName.isEmpty
-          ? 'Merchant not detected'
-          : uiState.ocrMerchantName;
-      final dateAndTime = hasOcrDateTime
-          ? DateFormat(
-              'dd MMM yyyy, hh:mm a',
-            ).format(uiState.ocrTransactionDateTime!)
-          : 'Date and time not detected';
-      final total = hasOcrTotal
-          ? _formatExpenseCurrencyAmount(currency, uiState.ocrExtractedTotal!)
-          : 'Not detected';
-      final tax = uiState.ocrExtractedTax == null
-          ? 'Not detected'
-          : _formatExpenseCurrencyAmount(currency, uiState.ocrExtractedTax!);
-      final hasMeaningfulMismatch =
-          uiState.hasOcrTotalMismatch &&
-          uiState.ocrTotalDifference.abs() > 0.05;
+    final merchant = uiState.ocrMerchantName.isEmpty
+        ? 'Merchant not detected'
+        : uiState.ocrMerchantName;
+    final dateAndTime = hasOcrDateTime
+        ? DateFormat(
+            'dd MMM yyyy, hh:mm a',
+          ).format(uiState.ocrTransactionDateTime!)
+        : 'Date and time not detected';
+    final total = hasOcrTotal
+        ? _formatExpenseCurrencyAmount(currency, uiState.ocrExtractedTotal!)
+        : 'Not detected';
+    final tax = uiState.ocrExtractedTax == null
+        ? 'Not detected'
+        : _formatExpenseCurrencyAmount(currency, uiState.ocrExtractedTax!);
+    final hasMeaningfulMismatch =
+        uiState.hasOcrTotalMismatch && uiState.ocrTotalDifference.abs() > 0.05;
 
-      return _ExpenseSectionCard(
-        title: 'RECEIPT OCR REVIEW',
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.check_circle_outline,
-                  color: appTheme.teal_A700,
-                  size: 17,
-                ),
-                SizedBox(width: 6),
-                Text(
-                  'Receipt scanned',
-                  style: TextStyle(
-                    color: appTheme.teal_A700,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 4),
-            Text(
-              'OCR may make mistakes. Use a clear, well-lit receipt and review the results.',
-              style: TextStyle(
-                color: appTheme.blue_gray_300,
-                fontSize: 11,
-                height: 1.3,
-              ),
-            ),
-            SizedBox(height: 7),
-            Text(
-              '$merchant | $dateAndTime',
-              style: TextStyle(color: appTheme.gray_900, fontSize: 13),
-            ),
-            SizedBox(height: 7),
-            Text(
-              'Total: $total | Tax: $tax',
-              style: TextStyle(
-                color: appTheme.gray_900,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            SizedBox(height: 7),
-            Text(
-              '$detectedItemCount ${detectedItemCount == 1 ? 'item' : 'items'} added - review them above.',
-              style: TextStyle(
-                color: appTheme.teal_800,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            if (hasMeaningfulMismatch) ...[
-              SizedBox(height: 10),
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Color(0xFFFFF4E5),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Color(0xFFFFB74D)),
-                ),
-                child: Text(
-                  'The receipt total differs by '
-                  '${_formatExpenseCurrencyAmount(currency, uiState.ocrTotalDifference.abs())}. '
-                  'Please review the detected items.',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-          ],
-        ),
-      );
-    }
     return _ExpenseSectionCard(
       title: 'RECEIPT OCR REVIEW',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildOcrValue(
-            'Merchant',
-            uiState.ocrMerchantName.isEmpty
-                ? 'Not detected'
-                : uiState.ocrMerchantName,
-          ),
-          _buildOcrValue(
-            'Date and time',
-            hasOcrDateTime
-                ? uiState.ocrDateWasDefaulted
-                      ? '${DateFormat('dd MMM yyyy, hh:mm a').format(uiState.ocrTransactionDateTime!)} '
-                            '(not detected — selected activity date used)'
-                      : DateFormat(
-                          'dd MMM yyyy, hh:mm a',
-                        ).format(uiState.ocrTransactionDateTime!)
-                : 'Not detected',
-          ),
-          _buildOcrValue(
-            'Extracted tax',
-            uiState.ocrExtractedTax != null
-                ? _formatExpenseCurrencyAmount(
-                    currency,
-                    uiState.ocrExtractedTax!,
-                  )
-                : '${_formatExpenseCurrencyAmount(currency, 0)} (Not detected)',
-          ),
-          _buildOcrValue(
-            'Extracted total',
-            hasOcrTotal
-                ? _formatExpenseCurrencyAmount(
-                    currency,
-                    uiState.ocrExtractedTotal!,
-                  )
-                : 'Not detected',
-          ),
-          if (uiState.hasOcrTotalMismatch) ...[
-            SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Color(0xFFFFF4E5),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Color(0xFFFFB74D)),
+          Row(
+            children: [
+              Icon(
+                Icons.check_circle_outline,
+                color: appTheme.teal_A700,
+                size: 17,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Receipt total does not match the detected items.',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    'Receipt total: '
-                    '${_formatExpenseCurrencyAmount(currency, uiState.ocrExtractedTotal!)}',
-                  ),
-                  Text(
-                    'Calculated from items and tax: '
-                    '${_formatExpenseCurrencyAmount(currency, uiState.draftTotalAmount)}',
-                  ),
-                  Text(
-                    'Difference: '
-                    '${_formatExpenseCurrencyAmount(currency, uiState.ocrTotalDifference.abs())}',
-                  ),
-                  SizedBox(height: 4),
-                  Text('Please review the detected expense items.'),
-                ],
+              SizedBox(width: 6),
+              Text(
+                'Receipt scanned',
+                style: TextStyle(
+                  color: appTheme.teal_A700,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
-          ],
-          if (uiState.ocrItemLines.isNotEmpty) ...[
-            SizedBox(height: 8),
-            Text('Possible receipt items', style: _fieldLabelStyle),
-            SizedBox(height: 4),
-            ...uiState.ocrItemLines.map(
-              (line) => Padding(
-                padding: EdgeInsets.only(bottom: 2),
-                child: Text('- $line'),
-              ),
-            ),
-          ],
-          SizedBox(height: 8),
+            ],
+          ),
+          SizedBox(height: 4),
           Text(
-            'Review and edit these values in the item form before saving.',
-            style: TextStyle(color: appTheme.blue_gray_300, fontSize: 12),
+            'OCR may make mistakes. Use a clear, well-lit receipt and review the results.',
+            style: TextStyle(
+              color: appTheme.blue_gray_300,
+              fontSize: 11,
+              height: 1.3,
+            ),
           ),
-          SizedBox(height: 10),
-          if (_hasAppliedOcrValues)
+          SizedBox(height: 7),
+          Text(
+            '$merchant | $dateAndTime',
+            style: TextStyle(color: appTheme.gray_900, fontSize: 13),
+          ),
+          SizedBox(height: 7),
+          Text(
+            'Total: $total | Tax: $tax',
+            style: TextStyle(
+              color: appTheme.gray_900,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          SizedBox(height: 7),
+          Text(
+            '$detectedItemCount ${detectedItemCount == 1 ? 'item' : 'items'} added - review them above.',
+            style: TextStyle(
+              color: appTheme.teal_800,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (hasMeaningfulMismatch) ...[
+            SizedBox(height: 10),
             Container(
               width: double.infinity,
               padding: EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: appTheme.teal_50,
+                color: Color(0xFFFFF4E5),
                 borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Color(0xFFFFB74D)),
               ),
               child: Text(
-                '$detectedItemCount receipt ${detectedItemCount == 1 ? 'item was' : 'items were'} detected. '
-                'Compare the editable items below with the receipt before saving.',
-                style: TextStyle(
-                  color: appTheme.teal_800,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
+                'The receipt total differs by '
+                '${_formatExpenseCurrencyAmount(currency, uiState.ocrTotalDifference.abs())}. '
+                'Please review the detected items.',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               ),
             ),
+          ],
         ],
       ),
     );
@@ -1735,17 +1665,113 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     );
   }
 
-  Widget _buildOcrValue(String label, String value) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: 6),
-      child: RichText(
-        text: TextSpan(
-          style: TextStyle(color: appTheme.gray_900, fontSize: 14),
-          children: [
-            TextSpan(text: '$label: ', style: _fieldLabelStyle),
-            TextSpan(text: value),
-          ],
-        ),
+  Widget _buildScanningReceiptOverlay() {
+    return Positioned.fill(
+      child: Stack(
+        children: [
+          ModalBarrier(
+            dismissible: false,
+            color: appTheme.black.withValues(alpha: 0.28),
+          ),
+          Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 28),
+              child: Transform.translate(
+                offset: Offset(0, -MediaQuery.sizeOf(context).height * 0.13),
+                child: Container(
+                  width: double.infinity,
+                  constraints: BoxConstraints(maxWidth: 330),
+                  padding: EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: appTheme.white_A700,
+                    borderRadius: BorderRadius.circular(22),
+                    boxShadow: [
+                      BoxShadow(
+                        color: appTheme.black.withValues(alpha: 0.12),
+                        blurRadius: 20,
+                        offset: Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 42,
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: appTheme.teal_50,
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Icon(
+                              Icons.document_scanner_outlined,
+                              color: appTheme.teal_A700,
+                            ),
+                          ),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Scanning receipt',
+                              style: TextStyle(
+                                color: appTheme.gray_900,
+                                fontFamily: 'Inter',
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 12),
+                      Text(
+                        'Please wait while OCR and AI read the receipt.',
+                        style: TextStyle(
+                          color: appTheme.blue_gray_700,
+                          fontFamily: 'Inter',
+                          fontSize: 13,
+                          height: 1.35,
+                        ),
+                      ),
+                      SizedBox(height: 16),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(999),
+                        child: LinearProgressIndicator(
+                          minHeight: 7,
+                          backgroundColor: appTheme.gray_100,
+                          color: appTheme.teal_A700,
+                        ),
+                      ),
+                      SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 44,
+                        child: OutlinedButton(
+                          onPressed: context
+                              .read<ActivityViewModel>()
+                              .cancelReceiptScan,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: appTheme.blue_gray_700,
+                            side: BorderSide(color: appTheme.gray_200),
+                            shape: StadiumBorder(),
+                            textStyle: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          child: Text('Cancel'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1898,6 +1924,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     final uiState = viewModel.uiState;
     if (uiState.errorMessage.isNotEmpty) {
       _showValidationMessage(uiState.errorMessage);
+      return;
     }
 
     if (uiState.ocrRawText.isNotEmpty) {
@@ -2139,7 +2166,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                     .read<ActivityViewModel>()
                     .takeReceiptPhoto();
                 if (didSelectReceipt && mounted) {
-                  await _offerReceiptCropThenScan();
+                  await _scanReceipt();
                 }
               },
             ),
@@ -2152,7 +2179,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                     .read<ActivityViewModel>()
                     .chooseReceiptFromGallery();
                 if (didSelectReceipt && mounted) {
-                  await _offerReceiptCropThenScan();
+                  await _scanReceipt();
                 }
               },
             ),
@@ -2183,35 +2210,6 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     if (mounted) {
       setState(() => _hasAppliedOcrValues = false);
     }
-  }
-
-  /// Receipt validation has already succeeded before this dialog is shown.
-  /// The tourist may crop the image or keep the original before OCR starts.
-  Future<void> _offerReceiptCropThenScan() async {
-    final shouldCrop = await _showConfirmationDialog(
-      title: 'Crop Receipt Before Scanning?',
-      message:
-          'You can crop the receipt to remove unnecessary background and improve text recognition.',
-      confirmLabel: 'Crop Receipt',
-      cancelLabel: 'Skip Cropping',
-    );
-    if (!mounted) return;
-
-    if (shouldCrop) {
-      await context.read<ActivityViewModel>().cropSelectedReceipt();
-      if (!mounted) return;
-
-      final errorMessage = context
-          .read<ActivityViewModel>()
-          .uiState
-          .errorMessage;
-      if (errorMessage.isNotEmpty) {
-        _showValidationMessage(errorMessage);
-        return;
-      }
-    }
-
-    await _scanReceipt();
   }
 
   Future<void> _confirmExpense() async {
@@ -2597,6 +2595,14 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
         _unitPriceController.text.trim().isNotEmpty;
   }
 
+  Future<void> _dismissKeyboardBeforePicker() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    for (var attempt = 0; attempt < 8; attempt++) {
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      if (!mounted || MediaQuery.viewInsetsOf(context).bottom == 0) return;
+    }
+  }
+
   Future<void> _pickDate() async {
     final viewModel = context.read<ActivityViewModel>();
     final uiState = viewModel.uiState;
@@ -2634,6 +2640,8 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
         : selectedDate.isAfter(lastDate)
         ? lastDate
         : selectedDate;
+    await _dismissKeyboardBeforePicker();
+    if (!mounted) return;
     final date = await showAppDatePicker(
       context: context,
       initialDate: initialDate,
@@ -2672,6 +2680,8 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
       );
       return;
     }
+    await _dismissKeyboardBeforePicker();
+    if (!mounted) return;
     final time = await showAppTimePicker(
       context: context,
       initialTime: _selectedTime,

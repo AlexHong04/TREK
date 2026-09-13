@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path/path.dart' as path;
@@ -38,28 +37,5 @@ class CameraSource {
 
     final savedFile = await File(tempFilePath).copy(permanentPath);
     return savedFile.path;
-  }
-
-  /// Opens the device crop tool and returns a permanent copy of the cropped
-  /// image. Returning null means the tourist cancelled cropping.
-  Future<String?> cropReceiptImage(String imagePath) async {
-    final croppedImage = await ImageCropper().cropImage(
-      sourcePath: imagePath,
-      compressFormat: ImageCompressFormat.jpg,
-      compressQuality: 90,
-      uiSettings: [
-        AndroidUiSettings(
-          toolbarTitle: 'Crop Receipt',
-          lockAspectRatio: false,
-        ),
-        IOSUiSettings(title: 'Crop Receipt'),
-      ],
-    );
-
-    if (croppedImage == null) {
-      return null;
-    }
-
-    return _saveToPermanentStorage(croppedImage.path);
   }
 }

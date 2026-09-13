@@ -199,13 +199,27 @@ class ExpenseTrackingService implements IExpenseTrackingService {
   @override
   bool isLikelyReceiptText(String receiptText) {
     final normalized = receiptText.toLowerCase();
-    final hasSummaryLabel = RegExp(
-      r'\b(?:grand\s+total|total|subtotal|amount\s+due|cash|change|tax|gst|sst)\b',
+    final hasReceiptLabel = RegExp(
+      r'\b(?:receipt|invoice|order|bill|cashier|table|qty|item|amount|payment|paid|cash|change|subtotal|sub\s+total|grand\s+total|total|amount\s+due|tax|gst|sst|rounding)\b',
     ).hasMatch(normalized);
+    final hasChineseReceiptLabel = RegExp(
+      r'(票据|发票|收据|时间|订单|名称|数量|单价|小计|原价|应收|实收|合计|总计|支付)',
+    ).hasMatch(receiptText);
     final amountCount = _receiptLines(
       receiptText,
     ).expand(_amountsFromLine).length;
-    return hasSummaryLabel && amountCount >= 2;
+    final hasReceiptDateTime = extractReceiptDateTime(receiptText) != null;
+    final hasMerchantHeader = extractMerchantName(receiptText) != null;
+    final tableLikeAmountRows = _receiptLines(receiptText).where((line) {
+      final amounts = _amountsFromLine(line);
+      return amounts.length >= 2;
+    }).length;
+    final hasClearReceiptText =
+        amountCount >= 2 &&
+        (hasReceiptLabel || hasChineseReceiptLabel || tableLikeAmountRows >= 2);
+    final hasMessyReceiptShape =
+        hasReceiptDateTime && hasMerchantHeader && amountCount >= 3;
+    return hasClearReceiptText || hasMessyReceiptShape;
   }
 
   /// Prefers text in the receipt header so uppercase product rows lower down
@@ -290,14 +304,18 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       r'\b(\d{1,2})\s+(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{2,4})\b',
       caseSensitive: false,
     ).firstMatch(receiptText);
-    final timeMatch = RegExp(
-      r'\b(\d{1,2})[:.](\d{2})(?::\d{2})?\s*(AM|PM)?\b',
-      caseSensitive: false,
-    ).firstMatch(receiptText);
 
     if (dateMatch == null && namedDateMatch == null) {
       return null;
     }
+
+    final dateLine = _lineContainingMatch(
+      receiptText,
+      dateMatch ?? namedDateMatch!,
+    );
+    final timeParts =
+        _receiptTimePartsFromText(dateLine) ??
+        _receiptTimePartsFromText(receiptText);
 
     int? day;
     int? month;
@@ -314,9 +332,16 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       month = _monthNumber(namedDateMatch.group(2)!);
       year = int.tryParse(namedDateMatch.group(3)!);
     }
-    var hour = timeMatch == null ? 0 : int.tryParse(timeMatch.group(1)!);
-    final minute = timeMatch == null ? 0 : int.tryParse(timeMatch.group(2)!);
-    final period = timeMatch?.group(3)?.toUpperCase();
+    var hour = timeParts?.hour;
+    final minute = timeParts?.minute;
+    final periodText = timeParts?.period?.toUpperCase().replaceAll('.', '');
+    final period = periodText == null
+        ? null
+        : periodText.startsWith('A')
+        ? 'AM'
+        : periodText.startsWith('P')
+        ? 'PM'
+        : null;
 
     if (day == null ||
         month == null ||
@@ -345,6 +370,49 @@ class ExpenseTrackingService implements IExpenseTrackingService {
         dateTime.minute != minute;
 
     return isInvalidDate ? null : dateTime;
+  }
+
+  String _lineContainingMatch(String text, RegExpMatch match) {
+    final lineStart = text.lastIndexOf('\n', match.start);
+    final lineEnd = text.indexOf('\n', match.end);
+    return text.substring(
+      lineStart < 0 ? 0 : lineStart + 1,
+      lineEnd < 0 ? text.length : lineEnd,
+    );
+  }
+
+  ({int hour, int minute, String? period})? _receiptTimePartsFromText(
+    String text,
+  ) {
+    final colonTimeMatch = RegExp(
+      r'\b(\d{1,2}):(\d{2})(?::\d{2})?\s*([AP][MN]|A\.?M\.?|P\.?M\.?)?\b',
+      caseSensitive: false,
+    ).firstMatch(text);
+    if (colonTimeMatch != null) {
+      final hour = int.tryParse(colonTimeMatch.group(1)!);
+      final minute = int.tryParse(colonTimeMatch.group(2)!);
+      if (hour != null && minute != null) {
+        return (hour: hour, minute: minute, period: colonTimeMatch.group(3));
+      }
+    }
+
+    final dotTimeWithPeriodMatch = RegExp(
+      r'\b(\d{1,2})\.(\d{2})(?::\d{2})?\s*([AP][MN]|A\.?M\.?|P\.?M\.?)\b',
+      caseSensitive: false,
+    ).firstMatch(text);
+    if (dotTimeWithPeriodMatch != null) {
+      final hour = int.tryParse(dotTimeWithPeriodMatch.group(1)!);
+      final minute = int.tryParse(dotTimeWithPeriodMatch.group(2)!);
+      if (hour != null && minute != null) {
+        return (
+          hour: hour,
+          minute: minute,
+          period: dotTimeWithPeriodMatch.group(3),
+        );
+      }
+    }
+
+    return null;
   }
 
   int? _monthNumber(String monthName) {
@@ -606,7 +674,7 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     if (RegExp(r'\bAUD\b|A\$').hasMatch(normalized)) return 'AUD';
     if (RegExp(r'\bCAD\b|C\$').hasMatch(normalized)) return 'CAD';
     if (RegExp(r'\bHKD\b|HK\$').hasMatch(normalized)) return 'HKD';
-    if (RegExp(r'\bUSD\b|\$').hasMatch(normalized)) return 'USD';
+    if (RegExp(r'\bUSD\b|US\$').hasMatch(normalized)) return 'USD';
     if (RegExp(r'\bEUR\b|€').hasMatch(normalized)) return 'EUR';
     if (RegExp(r'\bGBP\b|£').hasMatch(normalized)) return 'GBP';
     if (RegExp(r'\bJPY\b|¥').hasMatch(normalized)) return 'JPY';
