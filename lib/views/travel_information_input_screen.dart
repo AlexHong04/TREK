@@ -10,6 +10,7 @@ import '../widgets/custom_app_bar.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/destination_spending_rates_dialog.dart';
 import '../utils/malaysia_states.dart';
+import '../utils/transit_schedule_helper.dart';
 import '../view_models/ui_state/travel_information_ui_state.dart';
 
 class TravelInformationInputScreen extends StatefulWidget {
@@ -1787,6 +1788,8 @@ class _TravelInformationInputScreenState
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (index > 0) ...[
+                  const SizedBox(height: 12.0),
+                  _buildTransitConnectionCard(context, viewModel, index),
                   const SizedBox(height: 14.0),
                   Divider(color: appTheme.gray_100, height: 1.0),
                   const SizedBox(height: 14.0),
@@ -2167,9 +2170,405 @@ class _TravelInformationInputScreenState
                     ),
                   ],
                 ),
+                _buildScheduleSuggestions(
+                  context: context,
+                  viewModel: viewModel,
+                  index: index,
+                  transitType: departure.type,
+                  currentTime: departure.time,
+                ),
               ],
             );
           }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTransitConnectionCard(
+    BuildContext context,
+    TravelInformationInputViewModel viewModel,
+    int legIndex,
+  ) {
+    if (legIndex <= 0 ||
+        legIndex >= viewModel.uiState.arrivals.length ||
+        legIndex - 1 >= viewModel.uiState.departures.length) {
+      return const SizedBox.shrink();
+    }
+
+    final prevDep = viewModel.uiState.departures[legIndex - 1];
+    final curArr = viewModel.uiState.arrivals[legIndex];
+
+    final durationMin = TransitScheduleHelper.getEstimatedDurationMinutes(
+      transitType: prevDep.type,
+      fromLocation: prevDep.location,
+      toLocation: curArr.location,
+      selectedDestinations: viewModel.uiState.selectedDestinations,
+    );
+    final durationStr = TransitScheduleHelper.formatDuration(durationMin);
+
+    final depLoc = prevDep.location.isNotEmpty
+        ? prevDep.location
+        : 'Transit $legIndex Departure';
+    final arrLoc = curArr.location.isNotEmpty
+        ? curArr.location
+        : 'Transit ${legIndex + 1} Arrival';
+
+    final isOvernight = prevDep.date.isNotEmpty &&
+        curArr.date.isNotEmpty &&
+        prevDep.date != curArr.date;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
+      decoration: BoxDecoration(
+        color: appTheme.teal_50.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(12.0),
+        border: Border.all(
+          color: appTheme.teal_A700.withValues(alpha: 0.25),
+          width: 1.0,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(
+                      _getDepartureTransitIcon(prevDep.type),
+                      size: 14.0,
+                      color: appTheme.teal_700,
+                    ),
+                    const SizedBox(width: 5.0),
+                    Expanded(
+                      child: Text(
+                        'TRANSIT JOURNEY (Leg $legIndex ➔ Leg ${legIndex + 1})',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: 'Inter',
+                          color: appTheme.teal_800,
+                          letterSpacing: 0.3,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6.0),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 7.0, vertical: 2.0),
+                decoration: BoxDecoration(
+                  color: appTheme.teal_A700,
+                  borderRadius: BorderRadius.circular(10.0),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.timer_outlined,
+                      size: 11.0,
+                      color: appTheme.white_A700,
+                    ),
+                    const SizedBox(width: 3.0),
+                    Text(
+                      '~$durationStr',
+                      style: TextStyle(
+                        fontSize: 10.0,
+                        fontWeight: FontWeight.w700,
+                        fontFamily: 'Inter',
+                        color: appTheme.white_A700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8.0),
+          Row(
+            children: [
+              // Origin
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      depLoc,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Inter',
+                        color: appTheme.gray_800,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2.0),
+                    Text(
+                      prevDep.time.isNotEmpty ? prevDep.time : '09:00 AM',
+                      style: TextStyle(
+                        fontSize: 12.0,
+                        fontWeight: FontWeight.w700,
+                        fontFamily: 'Inter',
+                        color: appTheme.teal_800,
+                      ),
+                    ),
+                    if (prevDep.date.isNotEmpty)
+                      Text(
+                        prevDep.date,
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontFamily: 'Inter',
+                          color: appTheme.blue_gray_300,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.arrow_forward_rounded,
+                      size: 16.0,
+                      color: appTheme.teal_700,
+                    ),
+                    Text(
+                      durationStr,
+                      style: TextStyle(
+                        fontSize: 9.0,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Inter',
+                        color: appTheme.teal_700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Destination
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      arrLoc,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Inter',
+                        color: appTheme.gray_800,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2.0),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        if (isOvernight) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 4.0, vertical: 1.0),
+                            margin: const EdgeInsets.only(right: 3.0),
+                            decoration: BoxDecoration(
+                              color: appTheme.teal_700.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(4.0),
+                            ),
+                            child: Text(
+                              '+1d',
+                              style: TextStyle(
+                                fontSize: 9.0,
+                                fontWeight: FontWeight.w700,
+                                fontFamily: 'Inter',
+                                color: appTheme.teal_800,
+                              ),
+                            ),
+                          ),
+                        ],
+                        Text(
+                          curArr.time.isNotEmpty ? curArr.time : '01:30 PM',
+                          style: TextStyle(
+                            fontSize: 12.0,
+                            fontWeight: FontWeight.w700,
+                            fontFamily: 'Inter',
+                            color: appTheme.teal_800,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (curArr.date.isNotEmpty)
+                      Text(
+                        curArr.date,
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontFamily: 'Inter',
+                          color: appTheme.blue_gray_300,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6.0),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  'Calculated for ${prevDep.type} journey in Malaysia',
+                  style: TextStyle(
+                    fontSize: 10.0,
+                    fontFamily: 'Inter',
+                    fontStyle: FontStyle.italic,
+                    color: appTheme.blue_gray_300,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 6.0),
+              InkWell(
+                onTap: () {
+                  viewModel.syncLegArrivalWithDepartureDuration(legIndex);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Transit ${legIndex + 1} arrival synced to departure + $durationStr duration.',
+                      ),
+                      backgroundColor: appTheme.teal_A700,
+                      duration: const Duration(seconds: 2),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
+                borderRadius: BorderRadius.circular(6.0),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 4.0, vertical: 2.0),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.sync_rounded,
+                        size: 12.0,
+                        color: appTheme.teal_700,
+                      ),
+                      const SizedBox(width: 3.0),
+                      Text(
+                        'Sync Arrival',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Inter',
+                          color: appTheme.teal_700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScheduleSuggestions({
+    required BuildContext context,
+    required TravelInformationInputViewModel viewModel,
+    required int index,
+    required String transitType,
+    required String currentTime,
+  }) {
+    final times =
+        TransitScheduleHelper.getPopularScheduleDepartureTimes(transitType);
+    if (times.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.schedule_rounded,
+                size: 12.0,
+                color: appTheme.teal_700,
+              ),
+              const SizedBox(width: 4.0),
+              Text(
+                'Popular $transitType Timetable Slots:',
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Inter',
+                  color: appTheme.blue_gray_300,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 5.0),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: times.map((t) {
+                final isSelected = currentTime.trim() == t.trim();
+                return Padding(
+                  padding: const EdgeInsets.only(right: 6.0),
+                  child: InkWell(
+                    onTap: () => viewModel.updateDepartureTime(index, t),
+                    borderRadius: BorderRadius.circular(6.0),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8.0,
+                        vertical: 3.5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? appTheme.teal_A700.withValues(alpha: 0.12)
+                            : appTheme.gray_50_01,
+                        borderRadius: BorderRadius.circular(6.0),
+                        border: Border.all(
+                          color: isSelected
+                              ? appTheme.teal_A700
+                              : appTheme.gray_200,
+                          width: 1.0,
+                        ),
+                      ),
+                      child: Text(
+                        t,
+                        style: TextStyle(
+                          fontSize: 11.0,
+                          fontWeight:
+                              isSelected ? FontWeight.w700 : FontWeight.w500,
+                          fontFamily: 'Inter',
+                          color: isSelected
+                              ? appTheme.teal_800
+                              : appTheme.blue_gray_700,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
         ],
       ),
     );

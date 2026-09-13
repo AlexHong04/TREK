@@ -436,24 +436,15 @@ class ActivityViewModel extends ChangeNotifier {
   }
 
   void removeReceiptAndOcrData() {
-    final retainedItems = <ExpenseItem>[];
-    for (var index = 0; index < _uiState.draftExpenseItems.length; index++) {
-      if (!_uiState.ocrDraftItemIndexes.contains(index)) {
-        retainedItems.add(_uiState.draftExpenseItems[index]);
-      }
-    }
     _uiState = _uiState.copyWith(
       receiptLocalPath: '',
       clearOcrData: true,
-      draftExpenseItems: retainedItems,
+      draftExpenseItems: const [],
       draftTaxAmount: 0.0,
       draftDiscountAmount: 0.0,
       draftRoundingAmount: 0.0,
       draftAutoRounding: false,
-      draftTotalAmount: _expenseTrackingService.calculateTotalExpense(
-        retainedItems,
-        0.0,
-      ),
+      draftTotalAmount: 0.0,
       ocrDraftItemIndexes: const {},
       draftTaxFromOcr: false,
       errorMessage: '',
