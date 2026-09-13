@@ -42,3 +42,74 @@ class ActivityLocalDataSource {
     await prefs.remove('$_keyPrefix$tripId');
   }
 }
+
+class ExpenseDraftLocalDataSource {
+  static const String _keyPrefix = 'expense_manual_draft_';
+
+  String _key({
+    required String userId,
+    required String tripId,
+    required String activityId,
+  }) =>
+      '$_keyPrefix${userId}_${tripId}_$activityId';
+
+  Future<void> saveDraftItems({
+    required String userId,
+    required String tripId,
+    required String activityId,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    if (userId.isEmpty || tripId.isEmpty || activityId.isEmpty) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final key = _key(userId: userId, tripId: tripId, activityId: activityId);
+    if (items.isEmpty) {
+      await prefs.remove(key);
+      return;
+    }
+
+    await prefs.setString(key, jsonEncode(items));
+  }
+
+  Future<List<Map<String, dynamic>>> loadDraftItems({
+    required String userId,
+    required String tripId,
+    required String activityId,
+  }) async {
+    if (userId.isEmpty || tripId.isEmpty || activityId.isEmpty) {
+      return const [];
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(
+        _key(userId: userId, tripId: tripId, activityId: activityId),
+      );
+      if (raw == null || raw.isEmpty) return const [];
+
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return const [];
+
+      return decoded
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+    } catch (error) {
+      debugPrint('[ExpenseDraft] Error loading manual draft: $error');
+      return const [];
+    }
+  }
+
+  Future<void> clearDraftItems({
+    required String userId,
+    required String tripId,
+    required String activityId,
+  }) async {
+    if (userId.isEmpty || tripId.isEmpty || activityId.isEmpty) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(
+      _key(userId: userId, tripId: tripId, activityId: activityId),
+    );
+  }
+}

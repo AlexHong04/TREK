@@ -10,6 +10,7 @@ import '../../models/entities/expense_item.dart';
 import '../../models/local_data_source/camera_source.dart';
 import '../../models/local_data_source/gallery_source.dart';
 import '../../models/local_data_source/notification_source.dart';
+import '../../models/local_data_source/shared_preferences_source.dart';
 import '../../models/repository/expense_repository.dart';
 import '../../models/repository/i_itinerary_repository.dart';
 import '../../models/services/budget_service.dart';
@@ -38,6 +39,8 @@ class ActivityViewModel extends ChangeNotifier {
   final GallerySource _gallerySource = GallerySource();
   final NotificationSource _notificationSource = NotificationSource();
   final LocationSource _locationSource = LocationSource();
+  final ExpenseDraftLocalDataSource _expenseDraftLocalDataSource =
+      ExpenseDraftLocalDataSource();
 
   ActivityViewModel({
     IItineraryService? itineraryService,
@@ -143,6 +146,11 @@ class ActivityViewModel extends ChangeNotifier {
         recordedExpenses: recordedExpenses,
         isLoadingRecordedExpenses: false,
       );
+      if (recordedExpenses.isEmpty) {
+        unawaited(_restoreManualExpenseDraftForSelectedActivity());
+      } else {
+        unawaited(_clearManualExpenseDraftForSelectedActivity());
+      }
     } catch (error) {
       _uiState = _uiState.copyWith(
         recordedExpenses: const [],
@@ -183,6 +191,7 @@ class ActivityViewModel extends ChangeNotifier {
 
   void addExpenseItem(ExpenseItem item) {
     _updateDraftExpenseItems([..._uiState.draftExpenseItems, item]);
+    unawaited(_saveManualExpenseDraftForSelectedActivity());
   }
 
   void updateExpenseItem(int index, ExpenseItem item) {
@@ -194,6 +203,7 @@ class ActivityViewModel extends ChangeNotifier {
     final updatedItems = [..._uiState.draftExpenseItems];
     updatedItems[index] = item;
     _updateDraftExpenseItems(updatedItems);
+    unawaited(_saveManualExpenseDraftForSelectedActivity());
   }
 
   void removeExpenseItem(int index) {
@@ -208,11 +218,13 @@ class ActivityViewModel extends ChangeNotifier {
         .map((ocrIndex) => ocrIndex > index ? ocrIndex - 1 : ocrIndex)
         .toSet();
     _updateDraftExpenseItems(updatedItems, ocrItemIndexes: updatedOcrIndexes);
+    unawaited(_saveManualExpenseDraftForSelectedActivity());
   }
 
   /// Removes only unsaved draft items after the tourist agrees to replace them
   /// with OCR results. Confirmed Expense records are never changed here.
   void clearDraftExpenseItemsForOcr() {
+    unawaited(_clearManualExpenseDraftForSelectedActivity());
     _uiState = _uiState.copyWith(
       draftExpenseItems: const [],
       draftTaxAmount: 0.0,
@@ -436,6 +448,7 @@ class ActivityViewModel extends ChangeNotifier {
   }
 
   void removeReceiptAndOcrData() {
+    unawaited(_clearManualExpenseDraftForSelectedActivity());
     _uiState = _uiState.copyWith(
       receiptLocalPath: '',
       clearOcrData: true,
@@ -496,6 +509,7 @@ class ActivityViewModel extends ChangeNotifier {
         ocrItemIndexes: const {0},
         taxFromOcr: _uiState.ocrExtractedTax != null,
       );
+      unawaited(_clearManualExpenseDraftForSelectedActivity());
       return 1;
     }
 
@@ -511,6 +525,7 @@ class ActivityViewModel extends ChangeNotifier {
       ),
       taxFromOcr: _uiState.ocrExtractedTax != null || inferredTax > 0,
     );
+    unawaited(_clearManualExpenseDraftForSelectedActivity());
     return expenseItems.length;
   }
 
@@ -1010,6 +1025,7 @@ class ActivityViewModel extends ChangeNotifier {
             ? null
             : _uiState.receiptLocalPath,
       );
+      await _clearManualExpenseDraftForSelectedActivity();
 
       final updatedTrip = await _budgetService.deductRemainingBudget(
         tripId: _uiState.tripId,
@@ -1125,6 +1141,73 @@ class ActivityViewModel extends ChangeNotifier {
     if (_uiState.budgetAlertMessage.isEmpty) return;
     _uiState = _uiState.copyWith(budgetAlertMessage: '');
     notifyListeners();
+  }
+
+  bool get _hasReceiptOrOcrDraft =>
+      _uiState.receiptLocalPath.isNotEmpty ||
+      _uiState.ocrRawText.isNotEmpty ||
+      _uiState.ocrDraftItemIndexes.isNotEmpty;
+
+  String get _manualDraftUserId => _authService.currentUserId ?? '';
+
+  bool get _canUseManualExpenseDraft =>
+      !_hasReceiptOrOcrDraft && _uiState.recordedExpenses.isEmpty;
+
+  Future<void> _saveManualExpenseDraftForSelectedActivity() async {
+    final selectedActivity = _uiState.selectedActivity;
+    if (selectedActivity == null) return;
+
+    if (!_canUseManualExpenseDraft) {
+      await _clearManualExpenseDraftForSelectedActivity();
+      return;
+    }
+
+    await _expenseDraftLocalDataSource.saveDraftItems(
+      userId: _manualDraftUserId,
+      tripId: _uiState.tripId,
+      activityId: selectedActivity.activitiesId,
+      items: _uiState.draftExpenseItems.map((item) => item.toJson()).toList(),
+    );
+  }
+
+  Future<void> _restoreManualExpenseDraftForSelectedActivity() async {
+    final selectedActivity = _uiState.selectedActivity;
+    if (selectedActivity == null || !_canUseManualExpenseDraft) return;
+
+    final activityId = selectedActivity.activitiesId;
+    final itemsJson = await _expenseDraftLocalDataSource.loadDraftItems(
+      userId: _manualDraftUserId,
+      tripId: _uiState.tripId,
+      activityId: activityId,
+    );
+    if (itemsJson.isEmpty) return;
+
+    if (_uiState.selectedActivity?.activitiesId != activityId ||
+        !_canUseManualExpenseDraft ||
+        _uiState.draftExpenseItems.isNotEmpty) {
+      return;
+    }
+
+    try {
+      final restoredItems = itemsJson
+          .map((itemJson) => ExpenseItem.fromJson(itemJson))
+          .toList();
+      _updateDraftExpenseItems(restoredItems);
+    } catch (error) {
+      debugPrint('[ExpenseDraft] Error restoring manual draft: $error');
+      await _clearManualExpenseDraftForSelectedActivity();
+    }
+  }
+
+  Future<void> _clearManualExpenseDraftForSelectedActivity() async {
+    final selectedActivity = _uiState.selectedActivity;
+    if (selectedActivity == null) return;
+
+    await _expenseDraftLocalDataSource.clearDraftItems(
+      userId: _manualDraftUserId,
+      tripId: _uiState.tripId,
+      activityId: selectedActivity.activitiesId,
+    );
   }
 
   void _updateDraftExpenseItems(
