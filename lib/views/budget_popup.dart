@@ -779,7 +779,7 @@ Future<void> showBudgetRecoveryDialog({
                         amount <= shortageAmount;
 
                     return _buildActionButton(
-                      text: 'Top-up Budget',
+                      text: 'Top-up',
                       onPressed: isValid
                           ? () async {
                               final amount = double.parse(value.text.trim());
@@ -982,7 +982,7 @@ Future<void> showInitialBudgetInsufficientDialog({
                           enteredAmount <= roundCurrency(validationShortageAmount);
 
                   return _buildActionButton(
-                    text: 'Top-up Budget',
+                    text: 'Top-up',
                     onPressed: isValid
                         ? () async {
                             final amount = double.parse(value.text.trim());
@@ -1133,7 +1133,7 @@ Future<void> showTopUpConfirmation({
 }) {
   return _showTwoButtonsBudgetDialog(
     context: context,
-    title: 'Top-up Budget',
+    title: 'Top-up',
     messages: symbol != 'MYR'
         ? [
       'Are you sure you want to top-up '
@@ -1161,7 +1161,7 @@ Future<void> showInitialTopUpConfirmation({
 }) {
   return _showTwoButtonsBudgetDialog(
     context: context,
-    title: 'Top-up Budget',
+    title: 'Top-up',
     messages: [
       'Are you sure you want to top-up MYR ${convertedAmt.toStringAsFixed(2)} ($symbol ${topUpAmount.toStringAsFixed(2)})?',
     ],
