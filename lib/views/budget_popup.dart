@@ -488,20 +488,19 @@ Widget _buildTopUpCard(
 }
 
 Widget _buildInitialTopUpCard(
-    TextEditingController controller, {
-      required String symbol,
-      required double minTopUp,
-      required double shortageAmount,
-      required String? Function({
-      String? symbol,
-      required String value,
-      required double minTopUp,
-      required double shortageAmount,
-      }) validateTopUpAmount,
-      required Future<double?> Function({
-      required double amount,
-      }) convertToMYR,
-    }) {
+  TextEditingController controller, {
+  required String symbol,
+  double? minTopUp,
+  required double shortageAmount,
+  required String? Function({
+    String? symbol,
+    required String value,
+    required double minTopUp,
+    required double shortageAmount,
+  })
+  validateTopUpAmount,
+  required Future<double?> Function({required double amount}) convertToMYR,
+}) {
   return ValueListenableBuilder<TextEditingValue>(
     valueListenable: controller,
     builder: (context, value, child) {
@@ -510,7 +509,7 @@ Widget _buildInitialTopUpCard(
       final errorText = validateTopUpAmount(
         symbol: symbol,
         value: value.text,
-        minTopUp: minTopUp,
+        minTopUp: minTopUp ?? 0,
         shortageAmount: shortageAmount,
       );
 
@@ -524,97 +523,91 @@ Widget _buildInitialTopUpCard(
         prefixIcon: Icons.account_balance_wallet_outlined,
         prefixIconColor: appTheme.teal_A700,
         controller: controller,
-        keyboardType: const TextInputType.numberWithOptions(
-          decimal: true,
-        ),
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
         margin: EdgeInsets.zero,
         errorText: errorText,
 
         bottomWidget:
-        enteredAmount != null &&
-            enteredAmount > 0 &&
-            symbol != 'MYR'
+            enteredAmount != null && enteredAmount > 0 && symbol != 'MYR'
             ? FutureBuilder<double?>(
-          future: convertToMYR(amount: enteredAmount),
-          builder: (context, snapshot) {
-            final convertedAmount = snapshot.data;
+                future: convertToMYR(amount: enteredAmount),
+                builder: (context, snapshot) {
+                  final convertedAmount = snapshot.data;
 
-            return Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 14.0,
-                vertical: 10.0,
-              ),
-              decoration: BoxDecoration(
-                color: appTheme.teal_50.withValues(alpha: 0.45),
-                borderRadius: BorderRadius.circular(12.0),
-                border: Border.all(
-                  color: appTheme.teal_A700.withValues(alpha: 0.2),
-                  width: 1.0,
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment:
-                MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.currency_exchange_rounded,
-                        size: 16,
-                        color: appTheme.teal_700,
+                  return Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14.0,
+                      vertical: 10.0,
+                    ),
+                    decoration: BoxDecoration(
+                      color: appTheme.teal_50.withValues(alpha: 0.45),
+                      borderRadius: BorderRadius.circular(12.0),
+                      border: Border.all(
+                        color: appTheme.teal_A700.withValues(alpha: 0.2),
+                        width: 1.0,
                       ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Equivalent Value:',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          fontFamily: 'Inter',
-                          color: appTheme.blue_gray_700,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.currency_exchange_rounded,
+                              size: 16,
+                              color: appTheme.teal_700,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Equivalent Value:',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'Inter',
+                                color: appTheme.blue_gray_700,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
 
-                  const SizedBox(width: 12),
+                        const SizedBox(width: 12),
 
-                  Column(
-                    crossAxisAlignment:
-                    CrossAxisAlignment.end,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '$symbol ${enteredAmount.toStringAsFixed(2)}',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          fontFamily: 'Inter',
-                          color: appTheme.teal_800,
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '$symbol ${enteredAmount.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                                fontFamily: 'Inter',
+                                color: appTheme.teal_800,
+                              ),
+                            ),
+
+                            Text(
+                              snapshot.connectionState ==
+                                      ConnectionState.waiting
+                                  ? 'Converting...'
+                                  : convertedAmount != null
+                                  ? 'MYR ${convertedAmount.toStringAsFixed(2)}'
+                                  : 'Unable to convert',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'Inter',
+                                color: appTheme.blue_gray_700,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-
-                      Text(
-                        snapshot.connectionState ==
-                            ConnectionState.waiting
-                            ? 'Converting...'
-                            : convertedAmount != null
-                            ? 'MYR ${convertedAmount.toStringAsFixed(2)}'
-                            : 'Unable to convert',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          fontFamily: 'Inter',
-                          color: appTheme.blue_gray_700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            );
-          },
-        )
+                      ],
+                    ),
+                  );
+                },
+              )
             : null,
       );
     },
@@ -914,11 +907,12 @@ Future<void> showInitialBudgetInsufficientDialog({
   required Future<bool> Function(double amount) onTopUpBudget,
   required Future<double?> Function({required double amount}) convertToMYR,
   required String? Function({
-  String? symbol,
-  required String value,
-  required double minTopUp,
-  required double shortageAmount,
-  }) validateTopUpAmount,
+    String? symbol,
+    required String value,
+    required double minTopUp,
+    required double shortageAmount,
+  })
+  validateTopUpAmount,
 }) {
   final controller = TextEditingController();
 
@@ -933,8 +927,8 @@ Future<void> showInitialBudgetInsufficientDialog({
             ? _buildWishlistSummaryCard(
                 primaryLabel: 'Estimated Budget Shortage Amount',
                 primaryValue: shortageAmount,
-                secondaryLabel: 'Minimum Top Up Amount',
-                secondaryValue: minTopUp,
+                // secondaryLabel: 'Minimum Top Up Amount',
+                // secondaryValue: minTopUp,
                 thirdLabel: 'Wishlist Covered',
                 thirdValue: '${wishlistCovered.toString()} item(s)',
               )
@@ -950,14 +944,23 @@ Future<void> showInitialBudgetInsufficientDialog({
         contentCard: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildInitialTopUpCard(
-              controller,
-              symbol: symbol ?? 'MYR',
-              minTopUp: minTopUp,
-              shortageAmount: shortageAmount,
-              validateTopUpAmount: validateTopUpAmount,
-              convertToMYR: convertToMYR,
-            ),
+            wishlistCovered != null
+                ? _buildInitialTopUpCard(
+                    controller,
+                    symbol: symbol ?? 'MYR',
+                    minTopUp: null,
+                    shortageAmount: shortageAmount,
+                    validateTopUpAmount: validateTopUpAmount,
+                    convertToMYR: convertToMYR,
+                  )
+                : _buildInitialTopUpCard(
+                    controller,
+                    symbol: symbol ?? 'MYR',
+                    minTopUp: minTopUp,
+                    shortageAmount: shortageAmount,
+                    validateTopUpAmount: validateTopUpAmount,
+                    convertToMYR: convertToMYR,
+                  ),
           ],
         ),
 
@@ -986,10 +989,19 @@ Future<void> showInitialBudgetInsufficientDialog({
                       ? null
                       : roundCurrency(amount);
 
-                  final isValid =
+                  bool isValid = false;
+
+                  if (wishlistCovered != null) {
+                    isValid =
+                        enteredAmount != null &&
+                        enteredAmount ==
+                            roundCurrency(validationShortageAmount);
+                  }
+
+                  isValid =
                       enteredAmount != null &&
-                          enteredAmount >= roundCurrency(validationMinTopUp) &&
-                          enteredAmount <= roundCurrency(validationShortageAmount);
+                      enteredAmount >= roundCurrency(validationMinTopUp) &&
+                      enteredAmount <= roundCurrency(validationShortageAmount);
 
                   return _buildActionButton(
                     text: 'Top-up',
@@ -1146,14 +1158,14 @@ Future<void> showTopUpConfirmation({
     title: 'Top-up',
     messages: symbol != 'MYR'
         ? [
-      'Are you sure you want to top-up '
-          'MYR ${topUpAmount.toStringAsFixed(2)} '
-          '($symbol ${convertedAmt.toStringAsFixed(2)})?',
-    ]
+            'Are you sure you want to top-up '
+                'MYR ${topUpAmount.toStringAsFixed(2)} '
+                '($symbol ${convertedAmt.toStringAsFixed(2)})?',
+          ]
         : [
-      'Are you sure you want to top-up '
-          'MYR ${topUpAmount.toStringAsFixed(2)}?',
-    ],
+            'Are you sure you want to top-up '
+                'MYR ${topUpAmount.toStringAsFixed(2)}?',
+          ],
     color: appTheme.black,
     icon: false,
     onCancel: onCancel,

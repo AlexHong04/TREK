@@ -12,9 +12,13 @@ Future<TimeOfDay?> showAppTimePicker({
   return showDialog<TimeOfDay>(
     context: context,
     barrierColor: appTheme.gray_900.withValues(alpha: 0.25),
-    builder: (_) => _AppTimePickerDialog(
-      initialTime: initialTime,
-      isSelectable: isSelectable,
+    builder: (dialogContext) => MediaQuery.removeViewInsets(
+      context: dialogContext,
+      removeBottom: true,
+      child: _AppTimePickerDialog(
+        initialTime: initialTime,
+        isSelectable: isSelectable,
+      ),
     ),
   );
 }

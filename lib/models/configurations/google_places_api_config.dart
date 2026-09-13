@@ -140,8 +140,70 @@ class GooglePlacesApiConfig {
     return null;
   }
 
+  static bool _isSecondaryTextInDestinations(
+    String secondaryText,
+    List<String> destinations,
+  ) {
+    if (secondaryText.isEmpty) return true;
+    final secLower = secondaryText.toLowerCase();
+
+    for (final dest in destinations) {
+      final dLower = dest.toLowerCase().trim();
+      if (secLower.contains(dLower)) return true;
+      if (dLower == 'penang' &&
+          (secLower.contains('pulau pinang') ||
+              secLower.contains('george town') ||
+              secLower.contains('butterworth') ||
+              secLower.contains('batu ferringhi') ||
+              secLower.contains('bayan lepas'))) {
+        return true;
+      }
+      if ((dLower == 'melaka' || dLower == 'malacca') &&
+          (secLower.contains('melaka') || secLower.contains('malacca'))) {
+        return true;
+      }
+      if (dLower == 'kuala lumpur' &&
+          (secLower.contains('kuala lumpur') || secLower.contains('kl'))) {
+        return true;
+      }
+    }
+
+    final otherStates = [
+      'kuala lumpur',
+      'penang',
+      'pulau pinang',
+      'selangor',
+      'johor',
+      'perak',
+      'kedah',
+      'pahang',
+      'sabah',
+      'sarawak',
+      'melaka',
+      'malacca',
+      'terengganu',
+      'kelantan',
+      'negeri sembilan',
+      'perlis',
+      'putrajaya',
+      'labuan',
+    ];
+    for (final state in otherStates) {
+      if (secLower.contains(state)) {
+        final matchesAnyDest = destinations.any(
+          (d) =>
+              d.toLowerCase().contains(state) ||
+              state.contains(d.toLowerCase()),
+        );
+        if (!matchesAnyDest) return false;
+      }
+    }
+
+    return true;
+  }
+
   /// Searches Google Places (New) Autocomplete for a query and returns a list of suggested place names.
-  /// When [destinations] is provided, suggestions are biased towards the selected destinations.
+  /// When [destinations] is provided, suggestions are strictly filtered to the selected destinations.
   static Future<List<String>> getAutocompleteSuggestions(
     String query, {
     List<String>? destinations,
@@ -159,20 +221,10 @@ class GooglePlacesApiConfig {
       return await _fetchAutocomplete(trimmedQuery);
     }
 
-    // If query already contains any of the selected destination names, query directly
-    final lowerQuery = trimmedQuery.toLowerCase();
-    final alreadyIncludesDestination = validDestinations.any(
-      (dest) => lowerQuery.contains(dest.toLowerCase()),
-    );
-
-    if (alreadyIncludesDestination) {
-      return await _fetchAutocomplete(trimmedQuery);
-    }
-
-    // Query for each selected destination in parallel (capped at 3 for performance)
+    // Query for each selected destination strictly
     final targetDestinations = validDestinations.take(3).toList();
     final futures = targetDestinations.map(
-      (dest) => _fetchAutocomplete('$trimmedQuery, $dest'),
+      (dest) => _fetchAutocomplete('$trimmedQuery, $dest', validDestinations),
     );
 
     final resultsList = await Future.wait(futures);
@@ -185,21 +237,14 @@ class GooglePlacesApiConfig {
       }
     }
 
-    // Supplement with generic search if fewer than 3 results
-    if (combined.length < 3) {
-      final fallback = await _fetchAutocomplete(trimmedQuery);
-      for (final item in fallback) {
-        if (!isParkingText(item)) {
-          combined.add(item);
-        }
-      }
-    }
-
     return combined.take(6).toList();
   }
 
   /// Extracts place suggestion names excluding any parking facilities or parking lots.
-  static List<String> _extractNonParkingSuggestions(List suggestions) {
+  static List<String> _extractNonParkingSuggestions(
+    List suggestions, [
+    List<String>? allowedDestinations,
+  ]) {
     final List<String> results = [];
     for (final s in suggestions) {
       final placePrediction = s['placePrediction'];
@@ -208,6 +253,15 @@ class GooglePlacesApiConfig {
       if (_isParkingPrediction(placePrediction)) continue;
 
       final structured = placePrediction['structuredFormat'];
+      final secondaryText =
+          (structured?['secondaryText']?['text'] as String? ?? '').toLowerCase();
+
+      if (allowedDestinations != null && allowedDestinations.isNotEmpty) {
+        if (!_isSecondaryTextInDestinations(secondaryText, allowedDestinations)) {
+          continue;
+        }
+      }
+
       final mainText = structured?['mainText']?['text'] as String?;
       final fullText = placePrediction['text']?['text'] as String?;
       final text = mainText?.trim() ?? fullText?.trim();
@@ -257,7 +311,10 @@ class GooglePlacesApiConfig {
     return parkingPattern.hasMatch(lower);
   }
 
-  static Future<List<String>> _fetchAutocomplete(String inputQuery) async {
+  static Future<List<String>> _fetchAutocomplete(
+    String inputQuery, [
+    List<String>? allowedDestinations,
+  ]) async {
     final String directUrlStr =
         'https://places.googleapis.com/v1/places:autocomplete';
 
@@ -286,7 +343,10 @@ class GooglePlacesApiConfig {
           final data = jsonDecode(response.body);
           final suggestions = data['suggestions'] as List?;
           if (suggestions != null) {
-            return _extractNonParkingSuggestions(suggestions);
+            return _extractNonParkingSuggestions(
+              suggestions,
+              allowedDestinations,
+            );
           }
         } else {
           debugPrint(
@@ -303,7 +363,10 @@ class GooglePlacesApiConfig {
           final data = jsonDecode(response.body);
           final suggestions = data['suggestions'] as List?;
           if (suggestions != null) {
-            return _extractNonParkingSuggestions(suggestions);
+            return _extractNonParkingSuggestions(
+              suggestions,
+              allowedDestinations,
+            );
           }
         } else {
           try {
@@ -394,16 +457,22 @@ class GooglePlacesApiConfig {
     );
 
     if (alreadyIncludesDestination) {
-      final results = await _fetchHotelAutocomplete(trimmedQuery);
+      final results = await _fetchHotelAutocomplete(
+        trimmedQuery,
+        validDestinations,
+      );
       if (results.isNotEmpty) return deduplicateHotels(results).take(6).toList();
-      final fallback = await _fetchHotelAutocomplete('$trimmedQuery Hotel');
+      final fallback = await _fetchHotelAutocomplete(
+        '$trimmedQuery Hotel',
+        validDestinations,
+      );
       return deduplicateHotels(fallback).take(6).toList();
     }
 
     // Query for each selected destination in parallel
     final targetDestinations = validDestinations.take(3).toList();
     final futures = targetDestinations.map(
-      (dest) => _fetchHotelAutocomplete('$trimmedQuery, $dest'),
+      (dest) => _fetchHotelAutocomplete('$trimmedQuery, $dest', validDestinations),
     );
     final resultsList = await Future.wait(futures);
     final List<String> combined = [];
@@ -412,23 +481,27 @@ class GooglePlacesApiConfig {
     }
 
     if (deduplicateHotels(combined).length < 2) {
-      final fallback = await _fetchHotelAutocomplete(
-        lowerQuery.contains('hotel') ? trimmedQuery : '$trimmedQuery Hotel',
+      final fallbackFutures = targetDestinations.map(
+        (dest) => _fetchHotelAutocomplete(
+          lowerQuery.contains('hotel')
+              ? '$trimmedQuery, $dest'
+              : '$trimmedQuery Hotel, $dest',
+          validDestinations,
+        ),
       );
-      combined.addAll(fallback);
-    }
-
-    if (combined.isEmpty) {
-      final generic = await _fetchHotelAutocomplete(trimmedQuery);
-      combined.addAll(generic);
+      final fallbackResults = await Future.wait(fallbackFutures);
+      for (final list in fallbackResults) {
+        combined.addAll(list);
+      }
     }
 
     return deduplicateHotels(combined).take(6).toList();
   }
 
   static Future<List<String>> _fetchHotelAutocomplete(
-    String inputQuery,
-  ) async {
+    String inputQuery, [
+    List<String>? allowedDestinations,
+  ]) async {
     final String directUrlStr =
         'https://places.googleapis.com/v1/places:autocomplete';
 
@@ -459,10 +532,21 @@ class GooglePlacesApiConfig {
             final List<String> parsedList = [];
             for (final s in suggestions) {
               final structured = s['placePrediction']?['structuredFormat'];
-              final mainText =
-                  structured?['mainText']?['text'] as String?;
-              final fullText =
-                  s['placePrediction']?['text']?['text'] as String?;
+              final secondaryText =
+                  (structured?['secondaryText']?['text'] as String? ?? '')
+                      .toLowerCase();
+
+              if (allowedDestinations != null && allowedDestinations.isNotEmpty) {
+                if (!_isSecondaryTextInDestinations(
+                  secondaryText,
+                  allowedDestinations,
+                )) {
+                  continue;
+                }
+              }
+
+              final mainText = structured?['mainText']?['text'] as String?;
+              final fullText = s['placePrediction']?['text']?['text'] as String?;
               final text = mainText?.trim() ?? fullText?.trim();
               if (text != null && text.isNotEmpty) {
                 parsedList.add(text);
@@ -484,10 +568,21 @@ class GooglePlacesApiConfig {
             final List<String> parsedList = [];
             for (final s in suggestions) {
               final structured = s['placePrediction']?['structuredFormat'];
-              final mainText =
-                  structured?['mainText']?['text'] as String?;
-              final fullText =
-                  s['placePrediction']?['text']?['text'] as String?;
+              final secondaryText =
+                  (structured?['secondaryText']?['text'] as String? ?? '')
+                      .toLowerCase();
+
+              if (allowedDestinations != null && allowedDestinations.isNotEmpty) {
+                if (!_isSecondaryTextInDestinations(
+                  secondaryText,
+                  allowedDestinations,
+                )) {
+                  continue;
+                }
+              }
+
+              final mainText = structured?['mainText']?['text'] as String?;
+              final fullText = s['placePrediction']?['text']?['text'] as String?;
               final text = mainText?.trim() ?? fullText?.trim();
               if (text != null && text.isNotEmpty) {
                 parsedList.add(text);
@@ -524,7 +619,7 @@ class GooglePlacesApiConfig {
 
       final targetDestinations = validDestinations.take(3).toList();
       final futures = targetDestinations.map(
-        (dest) => _fetchAirportAutocomplete('$dest Airport'),
+        (dest) => _fetchAirportAutocomplete('$dest Airport', validDestinations),
       );
       final resultsList = await Future.wait(futures);
       final Set<String> combined = {};
@@ -554,15 +649,16 @@ class GooglePlacesApiConfig {
     if (alreadyIncludesDestination) {
       final results = await _fetchAirportAutocomplete(
         lowerQuery.contains('airport') ? trimmedQuery : '$trimmedQuery Airport',
+        validDestinations,
       );
       if (results.isNotEmpty) return results;
-      return await _fetchAirportAutocomplete(trimmedQuery);
+      return await _fetchAirportAutocomplete(trimmedQuery, validDestinations);
     }
 
     // Query for each selected destination in parallel
     final targetDestinations = validDestinations.take(3).toList();
     final futures = targetDestinations.map(
-      (dest) => _fetchAirportAutocomplete('$trimmedQuery, $dest'),
+      (dest) => _fetchAirportAutocomplete('$trimmedQuery, $dest', validDestinations),
     );
     final resultsList = await Future.wait(futures);
     final Set<String> combined = {};
@@ -571,23 +667,27 @@ class GooglePlacesApiConfig {
     }
 
     if (combined.length < 2) {
-      final fallback = await _fetchAirportAutocomplete(
-        lowerQuery.contains('airport') ? trimmedQuery : '$trimmedQuery Airport',
+      final fallbackFutures = targetDestinations.map(
+        (dest) => _fetchAirportAutocomplete(
+          lowerQuery.contains('airport')
+              ? '$trimmedQuery, $dest'
+              : '$trimmedQuery Airport, $dest',
+          validDestinations,
+        ),
       );
-      combined.addAll(fallback);
-    }
-
-    if (combined.isEmpty) {
-      final generic = await _fetchAirportAutocomplete(trimmedQuery);
-      combined.addAll(generic);
+      final fallbackResults = await Future.wait(fallbackFutures);
+      for (final list in fallbackResults) {
+        combined.addAll(list);
+      }
     }
 
     return combined.take(6).toList();
   }
 
   static Future<List<String>> _fetchAirportAutocomplete(
-    String inputQuery,
-  ) async {
+    String inputQuery, [
+    List<String>? allowedDestinations,
+  ]) async {
     final String directUrlStr =
         'https://places.googleapis.com/v1/places:autocomplete';
 
@@ -615,24 +715,32 @@ class GooglePlacesApiConfig {
           final data = jsonDecode(response.body);
           final suggestions = data['suggestions'] as List?;
           if (suggestions != null) {
-            return suggestions
-                .map((s) {
-                  final mainText =
-                      s['placePrediction']?['structuredFormat']?['mainText']?['text']
-                          as String?;
-                  final fullText =
-                      s['placePrediction']?['text']?['text'] as String?;
-                  return mainText ?? fullText;
-                })
-                .where(
-                  (text) =>
-                      text != null &&
-                      !text.contains('Bhd') &&
-                      !text.contains('Sdn'),
-                )
-                .cast<String>()
-                .take(5)
-                .toList();
+            final List<String> parsedList = [];
+            for (final s in suggestions) {
+              final structured = s['placePrediction']?['structuredFormat'];
+              final secondaryText =
+                  (structured?['secondaryText']?['text'] as String? ?? '')
+                      .toLowerCase();
+
+              if (allowedDestinations != null && allowedDestinations.isNotEmpty) {
+                if (!_isSecondaryTextInDestinations(
+                  secondaryText,
+                  allowedDestinations,
+                )) {
+                  continue;
+                }
+              }
+
+              final mainText = structured?['mainText']?['text'] as String?;
+              final fullText = s['placePrediction']?['text']?['text'] as String?;
+              final text = mainText ?? fullText;
+              if (text != null &&
+                  !text.contains('Bhd') &&
+                  !text.contains('Sdn')) {
+                parsedList.add(text);
+              }
+            }
+            return parsedList.take(5).toList();
           }
         }
       } else {
@@ -645,24 +753,32 @@ class GooglePlacesApiConfig {
           final data = jsonDecode(response.body);
           final suggestions = data['suggestions'] as List?;
           if (suggestions != null) {
-            return suggestions
-                .map((s) {
-                  final mainText =
-                      s['placePrediction']?['structuredFormat']?['mainText']?['text']
-                          as String?;
-                  final fullText =
-                      s['placePrediction']?['text']?['text'] as String?;
-                  return mainText ?? fullText;
-                })
-                .where(
-                  (text) =>
-                      text != null &&
-                      !text.contains('Bhd') &&
-                      !text.contains('Sdn'),
-                )
-                .cast<String>()
-                .take(5)
-                .toList();
+            final List<String> parsedList = [];
+            for (final s in suggestions) {
+              final structured = s['placePrediction']?['structuredFormat'];
+              final secondaryText =
+                  (structured?['secondaryText']?['text'] as String? ?? '')
+                      .toLowerCase();
+
+              if (allowedDestinations != null && allowedDestinations.isNotEmpty) {
+                if (!_isSecondaryTextInDestinations(
+                  secondaryText,
+                  allowedDestinations,
+                )) {
+                  continue;
+                }
+              }
+
+              final mainText = structured?['mainText']?['text'] as String?;
+              final fullText = s['placePrediction']?['text']?['text'] as String?;
+              final text = mainText ?? fullText;
+              if (text != null &&
+                  !text.contains('Bhd') &&
+                  !text.contains('Sdn')) {
+                parsedList.add(text);
+              }
+            }
+            return parsedList.take(5).toList();
           }
         }
       }

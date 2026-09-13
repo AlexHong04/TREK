@@ -340,6 +340,103 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  int? _parseTimeToMinutes(String timeStr) {
+    try {
+      final trimmed = timeStr.trim();
+      if (trimmed.isEmpty) return null;
+      final parts = trimmed.split(' ');
+      final timeParts = parts[0].split(':');
+      int hour = int.parse(timeParts[0]);
+      final minute = int.parse(timeParts[1]);
+      if (parts.length > 1 && parts[1].toUpperCase() == 'PM' && hour < 12) {
+        hour += 12;
+      } else if (parts.length > 1 &&
+          parts[1].toUpperCase() == 'AM' &&
+          hour == 12) {
+        hour = 0;
+      }
+      return hour * 60 + minute;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void addTransitLeg() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final defaultArrivalDate = _uiState.startDate != null
+        ? _uiState.startDate!.toLocal().toString().split(' ')[0]
+        : '';
+    final defaultDepartureDate = _uiState.endDate != null
+        ? _uiState.endDate!.toLocal().toString().split(' ')[0]
+        : '';
+
+    final hasPreviousDeparture = _uiState.departures.isNotEmpty;
+    final prevDeparture =
+        hasPreviousDeparture ? _uiState.departures.last : null;
+
+    // Inherit arrival type from previous leg's departure (e.g. Flight, Train, Bus)
+    final inheritedArrivalType = prevDeparture?.type.isNotEmpty == true
+        ? prevDeparture!.type
+        : 'Flight';
+
+    // Default arrival date to previous departure date (or trip start date)
+    final inheritedArrivalDate = prevDeparture?.date.isNotEmpty == true
+        ? prevDeparture!.date
+        : defaultArrivalDate;
+
+    // Default arrival time to previous departure time (or 09:00 AM)
+    final inheritedArrivalTime = prevDeparture?.time.isNotEmpty == true
+        ? prevDeparture!.time
+        : '09:00 AM';
+
+    final updatedArrivals = List<TransitPoint>.from(_uiState.arrivals)
+      ..add(TransitPoint(
+        id: 'arr_$now',
+        location: '',
+        time: inheritedArrivalTime,
+        type: inheritedArrivalType,
+        date: inheritedArrivalDate,
+      ));
+    final updatedDepartures = List<TransitPoint>.from(_uiState.departures)
+      ..add(TransitPoint(
+        id: 'dep_$now',
+        location: '',
+        time: '09:00 PM',
+        type: inheritedArrivalType,
+        date: defaultDepartureDate.isNotEmpty
+            ? defaultDepartureDate
+            : inheritedArrivalDate,
+      ));
+
+    _uiState = _uiState.copyWith(
+      arrivals: updatedArrivals,
+      departures: updatedDepartures,
+    );
+    notifyListeners();
+  }
+
+  void removeTransitLeg(int index) {
+    final updatedArrivals = List<TransitPoint>.from(_uiState.arrivals);
+    final updatedDepartures = List<TransitPoint>.from(_uiState.departures);
+
+    if (updatedArrivals.length > 1 &&
+        index >= 0 &&
+        index < updatedArrivals.length) {
+      updatedArrivals.removeAt(index);
+    }
+    if (updatedDepartures.length > 1 &&
+        index >= 0 &&
+        index < updatedDepartures.length) {
+      updatedDepartures.removeAt(index);
+    }
+
+    _uiState = _uiState.copyWith(
+      arrivals: updatedArrivals,
+      departures: updatedDepartures,
+    );
+    notifyListeners();
+  }
+
   void addArrival() {
     final newId = 'arr_${DateTime.now().millisecondsSinceEpoch}';
     final defaultDate = _uiState.startDate != null
@@ -379,18 +476,51 @@ class TravelInformationInputViewModel extends ChangeNotifier {
 
   void updateArrivalTime(int index, String time) {
     if (index >= 0 && index < _uiState.arrivals.length) {
-      final updated = List<TransitPoint>.from(_uiState.arrivals);
-      updated[index] = updated[index].copyWith(time: time);
-      _uiState = _uiState.copyWith(arrivals: updated);
+      final updatedArrivals = List<TransitPoint>.from(_uiState.arrivals);
+      updatedArrivals[index] = updatedArrivals[index].copyWith(time: time);
+
+      final updatedDepartures = List<TransitPoint>.from(_uiState.departures);
+      if (index < updatedDepartures.length) {
+        final curArr = updatedArrivals[index];
+        final curDep = updatedDepartures[index];
+        if (curArr.date.isNotEmpty && curArr.date == curDep.date) {
+          final arrMin = _parseTimeToMinutes(time);
+          final depMin = _parseTimeToMinutes(curDep.time);
+          if (arrMin != null && depMin != null && depMin < arrMin) {
+            updatedDepartures[index] = curDep.copyWith(time: time);
+          }
+        }
+      }
+
+      _uiState = _uiState.copyWith(
+        arrivals: updatedArrivals,
+        departures: updatedDepartures,
+      );
       notifyListeners();
     }
   }
 
   void updateArrivalDate(int index, String date) {
     if (index >= 0 && index < _uiState.arrivals.length) {
-      final updated = List<TransitPoint>.from(_uiState.arrivals);
-      updated[index] = updated[index].copyWith(date: date);
-      _uiState = _uiState.copyWith(arrivals: updated);
+      final updatedArrivals = List<TransitPoint>.from(_uiState.arrivals);
+      updatedArrivals[index] = updatedArrivals[index].copyWith(date: date);
+
+      final updatedDepartures = List<TransitPoint>.from(_uiState.departures);
+      if (index < updatedDepartures.length && date.isNotEmpty) {
+        final curDep = updatedDepartures[index];
+        if (curDep.date.isNotEmpty) {
+          final arrD = DateTime.tryParse(date);
+          final depD = DateTime.tryParse(curDep.date);
+          if (arrD != null && depD != null && depD.isBefore(arrD)) {
+            updatedDepartures[index] = curDep.copyWith(date: date);
+          }
+        }
+      }
+
+      _uiState = _uiState.copyWith(
+        arrivals: updatedArrivals,
+        departures: updatedDepartures,
+      );
       notifyListeners();
     }
   }
@@ -425,15 +555,38 @@ class TravelInformationInputViewModel extends ChangeNotifier {
 
   void updateDepartureDate(int index, String date) {
     if (index >= 0 && index < _uiState.departures.length) {
-      final updated = List<TransitPoint>.from(_uiState.departures);
-      updated[index] = updated[index].copyWith(date: date);
-      _uiState = _uiState.copyWith(departures: updated);
+      final updatedDepartures = List<TransitPoint>.from(_uiState.departures);
+      updatedDepartures[index] = updatedDepartures[index].copyWith(date: date);
+
+      final updatedArrivals = List<TransitPoint>.from(_uiState.arrivals);
+      if (index + 1 < updatedArrivals.length && date.isNotEmpty) {
+        final nextArr = updatedArrivals[index + 1];
+        if (nextArr.date.isNotEmpty) {
+          final depD = DateTime.tryParse(date);
+          final nextArrD = DateTime.tryParse(nextArr.date);
+          if (depD != null && nextArrD != null && nextArrD.isBefore(depD)) {
+            updatedArrivals[index + 1] = nextArr.copyWith(date: date);
+          }
+        }
+      }
+
+      _uiState = _uiState.copyWith(
+        departures: updatedDepartures,
+        arrivals: updatedArrivals,
+      );
       notifyListeners();
     }
   }
 
   void updateArrivalType(int index, String type) {
     if (index >= 0 && index < _uiState.arrivals.length) {
+      // If this is transit leg 2+, its arrival type is locked to previous departure
+      if (index > 0 && index - 1 < _uiState.departures.length) {
+        final lockedType = _uiState.departures[index - 1].type;
+        if (lockedType.isNotEmpty && type != lockedType) {
+          return; // Prevent changing to an unlinked category
+        }
+      }
       final updated = List<TransitPoint>.from(_uiState.arrivals);
       final current = updated[index];
       if (current.type != type) {
@@ -446,30 +599,91 @@ class TravelInformationInputViewModel extends ChangeNotifier {
 
   void updateDepartureType(int index, String type) {
     if (index >= 0 && index < _uiState.departures.length) {
-      final updated = List<TransitPoint>.from(_uiState.departures);
-      final current = updated[index];
+      final updatedDepartures = List<TransitPoint>.from(_uiState.departures);
+      final current = updatedDepartures[index];
       if (current.type != type) {
-        updated[index] = current.copyWith(type: type, location: '');
+        updatedDepartures[index] = current.copyWith(type: type, location: '');
       }
-      _uiState = _uiState.copyWith(departures: updated);
+
+      final updatedArrivals = List<TransitPoint>.from(_uiState.arrivals);
+      if (index + 1 < updatedArrivals.length) {
+        final nextArr = updatedArrivals[index + 1];
+        if (nextArr.type != type) {
+          updatedArrivals[index + 1] =
+              nextArr.copyWith(type: type, location: '');
+        }
+      }
+
+      _uiState = _uiState.copyWith(
+        departures: updatedDepartures,
+        arrivals: updatedArrivals,
+      );
+      notifyListeners();
+    }
+  }
+
+  void updateArrivalHub(
+    int index, {
+    required String type,
+    required String location,
+  }) {
+    if (index >= 0 && index < _uiState.arrivals.length) {
+      String effectiveType = type;
+      if (index > 0 && index - 1 < _uiState.departures.length) {
+        final lockedType = _uiState.departures[index - 1].type;
+        if (lockedType.isNotEmpty) {
+          effectiveType = lockedType;
+        }
+      }
+      final updated = List<TransitPoint>.from(_uiState.arrivals);
+      updated[index] =
+          updated[index].copyWith(type: effectiveType, location: location);
+      _uiState = _uiState.copyWith(arrivals: updated);
+      notifyListeners();
+    }
+  }
+
+  void updateDepartureHub(
+    int index, {
+    required String type,
+    required String location,
+  }) {
+    if (index >= 0 && index < _uiState.departures.length) {
+      final updatedDepartures = List<TransitPoint>.from(_uiState.departures);
+      updatedDepartures[index] =
+          updatedDepartures[index].copyWith(type: type, location: location);
+
+      final updatedArrivals = List<TransitPoint>.from(_uiState.arrivals);
+      if (index + 1 < updatedArrivals.length) {
+        final nextArr = updatedArrivals[index + 1];
+        if (nextArr.type != type) {
+          updatedArrivals[index + 1] =
+              nextArr.copyWith(type: type, location: '');
+        }
+      }
+
+      _uiState = _uiState.copyWith(
+        departures: updatedDepartures,
+        arrivals: updatedArrivals,
+      );
       notifyListeners();
     }
   }
 
   void syncTransitType(String type, {int? index}) {
     final updatedArrivals = _uiState.arrivals.asMap().entries.map((e) {
-      if (index == null || e.key == index || _uiState.arrivals.length == 1) {
+      if (index == null || e.key == index) {
         if (e.value.type != type) {
-          return e.value.copyWith(type: type, location: '');
+          return e.value.copyWith(type: type);
         }
       }
       return e.value;
     }).toList();
 
     final updatedDepartures = _uiState.departures.asMap().entries.map((e) {
-      if (index == null || e.key == index || _uiState.departures.length == 1) {
+      if (index == null || e.key == index) {
         if (e.value.type != type) {
-          return e.value.copyWith(type: type, location: '');
+          return e.value.copyWith(type: type);
         }
       }
       return e.value;
@@ -493,9 +707,26 @@ class TravelInformationInputViewModel extends ChangeNotifier {
 
   void updateDepartureTime(int index, String time) {
     if (index >= 0 && index < _uiState.departures.length) {
-      final updated = List<TransitPoint>.from(_uiState.departures);
-      updated[index] = updated[index].copyWith(time: time);
-      _uiState = _uiState.copyWith(departures: updated);
+      final updatedDepartures = List<TransitPoint>.from(_uiState.departures);
+      updatedDepartures[index] = updatedDepartures[index].copyWith(time: time);
+
+      final updatedArrivals = List<TransitPoint>.from(_uiState.arrivals);
+      if (index + 1 < updatedArrivals.length) {
+        final curDep = updatedDepartures[index];
+        final nextArr = updatedArrivals[index + 1];
+        if (curDep.date.isNotEmpty && curDep.date == nextArr.date) {
+          final depMin = _parseTimeToMinutes(time);
+          final arrMin = _parseTimeToMinutes(nextArr.time);
+          if (depMin != null && arrMin != null && arrMin < depMin) {
+            updatedArrivals[index + 1] = nextArr.copyWith(time: time);
+          }
+        }
+      }
+
+      _uiState = _uiState.copyWith(
+        departures: updatedDepartures,
+        arrivals: updatedArrivals,
+      );
       notifyListeners();
     }
   }

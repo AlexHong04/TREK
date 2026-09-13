@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../utils/input_validator.dart';
 import '../../utils/network_error.dart';
 import '../entities/user.dart';
+import '../local_data_source/notification_source.dart';
 import '../repository/i_auth_repository.dart';
 import '../repository/i_user_repository.dart';
 import 'i_auth_service.dart';
@@ -13,6 +14,7 @@ import 'i_auth_service.dart';
 class AuthService extends ChangeNotifier implements IAuthService {
   final IAuthRepository _authRepository;
   final IUserRepository _userRepository;
+  final NotificationSource _notificationSource = NotificationSource();
 
   User? _currentUser;
   AccountInfo? _accountInfo;
@@ -495,6 +497,11 @@ class AuthService extends ChangeNotifier implements IAuthService {
         // The session still ends. Cached data is never shown without a restored
         // session and a later cleanup attempt can remove the stale files.
       }
+    }
+    try {
+      await _notificationSource.cancelAllNotifications();
+    } catch (error) {
+      debugPrint('Unable to clear local notifications during logout: $error');
     }
     await _clearSessionState(clearCache: false);
     if (signOutFailure != null) throw signOutFailure;

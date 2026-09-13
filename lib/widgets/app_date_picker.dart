@@ -13,11 +13,15 @@ Future<DateTime?> showAppDatePicker({
   return showDialog<DateTime>(
     context: context,
     barrierColor: appTheme.gray_900.withValues(alpha: 0.25),
-    builder: (_) => AppDatePickerDialog(
-      initialDate: initialDate,
-      firstDate: firstDate,
-      lastDate: lastDate,
-      selectableDayPredicate: selectableDayPredicate,
+    builder: (dialogContext) => MediaQuery.removeViewInsets(
+      context: dialogContext,
+      removeBottom: true,
+      child: AppDatePickerDialog(
+        initialDate: initialDate,
+        firstDate: firstDate,
+        lastDate: lastDate,
+        selectableDayPredicate: selectableDayPredicate,
+      ),
     ),
   );
 }

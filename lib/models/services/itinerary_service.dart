@@ -320,7 +320,6 @@ class ItineraryService implements IItineraryService {
       Map<String, dynamic>? lastParsedObj;
 
       double responseTotalAllocatedBudget = 0.0;
-      int responseWishlistItemsCoveredCount = 0;
       double responseEstimatedExtraBudgetNeeded = 0.0;
 
       while (retries > 0) {
@@ -365,8 +364,6 @@ class ItineraryService implements IItineraryService {
           validatedList = jsonList;
           responseTotalAllocatedBudget =
               (parsedObj['totalAllocatedBudget'] as num?)?.toDouble() ?? 0.0;
-          responseWishlistItemsCoveredCount =
-              (parsedObj['wishlistItemsCoveredCount'] as num?)?.toInt() ?? 0;
           responseEstimatedExtraBudgetNeeded =
               (parsedObj['estimatedExtraBudgetNeeded'] as num?)?.toDouble() ??
               0.0;
@@ -437,8 +434,6 @@ class ItineraryService implements IItineraryService {
           validatedList = jsonList;
           responseTotalAllocatedBudget =
               (parsedObj['totalAllocatedBudget'] as num?)?.toDouble() ?? 0.0;
-          responseWishlistItemsCoveredCount =
-              (parsedObj['wishlistItemsCoveredCount'] as num?)?.toInt() ?? 0;
           responseEstimatedExtraBudgetNeeded =
               (parsedObj['estimatedExtraBudgetNeeded'] as num?)?.toDouble() ??
               0.0;
@@ -482,8 +477,6 @@ class ItineraryService implements IItineraryService {
           validatedList = jsonList;
           responseTotalAllocatedBudget =
               (parsedObj['totalAllocatedBudget'] as num?)?.toDouble() ?? 0.0;
-          responseWishlistItemsCoveredCount =
-              (parsedObj['wishlistItemsCoveredCount'] as num?)?.toInt() ?? 0;
           responseEstimatedExtraBudgetNeeded =
               (parsedObj['estimatedExtraBudgetNeeded'] as num?)?.toDouble() ??
               0.0;
@@ -509,9 +502,6 @@ class ItineraryService implements IItineraryService {
             responseTotalAllocatedBudget =
                 (lastParsedObj['totalAllocatedBudget'] as num?)?.toDouble() ??
                 0.0;
-            responseWishlistItemsCoveredCount =
-                (lastParsedObj['wishlistItemsCoveredCount'] as num?)?.toInt() ??
-                0;
             responseEstimatedExtraBudgetNeeded =
                 (lastParsedObj['estimatedExtraBudgetNeeded'] as num?)
                     ?.toDouble() ??
@@ -745,6 +735,12 @@ class ItineraryService implements IItineraryService {
         await Future.delayed(const Duration(milliseconds: 300));
       }
 
+      // Sort chronologically. Activity.date already embeds the slot's start
+      // time, so this orders by day and then by time, keeping the timeline (and
+      // the UI's day grouping) correct even when Gemini returns the slots out
+      // of sequence - e.g. an arrival listed after a restaurant.
+      newActivities.sort((a, b) => a.date.compareTo(b.date));
+
       // Ensure departure is covered if user specified departure points
       final resolvedDepList = (departures != null && departures.isNotEmpty)
           ? departures.where((d) => d.location.trim().isNotEmpty).toList()
@@ -857,13 +853,36 @@ class ItineraryService implements IItineraryService {
       }
 
       final double parsedBudget = double.tryParse(budget) ?? 0.0;
+      final double initialExcess = (responseTotalAllocatedBudget - parsedBudget).clamp(0.0, double.infinity);
 
-      // Defensive budget cap: ensure total cost NEVER exceeds parsedBudget in ANY mode
       if (parsedBudget > 0) {
         double currentTotal =
             newActivities.fold(0.0, (sum, a) => sum + a.allocatedBudget);
         if (currentTotal > parsedBudget) {
           double excess = currentTotal - parsedBudget;
+
+          // If NOT in strictBudget mode and wishlist items are present,
+          // any wishlist item that exceeds the budget cannot be afforded:
+          // replace it with a free scenic attraction in destination so it is omitted from the itinerary.
+          if (!strictBudget && wishlist != null && wishlist.isNotEmpty) {
+            for (int i = 0; i < newActivities.length; i++) {
+              if (excess <= 0.001) break;
+              final a = newActivities[i];
+              final bool isWishlistItem = wishlist.any(
+                (w) => _isWishlistMatch(w, a.destination, a.description),
+              );
+              if (isWishlistItem) {
+                final double savedBudget = a.allocatedBudget;
+                newActivities[i] = a.copyWith(
+                  destination: '$destination Heritage & Scenic Spot',
+                  description: 'Explore scenic and historical attractions around $destination.',
+                  activityCategory: 'Attraction',
+                  allocatedBudget: 0.0,
+                );
+                excess -= savedBudget;
+              }
+            }
+          }
 
           // Pass 1: Trim restaurant costs down towards minimum allowed
           for (int i = 0; i < newActivities.length; i++) {
@@ -873,7 +892,7 @@ class ItineraryService implements IItineraryService {
               final minAllowed =
                   (a.minAllocatedBudget != null && a.minAllocatedBudget! > 0)
                       ? a.minAllocatedBudget!
-                      : 4.0;
+                      : (parsedBudget < 20.0 ? (parsedBudget / newActivities.length).clamp(1.0, 4.0) : 4.0);
               final reducible = a.allocatedBudget - minAllowed;
               if (reducible > 0) {
                 final reduction = reducible > excess ? excess : reducible;
@@ -910,41 +929,17 @@ class ItineraryService implements IItineraryService {
 
           // Pass 3: If STILL exceeding budget:
           if (excess > 0.001) {
-            if (!strictBudget && wishlist != null && wishlist.isNotEmpty) {
-              // In initial mode, drop the excess wishlist item
-              for (int i = newActivities.length - 1; i >= 0; i--) {
-                if (excess <= 0.001) break;
-                final a = newActivities[i];
-                final bool isWishlistItem = wishlist.any(
-                  (w) => _isWishlistMatch(w, a.destination, a.description),
+            for (int i = 0; i < newActivities.length; i++) {
+              if (excess <= 0.001) break;
+              final a = newActivities[i];
+              if (a.allocatedBudget > 0) {
+                final reduction =
+                    a.allocatedBudget > excess ? excess : a.allocatedBudget;
+                final newBudget = double.parse(
+                  (a.allocatedBudget - reduction).toStringAsFixed(2),
                 );
-                if (isWishlistItem && a.allocatedBudget > 0) {
-                  final reduction =
-                      a.allocatedBudget > excess ? excess : a.allocatedBudget;
-                  final newBudget = double.parse(
-                    (a.allocatedBudget - reduction).toStringAsFixed(2),
-                  );
-                  newActivities[i] = a.copyWith(
-                    allocatedBudget: newBudget,
-                    minAllocatedBudget: 0.0,
-                  );
-                  excess -= reduction;
-                }
-              }
-            } else {
-              // In strictBudget (top-up) mode, proportionally scale down paid activities to fit parsedBudget strictly
-              for (int i = 0; i < newActivities.length; i++) {
-                if (excess <= 0.001) break;
-                final a = newActivities[i];
-                if (a.allocatedBudget > 0.0) {
-                  final reduction =
-                      a.allocatedBudget > excess ? excess : a.allocatedBudget;
-                  final newBudget = double.parse(
-                    (a.allocatedBudget - reduction).toStringAsFixed(2),
-                  );
-                  newActivities[i] = a.copyWith(allocatedBudget: newBudget);
-                  excess -= reduction;
-                }
+                newActivities[i] = a.copyWith(allocatedBudget: newBudget);
+                excess -= reduction;
               }
             }
           }
@@ -956,18 +951,13 @@ class ItineraryService implements IItineraryService {
         0.0,
         (sum, a) => sum + a.allocatedBudget,
       );
-      final double resolvedTotalAllocatedBudget = calculatedTotalCost > 0
-          ? calculatedTotalCost
-          : responseTotalAllocatedBudget;
+      final double resolvedTotalAllocatedBudget = (parsedBudget > 0 && calculatedTotalCost > parsedBudget)
+          ? parsedBudget
+          : (calculatedTotalCost > 0 ? calculatedTotalCost : responseTotalAllocatedBudget);
 
-      // Calculate mathematical budget shortfall
-      final double mathShortfall = (resolvedTotalAllocatedBudget - parsedBudget)
-          .clamp(0.0, double.infinity);
-
-      // Resolve wishlist coverage from activities and Gemini estimation
+      // Resolve wishlist coverage from activities actually present in itinerary
       int resolvedWishlistCovered = 0;
       if (wishlist != null && wishlist.isNotEmpty) {
-        // Count how many wishlist items are actually matched in activities
         int matchedCount = 0;
         for (final item in wishlist) {
           final isMatched = newActivities.any(
@@ -982,15 +972,8 @@ class ItineraryService implements IItineraryService {
           // In strict budget (top-up) mode, all wishlist items are guaranteed covered
           resolvedWishlistCovered = wishlist.length;
         } else {
-          // Use the higher of matched count vs Gemini's reported count
+          // Use the count of wishlist items actually matched in activities
           resolvedWishlistCovered = matchedCount;
-          if (responseWishlistItemsCoveredCount > resolvedWishlistCovered) {
-            resolvedWishlistCovered = responseWishlistItemsCoveredCount;
-          }
-          resolvedWishlistCovered = resolvedWishlistCovered.clamp(
-            0,
-            wishlist.length,
-          );
         }
       }
 
@@ -1016,9 +999,19 @@ class ItineraryService implements IItineraryService {
           }
         }
 
-        // 3. Mathematical shortfall if activities cost more than user's budget
-        if (mathShortfall > resolvedExtraBudget) {
-          resolvedExtraBudget = mathShortfall;
+        // Offset any unallocated budget from the user's target budget
+        // (e.g. User budget: 100.0, AI Allocated: 64.0 -> Remaining unallocated budget: 36.0.
+        // If uncovered item costs 75.0, extra budget needed is 75.0 - 36.0 = 39.0).
+        if (parsedBudget > 0 && resolvedExtraBudget > 0.0) {
+          final double remainingBudget =
+              (parsedBudget - resolvedTotalAllocatedBudget).clamp(0.0, double.infinity);
+          resolvedExtraBudget =
+              (resolvedExtraBudget - remainingBudget).clamp(0.0, double.infinity);
+        }
+
+        // 3. Mathematical shortfall if initial plan cost more than user's budget
+        if (initialExcess > resolvedExtraBudget) {
+          resolvedExtraBudget = initialExcess;
         }
       }
 

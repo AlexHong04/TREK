@@ -12,6 +12,7 @@ import 'package:intl/intl.dart';
 
 class WholeItineraryDetailViewModel extends ChangeNotifier {
   final IItineraryService _itineraryService;
+  // ignore: unused_field
   final IAuthService _authService;
   final IProfileService _profileService; // added this
 
@@ -20,8 +21,8 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     required IAuthService authService,
     required IProfileService profileService, // added this
   }) : _itineraryService = itineraryService ?? ItineraryService(),
-       _authService = authService,
-       _profileService = profileService; // added this
+        _authService = authService,
+        _profileService = profileService; // added this
 
   WholeItineraryUiState _uiState = const WholeItineraryUiState();
 
@@ -66,8 +67,8 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
   /// True while any time slot is still empty (deleted, or not yet filled),
   /// which blocks confirming the plan.
   bool get hasEmptyActivitySlots => _uiState.activities.any(
-    (a) =>
-        a.status == 'empty' ||
+        (a) =>
+    a.status == 'empty' ||
         (a.destination.trim().isEmpty && a.description.trim().isEmpty),
   );
 
@@ -92,22 +93,21 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
   bool get needsTopUp => hasExtraBudgetNeeded || (spentBudget > totalBudget);
 
   /// Confirm is only allowed once every time slot has been filled, we are
-  /// not busy generating, no extra budget is needed, and all wishlist items are covered.
+  /// not busy generating, and no extra budget is needed.
   bool get canConfirmItinerary {
     return !_uiState.isLoading &&
         !_uiState.isRegeneratingPlan &&
         _uiState.activities.isNotEmpty &&
         !hasEmptyActivitySlots &&
         !(spentBudget > totalBudget) &&
-        !needsTopUp &&
-        !hasUncoveredWishlist;
+        !needsTopUp;
   }
 
   static bool _matchesWishlist(
-    String wishlistName,
-    String destinationName, [
-    String description = '',
-  ]) {
+      String wishlistName,
+      String destinationName, [
+        String description = '',
+      ]) {
     final wLower = wishlistName.toLowerCase().trim();
     final dLower = destinationName.toLowerCase().trim();
     final descLower = description.toLowerCase().trim();
@@ -149,7 +149,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
 
     return wishlist.where((item) {
       return activeActivities.any(
-        (a) => _matchesWishlist(item, a.destination, a.description),
+            (a) => _matchesWishlist(item, a.destination, a.description),
       );
     }).toList();
   }
@@ -335,7 +335,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
   String? validateTopUpAmount({
     String? symbol,
     required String value,
-    required double minTopUp,
+    double? minTopUp,
     required double shortageAmount,
   }) {
     if (value.trim().isEmpty) {
@@ -346,6 +346,14 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
 
     if (amount == null) {
       return 'Please enter a valid amount.';
+    }
+
+    if (minTopUp == null) {
+      if (amount != shortageAmount) {
+        return 'Top-up amount should be ${symbol ?? 'MYR'} ${shortageAmount.toStringAsFixed(2)}.';
+      }
+
+      return null;
     }
 
     if (amount < minTopUp) {
@@ -368,7 +376,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     final budget = double.tryParse(_uiState.budgetText) ?? 0.0;
     final myrAmount =
         await _profileService.convertPreferredCurrencyToMyr(amount: amount) ??
-        amount;
+            amount;
 
     final shortfall = spentBudget - budget;
     final shortage = _uiState.estimatedExtraBudgetNeeded > shortfall
@@ -380,7 +388,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         await _profileService.convertPreferredCurrencyToMyr(
           amount: minRequired,
         ) ??
-        minRequired;
+            minRequired;
 
     final isSufficient =
         shortage <= 0.0 || myrAmount >= shortage || myrAmount >= myrMinRequired;
@@ -502,7 +510,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         .toList();
     for (final w in updatedWishlist) {
       if (activeActivities.any(
-        (a) => _matchesWishlist(w, a.destination, a.description),
+            (a) => _matchesWishlist(w, a.destination, a.description),
       )) {
         coveredCount++;
       }
@@ -512,7 +520,18 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     final double mathShortfall = (_uiState.totalAllocatedBudget - parsedBudget)
         .clamp(0.0, double.infinity);
 
-    final double newExtraBudget = mathShortfall;
+    final int uncoveredCount =
+        (updatedWishlist.length - coveredCount).clamp(0, updatedWishlist.length);
+
+    double newExtraBudget = mathShortfall;
+    if (uncoveredCount > 0 && _uiState.estimatedExtraBudgetNeeded > 0) {
+      final int prevUncovered = (currentWishlist.length -
+              _uiState.wishlistItemsCoveredCount)
+          .clamp(1, currentWishlist.length);
+      newExtraBudget = (_uiState.estimatedExtraBudgetNeeded *
+          uncoveredCount /
+          prevUncovered);
+    }
 
     _uiState = _uiState.copyWith(
       wishlist: updatedWishlist,
@@ -530,7 +549,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     required String destination,
   }) async {
     final slotIndex = _uiState.activities.indexWhere(
-      (a) => a.activitiesId == slotActivityId,
+          (a) => a.activitiesId == slotActivityId,
     );
     if (slotIndex == -1) return;
 
@@ -550,7 +569,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
       // and are skipped to avoid false matches.
       bool isRealVenue(Activity a) =>
           a.destination.isNotEmpty &&
-          a.activityCategory.toLowerCase() != 'transportation';
+              a.activityCategory.toLowerCase() != 'transportation';
 
       final excludedActivity = <String>[
         ..._uiState.stashedActivities
@@ -665,17 +684,18 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         transportFutures.add(
           _itineraryService
               .regenerateTransportation(
-                originPlace: origin,
-                destinationPlace: newDest,
-                city: city,
-                existingActivityId: transport.activitiesId,
-                dayTripId: transport.dayTripId,
-                date: transport.date,
-                startTime: transport.startTime,
-                endTime: transport.endTime,
-              )
-              .then((updated) => updatedList[slotIndex - 1] = updated)
-              .catchError((e) {
+            originPlace: origin,
+            destinationPlace: newDest,
+            city: city,
+            existingActivityId: transport.activitiesId,
+            dayTripId: transport.dayTripId,
+            date: transport.date,
+            startTime: transport.startTime,
+            endTime: transport.endTime,
+          )
+              .then<void>((updated) {
+            updatedList[slotIndex - 1] = updated;
+          }).catchError((e) {
             debugPrint('Failed to regenerate preceding transport: $e');
           }),
         );
@@ -699,17 +719,18 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         transportFutures.add(
           _itineraryService
               .regenerateTransportation(
-                originPlace: newDest,
-                destinationPlace: nextPlace,
-                city: city,
-                existingActivityId: transport.activitiesId,
-                dayTripId: transport.dayTripId,
-                date: transport.date,
-                startTime: transport.startTime,
-                endTime: transport.endTime,
-              )
-              .then((updated) => updatedList[slotIndex + 1] = updated)
-              .catchError((e) {
+            originPlace: newDest,
+            destinationPlace: nextPlace,
+            city: city,
+            existingActivityId: transport.activitiesId,
+            dayTripId: transport.dayTripId,
+            date: transport.date,
+            startTime: transport.startTime,
+            endTime: transport.endTime,
+          )
+              .then<void>((updated) {
+            updatedList[slotIndex + 1] = updated;
+          }).catchError((e) {
             debugPrint('Failed to regenerate following transport: $e');
           }),
         );
@@ -739,9 +760,9 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     final emptySlots = _uiState.activities
         .where(
           (a) =>
-              a.status == 'empty' ||
-              (a.destination.trim().isEmpty && a.description.trim().isEmpty),
-        )
+      a.status == 'empty' ||
+          (a.destination.trim().isEmpty && a.description.trim().isEmpty),
+    )
         .toList();
     if (emptySlots.isEmpty) return;
 
@@ -773,15 +794,15 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
 
       final newFilledActivities = await _itineraryService
           .regenerateEmptySlotsFromRemainingPlan(
-            destination: _uiState.destinationTitle,
-            remainingBudget: effectiveRemainingBudget,
-            remainingActivities: activeActivities,
-            emptySlots: emptySlots,
-            excludedPlaces: excludedPlaces,
-            uncoveredWishlist: uncoveredWishlistItems,
-            preference: _uiState.preference,
-            constraints: _uiState.constraints,
-          );
+        destination: _uiState.destinationTitle,
+        remainingBudget: effectiveRemainingBudget,
+        remainingActivities: activeActivities,
+        emptySlots: emptySlots,
+        excludedPlaces: excludedPlaces,
+        uncoveredWishlist: uncoveredWishlistItems,
+        preference: _uiState.preference,
+        constraints: _uiState.constraints,
+      );
 
       final Map<String, Activity> filledMap = {
         for (final act in newFilledActivities) act.activitiesId: act,
@@ -796,7 +817,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
 
       final newTotalAllocated = updatedList.fold(
         0.0,
-        (sum, a) => sum + a.allocatedBudget,
+            (sum, a) => sum + a.allocatedBudget,
       );
       final mathShortfall = (newTotalAllocated - totalBudget).clamp(
         0.0,
@@ -810,11 +831,11 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         final activeActivities = updatedList
             .where(
               (a) => a.status != 'empty' && a.destination.trim().isNotEmpty,
-            )
+        )
             .toList();
         for (final w in wishlist) {
           if (activeActivities.any(
-            (a) => _matchesWishlist(w, a.destination, a.description),
+                (a) => _matchesWishlist(w, a.destination, a.description),
           )) {
             coveredCount++;
           }
