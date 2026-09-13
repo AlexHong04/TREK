@@ -66,6 +66,7 @@ class _HomeScreenState extends State<HomeScreen> {
             _buildTopBar(context),
             const SizedBox(height: 18),
             _buildPageIndicator(),
+            const SizedBox(height: 10),
             Expanded(
               child: PageView(
                 controller: _pageController,

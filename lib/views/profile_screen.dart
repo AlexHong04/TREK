@@ -511,115 +511,37 @@ class _ProfilePicture extends StatelessWidget {
       ProfileViewModel viewModel, {
         required bool canRemove,
       }) async {
-    final renderObject = buttonContext.findRenderObject();
-    if (renderObject is! RenderBox || !renderObject.attached) return;
-
-    final mediaQuery = MediaQuery.of(buttonContext);
-    final screenSize = mediaQuery.size;
-    final buttonOffset = renderObject.localToGlobal(Offset.zero);
-    final buttonCenter = buttonOffset +
-        Offset(renderObject.size.width / 2, renderObject.size.height / 2);
-
-    const preferredWidth = 224.0;
-    const horizontalMargin = 16.0;
-    final availableWidth = screenSize.width - (horizontalMargin * 2);
-    final menuWidth = availableWidth < preferredWidth
-        ? availableWidth
-        : preferredWidth;
-    final menuLeft = (screenSize.width - menuWidth) / 2;
-    final menuHeight = canRemove ? 132.0 : 88.0;
-
-    var menuTop = buttonOffset.dy + renderObject.size.height + 6;
-    final bottomLimit =
-        screenSize.height - mediaQuery.padding.bottom - horizontalMargin;
-    if (menuTop + menuHeight > bottomLimit) {
-      menuTop = buttonOffset.dy - menuHeight - 6;
-    }
-    final minimumTop = mediaQuery.padding.top + 8;
-    if (menuTop < minimumTop) menuTop = minimumTop;
-
-    final animationAlignment = Alignment(
-      ((buttonCenter.dx / screenSize.width) * 2) - 1,
-      ((buttonCenter.dy / screenSize.height) * 2) - 1,
-    );
-
-    final action = await showGeneralDialog<_ProfilePictureAction>(
+    final action = await showModalBottomSheet<_ProfilePictureAction>(
       context: buttonContext,
-      barrierDismissible: true,
-      barrierLabel:
-      MaterialLocalizations.of(buttonContext).modalBarrierDismissLabel,
-      barrierColor: Colors.transparent,
-      transitionDuration: const Duration(milliseconds: 220),
-      pageBuilder: (dialogContext, _, __) {
-        return SizedBox.expand(
-          child: Stack(
-            children: [
-              Positioned(
-                left: menuLeft,
-                top: menuTop,
-                width: menuWidth,
-                child: Material(
-                  color: appTheme.white_A700,
-                  elevation: 7,
-                  clipBehavior: Clip.antiAlias,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(
-                      color: appTheme.teal_A700,
-                      width: 1.2,
-                    ),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _profilePictureMenuItem(
-                        onPressed: () => Navigator.of(dialogContext).pop(
-                          _ProfilePictureAction.gallery,
-                        ),
-                        icon: Icons.photo_library_outlined,
-                        label: 'Choose from gallery',
-                        color: appTheme.teal_A700,
-                      ),
-                      _profilePictureMenuItem(
-                        onPressed: () => Navigator.of(dialogContext).pop(
-                          _ProfilePictureAction.camera,
-                        ),
-                        icon: Icons.photo_camera_outlined,
-                        label: 'Take photo',
-                        color: appTheme.teal_A700,
-                      ),
-                      if (canRemove)
-                        _profilePictureMenuItem(
-                          onPressed: () => Navigator.of(dialogContext).pop(
-                            _ProfilePictureAction.remove,
-                          ),
-                          icon: Icons.delete_outline,
-                          label: 'Remove photo',
-                          color: appTheme.errorRed,
-                        ),
-                    ],
-                  ),
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Take photo'),
+              onTap: () => Navigator.of(sheetContext).pop(
+                _ProfilePictureAction.camera,
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose from gallery'),
+              onTap: () => Navigator.of(sheetContext).pop(
+                _ProfilePictureAction.gallery,
+              ),
+            ),
+            if (canRemove)
+              ListTile(
+                leading: const Icon(Icons.delete_outline),
+                title: const Text('Remove photo'),
+                onTap: () => Navigator.of(sheetContext).pop(
+                  _ProfilePictureAction.remove,
                 ),
               ),
-            ],
-          ),
-        );
-      },
-      transitionBuilder: (_, animation, __, child) {
-        final curvedAnimation = CurvedAnimation(
-          parent: animation,
-          curve: Curves.easeOutCubic,
-          reverseCurve: Curves.easeInCubic,
-        );
-        return FadeTransition(
-          opacity: curvedAnimation,
-          child: ScaleTransition(
-            scale: curvedAnimation,
-            alignment: animationAlignment,
-            child: child,
-          ),
-        );
-      },
+          ],
+        ),
+      ),
     );
 
     if (!buttonContext.mounted) return;
@@ -636,29 +558,6 @@ class _ProfilePicture extends StatelessWidget {
       case null:
         break;
     }
-  }
-
-  MenuItemButton _profilePictureMenuItem({
-    required VoidCallback onPressed,
-    required IconData icon,
-    required String label,
-    required Color color,
-  }) {
-    return MenuItemButton(
-      onPressed: onPressed,
-      leadingIcon: Icon(icon, size: 20, color: color),
-      style: ButtonStyle(
-        foregroundColor: WidgetStatePropertyAll(color),
-        minimumSize: const WidgetStatePropertyAll(Size(224, 44)),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
   }
 }
 

@@ -82,7 +82,7 @@ class EditProfileScreen extends StatelessWidget {
                       },
                       child: CustomTextField(
                         sectionTitle: 'FULL NAME',
-                        sectionTrailing: Text(
+                        titleTrailing: Text(
                           '$fullNameLength/$_fullNameMaxLength',
                           style: TextStyle(
                             color: _fullNameCounterColor(fullNameLength),

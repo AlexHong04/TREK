@@ -405,26 +405,71 @@ class _EditAccountScreenState extends State<EditAccountScreen>
       ) async {
     final confirmed = await showDialog<bool>(
       context: context,
+      barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
         icon: Icon(Icons.warning_amber_rounded, color: appTheme.errorRed),
         title: const Text('Request account deletion?'),
         content: const Text(
           'This starts the permanent deletion process. You will still receive one final confirmation before anything is deleted.',
         ),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: appTheme.errorRed),
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Continue'),
+          SizedBox(
+            width: double.maxFinite,
+            child: Row(
+              children: [
+                Expanded(
+                  child: _DeletionDialogButton(
+                    text: 'Cancel',
+                    backgroundColor: appTheme.teal_A700,
+                    onPressed: () => Navigator.pop(dialogContext, false),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _DeletionDialogButton(
+                    text: 'Continue',
+                    backgroundColor: appTheme.errorRed,
+                    onPressed: () => Navigator.pop(dialogContext, true),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
     if (confirmed == true) await viewModel.requestDeletion();
+  }
+}
+
+class _DeletionDialogButton extends StatelessWidget {
+  final String text;
+  final Color backgroundColor;
+  final VoidCallback onPressed;
+
+  const _DeletionDialogButton({
+    required this.text,
+    required this.backgroundColor,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 46,
+      child: FilledButton(
+        onPressed: onPressed,
+        style: FilledButton.styleFrom(
+          backgroundColor: backgroundColor,
+          foregroundColor: appTheme.white_A700,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: Text(text),
+      ),
+    );
   }
 }
 
