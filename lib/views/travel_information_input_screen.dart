@@ -7,7 +7,6 @@ import '../view_models/presentation_logic/travel_information_input_view_model.da
 import '../main.dart';
 import '../widgets/custom_app_bar.dart';
 import '../widgets/custom_text_field.dart';
-import '../widgets/dual_currency_amount.dart';
 import '../utils/malaysia_states.dart';
 import '../view_models/ui_state/travel_information_ui_state.dart';
 
@@ -199,7 +198,7 @@ class _TravelInformationInputScreenState
                         controller: _wishlistController,
                         inputFormatters: viewModel.wishlistInputFormatters,
                         errorText: viewModel.uiState.wishlistError,
-                        validator: viewModel.validateWishlist,
+                        validator: viewModel.validateExplicitWord,
                         // Wishlist items can only be added by tapping a
                         // suggestion, so submitting the field dismisses the keyboard.
                         textInputAction: TextInputAction.search,
@@ -692,6 +691,8 @@ class _TravelInformationInputScreenState
                   } catch (_) {}
                 }
 
+                if (!mounted) return;
+
                 final confirmed = await _showPlanGenerationConfirmDialog(
                   context: context,
                   destination: destination,
@@ -712,7 +713,7 @@ class _TravelInformationInputScreenState
                       .length,
                 );
 
-                if (confirmed != true || !context.mounted) return;
+                if (confirmed != true || !mounted) return;
 
                 final finalBudget =
                     (preferredCurrency != 'MYR' && convertedBudgetInMyr != null)
@@ -2390,9 +2391,11 @@ class _TravelInformationInputScreenState
                     ),
                     const SizedBox(height: 4.0),
                   ],
-                  TextField(
+                  TextFormField(
                     controller: controller,
                     readOnly: !hasDestinations,
+                    validator: viewModel.validateExplicitWord,
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
                     onTap: () {
                       if (!hasDestinations) {
                         FocusScope.of(context).unfocus();
@@ -2430,6 +2433,11 @@ class _TravelInformationInputScreenState
                         fontWeight: FontWeight.w400,
                         fontFamily: 'Inter',
                         color: appTheme.blue_gray_300,
+                      ),
+                      errorStyle: TextStyle(
+                        fontSize: 12,
+                        fontFamily: 'Inter',
+                        color: appTheme.colorFFEF44,
                       ),
                       prefixIcon: Icon(
                         Icons.hotel_outlined,
