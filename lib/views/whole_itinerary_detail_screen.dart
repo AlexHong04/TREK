@@ -354,8 +354,12 @@ class _WholeItineraryDetailScreenState
 
     if (!mounted) return false;
 
-    // Top-up was not enough to cover the remaining shortage.
-    if (!isSufficient) {
+    // If top-up was sufficient, automatically regenerate the itinerary
+    // with the new budget so that all wishlist items are scheduled and covered!
+    if (isSufficient) {
+      await viewModel.generateItinerary(suppressWarning: true);
+    } else {
+      // Top-up was not enough to cover the remaining shortage.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
 
@@ -368,11 +372,13 @@ class _WholeItineraryDetailScreenState
       });
     }
 
-    showThreeSecondMessage(
-      context,
-      'Budget top up successfully',
-      isError: false,
-    );
+    if (mounted) {
+      showThreeSecondMessage(
+        context,
+        'Budget top up successfully',
+        isError: false,
+      );
+    }
 
     return true;
   }
@@ -424,6 +430,7 @@ class _WholeItineraryDetailScreenState
               shortageAmount,
         );
       }
+      if (!mounted) return;
       if (hasUncoveredWishlist || hasBudgetShortfall) {
         await showInitialBudgetInsufficientDialog(
           context: context,
@@ -1294,7 +1301,6 @@ class _WholeItineraryDetailScreenState
             margin: const EdgeInsets.only(bottom: 12),
             child: Row(
               children: [
-                // Left: Top-up Button (Only appears when budget is insufficient or wishlist uncovered)
                 if (needsTopUp) ...[
                   Expanded(
                     child: Container(
@@ -1334,6 +1340,63 @@ class _WholeItineraryDetailScreenState
                                 const SizedBox(width: 8),
                                 Text(
                                   'Top-up',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                    fontFamily: 'Inter',
+                                    color: appTheme.teal_A700,
+                                  ).copyWith(height: 22 / 18),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                ] else if (viewModel.hasUncoveredWishlist) ...[
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: appTheme.white_A700,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: appTheme.teal_A700,
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: appTheme.teal_50,
+                            offset: const Offset(0, 4),
+                            blurRadius: 6,
+                          ),
+                        ],
+                      ),
+                      child: Material(
+                        color: appTheme.transparentCustom,
+                        borderRadius: BorderRadius.circular(16),
+                        child: InkWell(
+                          onTap: (viewModel.uiState.isLoading ||
+                                  viewModel.uiState.isRegeneratingPlan)
+                              ? null
+                              : () => viewModel.generateItinerary(
+                                    suppressWarning: true,
+                                  ),
+                          borderRadius: BorderRadius.circular(16),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.auto_awesome_rounded,
+                                  size: 20,
+                                  color: appTheme.teal_A700,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Regenerate',
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.w700,
@@ -1496,6 +1559,8 @@ class _WholeItineraryDetailScreenState
                                           return;
                                         }
                                       }
+
+                                      if (!context.mounted) return;
 
                                       showDialog(
                                         context: context,

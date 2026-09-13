@@ -93,15 +93,14 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
   bool get needsTopUp => hasExtraBudgetNeeded || (spentBudget > totalBudget);
 
   /// Confirm is only allowed once every time slot has been filled, we are
-  /// not busy generating, no extra budget is needed, and all wishlist items are covered.
+  /// not busy generating, and no extra budget is needed.
   bool get canConfirmItinerary {
     return !_uiState.isLoading &&
         !_uiState.isRegeneratingPlan &&
         _uiState.activities.isNotEmpty &&
         !hasEmptyActivitySlots &&
         !(spentBudget > totalBudget) &&
-        !needsTopUp &&
-        !hasUncoveredWishlist;
+        !needsTopUp;
   }
 
   static bool _matchesWishlist(
@@ -357,7 +356,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
       return null;
     }
 
-    if (amount < minTopUp!) {
+    if (amount < minTopUp) {
       return 'Top-up amount must be at least ${symbol ?? 'MYR'} ${minTopUp.toStringAsFixed(2)}.';
     }
 
@@ -694,8 +693,9 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
             startTime: transport.startTime,
             endTime: transport.endTime,
           )
-              .then((updated) => updatedList[slotIndex - 1] = updated)
-              .catchError((e) {
+              .then<void>((updated) {
+            updatedList[slotIndex - 1] = updated;
+          }).catchError((e) {
             debugPrint('Failed to regenerate preceding transport: $e');
           }),
         );
@@ -728,8 +728,9 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
             startTime: transport.startTime,
             endTime: transport.endTime,
           )
-              .then((updated) => updatedList[slotIndex + 1] = updated)
-              .catchError((e) {
+              .then<void>((updated) {
+            updatedList[slotIndex + 1] = updated;
+          }).catchError((e) {
             debugPrint('Failed to regenerate following transport: $e');
           }),
         );
