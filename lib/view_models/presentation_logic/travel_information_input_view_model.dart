@@ -704,6 +704,10 @@ class TravelInformationInputViewModel extends ChangeNotifier {
       updated[index] = updatedArr;
       _uiState = _uiState.copyWith(arrivals: updated);
       notifyListeners();
+
+      if (effectiveType.toLowerCase() == 'bus' && index > 0) {
+        syncLegArrivalWithDepartureDurationAsync(index);
+      }
     }
   }
 
@@ -745,6 +749,10 @@ class TravelInformationInputViewModel extends ChangeNotifier {
         arrivals: updatedArrivals,
       );
       notifyListeners();
+
+      if (type.toLowerCase() == 'bus' && index + 1 < _uiState.arrivals.length) {
+        syncLegArrivalWithDepartureDurationAsync(index + 1);
+      }
     }
   }
 
@@ -817,6 +825,11 @@ class TravelInformationInputViewModel extends ChangeNotifier {
         arrivals: updatedArrivals,
       );
       notifyListeners();
+
+      if (updatedDepartures[index].type.toLowerCase() == 'bus' &&
+          index + 1 < _uiState.arrivals.length) {
+        syncLegArrivalWithDepartureDurationAsync(index + 1);
+      }
     }
   }
 
@@ -827,6 +840,34 @@ class TravelInformationInputViewModel extends ChangeNotifier {
       final prevDep = _uiState.departures[legIndex - 1];
       final curArr = _uiState.arrivals[legIndex];
       final durationMin = TransitScheduleHelper.getEstimatedDurationMinutes(
+        transitType: curArr.type.isNotEmpty ? curArr.type : prevDep.type,
+        fromLocation: prevDep.location,
+        toLocation: curArr.location,
+        selectedDestinations: _uiState.selectedDestinations,
+      );
+      final calc = TransitScheduleHelper.calculateArrivalDateTime(
+        departureDate: prevDep.date,
+        departureTimeStr: prevDep.time,
+        minutesToAdd: durationMin,
+      );
+      final updatedArrivals = List<TransitPoint>.from(_uiState.arrivals);
+      updatedArrivals[legIndex] = curArr.copyWith(
+        time: calc['time'] as String,
+        date: calc['date'] as String,
+      );
+      _uiState = _uiState.copyWith(arrivals: updatedArrivals);
+      notifyListeners();
+    }
+  }
+
+  Future<void> syncLegArrivalWithDepartureDurationAsync(int legIndex) async {
+    if (legIndex > 0 &&
+        legIndex < _uiState.arrivals.length &&
+        legIndex - 1 < _uiState.departures.length) {
+      final prevDep = _uiState.departures[legIndex - 1];
+      final curArr = _uiState.arrivals[legIndex];
+      final durationMin =
+          await TransitScheduleHelper.getEstimatedDurationMinutesAsync(
         transitType: curArr.type.isNotEmpty ? curArr.type : prevDep.type,
         fromLocation: prevDep.location,
         toLocation: curArr.location,

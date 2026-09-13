@@ -2429,12 +2429,16 @@ class _TravelInformationInputScreenState
             children: [
               Expanded(
                 child: Text(
-                  'Calculated for ${prevDep.type} journey in Malaysia',
+                  prevDep.type.toLowerCase() == 'bus'
+                      ? 'Live OpenRouteService (ORS) Routing'
+                      : 'Calculated for ${prevDep.type} journey in Malaysia',
                   style: TextStyle(
                     fontSize: 10.0,
                     fontFamily: 'Inter',
                     fontStyle: FontStyle.italic,
-                    color: appTheme.blue_gray_300,
+                    color: prevDep.type.toLowerCase() == 'bus'
+                        ? appTheme.teal_700
+                        : appTheme.blue_gray_300,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -2442,18 +2446,21 @@ class _TravelInformationInputScreenState
               ),
               const SizedBox(width: 6.0),
               InkWell(
-                onTap: () {
-                  viewModel.syncLegArrivalWithDepartureDuration(legIndex);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Transit ${legIndex + 1} arrival synced to departure + $durationStr duration.',
+                onTap: () async {
+                  await viewModel
+                      .syncLegArrivalWithDepartureDurationAsync(legIndex);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Transit ${legIndex + 1} arrival synced to departure + $durationStr duration.',
+                        ),
+                        backgroundColor: appTheme.teal_A700,
+                        duration: const Duration(seconds: 2),
+                        behavior: SnackBarBehavior.floating,
                       ),
-                      backgroundColor: appTheme.teal_A700,
-                      duration: const Duration(seconds: 2),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
+                    );
+                  }
                 },
                 borderRadius: BorderRadius.circular(6.0),
                 child: Padding(

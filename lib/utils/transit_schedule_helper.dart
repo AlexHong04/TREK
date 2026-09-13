@@ -1,3 +1,5 @@
+import '../models/configurations/openrouteservice_api_config.dart';
+
 /// Helper utility for realistic Malaysia transit journey schedules, travel durations,
 /// and automatic departure/arrival date-time adjustments.
 class TransitScheduleHelper {
@@ -203,6 +205,103 @@ class TransitScheduleHelper {
     }
 
     return 240; // ~4h 00m default bus duration
+  }
+
+  /// Looks up geographical coordinates [lat, lng] for major Malaysian transit hubs.
+  static List<double>? getHubCoordinates(String location) {
+    final l = location.toLowerCase();
+    if (l.contains('tbs') ||
+        (l.contains('kuala lumpur') && (l.contains('bus') || l.contains('terminal')))) {
+      return [3.0768, 101.7107]; // TBS KL
+    }
+    if (l.contains('duta')) {
+      return [3.1818, 101.6748]; // Hentian Duta KL
+    }
+    if (l.contains('kl sentral') || l.contains('kuala lumpur')) {
+      return [3.1342, 101.6865]; // KL Sentral
+    }
+    if (l.contains('penang sentral') || l.contains('butterworth')) {
+      return [5.3942, 100.3685]; // Penang Sentral
+    }
+    if (l.contains('sungai nibong') || l.contains('penang')) {
+      return [5.3427, 100.2982]; // Sungai Nibong Penang
+    }
+    if (l.contains('amanjaya') || l.contains('ipoh') || l.contains('meru raya')) {
+      return [4.6711, 101.0715]; // Terminal Amanjaya Ipoh
+    }
+    if (l.contains('melaka') || l.contains('malacca')) {
+      return [2.2201, 102.2476]; // Melaka Sentral
+    }
+    if (l.contains('larkin') || l.contains('johor') || l.contains('jb')) {
+      return [1.4957, 103.7431]; // Larkin Sentral JB
+    }
+    if (l.contains('kuantan') || l.contains('tsk')) {
+      return [3.8291, 103.2758]; // Terminal Sentral Kuantan
+    }
+    if (l.contains('shahab perdana') || l.contains('alor setar') || l.contains('kedah')) {
+      return [6.1362, 100.3732]; // Terminal Shahab Perdana
+    }
+    if (l.contains('mbkt') || l.contains('terengganu')) {
+      return [5.3308, 103.1415]; // MBKT Kuala Terengganu
+    }
+    if (l.contains('kota bharu') || l.contains('kelantan')) {
+      return [6.1264, 102.2483]; // Terminal Kota Bharu
+    }
+    if (l.contains('genting')) {
+      return [3.4243, 101.7942]; // Genting Highlands
+    }
+    if (l.contains('cameron') || l.contains('tanah rata')) {
+      return [4.4697, 101.3789]; // Cameron Highlands
+    }
+    if (l.contains('seremban') || l.contains('negeri sembilan')) {
+      return [2.7247, 101.9392]; // Terminal 1 Seremban
+    }
+    if (l.contains('inanam') || l.contains('kinabalu') || l.contains('sabah')) {
+      return [5.9868, 116.1347]; // Inanam Bus Terminal
+    }
+    if (l.contains('kuching sentral') || l.contains('kuching') || l.contains('sarawak')) {
+      return [1.4721, 110.3342]; // Kuching Sentral
+    }
+    return null;
+  }
+
+  /// Calculates estimated travel duration in minutes asynchronously.
+  /// For Bus travel, tries OpenRouteService (ORS) dynamic road routing first;
+  /// seamlessly falls back to standard heuristic if API key is not configured or offline.
+  static Future<int> getEstimatedDurationMinutesAsync({
+    required String transitType,
+    String? fromLocation,
+    String? toLocation,
+    List<String>? selectedDestinations,
+  }) async {
+    if (transitType.toLowerCase() == 'bus') {
+      try {
+        final startCoords = getHubCoordinates(fromLocation ?? '');
+        final endCoords = getHubCoordinates(toLocation ?? '');
+        if (startCoords != null && endCoords != null) {
+          final res = await OpenRouteServiceApiConfig.calculateDrivingRoute(
+            startLat: startCoords[0],
+            startLng: startCoords[1],
+            endLat: endCoords[0],
+            endLng: endCoords[1],
+            isBus: true,
+          );
+          final int minutes = res['durationMinutes'] as int;
+          if (minutes > 0) {
+            return minutes;
+          }
+        }
+      } catch (_) {
+        // Fall back seamlessly to local heuristic on any network/API issue
+      }
+    }
+
+    return getEstimatedDurationMinutes(
+      transitType: transitType,
+      fromLocation: fromLocation,
+      toLocation: toLocation,
+      selectedDestinations: selectedDestinations,
+    );
   }
 
   /// Formats minutes into human-readable string, e.g. "4h 30m", "1h 15m".
