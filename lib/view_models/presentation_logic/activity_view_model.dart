@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 
+import '../../models/configurations/gemini_api_config.dart';
 import '../../models/entities/expense_item.dart';
 import '../../models/local_data_source/camera_source.dart';
 import '../../models/local_data_source/gallery_source.dart';
@@ -498,12 +499,13 @@ class ActivityViewModel extends ChangeNotifier {
       return 0;
     }
 
-    final expenseItems = _expenseTrackingService
-        .buildDraftExpenseItemsFromReceipt(
-          receiptText: _uiState.ocrRawText,
-          merchantName: _uiState.ocrMerchantName,
-          transactionDateTime: _uiState.ocrTransactionDateTime,
-        );
+    final expenseItems = _uiState.ocrParsedItems.isNotEmpty
+        ? List<ExpenseItem>.from(_uiState.ocrParsedItems)
+        : _expenseTrackingService.buildDraftExpenseItemsFromReceipt(
+            receiptText: _uiState.ocrRawText,
+            merchantName: _uiState.ocrMerchantName,
+            transactionDateTime: _uiState.ocrTransactionDateTime,
+          );
     if (expenseItems.isEmpty) {
       final detectedTax = _uiState.ocrExtractedTax ?? 0.0;
       final extractedTotal = _uiState.ocrExtractedTotal ?? 0.0;
@@ -610,28 +612,36 @@ class ActivityViewModel extends ChangeNotifier {
         receiptLocalPath,
       );
       debugPrint('[Receipt OCR raw text]\n$receiptText');
+      final geminiParse = await GeminiApiConfig.parseReceiptOcrText(
+        receiptText: receiptText,
+      );
       final extractedTotal = _expenseTrackingService.extractReceiptTotal(
         receiptText,
       );
+      final effectiveTotal = geminiParse?.totalAmount ?? extractedTotal;
       final detectedTax = _expenseTrackingService.extractReceiptTax(
         receiptText,
       );
+      final effectiveTax = geminiParse?.taxAmount ?? detectedTax;
       final extractedTax =
-          detectedTax != null &&
-              extractedTotal != null &&
-              detectedTax >= 0 &&
-              detectedTax <= extractedTotal * 0.20
-          ? detectedTax
+          effectiveTax != null &&
+              effectiveTotal != null &&
+              effectiveTax >= 0 &&
+              effectiveTax <= effectiveTotal * 0.20
+          ? effectiveTax
           : null;
-      final extractedDiscount = _expenseTrackingService.extractReceiptDiscount(
-        receiptText,
-      );
-      final extractedRounding = _expenseTrackingService.extractReceiptRounding(
-        receiptText,
-      );
-      final parsedDateTime = _expenseTrackingService.extractReceiptDateTime(
-        receiptText,
-      );
+      final extractedDiscount =
+          geminiParse?.discountAmount ??
+          _expenseTrackingService.extractReceiptDiscount(receiptText);
+      final extractedRounding =
+          geminiParse?.roundingAmount ??
+          _expenseTrackingService.extractReceiptRounding(receiptText);
+      final parsedDateTime =
+          geminiParse?.transactionDateTime ??
+          _expenseTrackingService.extractReceiptDateTime(receiptText);
+      final merchantName = geminiParse?.merchantName.trim().isNotEmpty == true
+          ? geminiParse!.merchantName.trim()
+          : _expenseTrackingService.extractMerchantName(receiptText) ?? '';
       final detectedCurrency = _expenseTrackingService.extractReceiptCurrency(
         receiptText,
       );
@@ -651,16 +661,20 @@ class ActivityViewModel extends ChangeNotifier {
       final effectiveTransactionDateTime =
           extractedDateTime ?? _activityDateTime(selectedActivity);
       _validateTransactionDateTime(effectiveTransactionDateTime);
-      final extractedItems = _expenseTrackingService
-          .buildDraftExpenseItemsFromReceipt(
-            receiptText: receiptText,
-            merchantName: _expenseTrackingService.extractMerchantName(
-              receiptText,
-            ),
-            transactionDateTime: effectiveTransactionDateTime,
-          );
+      final geminiItems = _buildExpenseItemsFromGeminiParse(
+        geminiParse,
+        merchantName,
+        effectiveTransactionDateTime,
+      );
+      final extractedItems = geminiItems.isNotEmpty
+          ? geminiItems
+          : _expenseTrackingService.buildDraftExpenseItemsFromReceipt(
+              receiptText: receiptText,
+              merchantName: merchantName,
+              transactionDateTime: effectiveTransactionDateTime,
+            );
       if (!_expenseTrackingService.isLikelyReceiptText(receiptText) ||
-          extractedTotal == null) {
+          effectiveTotal == null) {
         throw Exception(
           'Unable to read the receipt. Please try another image or continue with the manual entry.',
         );
@@ -669,9 +683,9 @@ class ActivityViewModel extends ChangeNotifier {
           ? 'No purchased item details were found on this receipt. Please enter the expense item manually.'
           : '';
 
-      if (extractedTotal != null) {
+      if (effectiveTotal != null) {
         try {
-          _expenseTrackingService.validateTotalAmount(extractedTotal);
+          _expenseTrackingService.validateTotalAmount(effectiveTotal);
         } on ArgumentError {
           extractedTotalError =
               'The extracted amount is invalid. Please correct it.';
@@ -681,20 +695,22 @@ class ActivityViewModel extends ChangeNotifier {
       _uiState = _uiState.copyWith(
         isScanningReceipt: false,
         ocrRawText: receiptText,
-        ocrMerchantName:
-            _expenseTrackingService.extractMerchantName(receiptText) ?? '',
+        ocrMerchantName: merchantName,
         ocrTransactionDateTime: effectiveTransactionDateTime,
         ocrDateWasDefaulted: extractedDateTime == null,
         originalCurrency: _expenseCurrency,
-        ocrExtractedTotal: extractedTotal,
-        clearOcrExtractedTotal: extractedTotal == null,
+        ocrExtractedTotal: effectiveTotal,
+        clearOcrExtractedTotal: effectiveTotal == null,
         ocrExtractedTax: extractedTax,
         clearOcrExtractedTax: extractedTax == null,
         ocrExtractedDiscount: extractedDiscount,
         ocrExtractedRounding: extractedRounding,
-        ocrItemLines: _expenseTrackingService.extractReceiptItemLines(
-          receiptText,
-        ),
+        ocrItemLines: extractedItems
+            .map(
+              (item) => '${item.itemName} ${item.unitPrice.toStringAsFixed(2)}',
+            )
+            .toList(),
+        ocrParsedItems: extractedItems,
         errorMessage: extractedTotalError,
       );
     } catch (error) {
@@ -704,6 +720,30 @@ class ActivityViewModel extends ChangeNotifier {
       );
     }
     notifyListeners();
+  }
+
+  List<ExpenseItem> _buildExpenseItemsFromGeminiParse(
+    GeminiReceiptParseResult? parse,
+    String merchantName,
+    DateTime transactionDateTime,
+  ) {
+    if (parse == null || parse.items.isEmpty) return const [];
+    return parse.items
+        .where((item) => item.name.trim().isNotEmpty && item.unitPrice > 0)
+        .map<ExpenseItem>(
+          (item) => ExpenseItem(
+            itemName: item.name.trim(),
+            itemDescription: null,
+            merchantName: merchantName.trim().isEmpty
+                ? null
+                : merchantName.trim(),
+            expenseDateTime: transactionDateTime,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            subtotal: item.quantity * item.unitPrice,
+          ),
+        )
+        .toList();
   }
 
   DateTime _activityDateTime(Activity activity) {

@@ -16,6 +16,38 @@ class GeminiApiRequestException implements Exception {
   String toString() => 'Gemini API returned status $statusCode.';
 }
 
+class GeminiReceiptItem {
+  final String name;
+  final int quantity;
+  final double unitPrice;
+
+  const GeminiReceiptItem({
+    required this.name,
+    required this.quantity,
+    required this.unitPrice,
+  });
+}
+
+class GeminiReceiptParseResult {
+  final String merchantName;
+  final DateTime? transactionDateTime;
+  final double? totalAmount;
+  final double? taxAmount;
+  final double? discountAmount;
+  final double? roundingAmount;
+  final List<GeminiReceiptItem> items;
+
+  const GeminiReceiptParseResult({
+    required this.merchantName,
+    required this.transactionDateTime,
+    required this.totalAmount,
+    required this.taxAmount,
+    required this.discountAmount,
+    required this.roundingAmount,
+    required this.items,
+  });
+}
+
 class GeminiApiConfig {
   // Gemini API Key
   static const String _apiKey =
@@ -44,6 +76,140 @@ class GeminiApiConfig {
       }
     } catch (_) {}
     return trimmed.contains(':') ? trimmed : default24H;
+  }
+
+  static Future<GeminiReceiptParseResult?> parseReceiptOcrText({
+    required String receiptText,
+  }) async {
+    final prompt =
+        '''
+Parse this Malaysian receipt OCR text into expense fields.
+
+Rules:
+- Return only valid JSON. No markdown, no explanation.
+- Use MYR amounts as numbers only.
+- Translate item names to English when they are clearly in another language.
+- Numeric dates like 04/09/2026 must be interpreted as DD/MM/YYYY.
+- Use ISO 8601 local datetime format for transactionDateTime when detected.
+- If tax, discount, or rounding is not clearly shown, return null for that field.
+- Do not infer tax from missing items unless a tax/GST/SST/service tax label exists.
+- Rounding can be positive or negative.
+- Items must be purchased product/service rows only, not subtotal, tax, rounding, total, payment, invoice, cashier, table, address, or thank-you lines.
+- Quantity defaults to 1 only when the item and price are clearly a purchased row.
+
+JSON shape:
+{
+  "merchantName": "string or empty",
+  "transactionDateTime": "YYYY-MM-DDTHH:mm:ss or null",
+  "totalAmount": 0.0,
+  "taxAmount": 0.0 or null,
+  "discountAmount": 0.0 or null,
+  "roundingAmount": 0.0 or null,
+  "items": [
+    {"name": "string", "quantity": 1, "unitPrice": 0.0}
+  ]
+}
+
+OCR text:
+$receiptText
+''';
+
+    try {
+      final response = await http
+          .post(
+            Uri.parse(
+              'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=$_apiKey',
+            ),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'contents': [
+                {
+                  'parts': [
+                    {'text': prompt},
+                  ],
+                },
+              ],
+              'generationConfig': {
+                'temperature': 0.1,
+                'responseMimeType': 'application/json',
+              },
+            }),
+          )
+          .timeout(const Duration(seconds: 20));
+
+      if (response.statusCode != 200) {
+        debugPrint('Gemini receipt OCR parse failed: ${response.statusCode}');
+        return null;
+      }
+
+      final data = jsonDecode(response.body);
+      final candidates = data['candidates'] as List?;
+      if (candidates == null || candidates.isEmpty) return null;
+      final content = candidates[0]['content'];
+      final parts = content?['parts'] as List?;
+      final rawText = parts?.isNotEmpty == true ? parts!.first['text'] : null;
+      if (rawText is! String || rawText.trim().isEmpty) return null;
+
+      final cleaned = rawText
+          .trim()
+          .replaceFirst(RegExp(r'^```(?:json)?\s*'), '')
+          .replaceFirst(RegExp(r'\s*```$'), '');
+      final decoded = jsonDecode(cleaned);
+      if (decoded is! Map<String, dynamic>) return null;
+
+      final itemValues = decoded['items'];
+      final items = <GeminiReceiptItem>[];
+      if (itemValues is List) {
+        for (final item in itemValues) {
+          if (item is! Map) continue;
+          final name = item['name']?.toString().trim() ?? '';
+          final quantity = _intValue(item['quantity']) ?? 1;
+          final unitPrice = _doubleValue(item['unitPrice']);
+          if (name.isEmpty || quantity <= 0 || unitPrice == null) continue;
+          items.add(
+            GeminiReceiptItem(
+              name: name,
+              quantity: quantity,
+              unitPrice: unitPrice,
+            ),
+          );
+        }
+      }
+
+      return GeminiReceiptParseResult(
+        merchantName: decoded['merchantName']?.toString().trim() ?? '',
+        transactionDateTime: _dateTimeValue(decoded['transactionDateTime']),
+        totalAmount: _doubleValue(decoded['totalAmount']),
+        taxAmount: _doubleValue(decoded['taxAmount']),
+        discountAmount: _doubleValue(decoded['discountAmount']),
+        roundingAmount: _doubleValue(decoded['roundingAmount']),
+        items: items,
+      );
+    } catch (error) {
+      debugPrint('Gemini receipt OCR parse error: $error');
+      return null;
+    }
+  }
+
+  static int? _intValue(Object? value) {
+    if (value is int) return value;
+    if (value is num) return value.round();
+    if (value is String) return int.tryParse(value.trim());
+    return null;
+  }
+
+  static double? _doubleValue(Object? value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    if (value is String) {
+      return double.tryParse(value.replaceAll(RegExp(r'[^0-9.\-]'), '').trim());
+    }
+    return null;
+  }
+
+  static DateTime? _dateTimeValue(Object? value) {
+    if (value is! String || value.trim().isEmpty) return null;
+    return DateTime.tryParse(value.trim());
   }
 
   // kokhong

@@ -1901,6 +1901,9 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     }
 
     if (uiState.ocrRawText.isNotEmpty) {
+      final shouldApplyOcr = await _showOcrApplyDialog(uiState);
+      if (!shouldApplyOcr || !mounted) return;
+
       var reviewReceiptDate = false;
       if (viewModel.ocrDateDiffersFromSelectedActivity) {
         final useReceiptDate = await _showConfirmationDialog(
@@ -1953,6 +1956,172 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         );
       }
     }
+  }
+
+  Future<bool> _showOcrApplyDialog(ActivityUiState uiState) async {
+    final currency = _activeExpenseCurrency(uiState);
+    final itemCount = uiState.ocrParsedItems.isNotEmpty
+        ? uiState.ocrParsedItems.length
+        : uiState.ocrItemLines.length;
+    final merchant = uiState.ocrMerchantName.isEmpty
+        ? 'Merchant not detected'
+        : uiState.ocrMerchantName;
+    final dateText = uiState.ocrTransactionDateTime == null
+        ? 'Date not detected'
+        : DateFormat(
+            'dd MMM yyyy, hh:mm a',
+          ).format(uiState.ocrTransactionDateTime!);
+    final totalText = uiState.ocrExtractedTotal == null
+        ? 'Total not detected'
+        : _formatExpenseCurrencyAmount(currency, uiState.ocrExtractedTotal!);
+    final taxText = uiState.ocrExtractedTax == null
+        ? 'Not detected'
+        : _formatExpenseCurrencyAmount(currency, uiState.ocrExtractedTax!);
+    final discountText = uiState.ocrExtractedDiscount == null
+        ? 'Not detected'
+        : _formatExpenseCurrencyAmount(currency, uiState.ocrExtractedDiscount!);
+    final roundingText = uiState.ocrExtractedRounding == null
+        ? 'Not detected'
+        : _formatExpenseCurrencyAmount(currency, uiState.ocrExtractedRounding!);
+
+    final shouldApply = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: appTheme.white_A700,
+        insetPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: 500),
+          child: SingleChildScrollView(
+            padding: EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Receipt Scanned',
+                  style: TextStyle(
+                    color: appTheme.black,
+                    fontFamily: 'Inter',
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: 14),
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: appTheme.teal_50,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: appTheme.teal_A200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildOcrSummaryLine('Merchant', merchant),
+                      _buildOcrSummaryLine('Date', dateText),
+                      _buildOcrSummaryLine('Total', totalText),
+                      _buildOcrSummaryLine('Items', '$itemCount detected'),
+                      _buildOcrSummaryLine('Tax', taxText),
+                      _buildOcrSummaryLine('Discount', discountText),
+                      _buildOcrSummaryLine('Rounding', roundingText),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 10),
+                Text(
+                  'OCR/AI may make mistakes. Please review before applying.',
+                  style: TextStyle(
+                    color: appTheme.blue_gray_300,
+                    fontSize: 12,
+                    height: 1.35,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(dialogContext, false),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: appTheme.white_A700,
+                          backgroundColor: appTheme.errorRed,
+                          minimumSize: Size.fromHeight(48),
+                          side: BorderSide(color: appTheme.errorRed),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                        ),
+                        child: Text(
+                          'Cancel',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(dialogContext, true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: appTheme.teal_A700,
+                          foregroundColor: appTheme.white_A700,
+                          minimumSize: Size.fromHeight(48),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                        ),
+                        child: Text(
+                          'Apply',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    return shouldApply ?? false;
+  }
+
+  Widget _buildOcrSummaryLine(String label, String value) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 7),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 76,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: appTheme.blue_gray_300,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                color: appTheme.gray_900,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _chooseReceipt() async {
