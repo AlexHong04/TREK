@@ -411,7 +411,7 @@ Widget _buildTopUpCard(
         margin: EdgeInsets.zero,
         errorText: errorText,
         bottomWidget:
-            (enteredAmount != null && enteredAmount > 0)
+            (enteredAmount != null && enteredAmount > 0 && symbol != 'MYR')
             ? Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(
@@ -702,6 +702,7 @@ Future<void> showBudgetExceededThresholdDialog({
 // Budget Recovery
 Future<void> showBudgetRecoveryDialog({
   required BuildContext context,
+  required String symbol,
   required double shortageAmount,
   required double minTopUp,
   required double remainingBudget,
@@ -740,7 +741,7 @@ Future<void> showBudgetRecoveryDialog({
 
           contentCard: _buildTopUpCard(
             controller,
-            symbol: 'MYR',
+            symbol: symbol,
             minTopUp: minTopUp,
             shortageAmount: shortageAmount,
             validateTopUpAmount: validateTopUpAmount,
@@ -1133,8 +1134,15 @@ Future<void> showTopUpConfirmation({
   return _showTwoButtonsBudgetDialog(
     context: context,
     title: 'Top-up Budget',
-    messages: [
-      'Are you sure you want to top-up MYR ${topUpAmount.toStringAsFixed(2)} ($symbol ${convertedAmt.toStringAsFixed(2)})?',
+    messages: symbol != 'MYR'
+        ? [
+      'Are you sure you want to top-up '
+          'MYR ${topUpAmount.toStringAsFixed(2)} '
+          '($symbol ${convertedAmt.toStringAsFixed(2)})?',
+    ]
+        : [
+      'Are you sure you want to top-up '
+          'MYR ${topUpAmount.toStringAsFixed(2)}?',
     ],
     color: appTheme.black,
     icon: false,
@@ -1155,7 +1163,7 @@ Future<void> showInitialTopUpConfirmation({
     context: context,
     title: 'Top-up Budget',
     messages: [
-      'Are you sure you want to top-up MYR ${convertedAmt.toStringAsFixed(2)} (MYR ${topUpAmount.toStringAsFixed(2)})?',
+      'Are you sure you want to top-up MYR ${convertedAmt.toStringAsFixed(2)} ($symbol ${topUpAmount.toStringAsFixed(2)})?',
     ],
     color: appTheme.black,
     icon: false,

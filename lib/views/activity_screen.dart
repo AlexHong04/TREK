@@ -420,6 +420,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
     showBudgetRecoveryDialog(
       context: context,
       shortageAmount: uiState.shortageAmount,
+      symbol: uiState.displayCurrency ?? 'MYR',
       minTopUp: minTopUp,
       remainingBudget: uiState.remainingBudget,
       warningText:
