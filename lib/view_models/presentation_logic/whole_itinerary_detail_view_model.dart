@@ -21,7 +21,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     required IProfileService profileService, // added this
   }) : _itineraryService = itineraryService ?? ItineraryService(),
        _authService = authService,
-        _profileService = profileService; // added this
+       _profileService = profileService; // added this
 
   WholeItineraryUiState _uiState = const WholeItineraryUiState();
 
@@ -120,11 +120,14 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
       if (cleanDesc.contains(cleanW)) return true;
     }
 
-    final tokens =
-        wLower.split(RegExp(r'[\s,]+')).where((t) => t.length >= 3).toList();
+    final tokens = wLower
+        .split(RegExp(r'[\s,]+'))
+        .where((t) => t.length >= 3)
+        .toList();
     if (tokens.length >= 2) {
-      final matchedTokens =
-          tokens.where((t) => dLower.contains(t) || cleanD.contains(t)).length;
+      final matchedTokens = tokens
+          .where((t) => dLower.contains(t) || cleanD.contains(t))
+          .length;
       if (matchedTokens >= 2) return true;
     }
 
@@ -297,14 +300,27 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
   }
 
   // zhiqin
-  String get preferredCurrency => _profileService.preferredCurrency; // changed this
+  String get preferredCurrency =>
+      _profileService.preferredCurrency; // changed this
 
   // zhiqin
   Future<double?> convertAmountToCurrency({required double amount}) async {
     try {
-      final result = await _profileService.convertToPreferredCurrency( // changed this
+      final result = await _profileService.convertToPreferredCurrency(
         amount: amount,
-        fromCurrency: 'MYR',
+        fromCurrency: 'MYR'
+      );
+      return result;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // zhiqin
+  Future<double?> convertAmountToMYR({required double amount}) async {
+    try {
+      final result = await _profileService.convertPreferredCurrencyToMyr(
+          amount: amount,
       );
       return result;
     } catch (_) {
@@ -313,6 +329,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
   }
 
   String? validateTopUpAmount({
+    String? symbol,
     required String value,
     required double minTopUp,
     required double shortageAmount,
@@ -328,11 +345,11 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     }
 
     if (amount < minTopUp) {
-      return 'Top-up amount must be at least RM ${minTopUp.toStringAsFixed(2)}.';
+      return 'Top-up amount must be at least ${symbol ?? 'MYR'} ${minTopUp.toStringAsFixed(2)}.';
     }
 
     if (amount > shortageAmount) {
-      return 'Top-up amount cannot exceed RM ${shortageAmount.toStringAsFixed(2)}.';
+      return 'Top-up amount cannot exceed ${symbol ?? 'MYR'} ${shortageAmount.toStringAsFixed(2)}.';
     }
 
     return null;
@@ -345,28 +362,28 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     }
 
     final budget = double.tryParse(_uiState.budgetText) ?? 0.0;
+    final myrAmount = await _profileService.convertPreferredCurrencyToMyr(
+      amount: amount,
+    ); // changed this
 
-    // Calculate current shortage considering both estimated extra budget and spentBudget vs budget
-    final overspend = (spentBudget - budget).clamp(0.0, double.infinity);
-    final shortage = _uiState.estimatedExtraBudgetNeeded > overspend
+    final shortfall = spentBudget - budget;
+    final shortage = _uiState.estimatedExtraBudgetNeeded > shortfall
         ? _uiState.estimatedExtraBudgetNeeded
-        : overspend;
+        : shortfall;
 
-    // Minimum required top-up is 50% of the shortage
     final minRequired = double.parse((shortage * 0.50).toStringAsFixed(2));
+    final myrMinRequired = await _profileService.convertPreferredCurrencyToMyr(amount: minRequired) ?? minRequired;
+    final myrShortfall = await _profileService.convertPreferredCurrencyToMyr(amount: shortfall) ?? shortfall;
 
-    // When topup is >= 50% of the shortage (or covers full shortage), it is sufficient
-    final isSufficient =
-        amount >= (minRequired - 0.01) || amount >= (shortage - 0.01);
+    final isSufficient = myrAmount! >= myrMinRequired || myrAmount <= myrShortfall;
 
-    // If sufficient (>= 50%), absorb the remaining difference so the confirm button is immediately enabled
     final double updatedBudget = isSufficient
-        ? (budget + amount < spentBudget ? spentBudget : budget + amount)
-        : (budget + amount);
+        ? (budget + myrAmount < spentBudget ? spentBudget : budget + myrAmount)
+        : (budget + myrAmount);
 
     final remainingShortage = isSufficient
         ? 0.0
-        : (shortage - amount).clamp(0.0, double.infinity);
+        : shortage - myrAmount;
 
     _uiState = _uiState.copyWith(
       budgetText: updatedBudget.toStringAsFixed(2),

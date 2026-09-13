@@ -1500,6 +1500,7 @@ class ActivityViewModel extends ChangeNotifier {
   }
 
   String? validateTopUpAmount({
+    String? symbol,
     required String value,
     required double minTopUp,
     required double shortageAmount,

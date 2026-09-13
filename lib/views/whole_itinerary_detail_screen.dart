@@ -293,7 +293,7 @@ class _WholeItineraryDetailScreenState
     required double amount,
     required double minTopUp,
   }) async {
-    final convertedAmt = await viewModel.convertAmountToCurrency(
+    final myrAmt = await viewModel.convertAmountToMYR(
       amount: amount,
     );
 
@@ -311,11 +311,11 @@ class _WholeItineraryDetailScreenState
 
     bool confirmed = false;
 
-    await showTopUpConfirmation(
+    await showInitialTopUpConfirmation(
       context: context,
       topUpAmount: amount,
       symbol: symbol,
-      convertedAmt: convertedAmt ?? amount,
+      convertedAmt: myrAmt ?? amount,
       onCancel: () {
         confirmed = false;
       },
@@ -365,54 +365,98 @@ class _WholeItineraryDetailScreenState
     return true;
   }
 
+  double roundCurrency(double value) {
+    return double.parse(value.toStringAsFixed(2));
+  }
+
   Future<void> _showWishlistWarningDialog(
-    WholeItineraryDetailViewModel viewModel,
-  ) async {
+      WholeItineraryDetailViewModel viewModel,
+      ) async {
     if (_wishlistWarningShowing) return;
 
     _wishlistWarningShowing = true;
 
     try {
-      // estimatedExtraBudgetNeeded, min top-up to be converted
-
+      // Original amounts in MYR
       double minTopUp = viewModel.uiState.estimatedExtraBudgetNeeded * 0.50;
 
       if (minTopUp <= 0.0) {
         minTopUp = 20.0;
       }
 
+      final double shortageAmount =
+          viewModel.uiState.estimatedExtraBudgetNeeded;
+
+      // Separate values used only for validation
+      double validationMinTopUp = minTopUp;
+      double validationShortageAmount = shortageAmount;
+
       final wishlist = viewModel.uiState.wishlist;
 
-      final hasWishlist = wishlist != null && wishlist.isNotEmpty;
+      final hasWishlist =
+          wishlist != null && wishlist.isNotEmpty;
 
       final hasUncoveredWishlist =
           hasWishlist &&
-          viewModel.uiState.wishlistItemsCoveredCount < wishlist.length;
+              viewModel.uiState.wishlistItemsCoveredCount < wishlist.length;
 
       final hasBudgetShortfall =
           viewModel.uiState.estimatedExtraBudgetNeeded > 0;
 
+      if (viewModel.preferredCurrency != 'MYR') {
+        validationMinTopUp = roundCurrency(
+          await viewModel.convertAmountToCurrency(
+            amount: minTopUp,
+          ) ??
+              minTopUp,
+        );
+
+        validationShortageAmount = roundCurrency(
+          await viewModel.convertAmountToCurrency(
+            amount: shortageAmount,
+          ) ??
+              shortageAmount,
+        );
+      }
+
       if (hasUncoveredWishlist || hasBudgetShortfall) {
         await showInitialBudgetInsufficientDialog(
           context: context,
-          shortageAmount: viewModel.uiState.estimatedExtraBudgetNeeded,
+          shortageAmount: shortageAmount,
           minTopUp: minTopUp,
+          validationShortageAmount: validationShortageAmount,
+          validationMinTopUp: validationMinTopUp,
           wishlistCovered: hasWishlist
               ? viewModel.uiState.wishlistItemsCoveredCount
               : null,
           symbol: viewModel.preferredCurrency,
           warningText:
-              'Insufficient top-up amount will trigger '
+          'Insufficient top-up amount will trigger '
               'alternative recommendation directly.',
-          validateTopUpAmount: viewModel.validateTopUpAmount,
+          validateTopUpAmount: ({
+            String? symbol,
+            required String value,
+            required double minTopUp,
+            required double shortageAmount,
+          }) {
+            return viewModel.validateTopUpAmount(
+              symbol: symbol,
+              value: value,
+              minTopUp: validationMinTopUp,
+              shortageAmount: validationShortageAmount,
+            );
+          },
+
           onCancel: () {},
+
           onTopUpBudget: (double amount) {
             return _handleTopUp(
               viewModel: viewModel,
               amount: amount,
-              minTopUp: minTopUp,
+              minTopUp: validationMinTopUp,
             );
           },
+          convertToMYR: viewModel.convertAmountToMYR,
         );
       }
     } finally {
