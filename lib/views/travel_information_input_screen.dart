@@ -1937,6 +1937,7 @@ class _TravelInformationInputScreenState
                                 isArrival: true,
                                 initialDateString: arrival.date,
                                 minAllowedDate: minDate,
+                                transitIndex: index,
                                 onDatePicked: (d) =>
                                     viewModel.updateArrivalDate(index, d),
                               );
@@ -2109,6 +2110,7 @@ class _TravelInformationInputScreenState
                                 isArrival: false,
                                 initialDateString: departure.date,
                                 minAllowedDate: minDate,
+                                transitIndex: index,
                                 onDatePicked: (d) =>
                                     viewModel.updateDepartureDate(index, d),
                               );
@@ -2646,6 +2648,7 @@ class _TravelInformationInputScreenState
     required String initialDateString,
     required ValueChanged<String> onDatePicked,
     DateTime? minAllowedDate,
+    int transitIndex = 0,
   }) async {
     final startDate = viewModel.uiState.startDate;
     final endDate = viewModel.uiState.endDate;
@@ -2662,12 +2665,18 @@ class _TravelInformationInputScreenState
       return;
     }
 
-    final tripFirstAllowed = startDate.subtract(const Duration(days: 1));
+    // Transit 2+ arrival stays strictly within trip dates without +1 buffer.
+    // Departures (including Transit 2 departure) keep the +1 day buffer.
+    final bool allowBuffer = !isArrival || transitIndex == 0;
+    final tripFirstAllowed = (isArrival && transitIndex == 0)
+        ? startDate.subtract(const Duration(days: 1))
+        : startDate;
     final firstAllowed =
         (minAllowedDate != null && minAllowedDate.isAfter(tripFirstAllowed))
             ? minAllowedDate
             : tripFirstAllowed;
-    final lastAllowed = endDate.add(const Duration(days: 1));
+    final lastAllowed =
+        allowBuffer ? endDate.add(const Duration(days: 1)) : endDate;
     final effectiveFirstAllowed =
         firstAllowed.isAfter(lastAllowed) ? lastAllowed : firstAllowed;
 
@@ -2689,9 +2698,11 @@ class _TravelInformationInputScreenState
       initialDate: initialDate,
       firstDate: effectiveFirstAllowed,
       lastDate: lastAllowed,
-      helpText: isArrival
-          ? 'SELECT ARRIVAL DATE (±1 DAY OF TRIP)'
-          : 'SELECT DEPARTURE DATE (±1 DAY OF TRIP)',
+      helpText: allowBuffer
+          ? (isArrival
+              ? 'SELECT ARRIVAL DATE (±1 DAY OF TRIP)'
+              : 'SELECT DEPARTURE DATE (±1 DAY OF TRIP)')
+          : (isArrival ? 'SELECT ARRIVAL DATE' : 'SELECT DEPARTURE DATE'),
       selectableDayPredicate: (day) {
         final checkDate = DateTime(day.year, day.month, day.day);
         if (minAllowedDate != null) {
@@ -2704,11 +2715,16 @@ class _TravelInformationInputScreenState
             return false;
           }
         }
+        if (!allowBuffer) {
+          if (checkDate.isBefore(startDate) || checkDate.isAfter(endDate)) {
+            return false;
+          }
+        }
         // Dates strictly within this trip are always valid
         if (!checkDate.isBefore(startDate) && !checkDate.isAfter(endDate)) {
           return true;
         }
-        // For ±1 day buffer, check that it does not overlap another existing trip
+        // For ±1 day buffer on transit leg 0, check that it does not overlap another existing trip
         for (final range in viewModel.uiState.unavailableDateRanges) {
           final rStart = DateTime(
             range.start.year,
@@ -2944,9 +2960,15 @@ class _TravelInformationInputScreenState
               : const TransitPoint(id: ''));
 
     final currentSelected = currentItem.location;
-    final initialMode = currentItem.type.isNotEmpty
-        ? currentItem.type
-        : 'Flight';
+    final String? lockedMode = (isArrival &&
+            index > 0 &&
+            index - 1 < viewModel.uiState.departures.length)
+        ? viewModel.uiState.departures[index - 1].type
+        : null;
+
+    final initialMode = (lockedMode != null && lockedMode.isNotEmpty)
+        ? lockedMode
+        : (currentItem.type.isNotEmpty ? currentItem.type : 'Flight');
 
     final destinations = viewModel.uiState.selectedDestinations;
 
@@ -2961,6 +2983,13 @@ class _TravelInformationInputScreenState
         return StatefulBuilder(
           builder: (context, setModalState) {
             final query = searchQuery.trim().toLowerCase();
+
+            final bool isFlightEnabled =
+                lockedMode == null || lockedMode.toLowerCase() == 'flight';
+            final bool isTrainEnabled =
+                lockedMode == null || lockedMode.toLowerCase() == 'train';
+            final bool isBusEnabled =
+                lockedMode == null || lockedMode.toLowerCase() == 'bus';
 
             final recommendedHubs = getTransitHubSuggestions(
               destinations,
@@ -3048,15 +3077,15 @@ class _TravelInformationInputScreenState
                                 modalTitle,
                                 style: TextStyle(
                                   fontSize: 18,
-                                  fontWeight: FontWeight.w700,
+                                  fontWeight: FontWeight.w800,
                                   fontFamily: 'Inter',
                                   color: appTheme.gray_800,
                                 ),
                               ),
-                              const SizedBox(height: 2.0),
+                              const SizedBox(height: 2),
                               Text(
                                 destinations.isNotEmpty
-                                    ? 'Based on destination: ${destinations.join(", ")}'
+                                    ? 'Based on your selected destinations'
                                     : 'Major $typeLabel Options in Malaysia',
                                 style: TextStyle(
                                   fontSize: 12,
@@ -3081,64 +3110,133 @@ class _TravelInformationInputScreenState
                       horizontal: 20.0,
                       vertical: 4.0,
                     ),
-                    child: Container(
-                      padding: const EdgeInsets.all(4.0),
-                      decoration: BoxDecoration(
-                        color: appTheme.gray_50_01,
-                        borderRadius: BorderRadius.circular(12.0),
-                        border: Border.all(color: appTheme.gray_200),
-                      ),
-                      child: Row(
-                        children: [
-                          _buildModalModeTab(
-                            icon: Icons.flight_rounded,
-                            label: 'Flight',
-                            isSelected: activeMode.toLowerCase() == 'flight',
-                            onTap: () {
-                              setModalState(() {
-                                activeMode = 'Flight';
-                              });
-                              if (isArrival) {
-                                viewModel.updateArrivalType(index, 'Flight');
-                              } else {
-                                viewModel.updateDepartureType(index, 'Flight');
-                              }
-                            },
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(4.0),
+                          decoration: BoxDecoration(
+                            color: appTheme.gray_50_01,
+                            borderRadius: BorderRadius.circular(12.0),
+                            border: Border.all(color: appTheme.gray_200),
                           ),
-                          const SizedBox(width: 4.0),
-                          _buildModalModeTab(
-                            icon: Icons.directions_subway_rounded,
-                            label: 'Train',
-                            isSelected: activeMode.toLowerCase() == 'train',
-                            onTap: () {
-                              setModalState(() {
-                                activeMode = 'Train';
-                              });
-                              if (isArrival) {
-                                viewModel.updateArrivalType(index, 'Train');
-                              } else {
-                                viewModel.updateDepartureType(index, 'Train');
-                              }
-                            },
+                          child: Row(
+                            children: [
+                              _buildModalModeTab(
+                                icon: Icons.flight_rounded,
+                                label: 'Flight',
+                                isSelected: activeMode.toLowerCase() == 'flight',
+                                isEnabled: isFlightEnabled,
+                                onTap: () {
+                                  if (!isFlightEnabled) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Transit ${index + 1} arrival category is locked to Transit $index departure ($lockedMode).',
+                                        ),
+                                        backgroundColor: appTheme.redButton,
+                                        behavior: SnackBarBehavior.floating,
+                                        duration: const Duration(seconds: 2),
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  setModalState(() {
+                                    activeMode = 'Flight';
+                                  });
+                                  if (isArrival) {
+                                    viewModel.updateArrivalType(index, 'Flight');
+                                  } else {
+                                    viewModel.updateDepartureType(index, 'Flight');
+                                  }
+                                },
+                              ),
+                              const SizedBox(width: 4.0),
+                              _buildModalModeTab(
+                                icon: Icons.directions_subway_rounded,
+                                label: 'Train',
+                                isSelected: activeMode.toLowerCase() == 'train',
+                                isEnabled: isTrainEnabled,
+                                onTap: () {
+                                  if (!isTrainEnabled) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Transit ${index + 1} arrival category is locked to Transit $index departure ($lockedMode).',
+                                        ),
+                                        backgroundColor: appTheme.redButton,
+                                        behavior: SnackBarBehavior.floating,
+                                        duration: const Duration(seconds: 2),
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  setModalState(() {
+                                    activeMode = 'Train';
+                                  });
+                                  if (isArrival) {
+                                    viewModel.updateArrivalType(index, 'Train');
+                                  } else {
+                                    viewModel.updateDepartureType(index, 'Train');
+                                  }
+                                },
+                              ),
+                              const SizedBox(width: 4.0),
+                              _buildModalModeTab(
+                                icon: Icons.directions_bus_rounded,
+                                label: 'Bus',
+                                isSelected: activeMode.toLowerCase() == 'bus',
+                                isEnabled: isBusEnabled,
+                                onTap: () {
+                                  if (!isBusEnabled) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Transit ${index + 1} arrival category is locked to Transit $index departure ($lockedMode).',
+                                        ),
+                                        backgroundColor: appTheme.redButton,
+                                        behavior: SnackBarBehavior.floating,
+                                        duration: const Duration(seconds: 2),
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  setModalState(() {
+                                    activeMode = 'Bus';
+                                  });
+                                  if (isArrival) {
+                                    viewModel.updateArrivalType(index, 'Bus');
+                                  } else {
+                                    viewModel.updateDepartureType(index, 'Bus');
+                                  }
+                                },
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 4.0),
-                          _buildModalModeTab(
-                            icon: Icons.directions_bus_rounded,
-                            label: 'Bus',
-                            isSelected: activeMode.toLowerCase() == 'bus',
-                            onTap: () {
-                              setModalState(() {
-                                activeMode = 'Bus';
-                              });
-                              if (isArrival) {
-                                viewModel.updateArrivalType(index, 'Bus');
-                              } else {
-                                viewModel.updateDepartureType(index, 'Bus');
-                              }
-                            },
+                        ),
+                        if (lockedMode != null) ...[
+                          const SizedBox(height: 6.0),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.lock_outline_rounded,
+                                size: 13,
+                                color: appTheme.teal_700,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Arrival category is locked to Transit $index departure ($lockedMode)',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  fontFamily: 'Inter',
+                                  color: appTheme.teal_700,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
-                      ),
+                      ],
                     ),
                   ),
 
@@ -3434,38 +3532,58 @@ class _TravelInformationInputScreenState
     required String label,
     required bool isSelected,
     required VoidCallback onTap,
+    bool isEnabled = true,
   }) {
     return Expanded(
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(8.0),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
-          decoration: BoxDecoration(
-            color: isSelected ? appTheme.teal_A700 : appTheme.transparentCustom,
-            borderRadius: BorderRadius.circular(8.0),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 14.0,
-                color: isSelected
-                    ? appTheme.white_A700
-                    : appTheme.blue_gray_300,
-              ),
-              const SizedBox(width: 6.0),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  fontFamily: 'Inter',
-                  color: isSelected ? appTheme.white_A700 : appTheme.gray_800,
+        child: Opacity(
+          opacity: isEnabled ? 1.0 : 0.4,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? appTheme.teal_A700
+                  : appTheme.transparentCustom,
+              borderRadius: BorderRadius.circular(8.0),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 14.0,
+                  color: isSelected
+                      ? appTheme.white_A700
+                      : (isEnabled
+                          ? appTheme.blue_gray_300
+                          : appTheme.blue_gray_300.withValues(alpha: 0.6)),
                 ),
-              ),
-            ],
+                const SizedBox(width: 6.0),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    fontFamily: 'Inter',
+                    color: isSelected
+                        ? appTheme.white_A700
+                        : (isEnabled ? appTheme.gray_800 : appTheme.blue_gray_300),
+                  ),
+                ),
+                if (!isEnabled) ...[
+                  const SizedBox(width: 4.0),
+                  Icon(
+                    Icons.lock_outline_rounded,
+                    size: 11.0,
+                    color: isSelected
+                        ? appTheme.white_A700
+                        : appTheme.blue_gray_300,
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       ),

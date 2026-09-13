@@ -580,6 +580,13 @@ class TravelInformationInputViewModel extends ChangeNotifier {
 
   void updateArrivalType(int index, String type) {
     if (index >= 0 && index < _uiState.arrivals.length) {
+      // If this is transit leg 2+, its arrival type is locked to previous departure
+      if (index > 0 && index - 1 < _uiState.departures.length) {
+        final lockedType = _uiState.departures[index - 1].type;
+        if (lockedType.isNotEmpty && type != lockedType) {
+          return; // Prevent changing to an unlinked category
+        }
+      }
       final updated = List<TransitPoint>.from(_uiState.arrivals);
       final current = updated[index];
       if (current.type != type) {
@@ -621,8 +628,16 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     required String location,
   }) {
     if (index >= 0 && index < _uiState.arrivals.length) {
+      String effectiveType = type;
+      if (index > 0 && index - 1 < _uiState.departures.length) {
+        final lockedType = _uiState.departures[index - 1].type;
+        if (lockedType.isNotEmpty) {
+          effectiveType = lockedType;
+        }
+      }
       final updated = List<TransitPoint>.from(_uiState.arrivals);
-      updated[index] = updated[index].copyWith(type: type, location: location);
+      updated[index] =
+          updated[index].copyWith(type: effectiveType, location: location);
       _uiState = _uiState.copyWith(arrivals: updated);
       notifyListeners();
     }
