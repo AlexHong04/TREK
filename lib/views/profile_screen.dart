@@ -367,7 +367,7 @@ class ProfileScreen extends StatelessWidget {
                 Expanded(
                   child: _LogoutDialogButton(
                     text: 'Cancel',
-                    backgroundColor: appTheme.errorRed,
+                    backgroundColor: appTheme.teal_A700,
                     onPressed: () => Navigator.pop(dialogContext, false),
                   ),
                 ),
@@ -375,7 +375,7 @@ class ProfileScreen extends StatelessWidget {
                 Expanded(
                   child: _LogoutDialogButton(
                     text: 'Confirm',
-                    backgroundColor: appTheme.teal_A700,
+                    backgroundColor: appTheme.errorRed,
                     onPressed: () => Navigator.pop(dialogContext, true),
                   ),
                 ),

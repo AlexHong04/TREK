@@ -6,6 +6,7 @@ import '../utils/input_validator.dart';
 
 class CustomTextField extends StatefulWidget {
   final String sectionTitle;
+  final Widget? sectionTrailing;
   final String hintText;
   final IconData prefixIcon;
   final TextEditingController? controller;
@@ -35,6 +36,7 @@ class CustomTextField extends StatefulWidget {
   const CustomTextField({
     super.key,
     required this.sectionTitle,
+    this.sectionTrailing,
     required this.hintText,
     required this.prefixIcon,
     this.controller,
@@ -61,9 +63,9 @@ class CustomTextField extends StatefulWidget {
     this.margin = const EdgeInsets.symmetric(horizontal: 24.0),
     this.prefixIconColor,
   }) : assert(
-         controller == null || initialValue == null,
-         'controller and initialValue cannot both be provided.',
-       );
+  controller == null || initialValue == null,
+  'controller and initialValue cannot both be provided.',
+  );
 
   @override
   State<CustomTextField> createState() => _CustomTextFieldState();
@@ -92,16 +94,26 @@ class _CustomTextFieldState extends State<CustomTextField> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            widget.sectionTitle,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-              fontFamily: 'Inter',
-              color: appTheme.blue_gray_300,
-              letterSpacing: 1,
-              height: 1.2,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  widget.sectionTitle,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    fontFamily: 'Inter',
+                    color: appTheme.blue_gray_300,
+                    letterSpacing: 1,
+                    height: 1.2,
+                  ),
+                ),
+              ),
+              if (widget.sectionTrailing != null) ...[
+                const SizedBox(width: 8),
+                widget.sectionTrailing!,
+              ],
+            ],
           ),
           const SizedBox(height: 6.0),
           Focus(

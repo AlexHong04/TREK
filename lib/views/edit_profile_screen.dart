@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../theme/app_theme.dart';
+import '../utils/input_validator.dart';
 import '../view_models/presentation_logic/edit_profile_view_model.dart';
 import '../widgets/custom_app_bar.dart';
 import '../widgets/custom_text_field.dart';
@@ -9,6 +11,8 @@ import '../widgets/currency_picker_field.dart';
 
 class EditProfileScreen extends StatelessWidget {
   const EditProfileScreen({super.key});
+
+  static const int _fullNameMaxLength = InputValidator.maxDisplayNameLength;
 
   static Widget builder(BuildContext context) {
     return const EditProfileViewModelScope(child: EditProfileScreen());
@@ -19,6 +23,7 @@ class EditProfileScreen extends StatelessWidget {
     return Consumer<EditProfileViewModel>(
       builder: (context, viewModel, _) {
         final state = viewModel.uiState;
+        final fullNameLength = state.fullName.characters.length;
         if (state.saveSucceeded) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!context.mounted) return;
@@ -77,6 +82,16 @@ class EditProfileScreen extends StatelessWidget {
                       },
                       child: CustomTextField(
                         sectionTitle: 'FULL NAME',
+                        sectionTrailing: Text(
+                          '$fullNameLength/$_fullNameMaxLength',
+                          style: TextStyle(
+                            color: _fullNameCounterColor(fullNameLength),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            fontFamily: 'Inter',
+                            height: 1.2,
+                          ),
+                        ),
                         hintText: 'Enter your full name (optional)',
                         prefixIcon: Icons.badge_outlined,
                         margin: EdgeInsets.zero,
@@ -85,6 +100,11 @@ class EditProfileScreen extends StatelessWidget {
                         textCapitalization: TextCapitalization.words,
                         textInputAction: TextInputAction.next,
                         autofillHints: const [AutofillHints.name],
+                        inputFormatters: [
+                          LengthLimitingTextInputFormatter(
+                            _fullNameMaxLength,
+                          ),
+                        ],
                         onChanged: viewModel.onFullNameChanged,
                         errorText: state.fullNameError,
                       ),
@@ -128,6 +148,13 @@ class EditProfileScreen extends StatelessWidget {
         );
       },
     );
+  }
+
+  static Color _fullNameCounterColor(int length) {
+    if (length >= 95) return appTheme.errorRed;
+    if (length >= 90) return appTheme.lime_900;
+    if (length >= 80) return appTheme.warningPopupHeader;
+    return appTheme.teal_A700;
   }
 
 }
