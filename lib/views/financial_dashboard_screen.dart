@@ -322,20 +322,14 @@ class FinancialDashboardScreen extends StatelessWidget {
               value: DashboardFilter.byDate,
               height: 46,
               padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: _DashboardFilterMenuItem(
-                icon: Icons.calendar_month_outlined,
-                label: 'By Date',
-              ),
+              child: const _DashboardFilterMenuItem(label: 'By Date'),
             ),
             PopupMenuDivider(height: 1, color: appTheme.gray_200),
             PopupMenuItem(
               value: DashboardFilter.byTrip,
               height: 46,
               padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: _DashboardFilterMenuItem(
-                icon: Icons.luggage_outlined,
-                label: 'By Trip',
-              ),
+              child: const _DashboardFilterMenuItem(label: 'By Trip'),
             ),
           ],
           child: Container(
@@ -519,6 +513,8 @@ class FinancialDashboardScreen extends StatelessWidget {
         ),
         const SizedBox(height: 18),
         Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
           spacing: 14,
           runSpacing: 8,
           children: [
@@ -554,31 +550,21 @@ class FinancialDashboardScreen extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Row(
+          Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 14,
+            runSpacing: 8,
             children: [
-              Expanded(
-                child: _ColumnHeading(
-                  color: appTheme.blue_gray_700,
-                  label: 'Budget',
-                ),
+              _ColumnHeading(color: appTheme.blue_gray_700, label: 'Budget'),
+              _ColumnHeading(
+                color: appTheme.warningPopupHeader,
+                label: 'Expense',
               ),
-              Expanded(
-                child: _ColumnHeading(
-                  color: appTheme.warningPopupHeader,
-                  label: 'Expense',
-                ),
-              ),
-              Expanded(
-                child: _ColumnHeading(
-                  color: appTheme.teal_A700,
-                  label: 'Remaining',
-                ),
-              ),
-              Expanded(
-                child: _ColumnHeading(
-                  color: appTheme.expenseOverspendText,
-                  label: 'Over Budget',
-                ),
+              _ColumnHeading(color: appTheme.teal_A700, label: 'Remaining'),
+              _ColumnHeading(
+                color: appTheme.expenseOverspendText,
+                label: 'Over Budget',
               ),
             ],
           ),
@@ -713,26 +699,17 @@ class _CurrencyAmountPairText extends StatelessWidget {
 }
 
 class _DashboardFilterMenuItem extends StatelessWidget {
-  final IconData icon;
   final String label;
 
-  const _DashboardFilterMenuItem({required this.icon, required this.label});
+  const _DashboardFilterMenuItem({required this.label});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 28,
-          height: 28,
-          decoration: BoxDecoration(
-            color: appTheme.teal_50,
-            borderRadius: BorderRadius.circular(7),
-          ),
-          child: Icon(icon, color: appTheme.teal_800, size: 16),
-        ),
-        const SizedBox(width: 8),
-        Text(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
           label,
           style: TextStyle(
             color: appTheme.gray_900,
@@ -740,7 +717,7 @@ class _DashboardFilterMenuItem extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-      ],
+      ),
     );
   }
 }
@@ -1050,10 +1027,13 @@ class _DashboardExpenseSortBar extends StatelessWidget {
           onSelected: viewModel.setExpenseSort,
           color: appTheme.white_A700,
           surfaceTintColor: appTheme.white_A700,
+          shadowColor: appTheme.gray_900.withValues(alpha: 0.16),
           elevation: 8,
           position: PopupMenuPosition.under,
           offset: const Offset(0, 6),
           constraints: const BoxConstraints(minWidth: 210, maxWidth: 230),
+          menuPadding: const EdgeInsets.symmetric(vertical: 6),
+          clipBehavior: Clip.antiAlias,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
             side: BorderSide(color: appTheme.gray_200),
@@ -1063,38 +1043,25 @@ class _DashboardExpenseSortBar extends StatelessWidget {
                 (sort) => PopupMenuItem<DashboardExpenseSort>(
                   value: sort,
                   height: 44,
-                  child: Row(
-                    children: [
-                      Icon(
-                        sort == DashboardExpenseSort.timeEarliest ||
-                                sort == DashboardExpenseSort.timeLatest
-                            ? Icons.schedule_outlined
-                            : Icons.payments_outlined,
-                        size: 17,
-                        color: sort == selectedSort
-                            ? appTheme.teal_A700
-                            : appTheme.blue_gray_300,
+                  padding: EdgeInsets.zero,
+                  child: Container(
+                    height: 44,
+                    width: double.infinity,
+                    alignment: Alignment.centerLeft,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    color: sort == selectedSort
+                        ? appTheme.gray_200
+                        : appTheme.white_A700,
+                    child: Text(
+                      viewModel.expenseSortLabel(sort),
+                      style: TextStyle(
+                        color: appTheme.gray_900,
+                        fontSize: 12,
+                        fontWeight: sort == selectedSort
+                            ? FontWeight.w700
+                            : FontWeight.w500,
                       ),
-                      const SizedBox(width: 9),
-                      Expanded(
-                        child: Text(
-                          viewModel.expenseSortLabel(sort),
-                          style: TextStyle(
-                            color: appTheme.gray_900,
-                            fontSize: 12,
-                            fontWeight: sort == selectedSort
-                                ? FontWeight.w700
-                                : FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                      if (sort == selectedSort)
-                        Icon(
-                          Icons.check_rounded,
-                          size: 17,
-                          color: appTheme.teal_A700,
-                        ),
-                    ],
+                    ),
                   ),
                 ),
               )
@@ -1942,19 +1909,55 @@ class _SummaryRow extends StatelessWidget {
             ),
           ),
           SizedBox(
-            width: 126,
-            child: _CurrencyAmountPairText(
-              primaryText: primaryAmountText,
-              secondaryText: secondaryAmountText,
-              primaryStyle: _amountStyle.copyWith(color: amountColor),
-              secondaryStyle: TextStyle(
-                color: amount < 0
-                    ? appTheme.errorRed
-                    : appTheme.white_A700.withValues(alpha: 0.88),
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            width: amount < 0 ? 140 : 126,
+            child: amount < 0
+                ? Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: appTheme.white_A700,
+                      borderRadius: BorderRadius.circular(9),
+                      border: Border.all(
+                        color: appTheme.errorRed.withValues(alpha: 0.20),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.warning_amber_rounded,
+                          color: appTheme.errorRed,
+                          size: 17,
+                        ),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: _CurrencyAmountPairText(
+                            primaryText: primaryAmountText,
+                            secondaryText: secondaryAmountText,
+                            primaryStyle: _amountStyle.copyWith(
+                              color: appTheme.errorRed,
+                            ),
+                            secondaryStyle: TextStyle(
+                              color: appTheme.errorRed,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : _CurrencyAmountPairText(
+                    primaryText: primaryAmountText,
+                    secondaryText: secondaryAmountText,
+                    primaryStyle: _amountStyle.copyWith(color: amountColor),
+                    secondaryStyle: TextStyle(
+                      color: appTheme.white_A700.withValues(alpha: 0.88),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
           ),
         ],
       ),
@@ -2185,25 +2188,32 @@ class _BreakdownRow extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
+        Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          runSpacing: 6,
           children: [
-            Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                color: category.isOverspent
-                    ? appTheme.errorRed
-                    : appTheme.teal_A700,
-                borderRadius: BorderRadius.circular(3),
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: category.isOverspent
+                        ? appTheme.errorRed
+                        : appTheme.teal_A700,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+                const SizedBox(width: 9),
+                Text(
+                  category.name,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ],
             ),
-            const SizedBox(width: 9),
-            Text(
-              category.name,
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            if (category.isOverspent) ...[
-              const SizedBox(width: 8),
+            if (category.isOverspent)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
@@ -2220,7 +2230,6 @@ class _BreakdownRow extends StatelessWidget {
                   ),
                 ),
               ),
-            ],
           ],
         ),
         const SizedBox(height: 10),

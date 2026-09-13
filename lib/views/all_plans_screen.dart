@@ -17,7 +17,10 @@ class AllPlansScreen extends StatefulWidget {
     final profileService = context.read<IProfileService>(); // added this
 
     return ChangeNotifierProvider<WholeItineraryDetailViewModel>(
-      create: (_) => WholeItineraryDetailViewModel(authService: authService, profileService: profileService), // changed this
+      create: (_) => WholeItineraryDetailViewModel(
+        authService: authService,
+        profileService: profileService,
+      ), // changed this
       child: const AllPlansScreen(),
     );
   }
@@ -46,23 +49,30 @@ class _AllPlansScreenState extends State<AllPlansScreen> {
       body: uiState.isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildFilterDropdownCard(uiState, viewModel),
-            const SizedBox(height: 16.0),
-            _buildTripList(uiState),
-          ],
-        ),
-      ),
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildFilterDropdownCard(uiState, viewModel),
+                  const SizedBox(height: 16.0),
+                  _buildTripList(uiState),
+                ],
+              ),
+            ),
     );
   }
 
   Widget _buildFilterDropdownCard(
-      WholeItineraryUiState uiState,
-      WholeItineraryDetailViewModel viewModel,
-      ) {
+    WholeItineraryUiState uiState,
+    WholeItineraryDetailViewModel viewModel,
+  ) {
+    const statusFilters = [
+      'All Plans',
+      'Pending',
+      'Ongoing',
+      'Completed',
+      'Terminated',
+    ];
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16.0),
@@ -96,29 +106,91 @@ class _AllPlansScreenState extends State<AllPlansScreen> {
                   ),
                 ),
                 const SizedBox(height: 10.0),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14.0),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10.0),
-                    border: Border.all(color: appTheme.gray_200),
+                PopupMenuButton<String>(
+                  tooltip: 'Filter plans by status',
+                  initialValue: uiState.selectedStatusFilter,
+                  onSelected: viewModel.setStatusFilter,
+                  color: appTheme.white_A700,
+                  surfaceTintColor: appTheme.white_A700,
+                  shadowColor: appTheme.gray_900.withValues(alpha: 0.16),
+                  elevation: 8,
+                  position: PopupMenuPosition.under,
+                  offset: const Offset(0, 6),
+                  constraints: const BoxConstraints(
+                    minWidth: 150,
+                    maxWidth: 180,
                   ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: uiState.selectedStatusFilter,
-                      isExpanded: true,
-                      icon: const Icon(Icons.keyboard_arrow_down),
-                      items: const [
-                        DropdownMenuItem(value: 'All Plans', child: Text('All Plans')),
-                        DropdownMenuItem(value: 'Pending', child: Text('Pending')),
-                        DropdownMenuItem(value: 'Ongoing', child: Text('Ongoing')),
-                        DropdownMenuItem(value: 'Completed', child: Text('Completed')),
-                        DropdownMenuItem(value: 'Terminated', child: Text('Terminated')),
+                  menuPadding: const EdgeInsets.symmetric(vertical: 6),
+                  clipBehavior: Clip.antiAlias,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: appTheme.gray_200),
+                  ),
+                  itemBuilder: (context) => statusFilters
+                      .map(
+                        (status) => PopupMenuItem<String>(
+                          value: status,
+                          height: 44,
+                          padding: EdgeInsets.zero,
+                          child: Container(
+                            width: double.infinity,
+                            height: 44,
+                            alignment: Alignment.centerLeft,
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            color: status == uiState.selectedStatusFilter
+                                ? appTheme.gray_200
+                                : appTheme.white_A700,
+                            child: Text(
+                              status,
+                              style: TextStyle(
+                                color: appTheme.gray_900,
+                                fontSize: 12,
+                                fontWeight:
+                                    status == uiState.selectedStatusFilter
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  child: Container(
+                    height: 46,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    decoration: BoxDecoration(
+                      color: appTheme.white_A700,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: appTheme.gray_200),
+                      boxShadow: [
+                        BoxShadow(
+                          color: appTheme.black_900_0c,
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
                       ],
-                      onChanged: (value) {
-                        if (value != null) {
-                          viewModel.setStatusFilter(value);
-                        }
-                      },
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            uiState.selectedStatusFilter,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: appTheme.gray_900,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              fontFamily: 'Inter',
+                            ),
+                          ),
+                        ),
+                        Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          size: 18,
+                          color: appTheme.teal_A700,
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -186,8 +258,9 @@ class _AllPlansScreenState extends State<AllPlansScreen> {
                         Expanded(
                           child: Text(
                             uiState.selectedDateFilter != null
-                                ? DateFormat('dd/MM/yy')
-                                    .format(uiState.selectedDateFilter!)
+                                ? DateFormat(
+                                    'dd/MM/yy',
+                                  ).format(uiState.selectedDateFilter!)
                                 : 'All',
                             style: TextStyle(
                               fontSize: 14,
@@ -271,7 +344,7 @@ class _AllPlansScreenState extends State<AllPlansScreen> {
     final bool isTerminated = status == 'terminated';
 
     final String? activeImageUrl =
-    (trip.imgUrl != null && trip.imgUrl!.trim().isNotEmpty)
+        (trip.imgUrl != null && trip.imgUrl!.trim().isNotEmpty)
         ? trip.imgUrl!.trim()
         : null;
 
@@ -312,7 +385,7 @@ class _AllPlansScreenState extends State<AllPlansScreen> {
                       activeImageUrl,
                       destination: trip.destination,
                     ),
-                    if(isPending)
+                    if (isPending)
                       Positioned(
                         top: 12,
                         right: 12,
@@ -375,7 +448,8 @@ class _AllPlansScreenState extends State<AllPlansScreen> {
                             const SizedBox(width: 4),
                             Text(
                               status.isNotEmpty
-                                  ? status[0].toUpperCase() + status.substring(1)
+                                  ? status[0].toUpperCase() +
+                                        status.substring(1)
                                   : 'Pending',
                               style: TextStyle(
                                 fontSize: 12,
@@ -509,7 +583,9 @@ class _AllPlansScreenState extends State<AllPlansScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Plan'),
-        content: Text('Are you sure you want to delete your trip to ${trip.destination}?'),
+        content: Text(
+          'Are you sure you want to delete your trip to ${trip.destination}?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -525,7 +601,9 @@ class _AllPlansScreenState extends State<AllPlansScreen> {
     );
 
     if (confirmed == true && context.mounted) {
-      await context.read<WholeItineraryDetailViewModel>().deletePendingTrip(trip.tripId);
+      await context.read<WholeItineraryDetailViewModel>().deletePendingTrip(
+        trip.tripId,
+      );
     }
   }
 }
