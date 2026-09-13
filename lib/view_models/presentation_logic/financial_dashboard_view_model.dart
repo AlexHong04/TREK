@@ -30,7 +30,7 @@ class FinancialDashboardViewModel extends ChangeNotifier {
     required IAuthService authService,
     required IProfileService profileService,
   }) : _service = service ?? FinancialDashboardService(),
-        _profileService = profileService,
+       _profileService = profileService,
        _authService = authService {
     _authService.addListener(_handleAuthUserChanged);
     _syncAuthUser(notify: false);
@@ -290,6 +290,7 @@ class FinancialDashboardViewModel extends ChangeNotifier {
                 endDate: trip.endDate,
                 totalBudget: trip.totalBudget,
                 travelPreference: trip.travelPreference,
+                status: trip.computedStatus,
               ),
             )
             .toList(),
@@ -303,7 +304,7 @@ class FinancialDashboardViewModel extends ChangeNotifier {
       _uiState = _uiState.copyWith(
         isLoadingCompletedTrips: false,
         completedTripsErrorMessage:
-            'Unable to load completed trips. Please try again.',
+            'Unable to load past trips. Please try again.',
       );
     }
     notifyListeners();
@@ -676,15 +677,29 @@ class DashboardDonutChartPainter extends CustomPainter {
       final direction = Offset(math.cos(middleAngle), math.sin(middleAngle));
       const ringOuterRadius = radius + strokeWidth / 2;
       final leaderStart = center + direction * (ringOuterRadius + 3);
-      final labelAnchor = center + direction * (ringOuterRadius + 15);
+      final labelAnchor = center + direction * (ringOuterRadius + 22);
+      final amountLines = amountLabelBuilder(category.expense).split('\n');
       final textPainter = TextPainter(
         text: TextSpan(
-          text: amountLabelBuilder(category.expense),
-          style: TextStyle(
-            color: appTheme.gray_900,
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-          ),
+          children: [
+            TextSpan(
+              text: amountLines.first,
+              style: TextStyle(
+                color: appTheme.gray_900,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            if (amountLines.length > 1)
+              TextSpan(
+                text: '\n${amountLines.sublist(1).join('\n')}',
+                style: TextStyle(
+                  color: appTheme.blue_gray_700,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+          ],
         ),
         textAlign: TextAlign.center,
         textDirection: ui.TextDirection.ltr,
@@ -694,8 +709,8 @@ class DashboardDonutChartPainter extends CustomPainter {
         leaderStart,
         labelAnchor,
         Paint()
-          ..color = appTheme.blue_gray_300.withValues(alpha: 0.7)
-          ..strokeWidth = 1,
+          ..color = appTheme.blue_gray_700
+          ..strokeWidth = 1.2,
       );
 
       final desiredOffset = _labelOffset(
@@ -751,7 +766,7 @@ class DashboardDonutChartPainter extends CustomPainter {
 
 Color dashboardCategoryColor(String categoryName) {
   return switch (categoryName) {
-    'Restaurant' => appTheme.teal_50,
+    'Restaurant' => appTheme.teal_A200,
     'Transport' => appTheme.teal_800,
     _ => appTheme.teal_A700,
   };

@@ -78,6 +78,7 @@ class DashboardTripUiState {
   final DateTime endDate;
   final double totalBudget;
   final String travelPreference;
+  final String status;
 
   const DashboardTripUiState({
     required this.tripId,
@@ -87,6 +88,7 @@ class DashboardTripUiState {
     required this.endDate,
     required this.totalBudget,
     required this.travelPreference,
+    required this.status,
   });
 }
 

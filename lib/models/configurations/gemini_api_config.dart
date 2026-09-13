@@ -523,29 +523,34 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
     if (previousActivityDestination != null &&
         previousActivityDestination.isNotEmpty) {
       surroundingContext.write(
-          '    - Previous Activity (before this slot): "$previousActivityDestination"\n');
+        '    - Previous Activity (before this slot): "$previousActivityDestination"\n',
+      );
     }
-    if (nextActivityDestination != null &&
-        nextActivityDestination.isNotEmpty) {
+    if (nextActivityDestination != null && nextActivityDestination.isNotEmpty) {
       surroundingContext.write(
-          '    - Next Activity (after this slot): "$nextActivityDestination"\n');
+        '    - Next Activity (after this slot): "$nextActivityDestination"\n',
+      );
     }
 
     // Build day position context (arrival/departure awareness)
     final dayPositionContext = StringBuffer();
     if (isFirstDay) {
-      dayPositionContext.write('''
+      dayPositionContext.write(
+        '''
     DAY 1 AWARENESS:
     - This is the FIRST day of the trip. The traveler may have just arrived.
     - If this slot is early in the day, suggest activities near common arrival points (airports, train stations, bus terminals) or the hotel area.
-    - Avoid suggesting far-flung locations that require long transit from arrival points.\n''');
+    - Avoid suggesting far-flung locations that require long transit from arrival points.\n''',
+      );
     }
     if (isLastDay) {
-      dayPositionContext.write('''
+      dayPositionContext.write(
+        '''
     FINAL DAY AWARENESS:
     - This is the LAST day (Day $dayNumber of $totalDays) of the trip. The traveler will depart later today.
     - If this slot is in the afternoon or evening, suggest activities near departure points or the hotel area so the traveler can leave on time.
-    - Avoid suggesting activities far from the city center or transit hubs.\n''');
+    - Avoid suggesting activities far from the city center or transit hubs.\n''',
+      );
     }
 
     final prompt =

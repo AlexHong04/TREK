@@ -38,7 +38,7 @@ class TripSummaryScreen extends StatelessWidget {
         centerTitle: true,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: Icon(Icons.arrow_back, color: appTheme.teal_800),
+          icon: Icon(Icons.arrow_back, color: appTheme.teal_A700),
         ),
         title: Text(
           'Dashboard',
@@ -119,7 +119,11 @@ class TripSummaryScreen extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               _formatDateRange(uiState.startDate!, uiState.endDate!),
-              style: TextStyle(color: appTheme.gray_400, fontSize: 14),
+              style: TextStyle(
+                color: appTheme.blue_gray_700,
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+              ),
             ),
             const SizedBox(height: 28),
             _buildBudgetOverview(uiState),
@@ -152,9 +156,8 @@ class TripSummaryScreen extends StatelessWidget {
     final isUnhealthy = uiState.financialHealth == 'Unhealthy';
     final expenseColor = isOverspent
         ? appTheme.errorRed
-        : isUnhealthy
-        ? appTheme.warningPopupHeader
-        : appTheme.teal_800;
+        : appTheme.warningPopupHeader;
+    final actualBudgetColor = appTheme.teal_800;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -172,8 +175,8 @@ class TripSummaryScreen extends StatelessWidget {
                     allocatedBudgetProgress:
                         uiState.allocatedBudgetRingProgress,
                     expenseProgress: uiState.expenseRingProgress,
-                    actualBudgetColor: appTheme.teal_A700,
-                    allocatedBudgetColor: appTheme.blue_gray_300,
+                    actualBudgetColor: actualBudgetColor,
+                    allocatedBudgetColor: appTheme.blue_gray_700,
                     expenseColor: expenseColor,
                     backgroundColor: appTheme.gray_200,
                   ),
@@ -191,11 +194,11 @@ class TripSummaryScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               if (isUnhealthy) ...[
-                _BudgetRingLegend(color: appTheme.teal_A700, label: 'Actual'),
+                _BudgetRingLegend(color: actualBudgetColor, label: 'Actual'),
                 const SizedBox(height: 6),
               ],
               _BudgetRingLegend(
-                color: appTheme.blue_gray_300,
+                color: appTheme.blue_gray_700,
                 label: 'Allocated',
               ),
               const SizedBox(height: 6),
@@ -269,9 +272,9 @@ class TripSummaryScreen extends StatelessWidget {
     TripSummaryUiState uiState,
   ) {
     final colors = [
-      appTheme.teal_A200,
       appTheme.teal_A700,
-      appTheme.blue_gray_300,
+      appTheme.teal_800,
+      appTheme.blue_gray_700,
     ];
     final highest = uiState.categories.isEmpty
         ? null
@@ -300,13 +303,49 @@ class TripSummaryScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 18),
-          Text(
-            highest == null || highest.expense == 0
-                ? 'No expenses recorded for this trip'
-                : 'Highest Expenditure: ${highest.name} (${viewModel.formatDisplayMoney(highest.expense)})',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: appTheme.gray_900, fontSize: 14),
-          ),
+          if (highest == null || highest.expense == 0)
+            Text(
+              'No expenses recorded for this trip',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: appTheme.gray_900, fontSize: 14),
+            )
+          else
+            Column(
+              children: [
+                Text(
+                  'Highest Expenditure: ${highest.name}',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: appTheme.gray_900,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                _CurrencyAmountPairText(
+                  primaryText: viewModel.formatPrimaryMoney(highest.expense),
+                  secondaryText: viewModel.formatSecondaryMoney(
+                    highest.expense,
+                  ),
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  textAlign: TextAlign.center,
+                  primaryStyle: TextStyle(
+                    color: highest.expense < 0
+                        ? appTheme.errorRed
+                        : appTheme.gray_900,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  secondaryStyle: TextStyle(
+                    color: highest.expense < 0
+                        ? appTheme.errorRed
+                        : appTheme.blue_gray_700,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
     );
@@ -366,7 +405,7 @@ class TripSummaryScreen extends StatelessWidget {
           : uiState.costSavingTips.isEmpty
           ? Text(
               'No cost-saving tips are available.',
-              style: TextStyle(color: appTheme.gray_400, fontSize: 13),
+              style: TextStyle(color: appTheme.blue_gray_700, fontSize: 14),
             )
           : Column(
               children: List.generate(
@@ -481,9 +520,9 @@ class TripSummaryScreen extends StatelessWidget {
                             color:
                                 uiState.futureRecommendationsErrorMessage ==
                                     null
-                                ? appTheme.gray_400
+                                ? appTheme.blue_gray_700
                                 : appTheme.errorRed,
-                            fontSize: 13,
+                            fontSize: 14,
                           ),
                         ),
                         const SizedBox(height: 10),
@@ -831,6 +870,59 @@ class TripSummaryScreen extends StatelessWidget {
   }
 }
 
+String _displayMyrCode(String value) {
+  return value.replaceAll(RegExp(r'\bRM\b'), 'MYR');
+}
+
+class _CurrencyAmountPairText extends StatelessWidget {
+  final String primaryText;
+  final String? secondaryText;
+  final TextStyle primaryStyle;
+  final TextStyle secondaryStyle;
+  final CrossAxisAlignment crossAxisAlignment;
+  final TextAlign textAlign;
+
+  const _CurrencyAmountPairText({
+    required this.primaryText,
+    required this.secondaryText,
+    required this.primaryStyle,
+    required this.secondaryStyle,
+    this.crossAxisAlignment = CrossAxisAlignment.end,
+    this.textAlign = TextAlign.end,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: crossAxisAlignment,
+      children: [
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            _displayMyrCode(primaryText),
+            maxLines: 1,
+            textAlign: textAlign,
+            style: primaryStyle,
+          ),
+        ),
+        if (secondaryText != null) ...[
+          const SizedBox(height: 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              '≈ ${_displayMyrCode(secondaryText!)}',
+              maxLines: 1,
+              textAlign: textAlign,
+              style: secondaryStyle,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 class _BudgetRingLegend extends StatelessWidget {
   final Color color;
   final String label;
@@ -850,7 +942,11 @@ class _BudgetRingLegend extends StatelessWidget {
         const SizedBox(width: 7),
         Text(
           label,
-          style: TextStyle(color: appTheme.blue_gray_700, fontSize: 11),
+          style: TextStyle(
+            color: appTheme.gray_800,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
         ),
       ],
     );
@@ -878,6 +974,7 @@ class _BudgetMetricsCard extends StatelessWidget {
                 child: _BudgetMetric(
                   amount: uiState.allocatedBudget,
                   label: 'Allocated Budget',
+                  amountColor: appTheme.blue_gray_700,
                 ),
               ),
               Container(width: 1, height: 74, color: appTheme.gray_200),
@@ -885,6 +982,9 @@ class _BudgetMetricsCard extends StatelessWidget {
                 child: _BudgetMetric(
                   amount: uiState.totalExpense,
                   label: 'Expense',
+                  amountColor: uiState.remainingBudget < 0
+                      ? appTheme.errorRed
+                      : appTheme.warningPopupHeader,
                 ),
               ),
             ],
@@ -897,13 +997,19 @@ class _BudgetMetricsCard extends StatelessWidget {
               amountColor: appTheme.teal_A700,
             ),
             Divider(color: appTheme.gray_200, height: 1),
-            _BudgetMetric(amount: uiState.actualBudget, label: 'Actual Budget'),
+            _BudgetMetric(
+              amount: uiState.actualBudget,
+              label: 'Actual Budget',
+              amountColor: appTheme.teal_800,
+            ),
             Divider(color: appTheme.gray_200, height: 1),
           ],
           _BudgetMetric(
             amount: uiState.remainingBudget,
-            label: 'Remain',
-            amountColor: uiState.remainingBudget < 0 ? appTheme.errorRed : null,
+            label: 'Remaining',
+            amountColor: uiState.remainingBudget < 0
+                ? appTheme.errorRed
+                : appTheme.teal_A700,
           ),
         ],
       ),
@@ -927,46 +1033,40 @@ class _BudgetMetric extends StatelessWidget {
     final viewModel = context.watch<TripSummaryViewModel>();
     final primaryAmountText = viewModel.formatPrimaryMoney(amount);
     final secondaryAmountText = viewModel.formatSecondaryMoney(amount);
+    final effectiveColor = amount < 0
+        ? appTheme.errorRed
+        : amountColor ?? appTheme.gray_900;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 13),
       child: Column(
         children: [
-          Column(
-            children: [
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  primaryAmountText,
-                  maxLines: 1,
-                  style: TextStyle(
-                    color: amountColor ?? appTheme.gray_900,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              if (secondaryAmountText != null) ...[
-                const SizedBox(height: 2),
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    '≈ $secondaryAmountText',
-                    maxLines: 1,
-                    style: TextStyle(
-                      color: amountColor ?? appTheme.blue_gray_700,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
-            ],
+          _CurrencyAmountPairText(
+            primaryText: primaryAmountText,
+            secondaryText: secondaryAmountText,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            textAlign: TextAlign.center,
+            primaryStyle: TextStyle(
+              color: effectiveColor,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+            secondaryStyle: TextStyle(
+              color: amount < 0
+                  ? appTheme.errorRed
+                  : amountColor ?? appTheme.blue_gray_700,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
           ),
           const SizedBox(height: 6),
           Text(
             label,
             textAlign: TextAlign.center,
-            style: TextStyle(color: appTheme.gray_900, fontSize: 10),
+            style: TextStyle(
+              color: appTheme.gray_800,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),
@@ -982,10 +1082,17 @@ class _SpendingBarWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final amountText = context.watch<TripSummaryViewModel>().formatDisplayMoney(
+    final viewModel = context.watch<TripSummaryViewModel>();
+    final primaryAmountText = viewModel.formatPrimaryMoney(
       category.expense,
       compact: true,
     );
+    final secondaryAmountText = viewModel.formatSecondaryMoney(
+      category.expense,
+      compact: true,
+    );
+    final isNegative = category.expense < 0;
+    final amountColor = isNegative ? appTheme.errorRed : appTheme.gray_900;
     final barHeight = category.percentage == 0
         ? 4.0
         : (category.percentage * 2.45).clamp(18.0, 145.0);
@@ -993,17 +1100,20 @@ class _SpendingBarWidget extends StatelessWidget {
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            amountText,
-            maxLines: 2,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: appTheme.gray_800,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
+        _CurrencyAmountPairText(
+          primaryText: primaryAmountText,
+          secondaryText: secondaryAmountText,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          textAlign: TextAlign.center,
+          primaryStyle: TextStyle(
+            color: amountColor,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+          secondaryStyle: TextStyle(
+            color: amountColor,
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
           ),
         ),
         const SizedBox(height: 5),
@@ -1013,7 +1123,11 @@ class _SpendingBarWidget extends StatelessWidget {
           alignment: Alignment.topCenter,
           padding: EdgeInsets.only(top: barHeight < 30 ? 0 : 7),
           decoration: BoxDecoration(
-            color: category.percentage == 0 ? appTheme.gray_200 : color,
+            color: isNegative
+                ? appTheme.errorRed
+                : category.percentage == 0
+                ? appTheme.gray_200
+                : color,
             borderRadius: BorderRadius.circular(7),
           ),
           child: barHeight < 30
@@ -1022,8 +1136,8 @@ class _SpendingBarWidget extends StatelessWidget {
                   '${category.percentage.round()}%',
                   style: TextStyle(
                     color: appTheme.white_A700,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
         ),
@@ -1033,9 +1147,9 @@ class _SpendingBarWidget extends StatelessWidget {
           child: Text(
             category.name,
             style: TextStyle(
-              color: appTheme.gray_800,
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
+              color: appTheme.gray_900,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
@@ -1080,7 +1194,7 @@ class _CurrencyConversionStatus extends StatelessWidget {
         Flexible(
           child: Text(
             isLoading
-                ? 'Converting RM to $preferredCurrency...'
+                ? 'Converting MYR to $preferredCurrency...'
                 : errorMessage!,
             textAlign: TextAlign.center,
             style: TextStyle(
@@ -1133,14 +1247,14 @@ class _CostSavingTipRow extends StatelessWidget {
                 tip.title,
                 style: TextStyle(
                   color: appTheme.gray_900,
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 tip.description,
-                style: TextStyle(color: appTheme.blue_gray_700, fontSize: 10),
+                style: TextStyle(color: appTheme.gray_800, fontSize: 12),
               ),
             ],
           ),
@@ -1183,7 +1297,11 @@ class _FutureBudgetRecommendationRow extends StatelessWidget {
                 child: Text(
                   recommendation.category,
                   maxLines: 1,
-                  style: TextStyle(color: appTheme.gray_900, fontSize: 11),
+                  style: TextStyle(
+                    color: appTheme.gray_900,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ],
@@ -1216,19 +1334,19 @@ class _FutureBudgetRecommendationRow extends StatelessWidget {
                 children: [
                   Text(
                     '${recommendation.minimumPercentage.round()}%',
-                    style: TextStyle(color: appTheme.gray_800, fontSize: 10),
+                    style: TextStyle(color: appTheme.gray_800, fontSize: 11),
                   ),
                   Text(
                     '${recommendation.selectedPercentage.round()}%',
                     style: TextStyle(
                       color: appTheme.teal_800,
-                      fontSize: 11,
+                      fontSize: 12,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   Text(
                     '${recommendation.maximumPercentage.round()}%',
-                    style: TextStyle(color: appTheme.gray_800, fontSize: 10),
+                    style: TextStyle(color: appTheme.gray_800, fontSize: 11),
                   ),
                 ],
               ),

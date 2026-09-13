@@ -30,7 +30,7 @@ class TripSummaryViewModel extends ChangeNotifier {
     required IProfileService profileService,
     IFinancialDashboardService? service,
   }) : _service = service ?? FinancialDashboardService(),
-        _profileService = profileService,
+       _profileService = profileService,
        _authService = authService {
     _authService.addListener(_handleAuthUserChanged);
     _uiState = _uiState.copyWith(

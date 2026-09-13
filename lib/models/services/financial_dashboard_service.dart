@@ -372,8 +372,8 @@ class FinancialDashboardService implements IFinancialDashboardService {
   Future<List<WholeTrip>> getCompletedTrips() async {
     final trips = await _repository.getTripsForCurrentUser();
     return trips.where((trip) {
-      return trip.status.toLowerCase() != 'terminated' &&
-          trip.computedStatus == 'completed';
+      final status = trip.computedStatus;
+      return status == 'completed' || status == 'terminated';
     }).toList();
   }
 
