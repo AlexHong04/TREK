@@ -51,9 +51,7 @@ class InputValidator {
   static final RegExp _emailLocalSegment = RegExp(
     r"^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+$",
   );
-  static final RegExp _gmailUsernamePart = RegExp(
-    r'^[A-Za-z0-9]+(?:\.[A-Za-z0-9]+)*$',
-  );
+  static final RegExp _personalGmailUsername = RegExp(r'^[A-Za-z0-9]+$');
   static final RegExp _domainLabel = RegExp(r'^[A-Za-z0-9-]+$');
   static final RegExp _domainTopLevel = RegExp(
     r'^(?:[A-Za-z]{2,63}|xn--[A-Za-z0-9-]{2,59})$',
@@ -147,24 +145,12 @@ class InputValidator {
     }
 
     if (_gmailDomains.contains(domain)) {
-      final tagSeparator = local.indexOf('+');
-      final gmailUsername = tagSeparator == -1
-          ? local
-          : local.substring(0, tagSeparator);
-      final gmailTag = tagSeparator == -1
-          ? null
-          : local.substring(tagSeparator + 1);
-
-      if (!_gmailUsernamePart.hasMatch(gmailUsername)) {
-        return 'Gmail usernames can use only letters, numbers, and single periods.';
-      }
-      if (gmailTag != null && !_gmailUsernamePart.hasMatch(gmailTag)) {
-        return 'Gmail +tags must start and end with a letter or number. Single periods are allowed only between them.';
+      if (!_personalGmailUsername.hasMatch(local)) {
+        return 'Personal Gmail addresses can use only letters and numbers '
+            'before @.';
       }
 
-      final usernameWithoutPeriods =
-      gmailUsername.replaceAll('.', '').toLowerCase();
-      if (_reservedGmailUsernames.contains(usernameWithoutPeriods)) {
+      if (_reservedGmailUsernames.contains(local.toLowerCase())) {
         return 'This Gmail address is reserved and cannot be used.';
       }
     }
