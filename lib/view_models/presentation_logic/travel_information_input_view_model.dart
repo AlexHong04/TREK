@@ -498,17 +498,82 @@ class TravelInformationInputViewModel extends ChangeNotifier {
   void updateArrivalTime(int index, String time) {
     if (index >= 0 && index < _uiState.arrivals.length) {
       final updatedArrivals = List<TransitPoint>.from(_uiState.arrivals);
-      updatedArrivals[index] = updatedArrivals[index].copyWith(time: time);
+      String effectiveTime = time;
+      String effectiveDate = updatedArrivals[index].date;
+
+      // AUTOMATIC CHECK: If this is Transit 2+ arrival, check against Transit 1 departure + travel duration
+      if (index > 0 && index - 1 < _uiState.departures.length) {
+        final prevDep = _uiState.departures[index - 1];
+        final curArr = updatedArrivals[index];
+        final durationMin = TransitScheduleHelper.getEstimatedDurationMinutes(
+          transitType: curArr.type.isNotEmpty ? curArr.type : prevDep.type,
+          fromLocation: prevDep.location,
+          toLocation: curArr.location,
+          selectedDestinations: _uiState.selectedDestinations,
+        );
+        final depDate = prevDep.date.isNotEmpty
+            ? prevDep.date
+            : (_uiState.startDate?.toLocal().toString().split(' ')[0] ??
+                DateTime.now().toLocal().toString().split(' ')[0]);
+        final calculated = TransitScheduleHelper.calculateArrivalDateTime(
+          departureDate: depDate,
+          departureTimeStr: prevDep.time,
+          minutesToAdd: durationMin,
+        );
+        final minArrDate = calculated['date'] as String;
+        final minArrTime = calculated['time'] as String;
+
+        final curArrDateStr =
+            curArr.date.isNotEmpty ? curArr.date : minArrDate;
+        final arrD = DateTime.tryParse(curArrDateStr);
+        final minD = DateTime.tryParse(minArrDate);
+
+        bool isInvalid = false;
+        if (arrD != null && minD != null) {
+          final aDay = DateTime(arrD.year, arrD.month, arrD.day);
+          final mDay = DateTime(minD.year, minD.month, minD.day);
+          if (aDay.isBefore(mDay)) {
+            isInvalid = true;
+          } else if (aDay.isAtSameMomentAs(mDay)) {
+            final pickedMin = _parseTimeToMinutes(time);
+            final minMin = _parseTimeToMinutes(minArrTime);
+            if (pickedMin != null && minMin != null && pickedMin < minMin) {
+              isInvalid = true;
+            }
+          }
+        } else {
+          final pickedMin = _parseTimeToMinutes(time);
+          final minMin = _parseTimeToMinutes(minArrTime);
+          if (pickedMin != null && minMin != null && pickedMin < minMin) {
+            isInvalid = true;
+          }
+        }
+
+        // AUTO-SYNC: If user's manual time is invalid ("发现不对"), automatically auto-sync arrival!
+        if (isInvalid) {
+          effectiveTime = minArrTime;
+          effectiveDate = minArrDate;
+          if (curArr.type.toLowerCase() == 'bus' ||
+              prevDep.type.toLowerCase() == 'bus') {
+            syncLegArrivalWithDepartureDurationAsync(index);
+          }
+        }
+      }
+
+      updatedArrivals[index] = updatedArrivals[index].copyWith(
+        time: effectiveTime,
+        date: effectiveDate,
+      );
 
       final updatedDepartures = List<TransitPoint>.from(_uiState.departures);
       if (index < updatedDepartures.length) {
         final curArr = updatedArrivals[index];
         final curDep = updatedDepartures[index];
         if (curArr.date.isNotEmpty && curArr.date == curDep.date) {
-          final arrMin = _parseTimeToMinutes(time);
+          final arrMin = _parseTimeToMinutes(effectiveTime);
           final depMin = _parseTimeToMinutes(curDep.time);
           if (arrMin != null && depMin != null && depMin < arrMin) {
-            updatedDepartures[index] = curDep.copyWith(time: time);
+            updatedDepartures[index] = curDep.copyWith(time: effectiveTime);
           }
         }
       }
@@ -524,16 +589,61 @@ class TravelInformationInputViewModel extends ChangeNotifier {
   void updateArrivalDate(int index, String date) {
     if (index >= 0 && index < _uiState.arrivals.length) {
       final updatedArrivals = List<TransitPoint>.from(_uiState.arrivals);
-      updatedArrivals[index] = updatedArrivals[index].copyWith(date: date);
+      String effectiveDate = date;
+      String effectiveTime = updatedArrivals[index].time;
+
+      // AUTOMATIC CHECK: If this is Transit 2+ arrival, check against Transit 1 departure + travel duration
+      if (index > 0 && index - 1 < _uiState.departures.length) {
+        final prevDep = _uiState.departures[index - 1];
+        final curArr = updatedArrivals[index];
+        final durationMin = TransitScheduleHelper.getEstimatedDurationMinutes(
+          transitType: curArr.type.isNotEmpty ? curArr.type : prevDep.type,
+          fromLocation: prevDep.location,
+          toLocation: curArr.location,
+          selectedDestinations: _uiState.selectedDestinations,
+        );
+        final depDate = prevDep.date.isNotEmpty
+            ? prevDep.date
+            : (_uiState.startDate?.toLocal().toString().split(' ')[0] ??
+                DateTime.now().toLocal().toString().split(' ')[0]);
+        final calculated = TransitScheduleHelper.calculateArrivalDateTime(
+          departureDate: depDate,
+          departureTimeStr: prevDep.time,
+          minutesToAdd: durationMin,
+        );
+        final minArrDate = calculated['date'] as String;
+        final minArrTime = calculated['time'] as String;
+        final chosenD = DateTime.tryParse(date);
+        final minD = DateTime.tryParse(minArrDate);
+        if (chosenD != null && minD != null) {
+          final cDay = DateTime(chosenD.year, chosenD.month, chosenD.day);
+          final mDay = DateTime(minD.year, minD.month, minD.day);
+          if (cDay.isBefore(mDay)) {
+            effectiveDate = minArrDate;
+            effectiveTime = minArrTime;
+          } else if (cDay.isAtSameMomentAs(mDay)) {
+            final curMin = _parseTimeToMinutes(effectiveTime);
+            final minMin = _parseTimeToMinutes(minArrTime);
+            if (curMin != null && minMin != null && curMin < minMin) {
+              effectiveTime = minArrTime;
+            }
+          }
+        }
+      }
+
+      updatedArrivals[index] = updatedArrivals[index].copyWith(
+        date: effectiveDate,
+        time: effectiveTime,
+      );
 
       final updatedDepartures = List<TransitPoint>.from(_uiState.departures);
-      if (index < updatedDepartures.length && date.isNotEmpty) {
+      if (index < updatedDepartures.length && effectiveDate.isNotEmpty) {
         final curDep = updatedDepartures[index];
         if (curDep.date.isNotEmpty) {
-          final arrD = DateTime.tryParse(date);
+          final arrD = DateTime.tryParse(effectiveDate);
           final depD = DateTime.tryParse(curDep.date);
           if (arrD != null && depD != null && depD.isBefore(arrD)) {
-            updatedDepartures[index] = curDep.copyWith(date: date);
+            updatedDepartures[index] = curDep.copyWith(date: effectiveDate);
           }
         }
       }
@@ -774,6 +884,33 @@ class TravelInformationInputViewModel extends ChangeNotifier {
       }
       return e.value;
     }).toList();
+
+    // Recalculate arrival times for dependent legs when type changes
+    for (int i = 1;
+        i < updatedArrivals.length && i - 1 < updatedDepartures.length;
+        i++) {
+      final prevDep = updatedDepartures[i - 1];
+      final curArr = updatedArrivals[i];
+      final durationMin = TransitScheduleHelper.getEstimatedDurationMinutes(
+        transitType: curArr.type,
+        fromLocation: prevDep.location,
+        toLocation: curArr.location,
+        selectedDestinations: _uiState.selectedDestinations,
+      );
+      final depDate = prevDep.date.isNotEmpty
+          ? prevDep.date
+          : (_uiState.startDate?.toLocal().toString().split(' ')[0] ??
+              DateTime.now().toLocal().toString().split(' ')[0]);
+      final calc = TransitScheduleHelper.calculateArrivalDateTime(
+        departureDate: depDate,
+        departureTimeStr: prevDep.time,
+        minutesToAdd: durationMin,
+      );
+      updatedArrivals[i] = curArr.copyWith(
+        time: calc['time'] as String,
+        date: calc['date'] as String,
+      );
+    }
 
     _uiState = _uiState.copyWith(
       arrivals: updatedArrivals,

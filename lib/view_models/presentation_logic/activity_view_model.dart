@@ -10,6 +10,7 @@ import '../../models/entities/expense_item.dart';
 import '../../models/local_data_source/camera_source.dart';
 import '../../models/local_data_source/gallery_source.dart';
 import '../../models/local_data_source/notification_source.dart';
+import '../../models/local_data_source/shared_preferences_source.dart';
 import '../../models/repository/expense_repository.dart';
 import '../../models/repository/i_itinerary_repository.dart';
 import '../../models/services/budget_service.dart';
@@ -38,6 +39,8 @@ class ActivityViewModel extends ChangeNotifier {
   final GallerySource _gallerySource = GallerySource();
   final NotificationSource _notificationSource = NotificationSource();
   final LocationSource _locationSource = LocationSource();
+  final ExpenseDraftLocalDataSource _expenseDraftLocalDataSource =
+      ExpenseDraftLocalDataSource();
 
   ActivityViewModel({
     IItineraryService? itineraryService,
@@ -143,6 +146,11 @@ class ActivityViewModel extends ChangeNotifier {
         recordedExpenses: recordedExpenses,
         isLoadingRecordedExpenses: false,
       );
+      if (recordedExpenses.isEmpty) {
+        unawaited(_restoreManualExpenseDraftForSelectedActivity());
+      } else {
+        unawaited(_clearManualExpenseDraftForSelectedActivity());
+      }
     } catch (error) {
       _uiState = _uiState.copyWith(
         recordedExpenses: const [],
@@ -183,6 +191,7 @@ class ActivityViewModel extends ChangeNotifier {
 
   void addExpenseItem(ExpenseItem item) {
     _updateDraftExpenseItems([..._uiState.draftExpenseItems, item]);
+    unawaited(_saveManualExpenseDraftForSelectedActivity());
   }
 
   void updateExpenseItem(int index, ExpenseItem item) {
@@ -194,6 +203,7 @@ class ActivityViewModel extends ChangeNotifier {
     final updatedItems = [..._uiState.draftExpenseItems];
     updatedItems[index] = item;
     _updateDraftExpenseItems(updatedItems);
+    unawaited(_saveManualExpenseDraftForSelectedActivity());
   }
 
   void removeExpenseItem(int index) {
@@ -208,11 +218,13 @@ class ActivityViewModel extends ChangeNotifier {
         .map((ocrIndex) => ocrIndex > index ? ocrIndex - 1 : ocrIndex)
         .toSet();
     _updateDraftExpenseItems(updatedItems, ocrItemIndexes: updatedOcrIndexes);
+    unawaited(_saveManualExpenseDraftForSelectedActivity());
   }
 
   /// Removes only unsaved draft items after the tourist agrees to replace them
   /// with OCR results. Confirmed Expense records are never changed here.
   void clearDraftExpenseItemsForOcr() {
+    unawaited(_clearManualExpenseDraftForSelectedActivity());
     _uiState = _uiState.copyWith(
       draftExpenseItems: const [],
       draftTaxAmount: 0.0,
@@ -436,6 +448,7 @@ class ActivityViewModel extends ChangeNotifier {
   }
 
   void removeReceiptAndOcrData() {
+    unawaited(_clearManualExpenseDraftForSelectedActivity());
     _uiState = _uiState.copyWith(
       receiptLocalPath: '',
       clearOcrData: true,
@@ -496,6 +509,7 @@ class ActivityViewModel extends ChangeNotifier {
         ocrItemIndexes: const {0},
         taxFromOcr: _uiState.ocrExtractedTax != null,
       );
+      unawaited(_clearManualExpenseDraftForSelectedActivity());
       return 1;
     }
 
@@ -511,6 +525,7 @@ class ActivityViewModel extends ChangeNotifier {
       ),
       taxFromOcr: _uiState.ocrExtractedTax != null || inferredTax > 0,
     );
+    unawaited(_clearManualExpenseDraftForSelectedActivity());
     return expenseItems.length;
   }
 
@@ -749,29 +764,43 @@ class ActivityViewModel extends ChangeNotifier {
   }
 
   DateTime _activityDateTime(Activity activity) {
+    return _activityDateTimeFromRawTime(activity, activity.startTime) ??
+        DateTime(
+          activity.date.year,
+          activity.date.month,
+          activity.date.day,
+          activity.date.hour,
+          activity.date.minute,
+        );
+  }
+
+  DateTime? _activityDateTimeFromRawTime(Activity activity, String? rawTime) {
     var hour = activity.date.hour;
     var minute = activity.date.minute;
-    final startTime = activity.startTime?.trim().toUpperCase() ?? '';
+    final startTime = rawTime?.trim().toUpperCase() ?? '';
     final match = RegExp(
       r'^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?$',
     ).firstMatch(startTime);
-    if (match != null) {
-      final parsedHour = int.tryParse(match.group(1)!);
-      final parsedMinute = int.tryParse(match.group(2)!);
-      final period = match.group(3);
-      if (parsedHour != null &&
-          parsedMinute != null &&
-          parsedMinute < 60 &&
-          ((period == null && parsedHour < 24) ||
-              (period != null && parsedHour >= 1 && parsedHour <= 12))) {
-        hour = period == 'PM' && parsedHour < 12
-            ? parsedHour + 12
-            : period == 'AM' && parsedHour == 12
-            ? 0
-            : parsedHour;
-        minute = parsedMinute;
-      }
+    if (match == null) return null;
+
+    final parsedHour = int.tryParse(match.group(1)!);
+    final parsedMinute = int.tryParse(match.group(2)!);
+    final period = match.group(3);
+    if (parsedHour == null ||
+        parsedMinute == null ||
+        parsedMinute >= 60 ||
+        (period == null && parsedHour >= 24) ||
+        (period != null && (parsedHour < 1 || parsedHour > 12))) {
+      return null;
     }
+
+    hour = period == 'PM' && parsedHour < 12
+        ? parsedHour + 12
+        : period == 'AM' && parsedHour == 12
+        ? 0
+        : parsedHour;
+    minute = parsedMinute;
+
     return DateTime(
       activity.date.year,
       activity.date.month,
@@ -785,6 +814,11 @@ class ActivityViewModel extends ChangeNotifier {
     final selected = _uiState.selectedActivity;
     if (selected == null) return null;
     final start = _activityDateTime(selected);
+    final end = _activityDateTimeFromRawTime(selected, selected.endTime);
+    if (end != null && end.isAfter(start)) {
+      return (start: start, nextStart: end);
+    }
+
     DateTime? nextStart;
     final schedule = _uiState.allActivities.isNotEmpty
         ? _uiState.allActivities
@@ -871,7 +905,7 @@ class ActivityViewModel extends ChangeNotifier {
     final nextStart = selectedExpenseTimeWindow?.nextStart;
     if (nextStart != null && !transactionDateTime.isBefore(nextStart)) {
       throw ArgumentError(
-        'Transaction date and time must be before the next activity starts.',
+        'Transaction date and time must be before the selected activity ends.',
       );
     }
     final bounds = _tripDateBounds();
@@ -991,6 +1025,7 @@ class ActivityViewModel extends ChangeNotifier {
             ? null
             : _uiState.receiptLocalPath,
       );
+      await _clearManualExpenseDraftForSelectedActivity();
 
       final updatedTrip = await _budgetService.deductRemainingBudget(
         tripId: _uiState.tripId,
@@ -1106,6 +1141,73 @@ class ActivityViewModel extends ChangeNotifier {
     if (_uiState.budgetAlertMessage.isEmpty) return;
     _uiState = _uiState.copyWith(budgetAlertMessage: '');
     notifyListeners();
+  }
+
+  bool get _hasReceiptOrOcrDraft =>
+      _uiState.receiptLocalPath.isNotEmpty ||
+      _uiState.ocrRawText.isNotEmpty ||
+      _uiState.ocrDraftItemIndexes.isNotEmpty;
+
+  String get _manualDraftUserId => _authService.currentUserId ?? '';
+
+  bool get _canUseManualExpenseDraft =>
+      !_hasReceiptOrOcrDraft && _uiState.recordedExpenses.isEmpty;
+
+  Future<void> _saveManualExpenseDraftForSelectedActivity() async {
+    final selectedActivity = _uiState.selectedActivity;
+    if (selectedActivity == null) return;
+
+    if (!_canUseManualExpenseDraft) {
+      await _clearManualExpenseDraftForSelectedActivity();
+      return;
+    }
+
+    await _expenseDraftLocalDataSource.saveDraftItems(
+      userId: _manualDraftUserId,
+      tripId: _uiState.tripId,
+      activityId: selectedActivity.activitiesId,
+      items: _uiState.draftExpenseItems.map((item) => item.toJson()).toList(),
+    );
+  }
+
+  Future<void> _restoreManualExpenseDraftForSelectedActivity() async {
+    final selectedActivity = _uiState.selectedActivity;
+    if (selectedActivity == null || !_canUseManualExpenseDraft) return;
+
+    final activityId = selectedActivity.activitiesId;
+    final itemsJson = await _expenseDraftLocalDataSource.loadDraftItems(
+      userId: _manualDraftUserId,
+      tripId: _uiState.tripId,
+      activityId: activityId,
+    );
+    if (itemsJson.isEmpty) return;
+
+    if (_uiState.selectedActivity?.activitiesId != activityId ||
+        !_canUseManualExpenseDraft ||
+        _uiState.draftExpenseItems.isNotEmpty) {
+      return;
+    }
+
+    try {
+      final restoredItems = itemsJson
+          .map((itemJson) => ExpenseItem.fromJson(itemJson))
+          .toList();
+      _updateDraftExpenseItems(restoredItems);
+    } catch (error) {
+      debugPrint('[ExpenseDraft] Error restoring manual draft: $error');
+      await _clearManualExpenseDraftForSelectedActivity();
+    }
+  }
+
+  Future<void> _clearManualExpenseDraftForSelectedActivity() async {
+    final selectedActivity = _uiState.selectedActivity;
+    if (selectedActivity == null) return;
+
+    await _expenseDraftLocalDataSource.clearDraftItems(
+      userId: _manualDraftUserId,
+      tripId: _uiState.tripId,
+      activityId: selectedActivity.activitiesId,
+    );
   }
 
   void _updateDraftExpenseItems(
@@ -1583,34 +1685,7 @@ class ActivityViewModel extends ChangeNotifier {
   /// Combines the database activity date with a stored HH:mm end time.
   /// Activities without a valid end time cannot have an end-time reminder.
   DateTime? _activityEndDateTime(Activity activity) {
-    final endTime = activity.endTime;
-    if (endTime == null || endTime.trim().isEmpty) {
-      return null;
-    }
-
-    final timeParts = endTime.trim().split(':');
-    if (timeParts.length < 2) {
-      return null;
-    }
-
-    final hour = int.tryParse(timeParts[0]);
-    final minute = int.tryParse(timeParts[1]);
-    if (hour == null ||
-        minute == null ||
-        hour < 0 ||
-        hour > 23 ||
-        minute < 0 ||
-        minute > 59) {
-      return null;
-    }
-
-    return DateTime(
-      activity.date.year,
-      activity.date.month,
-      activity.date.day,
-      hour,
-      minute,
-    );
+    return _activityDateTimeFromRawTime(activity, activity.endTime);
   }
 
   bool _isSameDate(DateTime first, DateTime second) {

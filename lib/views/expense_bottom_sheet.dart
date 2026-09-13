@@ -144,9 +144,16 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         !_isRecordingNewExpense;
     final isExpenseFormMode =
         !uiState.isLoadingRecordedExpenses && !showRecordedExpenses;
-    final hasMoreRecordedExpensesThanFit = uiState.recordedExpenses.length >= 3;
+    final hasMoreRecordedExpensesThanFit = uiState.recordedExpenses.length >= 2;
     final canExpandSheet = isExpenseFormMode || hasMoreRecordedExpensesThanFit;
-    final recordedExpensesHeight = 0.80;
+    final recordedExpensesHeight = 0.75;
+    final recordedExpenseCount = uiState.recordedExpenses.length;
+    final maxRecordedExpensesHeight = recordedExpenseCount >= 3
+        ? 0.90
+        : recordedExpenseCount == 2
+        ? 0.80
+        : recordedExpensesHeight;
+    final initialRecordedExpensesHeight = maxRecordedExpensesHeight;
 
     return MediaQuery.removeViewInsets(
       context: context,
@@ -160,15 +167,17 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
               : 'history',
         ),
         expand: widget.viewOnly || showRecordedExpenses,
-        initialChildSize: isExpenseFormMode ? 0.88 : recordedExpensesHeight,
+        initialChildSize: isExpenseFormMode
+            ? 0.88
+            : initialRecordedExpensesHeight,
         minChildSize: 0.10,
-        maxChildSize: canExpandSheet ? 0.90 : recordedExpensesHeight,
+        maxChildSize: isExpenseFormMode ? 0.90 : maxRecordedExpensesHeight,
         snap: !isExpenseFormMode,
         snapSizes: isExpenseFormMode
             ? null
             : hasMoreRecordedExpensesThanFit
-            ? [0.50, 0.80, 0.90]
-            : [0.50, 0.80],
+            ? [0.50, recordedExpensesHeight, maxRecordedExpensesHeight]
+            : [0.50, recordedExpensesHeight],
         shouldCloseOnMinExtent: true,
         builder: (context, scrollController) => Stack(
           fit: StackFit.expand,
@@ -2850,6 +2859,7 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
         _ThousandsSeparatorInputFormatter(
           maximumIntegerDigits: 5,
           decimalDigits: 2,
+          allowZero: true,
         ),
       ];
     }
