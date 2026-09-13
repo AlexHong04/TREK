@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../utils/input_validator.dart';
 import '../../utils/network_error.dart';
+import '../../utils/preference_keys.dart';
 import '../entities/user.dart';
 import '../local_data_source/notification_source.dart';
 import '../repository/i_auth_repository.dart';
@@ -120,11 +121,24 @@ class AuthService extends ChangeNotifier implements IAuthService {
       if (authUser == null) {
         throw StateError('Registration completed without an Auth session.');
       }
+      // Queue the one-off user guide here rather than in the registration form.
+      // This is the only place that knows a brand-new account now exists, and it
+      // runs before _loadAuthenticatedAccount() flips the destination and the
+      // app routes the new tourist to the Home screen.
+      try {
+        final preferences = await SharedPreferences.getInstance();
+        await preferences.setBool(PreferenceKeys.userGuidePending, true);
+        debugPrint('[UserGuide] queued after registration.');
+      } catch (error) {
+        // A missing guide is never a reason to fail a successful registration.
+        debugPrint('[UserGuide] could not queue the guide: $error');
+      }
       await _loadAuthenticatedAccount(authUser);
-      // A verification cooldown belongs to the email address that requested
-      // it. Do not carry an older account's saved countdown into this newly
-      // registered account.
-      await _clearEmailCooldown(EmailActionType.verification);
+      // Cooldowns belong to the email address that requested them. Do not carry
+      // an older account's saved countdown into this newly registered account -
+      // a stale deletion cooldown would otherwise block this account from ever
+      // requesting its own confirmation email.
+      await _clearAllEmailCooldowns();
       // Registration no longer sends a verification email automatically. The
       // 60-second resend timer therefore starts only after the user explicitly
       // presses Verify email on Profile or the verification gate.
@@ -504,6 +518,9 @@ class AuthService extends ChangeNotifier implements IAuthService {
       debugPrint('Unable to clear local notifications during logout: $error');
     }
     await _clearSessionState(clearCache: false);
+    // A cooldown belongs to the account that triggered it, so it must not
+    // follow the device into the next session.
+    await _clearAllEmailCooldowns();
     if (signOutFailure != null) throw signOutFailure;
   }
 
@@ -976,14 +993,23 @@ class AuthService extends ChangeNotifier implements IAuthService {
     }
   }
 
-  Future<void> _clearEmailCooldown(EmailActionType action) async {
-    _emailCooldownUntil.remove(action);
+  /// Drops every locally cached cooldown.
+  ///
+  /// A cooldown belongs to the email address that triggered it, so it must not
+  /// survive an account change: a stale deletion or password-recovery countdown
+  /// saved by a previous account would otherwise block the next account from
+  /// ever requesting that email. The server still enforces its own limit, so
+  /// clearing this can never be used to bypass it.
+  Future<void> _clearAllEmailCooldowns() async {
+    _emailCooldownUntil.clear();
     _ensureEmailCooldownTimer();
     try {
       final preferences = await SharedPreferences.getInstance();
-      await preferences.remove('trek.email_cooldown.${action.name}');
+      for (final action in EmailActionType.values) {
+        await preferences.remove('trek.email_cooldown.${action.name}');
+      }
     } catch (_) {
-      // The in-memory timer is already cleared for the new account.
+      // The in-memory map is already cleared.
     }
   }
 

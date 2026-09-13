@@ -766,12 +766,6 @@ class _TravelInformationInputScreenState
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.description_outlined,
-                    color: appTheme.white_A700,
-                    size: 20.0,
-                  ),
-                  const SizedBox(width: 8),
                   Text(
                     'Generate Trip',
                     style: TextStyle(
@@ -3177,6 +3171,7 @@ class _TravelInformationInputScreenState
       initialDate: initialDate,
       firstDate: effectiveFirstAllowed,
       lastDate: lastAllowed,
+      confirmText: 'Confirm',
       helpText: allowBuffer
           ? (isArrival
               ? 'SELECT ARRIVAL DATE (±1 DAY OF TRIP)'
@@ -4775,7 +4770,7 @@ class _TripDateRangePickerDialogState
                     ).pop(DateTimeRange(start: start, end: end));
                   },
             child: Text(
-              'OK',
+              'Confirm',
               style: TextStyle(
                 fontSize: 14.0,
                 fontWeight: FontWeight.w500,

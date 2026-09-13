@@ -39,6 +39,7 @@ import 'views/edit_account_screen.dart';
 import 'views/verification_gate_screen.dart';
 import 'views/whole_itinerary_detail_screen.dart';
 import 'views/home_screen.dart';
+import 'views/user_guide_bottom_sheet.dart';
 import 'views/travel_information_input_screen.dart';
 import 'views/activity_screen.dart';
 import 'views/financial_dashboard_screen.dart';
@@ -153,6 +154,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   AuthDestination? _lastRoutedDestination;
   bool _navigationScheduled = false;
 
+  /// Shows the one-off user guide as soon as the Home route is on screen.
+  /// Doing it here (rather than only inside the Home widget) means the guide
+  /// cannot be missed because of Home's mount/reload timing.
+  late final NavigatorObserver _userGuideObserver = _UserGuideRouteObserver();
+
   @override
   void initState() {
     super.initState();
@@ -231,6 +237,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       theme: theme,
       navigatorKey: NavigatorService.navigatorKey,
       scaffoldMessengerKey: globalMessengerKey,
+      navigatorObservers: [_userGuideObserver],
       initialRoute: _routeFor(widget.authService.destination),
       builder: (context, child) {
         return MediaQuery(
@@ -271,5 +278,22 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         AppRoutes.allPlansScreen: (context) => AllPlansScreen.builder(context),
       },
     );
+  }
+}
+
+/// Watches route pushes so the one-off user guide can be shown the moment the
+/// tourist lands on the Home screen.
+class _UserGuideRouteObserver extends NavigatorObserver {
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didPush(route, previousRoute);
+    if (route.settings.name != AppRoutes.homeScreen) return;
+
+    // Let the Home route finish its first frame before opening the sheet.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final context = NavigatorService.navigatorKey.currentContext;
+      if (context == null) return;
+      unawaited(maybeShowUserGuide(context));
+    });
   }
 }

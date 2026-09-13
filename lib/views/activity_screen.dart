@@ -1455,6 +1455,12 @@ class _ActivityScreenState extends State<ActivityScreen> {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
+                    if (activity.activityCategory.isNotEmpty)
+                      _buildChip(
+                        label: activity.activityCategory,
+                        backgroundColor: appTheme.blue_gray_50,
+                        textColor: appTheme.blue_gray_700,
+                      ),
                     if (activity.duration != null &&
                         activity.duration!.isNotEmpty)
                       _buildChip(
