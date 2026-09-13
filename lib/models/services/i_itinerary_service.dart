@@ -50,6 +50,17 @@ abstract interface class IItineraryService {
     int totalDays = 1,
   });
 
+  Future<Activity> regenerateTransportation({
+    required String originPlace,
+    required String destinationPlace,
+    required String city,
+    required String existingActivityId,
+    required String dayTripId,
+    required DateTime date,
+    String? startTime,
+    String? endTime,
+  });
+
   Future<List<Activity>> regenerateEmptySlotsFromRemainingPlan({
     required String destination,
     required double remainingBudget,

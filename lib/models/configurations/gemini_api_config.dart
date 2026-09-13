@@ -733,6 +733,82 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
     }
   }
 
+  /// Generates a single transportation activity between two places.
+  /// Used when an attraction is replaced and adjacent transport needs updating.
+  static Future<String> askGeminiForTransportation({
+    required String originPlace,
+    required String destinationPlace,
+    required String city,
+  }) async {
+    final prompt = '''
+    You are an expert travel planner in Malaysia. A user's itinerary has changed and the transportation between two activities needs to be updated.
+
+    CONTEXT:
+    - City: $city
+    - Origin (departing from): $originPlace
+    - Destination (going to): $destinationPlace
+
+    PROXIMITY & TRANSIT MODE RULE:
+    - If the two places are CLOSE to each other (within walking distance, e.g. < 1km, adjacent streets, or within the same mall/complex):
+      + Transit mode is WALKING: set "destination" to "Walk to $destinationPlace", "description" to a short sentence about the walk (e.g. "Short 5-10 min walk to the next venue"), "duration" to "5-15 min", and "allocatedBudget" to 0.0.
+    - If the two places are FAR from each other (requiring motorized transit, different neighborhoods, or > 1km):
+      + Transit mode is VEHICULAR (MRT, LRT, Bus, or Grab): set "destination" to the station, terminal, or transit route (e.g. "KLCC LRT Station", "Bukit Bintang MRT Station"), "description" to describe the transit route (e.g. "Take MRT Kajang Line from ... to ..."), "duration" to "15-30 min", and "allocatedBudget" to a realistic fare (e.g. MYR 1.00 - MYR 15.00).
+
+    Format your response as a valid single JSON object:
+    {
+      "destination": "Walk to ... or Station Name",
+      "imageKeyword": "Station name or landmark name for image lookup (e.g. 'KLCC LRT Station', 'Bukit Bintang MRT Station', 'Pavilion KL')",
+      "description": "Short commute description",
+      "duration": "10 min",
+      "allocatedBudget": 0.0,
+      "activityCategory": "Transportation"
+    }
+
+    Return ONLY the raw JSON object with no markdown fences, no backticks, and no extra commentary.
+    ''';
+
+    final url = Uri.parse(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=$_apiKey',
+    );
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          "contents": [
+            {
+              "parts": [
+                {"text": prompt},
+              ],
+            },
+          ],
+          "generationConfig": {"responseMimeType": "application/json"},
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = jsonDecode(response.body);
+        final candidates = data['candidates'] as List?;
+        if (candidates != null && candidates.isNotEmpty) {
+          final content = candidates[0]['content'];
+          final parts = content['parts'] as List?;
+          if (parts != null && parts.isNotEmpty) {
+            return parts[0]['text'] ?? '{}';
+          }
+        }
+        return '{}';
+      } else {
+        throw Exception(
+          'Gemini Error: ${response.statusCode} - ${response.body}',
+        );
+      }
+    } catch (e) {
+      debugPrint('Gemini API Transportation Error: $e');
+      throw Exception('Failed to generate transportation: $e');
+    }
+  }
+
   // kokhong
   // Regenerates activities for empty slots using the remaining plan as route context.
   static Future<String> askGeminiToRegenerateEmptySlots({

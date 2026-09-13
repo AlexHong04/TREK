@@ -665,6 +665,11 @@ class _TravelInformationInputScreenState
           borderRadius: BorderRadius.circular(14),
           child: InkWell(
             onTap: () async {
+              // Dismiss the keyboard first to prevent
+              // RenderFlex overflow in the confirmation dialog.
+              FocusScope.of(context).unfocus();
+              await Future.delayed(const Duration(milliseconds: 100));
+
               if (_formKey.currentState?.validate() ?? false) {
                 final destination = viewModel.uiState.selectedDestinations.join(
                   ', ',
@@ -866,111 +871,120 @@ class _TravelInformationInputScreenState
                     ],
                   ),
                   const SizedBox(height: 18.0),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14.0,
-                      vertical: 12.0,
-                    ),
-                    decoration: BoxDecoration(
-                      color: appTheme.gray_50_02,
-                      borderRadius: BorderRadius.circular(16.0),
-                      border: Border.all(color: appTheme.gray_100, width: 1.0),
-                    ),
-                    child: Column(
-                      children: [
-                        _buildDialogInfoRow(
-                          icon: Icons.location_on_rounded,
-                          label: 'Destination',
-                          value: destination,
-                        ),
-                        Divider(color: appTheme.gray_100, height: 16.0),
-                        _buildDialogInfoRow(
-                          icon: Icons.calendar_today_rounded,
-                          label: 'Dates',
-                          value: dates,
-                        ),
-                        Divider(color: appTheme.gray_100, height: 16.0),
-                        _buildDialogInfoRow(
-                          icon: Icons.account_balance_wallet_rounded,
-                          label: 'Budget',
-                          value:
-                              (currency == 'MYR' ||
-                                  convertedBudgetInMyr == null)
-                              ? '$currency $budget'
-                              : '$currency $budget (≈ MYR ${convertedBudgetInMyr.toStringAsFixed(2)})',
-                        ),
-                        if (preference != null && preference.isNotEmpty) ...[
-                          Divider(color: appTheme.gray_100, height: 16.0),
-                          _buildDialogInfoRow(
-                            icon: Icons.tune_rounded,
-                            label: 'Preference',
-                            value: preference,
-                          ),
-                        ],
-                        if (wishlistCount > 0) ...[
-                          Divider(color: appTheme.gray_100, height: 16.0),
-                          _buildDialogInfoRow(
-                            icon: Icons.favorite_rounded,
-                            label: 'Wishlist',
-                            value: '$wishlistCount item(s)',
-                          ),
-                        ],
-                        if (hotelCount > 0) ...[
-                          Divider(color: appTheme.gray_100, height: 16.0),
-                          _buildDialogInfoRow(
-                            icon: Icons.hotel_rounded,
-                            label: 'Accommodation',
-                            value:
-                                '$hotelCount stay${hotelCount > 1 ? 's' : ''}',
-                          ),
-                        ],
-                        if (arrivalCount > 0 || departureCount > 0) ...[
-                          Divider(color: appTheme.gray_100, height: 16.0),
-                          _buildDialogInfoRow(
-                            icon: Icons.flight_takeoff_rounded,
-                            label: 'Transit',
-                            value:
-                                '${arrivalCount + departureCount} transit hub(s)',
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14.0),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12.0,
-                      vertical: 10.0,
-                    ),
-                    decoration: BoxDecoration(
-                      color: appTheme.teal_50.withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(12.0),
-                      border: Border.all(
-                        color: appTheme.teal_A700.withValues(alpha: 0.2),
-                      ),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.auto_awesome,
-                          size: 16.0,
-                          color: appTheme.teal_700,
-                        ),
-                        const SizedBox(width: 8.0),
-                        Expanded(
-                          child: Text(
-                            'AI will generate a personalized day-by-day itinerary. You can freely edit and customize activities afterwards.',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w500,
-                              fontFamily: 'Inter',
-                              color: appTheme.teal_800,
-                              height: 1.35,
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14.0,
+                              vertical: 12.0,
+                            ),
+                            decoration: BoxDecoration(
+                              color: appTheme.gray_50_02,
+                              borderRadius: BorderRadius.circular(16.0),
+                              border: Border.all(color: appTheme.gray_100, width: 1.0),
+                            ),
+                            child: Column(
+                              children: [
+                                _buildDialogInfoRow(
+                                  icon: Icons.location_on_rounded,
+                                  label: 'Destination',
+                                  value: destination,
+                                ),
+                                Divider(color: appTheme.gray_100, height: 16.0),
+                                _buildDialogInfoRow(
+                                  icon: Icons.calendar_today_rounded,
+                                  label: 'Dates',
+                                  value: dates,
+                                ),
+                                Divider(color: appTheme.gray_100, height: 16.0),
+                                _buildDialogInfoRow(
+                                  icon: Icons.account_balance_wallet_rounded,
+                                  label: 'Budget',
+                                  value:
+                                      (currency == 'MYR' ||
+                                          convertedBudgetInMyr == null)
+                                      ? '$currency $budget'
+                                      : '$currency $budget (≈ MYR ${convertedBudgetInMyr.toStringAsFixed(2)})',
+                                ),
+                                if (preference != null && preference.isNotEmpty) ...[
+                                  Divider(color: appTheme.gray_100, height: 16.0),
+                                  _buildDialogInfoRow(
+                                    icon: Icons.tune_rounded,
+                                    label: 'Preference',
+                                    value: preference,
+                                  ),
+                                ],
+                                if (wishlistCount > 0) ...[
+                                  Divider(color: appTheme.gray_100, height: 16.0),
+                                  _buildDialogInfoRow(
+                                    icon: Icons.favorite_rounded,
+                                    label: 'Wishlist',
+                                    value: '$wishlistCount item(s)',
+                                  ),
+                                ],
+                                if (hotelCount > 0) ...[
+                                  Divider(color: appTheme.gray_100, height: 16.0),
+                                  _buildDialogInfoRow(
+                                    icon: Icons.hotel_rounded,
+                                    label: 'Accommodation',
+                                    value:
+                                        '$hotelCount stay${hotelCount > 1 ? 's' : ''}',
+                                  ),
+                                ],
+                                if (arrivalCount > 0 || departureCount > 0) ...[
+                                  Divider(color: appTheme.gray_100, height: 16.0),
+                                  _buildDialogInfoRow(
+                                    icon: Icons.flight_takeoff_rounded,
+                                    label: 'Transit',
+                                    value:
+                                        '${arrivalCount + departureCount} transit hub(s)',
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 14.0),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12.0,
+                              vertical: 10.0,
+                            ),
+                            decoration: BoxDecoration(
+                              color: appTheme.teal_50.withValues(alpha: 0.5),
+                              borderRadius: BorderRadius.circular(12.0),
+                              border: Border.all(
+                                color: appTheme.teal_A700.withValues(alpha: 0.2),
+                              ),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(
+                                  Icons.auto_awesome,
+                                  size: 16.0,
+                                  color: appTheme.teal_700,
+                                ),
+                                const SizedBox(width: 8.0),
+                                Expanded(
+                                  child: Text(
+                                    'AI will generate a personalized day-by-day itinerary. You can freely edit and customize activities afterwards.',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w500,
+                                      fontFamily: 'Inter',
+                                      color: appTheme.teal_800,
+                                      height: 1.35,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: 20.0),
