@@ -357,16 +357,7 @@ class FinancialDashboardService implements IFinancialDashboardService {
   }
 
   @override
-  Future<List<DateTime>> getAvailableDates() async {
-    final dates = await _repository.getAvailableDates();
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-
-    return dates.where((date) {
-      final dateOnly = DateTime(date.year, date.month, date.day);
-      return !dateOnly.isAfter(today);
-    }).toList();
-  }
+  Future<List<DateTime>> getAvailableDates() => _repository.getAvailableDates();
 
   @override
   Future<List<WholeTrip>> getCompletedTrips() async {

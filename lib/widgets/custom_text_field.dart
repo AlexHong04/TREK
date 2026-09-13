@@ -6,6 +6,7 @@ import '../utils/input_validator.dart';
 
 class CustomTextField extends StatefulWidget {
   final String sectionTitle;
+  final Widget? titleTrailing;
   final String hintText;
   final IconData prefixIcon;
   final TextEditingController? controller;
@@ -31,11 +32,11 @@ class CustomTextField extends StatefulWidget {
   final Widget? suffixIcon;
   final EdgeInsetsGeometry margin;
   final Color? prefixIconColor;
-  final Widget? titleTrailing;
 
   const CustomTextField({
     super.key,
     required this.sectionTitle,
+    this.titleTrailing,
     required this.hintText,
     required this.prefixIcon,
     this.controller,
@@ -61,11 +62,10 @@ class CustomTextField extends StatefulWidget {
     this.suffixIcon,
     this.margin = const EdgeInsets.symmetric(horizontal: 24.0),
     this.prefixIconColor,
-    this.titleTrailing,
   }) : assert(
-         controller == null || initialValue == null,
-         'controller and initialValue cannot both be provided.',
-       );
+  controller == null || initialValue == null,
+  'controller and initialValue cannot both be provided.',
+  );
 
   @override
   State<CustomTextField> createState() => _CustomTextFieldState();
@@ -95,21 +95,24 @@ class _CustomTextFieldState extends State<CustomTextField> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Text(
-                widget.sectionTitle,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  fontFamily: 'Inter',
-                  color: appTheme.blue_gray_300,
-                  letterSpacing: 1,
-                  height: 1.2,
+              Expanded(
+                child: Text(
+                  widget.sectionTitle,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    fontFamily: 'Inter',
+                    color: appTheme.blue_gray_300,
+                    letterSpacing: 1,
+                    height: 1.2,
+                  ),
                 ),
               ),
-              if (widget.titleTrailing != null) widget.titleTrailing!,
+              if (widget.titleTrailing != null) ...[
+                const SizedBox(width: 8),
+                widget.titleTrailing!,
+              ],
             ],
           ),
           const SizedBox(height: 6.0),

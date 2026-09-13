@@ -51,10 +51,21 @@ class InputValidator {
   static final RegExp _emailLocalSegment = RegExp(
     r"^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+$",
   );
+  static final RegExp _gmailUsernamePart = RegExp(
+    r'^[A-Za-z0-9]+(?:\.[A-Za-z0-9]+)*$',
+  );
   static final RegExp _domainLabel = RegExp(r'^[A-Za-z0-9-]+$');
   static final RegExp _domainTopLevel = RegExp(
     r'^(?:[A-Za-z]{2,63}|xn--[A-Za-z0-9-]{2,59})$',
   );
+  static const Set<String> _gmailDomains = {
+    'gmail.com',
+    'googlemail.com',
+  };
+  static const Set<String> _reservedGmailUsernames = {
+    'abuse',
+    'postmaster',
+  };
   static bool _publicTextFilterInitialized = false;
 
   /// Warms the on-device profanity filter once. Validation also calls this
@@ -80,6 +91,28 @@ class InputValidator {
     final local = trimmed.substring(0, separator);
     final domain = trimmed.substring(separator + 1).toLowerCase();
     return '$local@$domain';
+  }
+
+  /// Returns a stable duplicate-detection key for a validated email address.
+  /// Keep [normalizeEmail] for delivery and authentication; this value is for
+  /// a separately stored, uniquely indexed identity key.
+  static String canonicalizeEmailForIdentity(String value) {
+    final email = normalizeEmail(value);
+    final separator = email.lastIndexOf('@');
+    if (separator <= 0 || separator == email.length - 1) return email;
+
+    final local = email.substring(0, separator);
+    final domain = email.substring(separator + 1).toLowerCase();
+    if (!_gmailDomains.contains(domain)) return email.toLowerCase();
+
+    final tagSeparator = local.indexOf('+');
+    final gmailUsername = tagSeparator == -1
+        ? local
+        : local.substring(0, tagSeparator);
+    final canonicalUsername = gmailUsername
+        .replaceAll('.', '')
+        .toLowerCase();
+    return '$canonicalUsername@gmail.com';
   }
 
   static String? validateEmail(String value) {
@@ -111,6 +144,29 @@ class InputValidator {
           (segment) => segment.isEmpty || !_emailLocalSegment.hasMatch(segment),
     )) {
       return 'Enter a valid email address.';
+    }
+
+    if (_gmailDomains.contains(domain)) {
+      final tagSeparator = local.indexOf('+');
+      final gmailUsername = tagSeparator == -1
+          ? local
+          : local.substring(0, tagSeparator);
+      final gmailTag = tagSeparator == -1
+          ? null
+          : local.substring(tagSeparator + 1);
+
+      if (!_gmailUsernamePart.hasMatch(gmailUsername)) {
+        return 'Gmail usernames can use only letters, numbers, and single periods.';
+      }
+      if (gmailTag != null && !_gmailUsernamePart.hasMatch(gmailTag)) {
+        return 'Gmail +tags must start and end with a letter or number. Single periods are allowed only between them.';
+      }
+
+      final usernameWithoutPeriods =
+      gmailUsername.replaceAll('.', '').toLowerCase();
+      if (_reservedGmailUsernames.contains(usernameWithoutPeriods)) {
+        return 'This Gmail address is reserved and cannot be used.';
+      }
     }
 
     if (domain.startsWith('.') ||

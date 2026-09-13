@@ -1753,8 +1753,9 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                               .read<ActivityViewModel>()
                               .cancelReceiptScan,
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: appTheme.blue_gray_700,
-                            side: BorderSide(color: appTheme.gray_200),
+                            foregroundColor: appTheme.white_A700,
+                            backgroundColor: appTheme.errorRed,
+                            side: BorderSide(color: appTheme.errorRed),
                             shape: StadiumBorder(),
                             textStyle: TextStyle(
                               fontFamily: 'Inter',
@@ -1929,7 +1930,21 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
 
     if (uiState.ocrRawText.isNotEmpty) {
       final shouldApplyOcr = await _showOcrApplyDialog(uiState);
-      if (!shouldApplyOcr || !mounted) return;
+      if (!shouldApplyOcr || !mounted) {
+        viewModel.removeReceiptAndOcrData();
+        _taxController.clear();
+        _discountController.clear();
+        _roundingController.clear();
+        _manualRoundingText = '';
+        setState(() {
+          _showAdjustments = false;
+          _hasAppliedOcrValues = false;
+          _showUnknownItemPlaceholder = false;
+          _editingItemIndex = null;
+          _showItemForm = false;
+        });
+        return;
+      }
 
       var reviewReceiptDate = false;
       if (viewModel.ocrDateDiffersFromSelectedActivity) {
@@ -2010,6 +2025,17 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     final roundingText = uiState.ocrExtractedRounding == null
         ? 'Not detected'
         : _formatExpenseCurrencyAmount(currency, uiState.ocrExtractedRounding!);
+    final detectedItemNames = uiState.ocrParsedItems.isNotEmpty
+        ? uiState.ocrParsedItems
+              .map((item) => item.itemName.trim())
+              .where((name) => name.isNotEmpty)
+              .toList()
+        : uiState.ocrItemLines
+              .map((line) => line.trim())
+              .where((line) => line.isNotEmpty)
+              .toList();
+    final visibleItemNames = detectedItemNames.take(4).toList();
+    final hiddenItemCount = detectedItemNames.length - visibleItemNames.length;
 
     final shouldApply = await showDialog<bool>(
       context: context,
@@ -2054,6 +2080,42 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                       _buildOcrSummaryLine('Tax', taxText),
                       _buildOcrSummaryLine('Discount', discountText),
                       _buildOcrSummaryLine('Rounding', roundingText),
+                      if (visibleItemNames.isNotEmpty) ...[
+                        SizedBox(height: 4),
+                        Text(
+                          'Detected items',
+                          style: TextStyle(
+                            color: appTheme.blue_gray_300,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        ...visibleItemNames.map(
+                          (name) => Padding(
+                            padding: EdgeInsets.only(bottom: 3),
+                            child: Text(
+                              '- $name',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: appTheme.gray_900,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (hiddenItemCount > 0)
+                          Text(
+                            '+ $hiddenItemCount more',
+                            style: TextStyle(
+                              color: appTheme.teal_A700,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                      ],
                     ],
                   ),
                 ),
@@ -2194,7 +2256,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
       final shouldRemove = await _showConfirmationDialog(
         title: 'Remove Receipt and OCR Items?',
         message:
-            'Removing this receipt will also clear the tax and remove its OCR-extracted items. Manually added items will be kept.',
+            'Removing this receipt will clear all current expense items and adjustments for this draft.',
         confirmLabel: 'Remove',
         isDestructive: true,
       );

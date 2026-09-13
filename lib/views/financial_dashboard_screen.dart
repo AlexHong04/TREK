@@ -2087,19 +2087,22 @@ class _ExpenseBars extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
         Row(
-          mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            _AmountBar(
-              amount: category.budget,
-              height: barHeight(category.budget),
-              color: appTheme.blue_gray_700,
+            Expanded(
+              child: _AmountBar(
+                amount: category.budget,
+                height: barHeight(category.budget),
+                color: appTheme.blue_gray_700,
+              ),
             ),
-            const SizedBox(width: 10),
-            _AmountBar(
-              amount: category.expense,
-              height: barHeight(category.expense),
-              color: expenseColor,
+            const SizedBox(width: 4),
+            Expanded(
+              child: _AmountBar(
+                amount: category.expense,
+                height: barHeight(category.expense),
+                color: expenseColor,
+              ),
             ),
           ],
         ),

@@ -126,7 +126,7 @@ class _AppDatePickerDialogState extends State<AppDatePickerDialog> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: _DatePickerActionButton(
-                      label: 'OK',
+                      label: 'Confirm',
                       backgroundColor: appTheme.teal_A700,
                       onPressed: () => Navigator.pop(context, _pendingDate),
                     ),

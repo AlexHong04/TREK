@@ -94,23 +94,68 @@ class DeleteAccountConfirmationScreen extends StatelessWidget {
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
+        icon: Icon(Icons.delete_forever_outlined, color: appTheme.errorRed),
         title: const Text('Permanently delete account?'),
         content: const Text(
           'This is your final confirmation. Your account and associated TREK data cannot be recovered.',
         ),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Not Now'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: appTheme.errorRed),
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Delete'),
+          SizedBox(
+            width: double.maxFinite,
+            child: Row(
+              children: [
+                Expanded(
+                  child: _DeleteAccountDialogButton(
+                    text: 'Cancel',
+                    backgroundColor: appTheme.teal_A700,
+                    onPressed: () => Navigator.pop(dialogContext, false),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _DeleteAccountDialogButton(
+                    text: 'Delete',
+                    backgroundColor: appTheme.errorRed,
+                    onPressed: () => Navigator.pop(dialogContext, true),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
     if (confirmed == true) await viewModel.deletePermanently();
+  }
+}
+
+class _DeleteAccountDialogButton extends StatelessWidget {
+  final String text;
+  final Color backgroundColor;
+  final VoidCallback onPressed;
+
+  const _DeleteAccountDialogButton({
+    required this.text,
+    required this.backgroundColor,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 46,
+      child: FilledButton(
+        onPressed: onPressed,
+        style: FilledButton.styleFrom(
+          backgroundColor: backgroundColor,
+          foregroundColor: appTheme.white_A700,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: Text(text),
+      ),
+    );
   }
 }
