@@ -49,6 +49,246 @@ class ItineraryService implements IItineraryService {
     return false;
   }
 
+  static bool _isAddressInDestination(String address, String destination) {
+    final addrLower = address.toLowerCase();
+    final destTokens = destination
+        .toLowerCase()
+        .split(RegExp(r'[\s,]+'))
+        .where((t) => t.length >= 3)
+        .toList();
+
+    // Direct token check
+    for (final token in destTokens) {
+      if (addrLower.contains(token)) return true;
+    }
+
+    // Common Malaysian State & Territory Aliases
+    final Map<String, List<String>> aliases = {
+      'penang': [
+        'pulau pinang',
+        'pinang',
+        'george town',
+        'georgetown',
+        'batu ferringhi',
+        'butterworth',
+        'bayan lepas',
+        'bukit mertajam',
+      ],
+      'kuala lumpur': [
+        'kl',
+        'wilayah persekutuan kuala lumpur',
+        'wp kuala lumpur',
+        'cheras',
+        'bukit bintang',
+        'bangsar',
+      ],
+      'selangor': [
+        'petaling jaya',
+        'pj',
+        'subang',
+        'sunway',
+        'shah alam',
+        'klang',
+        'cyberjaya',
+        'sepang',
+        'puchong',
+        'seri kembangan',
+      ],
+      'malacca': ['melaka', 'ayer keroh', 'klebang'],
+      'melaka': ['malacca', 'ayer keroh', 'klebang'],
+      'johor': [
+        'johor bahru',
+        'jb',
+        'muar',
+        'batu pahat',
+        'kluang',
+        'iskandar puteri',
+      ],
+      'perak': ['ipoh', 'taiping', 'pangkor', 'lumut', 'teluk intan', 'kampar'],
+      'kedah': ['alor setar', 'langkawi', 'sungai petani', 'kulim'],
+      'langkawi': ['pantai cenang', 'kuah', 'kedah'],
+      'pahang': [
+        'kuantan',
+        'cameron',
+        'cameron highlands',
+        'genting',
+        'genting highlands',
+        'tioman',
+        'cherating',
+        'bentong',
+      ],
+      'sabah': [
+        'kota kinabalu',
+        'sandakan',
+        'tawau',
+        'semporna',
+        'kundasang',
+        'ranau',
+      ],
+      'sarawak': ['kuching', 'miri', 'sibu', 'bintulu'],
+      'terengganu': ['kuala terengganu', 'redang', 'perhentian', 'kapas'],
+      'kelantan': ['kota bharu'],
+      'negeri sembilan': ['seremban', 'port dickson', 'nilai'],
+      'perlis': ['kangar', 'arau'],
+      'putrajaya': ['wilayah persekutuan putrajaya'],
+      'labuan': ['wilayah persekutuan labuan'],
+    };
+
+    for (final entry in aliases.entries) {
+      final key = entry.key;
+      if (destTokens.any((t) => t.contains(key) || key.contains(t))) {
+        for (final alias in entry.value) {
+          if (addrLower.contains(alias)) return true;
+        }
+      }
+    }
+
+    // If destination didn't match, verify whether the address belongs to a different major state
+    final majorStates = [
+      'kuala lumpur',
+      'penang',
+      'pulau pinang',
+      'selangor',
+      'melaka',
+      'malacca',
+      'johor',
+      'perak',
+      'kedah',
+      'pahang',
+      'sabah',
+      'sarawak',
+      'terengganu',
+      'kelantan',
+      'negeri sembilan',
+      'perlis',
+      'putrajaya',
+      'labuan',
+    ];
+    for (final state in majorStates) {
+      if (addrLower.contains(state)) {
+        final destMatches =
+            destTokens.any((t) => t.contains(state) || state.contains(t)) ||
+            (aliases[state]?.any(
+                  (a) => destTokens.any((t) => t.contains(a) || a.contains(t)),
+                ) ??
+                false);
+        if (!destMatches) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
+  static int _timeToMinutes(String? timeStr, int defaultMinutes) {
+    if (timeStr == null || timeStr.trim().isEmpty) return defaultMinutes;
+    try {
+      final trimmed = timeStr.trim();
+      final parts = trimmed.split(RegExp(r'[:\s]'));
+      if (parts.length >= 2) {
+        int h = int.parse(parts[0]);
+        int m = int.parse(parts[1]);
+        final lower = trimmed.toLowerCase();
+        final isPm = lower.contains('pm');
+        final isAm = lower.contains('am');
+        if (isPm && h < 12) h += 12;
+        if (isAm && h == 12) h = 0;
+        return h * 60 + m;
+      }
+    } catch (_) {}
+    return defaultMinutes;
+  }
+
+  static String _minutesToTimeString(int totalMinutes) {
+    if (totalMinutes < 0) totalMinutes = 0;
+    if (totalMinutes >= 24 * 60) totalMinutes = 23 * 60 + 59;
+    final h = totalMinutes ~/ 60;
+    final m = totalMinutes % 60;
+    return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
+  }
+
+  static Map<String, dynamic>? _tryParseOrRepairJson(String raw) {
+    if (raw.trim().isEmpty) return null;
+
+    // 1. Try standard parse directly
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, dynamic>) return decoded;
+    } catch (_) {}
+
+    // 2. Try parsing after extracting outer object
+    try {
+      final match = RegExp(r'\{.*\}', dotAll: true).firstMatch(raw);
+      if (match != null) {
+        final decoded = jsonDecode(match.group(0)!);
+        if (decoded is Map<String, dynamic>) return decoded;
+      }
+    } catch (_) {}
+
+    // 3. Attempt repair for truncated JSON
+    try {
+      int firstBrace = raw.indexOf('{');
+      if (firstBrace == -1) return null;
+      var trimmed = raw.substring(firstBrace).trim();
+
+      // If it ends inside an incomplete item, trim to last valid '}'
+      final lastBrace = trimmed.lastIndexOf('}');
+      if (lastBrace != -1 && lastBrace < trimmed.length - 1) {
+        trimmed = trimmed.substring(0, lastBrace + 1);
+      }
+
+      int openBraces = 0;
+      int openBrackets = 0;
+      bool inString = false;
+      bool escape = false;
+
+      for (int i = 0; i < trimmed.length; i++) {
+        final char = trimmed[i];
+        if (escape) {
+          escape = false;
+          continue;
+        }
+        if (char == '\\') {
+          escape = true;
+          continue;
+        }
+        if (char == '"') {
+          inString = !inString;
+          continue;
+        }
+        if (!inString) {
+          if (char == '{') openBraces++;
+          if (char == '}') openBraces--;
+          if (char == '[') openBrackets++;
+          if (char == ']') openBrackets--;
+        }
+      }
+
+      var repaired = trimmed.trim();
+      while (repaired.endsWith(',')) {
+        repaired = repaired.substring(0, repaired.length - 1).trim();
+      }
+
+      final buffer = StringBuffer(repaired);
+      while (openBrackets > 0) {
+        buffer.write('\n]');
+        openBrackets--;
+      }
+      while (openBraces > 0) {
+        buffer.write('\n}');
+        openBraces--;
+      }
+
+      final decoded = jsonDecode(buffer.toString());
+      if (decoded is Map<String, dynamic>) return decoded;
+    } catch (e) {
+      debugPrint('JSON repair attempt failed: $e');
+    }
+
+    return null;
+  }
+
   // kokhong - Gemini API + Google Places validation + image resolution
   @override
   Future<ItineraryGenerationResult> generateItinerary({
@@ -106,30 +346,13 @@ class ItineraryService implements IItineraryService {
           hotelCheckOutTime: hotelCheckOutTime,
         );
 
-        // Extract JSON object
-        final jsonMatch = RegExp(
-          r'\{.*\}',
-          dotAll: true,
-        ).firstMatch(responseText);
+        // Extract and parse JSON object safely (with truncation repair)
+        final parsedObj = _tryParseOrRepairJson(responseText);
 
-        if (jsonMatch == null) {
+        if (parsedObj == null) {
           retries--;
           if (retries == 0) {
-            throw Exception(
-              'No JSON found in response after multiple attempts: $responseText',
-            );
-          }
-          continue;
-        }
-
-        final jsonString = jsonMatch.group(0)!;
-        Map<String, dynamic> parsedObj;
-        try {
-          parsedObj = jsonDecode(jsonString) as Map<String, dynamic>;
-        } catch (e) {
-          retries--;
-          if (retries == 0) {
-            throw Exception('Invalid JSON returned by Gemini: $jsonString');
+            throw Exception('Invalid JSON returned by Gemini: $responseText');
           }
           continue;
         }
@@ -194,6 +417,16 @@ class ItineraryService implements IItineraryService {
           final place = searchCache[destName];
           if (place == null) {
             if (category != 'transportation') {
+              allValid = false;
+              currentFailed.add(destName);
+            }
+          } else if (category != 'transportation') {
+            final address = (place['address'] as String? ?? '').trim();
+            if (address.isNotEmpty &&
+                !_isAddressInDestination(address, destination)) {
+              developer.log(
+                'Destination "$destName" is outside "$destination" (Google Places address: $address). Rejecting.',
+              );
               allValid = false;
               currentFailed.add(destName);
             }
@@ -288,6 +521,106 @@ class ItineraryService implements IItineraryService {
           throw Exception(
             'Failed to generate a valid itinerary with searchable Google Places locations.',
           );
+        }
+      }
+
+      // Ensure Day 1 start time strictly matches user's arrival time,
+      // and Last Day end time strictly matches user's departure time.
+      final String rawArrivalTime = (arrivals != null &&
+              arrivals.isNotEmpty &&
+              arrivals.first.time.trim().isNotEmpty)
+          ? arrivals.first.time
+          : (arrivalTime != null && arrivalTime.trim().isNotEmpty
+              ? arrivalTime
+              : '09:00 AM');
+      final int expectedDay1StartMinutes =
+          _timeToMinutes(rawArrivalTime, 9 * 60);
+
+      final String rawDepartureTime = (departures != null &&
+              departures.isNotEmpty &&
+              departures.last.time.trim().isNotEmpty)
+          ? departures.last.time
+          : (departureTime != null && departureTime.trim().isNotEmpty
+              ? departureTime
+              : '09:00 PM');
+      final int expectedLastDayEndMinutes =
+          _timeToMinutes(rawDepartureTime, 21 * 60);
+
+      int maxDay = 1;
+      for (final item in validatedList) {
+        final d = int.tryParse(item['dayNumber']?.toString() ?? '1') ?? 1;
+        if (d > maxDay) maxDay = d;
+      }
+
+      final day1Indices = <int>[];
+      final lastDayIndices = <int>[];
+      for (int i = 0; i < validatedList.length; i++) {
+        final dNum =
+            int.tryParse(validatedList[i]['dayNumber']?.toString() ?? '1') ?? 1;
+        if (dNum == 1) {
+          day1Indices.add(i);
+        }
+        if (dNum == maxDay) {
+          lastDayIndices.add(i);
+        }
+      }
+
+      // 1. Day 1 start time based on arrival time for first activity
+      if (day1Indices.isNotEmpty) {
+        int minStartM = 24 * 60;
+        for (final idx in day1Indices) {
+          final sM = _timeToMinutes(
+              validatedList[idx]['startTime']?.toString(), 9 * 60);
+          if (sM < minStartM) minStartM = sM;
+        }
+
+        if (minStartM != expectedDay1StartMinutes) {
+          final shift = expectedDay1StartMinutes - minStartM;
+          for (final idx in day1Indices) {
+            final it = Map<String, dynamic>.from(validatedList[idx] as Map);
+            final sM = _timeToMinutes(it['startTime']?.toString(), 9 * 60);
+            final eM = _timeToMinutes(it['endTime']?.toString(), sM + 60);
+            it['startTime'] = _minutesToTimeString(sM + shift);
+            it['endTime'] = _minutesToTimeString(eM + shift);
+            validatedList[idx] = it;
+          }
+        }
+      }
+
+      // 2. Last day end time based on departure time for last activity
+      if (lastDayIndices.isNotEmpty) {
+        int maxEndM = -1;
+        int lastIdx = lastDayIndices.last;
+        for (final idx in lastDayIndices) {
+          final sM = _timeToMinutes(
+              validatedList[idx]['startTime']?.toString(), 20 * 60);
+          final eM =
+              _timeToMinutes(validatedList[idx]['endTime']?.toString(), sM + 60);
+          if (eM > maxEndM) {
+            maxEndM = eM;
+            lastIdx = idx;
+          }
+        }
+
+        if (maxEndM != expectedLastDayEndMinutes) {
+          final lastIt = Map<String, dynamic>.from(validatedList[lastIdx] as Map);
+          final oldStartM =
+              _timeToMinutes(lastIt['startTime']?.toString(), 20 * 60);
+          final oldEndM =
+              _timeToMinutes(lastIt['endTime']?.toString(), oldStartM + 60);
+          int durationM = oldEndM - oldStartM;
+          if (durationM <= 0 || durationM > 180) durationM = 60;
+
+          int newStartM = expectedLastDayEndMinutes - durationM;
+          if (newStartM < 0) newStartM = 0;
+
+          if (maxDay == 1 && day1Indices.length == 1) {
+            newStartM = expectedDay1StartMinutes;
+          }
+
+          lastIt['startTime'] = _minutesToTimeString(newStartM);
+          lastIt['endTime'] = _minutesToTimeString(expectedLastDayEndMinutes);
+          validatedList[lastIdx] = lastIt;
         }
       }
 
@@ -416,7 +749,7 @@ class ItineraryService implements IItineraryService {
       final resolvedDepList = (departures != null && departures.isNotEmpty)
           ? departures.where((d) => d.location.trim().isNotEmpty).toList()
           : (departureLocation != null && departureLocation.trim().isNotEmpty)
-              ? [TransitPoint(id: 'dep_0', location: departureLocation, time: departureTime ?? '18:00')]
+              ? [TransitPoint(id: 'dep_0', location: departureLocation, time: departureTime ?? '21:00')]
               : <TransitPoint>[];
 
       if (resolvedDepList.isNotEmpty && newActivities.isNotEmpty) {
@@ -434,7 +767,7 @@ class ItineraryService implements IItineraryService {
           final lastActivity = newActivities.last;
           DateTime lastDate = lastActivity.date;
           String depTimeStr = lastDep.time;
-          String formattedEndTime = '18:00';
+          String formattedEndTime = '21:00';
           try {
             final tParts = depTimeStr.trim().split(RegExp(r'[:\s]'));
             if (tParts.length >= 2) {
@@ -450,7 +783,7 @@ class ItineraryService implements IItineraryService {
             formattedEndTime = depTimeStr;
           }
 
-          String formattedStartTime = '17:00';
+          String formattedStartTime = '20:00';
           try {
             final parts = formattedEndTime.split(':');
             int h = int.parse(parts[0]);
@@ -472,7 +805,7 @@ class ItineraryService implements IItineraryService {
                 lastDate.year,
                 lastDate.month,
                 lastDate.day,
-                int.tryParse(formattedStartTime.split(':')[0]) ?? 17,
+                int.tryParse(formattedStartTime.split(':')[0]) ?? 20,
                 int.tryParse(formattedStartTime.split(':')[1]) ?? 0,
               ),
               allocatedBudget: 0.0,
@@ -487,6 +820,39 @@ class ItineraryService implements IItineraryService {
             ),
           );
           index++;
+        }
+      }
+
+      if (newActivities.isNotEmpty) {
+        // Guarantee first activity of Day 1 starts at arrival time
+        final firstAct = newActivities.first;
+        final expectedStartStr = _minutesToTimeString(expectedDay1StartMinutes);
+        if (firstAct.startTime != expectedStartStr) {
+          final sM = _timeToMinutes(firstAct.startTime, expectedDay1StartMinutes);
+          final eM = _timeToMinutes(firstAct.endTime, sM + 60);
+          final dur = eM - sM;
+          final newEndStr = _minutesToTimeString(
+              expectedDay1StartMinutes + (dur > 0 ? dur : 60));
+          newActivities[0] = firstAct.copyWith(
+            startTime: expectedStartStr,
+            endTime: newEndStr,
+          );
+        }
+
+        // Guarantee last activity of the trip ends at departure time
+        final lastAct = newActivities.last;
+        final expectedEndStr = _minutesToTimeString(expectedLastDayEndMinutes);
+        if (lastAct.endTime != expectedEndStr) {
+          final sM =
+              _timeToMinutes(lastAct.startTime, expectedLastDayEndMinutes - 60);
+          final eM = _timeToMinutes(lastAct.endTime, sM + 60);
+          final dur = eM - sM;
+          final newStartStr = _minutesToTimeString(
+              expectedLastDayEndMinutes - (dur > 0 ? dur : 60));
+          newActivities[newActivities.length - 1] = lastAct.copyWith(
+            startTime: newStartStr,
+            endTime: expectedEndStr,
+          );
         }
       }
 

@@ -36,7 +36,8 @@ class GooglePlacesApiConfig {
     final Map<String, String> headers = {
       'Content-Type': 'application/json',
       'X-Goog-Api-Key': _apiKey,
-      'X-Goog-FieldMask': 'places.displayName,places.photos',
+      'X-Goog-FieldMask':
+          'places.displayName,places.photos,places.formattedAddress',
     };
 
     // if (!kIsWeb) {
@@ -63,6 +64,7 @@ class GooglePlacesApiConfig {
             final raw = places.first as Map<String, dynamic>;
             return {
               'name': raw['displayName']?['text'],
+              'address': raw['formattedAddress'] as String?,
               'photos': (raw['photos'] as List?)
                   ?.map(
                     (p) => {
@@ -98,6 +100,7 @@ class GooglePlacesApiConfig {
             final raw = places.first as Map<String, dynamic>;
             return {
               'name': raw['displayName']?['text'],
+              'address': raw['formattedAddress'] as String?,
               'photos': (raw['photos'] as List?)
                   ?.map((p) => {'photo_reference': p['name']})
                   .toList(),

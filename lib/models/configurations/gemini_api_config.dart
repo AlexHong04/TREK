@@ -27,6 +27,25 @@ class GeminiApiConfig {
     _model = GenerativeModel(model: 'gemini-3.5-flash-lite', apiKey: _apiKey);
   }
 
+  static String _formatTo24Hour(String? timeStr, String default24H) {
+    if (timeStr == null || timeStr.trim().isEmpty) return default24H;
+    final trimmed = timeStr.trim();
+    try {
+      final tParts = trimmed.split(RegExp(r'[:\s]'));
+      if (tParts.length >= 2) {
+        int h = int.parse(tParts[0]);
+        int m = int.parse(tParts[1]);
+        final lower = trimmed.toLowerCase();
+        final isPm = lower.contains('pm');
+        final isAm = lower.contains('am');
+        if (isPm && h < 12) h += 12;
+        if (isAm && h == 12) h = 0;
+        return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
+      }
+    } catch (_) {}
+    return trimmed.contains(':') ? trimmed : default24H;
+  }
+
   // kokhong
   static Future<String> askGeminiForItinerary({
     required String destination,
@@ -59,6 +78,29 @@ class GeminiApiConfig {
       }
     } catch (_) {}
 
+    final String rawArrivalTime =
+        (arrivals != null &&
+            arrivals.isNotEmpty &&
+            arrivals.first.time.trim().isNotEmpty)
+        ? arrivals.first.time
+        : (arrivalTime != null && arrivalTime.trim().isNotEmpty
+              ? arrivalTime
+              : '09:00 AM');
+    final String day1StartTime24H = _formatTo24Hour(rawArrivalTime, '09:00');
+
+    final String rawDepartureTime =
+        (departures != null &&
+            departures.isNotEmpty &&
+            departures.last.time.trim().isNotEmpty)
+        ? departures.last.time
+        : (departureTime != null && departureTime.trim().isNotEmpty
+              ? departureTime
+              : '09:00 PM');
+    final String finalDayEndTime24H = _formatTo24Hour(
+      rawDepartureTime,
+      '21:00',
+    );
+
     final List<TransitPoint> resolvedArrivals = [];
     if (arrivals != null && arrivals.isNotEmpty) {
       resolvedArrivals.addAll(
@@ -69,7 +111,7 @@ class GeminiApiConfig {
         TransitPoint(
           id: 'arr_0',
           location: arrivalLocation,
-          time: arrivalTime ?? '09:00 AM',
+          time: rawArrivalTime,
         ),
       );
     }
@@ -85,7 +127,7 @@ class GeminiApiConfig {
         TransitPoint(
           id: 'dep_0',
           location: departureLocation,
-          time: departureTime ?? '06:00 PM',
+          time: rawDepartureTime,
         ),
       );
     }
@@ -116,13 +158,24 @@ class GeminiApiConfig {
     CRITICAL MANDATORY GEOGRAPHIC BOUNDARY RULE:
     - Target Destination: "$destination", Malaysia.
     - STRICT ENFORCEMENT: EVERY single activity, attraction, restaurant, cafe, hawker stall, shop, landmark, and transit stop MUST be physically located within "$destination", Malaysia!
-    - ABSOLUTELY FORBIDDEN: NEVER include or recommend places from other cities or states (for example, if Destination is "Penang", you MUST ONLY choose places located within Penang state, e.g. George Town, Batu Ferringhi, Air Itam, Bayan Lepas, Gurney Drive, etc. DO NOT include places in Kuala Lumpur such as KLCC, Petronas Towers, Batu Caves, Bukit Bintang, Pavilion KL, etc.!).
+    - STRICT PROHIBITION: NEVER propose places from other states or regions. 100% of all attractions, restaurants, and venues across all days MUST be physically located inside "$destination", Malaysia. Recommending any venue outside "$destination" is strictly invalid.
     - Suggesting places outside "$destination" is strictly forbidden and invalid.
     ${preference != null ? '- Preference: $preference (You MUST heavily prioritize planning activities that strictly match this theme!)' : ''}
-    ${resolvedArrivals.isNotEmpty ? '''- Arrival Details:
-${resolvedArrivals.asMap().entries.map((e) => '      * Arrival ${e.key + 1} (${e.value.type}): ${e.value.location}${e.value.date.isNotEmpty ? ' on ${e.value.date}' : ''} at ${e.value.time}').join('\n')}
-      * CRITICAL FOR DAY 1: Day 1 activities MUST start after the initial arrival time (${resolvedArrivals.first.time}${resolvedArrivals.first.date.isNotEmpty ? ' on ${resolvedArrivals.first.date}' : ''}) at "${resolvedArrivals.first.location}" (arriving via ${resolvedArrivals.first.type}). Route connecting activities accordingly!''' : ''}
-    ${resolvedDepartures.isNotEmpty ? '''- Departure Details:
+    - Traveler Arrival & Day 1 Start Time:
+      * Day 1 Arrival Time: $day1StartTime24H ($rawArrivalTime)${resolvedArrivals.isNotEmpty ? ' at "${resolvedArrivals.first.location}" (${resolvedArrivals.first.type})' : ''}.
+      * CRITICAL FOR DAY 1 START TIME:
+        The traveler only begins Day 1 at $day1StartTime24H ($rawArrivalTime).
+        Therefore, Day 1's very first activity MUST start strictly at $day1StartTime24H ("startTime": "$day1StartTime24H")!
+        ABSOLUTELY DO NOT start Day 1 at 09:00 unless the traveler arrival time is 09:00!
+        NEVER schedule any activity before $day1StartTime24H on Day 1!
+    ${resolvedArrivals.length > 1 ? '''- Additional Arrivals:
+${resolvedArrivals.skip(1).map((a) => '      * Arrival (${a.type}): ${a.location}${a.date.isNotEmpty ? ' on ${a.date}' : ''} at ${a.time}').join('\n')}''' : ''}
+    - Traveler Departure & Final Day End Time:
+      * Final Day (Day $numberOfDays) Departure Time: $finalDayEndTime24H ($rawDepartureTime)${resolvedDepartures.isNotEmpty ? ' at "${resolvedDepartures.last.location}" (${resolvedDepartures.last.type})' : ''}.
+      * CRITICAL FOR FINAL DAY END TIME:
+        All activities on Day $numberOfDays MUST conclude by $finalDayEndTime24H ($rawDepartureTime).
+        ABSOLUTELY DO NOT schedule any activities after $finalDayEndTime24H on Day $numberOfDays!
+    ${resolvedDepartures.isNotEmpty ? '''- Departure Details & Mandatory Departure Activity:
 ${resolvedDepartures.asMap().entries.map((e) => '      * Departure ${e.key + 1} (${e.value.type}): ${e.value.location}${e.value.date.isNotEmpty ? ' on ${e.value.date}' : ''} at ${e.value.time}').join('\n')}
       * CRITICAL FOR FINAL DAY (MANDATORY DEPARTURE COVERAGE):
         - The traveler departs from "${resolvedDepartures.last.location}" via ${resolvedDepartures.last.type} at ${resolvedDepartures.last.time}.
@@ -206,13 +259,13 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
     - THIS IS THE MOST IMPORTANT RULE: You MUST generate an itinerary exactly for $numberOfDays day(s). If $numberOfDays is 3, return exactly 3 days. If $numberOfDays is 4, return exactly 4 days. The number of days returned MUST strictly match $numberOfDays!
     - The "dayNumber" MUST go sequentially from 1 up to exactly $numberOfDays. DO NOT generate less or more days than $numberOfDays!
     - Daily schedule timing:
-      * Day 1 starts at ${resolvedArrivals.isNotEmpty ? resolvedArrivals.first.time : '09:00'} (accommodating traveler arrival at "${resolvedArrivals.isNotEmpty ? resolvedArrivals.first.location : 'arrival location'}").
-      * The final day ends at ${resolvedDepartures.isNotEmpty ? resolvedDepartures.last.time : '21:00'} with the traveler reaching their departure hub "${resolvedDepartures.isNotEmpty ? resolvedDepartures.last.location : 'departure location'}".
+      * Day 1 starts at $day1StartTime24H (the very first activity on Day 1 MUST have "startTime": "$day1StartTime24H", NEVER 09:00 unless arrival is 09:00)${resolvedArrivals.isNotEmpty ? ' (accommodating traveler arrival at "${resolvedArrivals.first.location}")' : ''}.
+      * The final day ends at $finalDayEndTime24H${resolvedDepartures.isNotEmpty ? ' with the traveler reaching their departure hub "${resolvedDepartures.last.location}"' : ''}.
       * All intermediate days strictly start at 09:00 and end at 21:00.
       * Provide a complete continuous schedule filling the active hours, with connecting transportation between destinations.
     - The endTime of each activity must smoothly connect to the startTime of the next activity without large gaps.
-    - Do not schedule any activities before 09:00 or after 21:00 (unless Day 1 arrival or final day departure dictates earlier or later). 
-    - On intermediate days, the last activity of the day should reach 21:00. On the final day with departure, the final activity MUST be the departure transfer to "${resolvedDepartures.isNotEmpty ? resolvedDepartures.last.location : 'departure point'}" ending at ${resolvedDepartures.isNotEmpty ? resolvedDepartures.last.time : '21:00'}.
+    - Do not schedule any activities before $day1StartTime24H on Day 1, or after $finalDayEndTime24H on the final day. 
+    - On intermediate days, the last activity of the day should reach 21:00. On the final day with departure, the final activity MUST be the departure transfer to "${resolvedDepartures.isNotEmpty ? resolvedDepartures.last.location : 'departure point'}" ending at $finalDayEndTime24H.
 
     CRITICAL RULE FOR COMPOSITION & TRANSPORTATION:
     - Meal planning:
@@ -259,8 +312,8 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
           "allocatedBudget": 50.0,
           "duration": "60-90 min",
           "activityCategory": "Attraction",
-          "startTime": "09:00",
-          "endTime": "11:00",
+          "startTime": "$day1StartTime24H",
+          "endTime": "...",
           "minPrice": 20.0 
         }
       ]
@@ -276,7 +329,7 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
     - allocatedBudget (double): Max estimated cost or fixed price in MYR. 0.0 for free.
     - duration (String): e.g., "60-90 min".
     - activityCategory (String): MUST be "Transportation", "Attraction", or "Restaurant".
-    - startTime/endTime (String): 24-hour format "HH:mm".
+    - startTime/endTime (String): 24-hour format "HH:mm". Note: Day 1's first activity startTime MUST be "$day1StartTime24H".
     - minPrice (double): Min estimated cost in MYR. Set to 0.0 or null if free/fixed.
     ''';
 
@@ -298,7 +351,10 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
                 ],
               },
             ],
-            "generationConfig": {"responseMimeType": "application/json"},
+            "generationConfig": {
+              "responseMimeType": "application/json",
+              "maxOutputTokens": 8192,
+            },
           }),
         );
 
@@ -400,7 +456,10 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
             ],
           },
         ],
-        "generationConfig": {"responseMimeType": "application/json"},
+        "generationConfig": {
+          "responseMimeType": "application/json",
+          "maxOutputTokens": 8192,
+        },
       }),
     );
 

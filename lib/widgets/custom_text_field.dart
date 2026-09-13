@@ -31,6 +31,7 @@ class CustomTextField extends StatefulWidget {
   final Widget? suffixIcon;
   final EdgeInsetsGeometry margin;
   final Color? prefixIconColor;
+  final Widget? titleTrailing;
 
   const CustomTextField({
     super.key,
@@ -60,6 +61,7 @@ class CustomTextField extends StatefulWidget {
     this.suffixIcon,
     this.margin = const EdgeInsets.symmetric(horizontal: 24.0),
     this.prefixIconColor,
+    this.titleTrailing,
   }) : assert(
          controller == null || initialValue == null,
          'controller and initialValue cannot both be provided.',
@@ -92,16 +94,23 @@ class _CustomTextFieldState extends State<CustomTextField> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            widget.sectionTitle,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-              fontFamily: 'Inter',
-              color: appTheme.blue_gray_300,
-              letterSpacing: 1,
-              height: 1.2,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                widget.sectionTitle,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  fontFamily: 'Inter',
+                  color: appTheme.blue_gray_300,
+                  letterSpacing: 1,
+                  height: 1.2,
+                ),
+              ),
+              if (widget.titleTrailing != null) widget.titleTrailing!,
+            ],
           ),
           const SizedBox(height: 6.0),
           Focus(

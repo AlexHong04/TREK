@@ -8,6 +8,7 @@ import '../view_models/presentation_logic/travel_information_input_view_model.da
 import '../main.dart';
 import '../widgets/custom_app_bar.dart';
 import '../widgets/custom_text_field.dart';
+import '../widgets/destination_spending_rates_dialog.dart';
 import '../utils/malaysia_states.dart';
 import '../view_models/ui_state/travel_information_ui_state.dart';
 
@@ -190,6 +191,24 @@ class _TravelInformationInputScreenState
                       const SizedBox(height: 22.0),
                       CustomTextField(
                         sectionTitle: 'WISHLIST',
+                        titleTrailing:
+                            viewModel.uiState.wishlistItems.isNotEmpty
+                                ? GestureDetector(
+                                    onTap: () {
+                                      _wishlistController.clear();
+                                      viewModel.clearWishlist();
+                                    },
+                                    child: Text(
+                                      'Clear all',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        fontFamily: 'Inter',
+                                        color: appTheme.teal_A700,
+                                      ),
+                                    ),
+                                  )
+                                : null,
                         hintText:
                             viewModel.uiState.selectedDestinations.isNotEmpty
                             ? 'Search places in ${viewModel.uiState.selectedDestinations.join(", ")}...'
@@ -317,6 +336,28 @@ class _TravelInformationInputScreenState
 
                           return CustomTextField(
                             sectionTitle: 'TRIP BUDGET ($preferredCurrency)',
+                            titleTrailing: InkWell(
+                              onTap: () => showDestinationSpendingRatesDialog(
+                                context,
+                                currentDestination:
+                                    viewModel
+                                        .uiState
+                                        .selectedDestinations
+                                        .isNotEmpty
+                                    ? viewModel.uiState.selectedDestinations
+                                          .join(', ')
+                                    : null,
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                              child: Padding(
+                                padding: const EdgeInsets.all(4.0),
+                                child: Icon(
+                                  Icons.info_outline_rounded,
+                                  size: 16,
+                                  color: appTheme.teal_700,
+                                ),
+                              ),
+                            ),
                             hintText: 'Total Trip Budget ($preferredCurrency)',
                             prefixIcon: Icons.account_balance_wallet_outlined,
                             prefixIconColor: appTheme.teal_A700,
@@ -2851,29 +2892,11 @@ class _TravelInformationInputScreenState
   }
 
   String _getArrivalPlaceholder(String type, int index, int total) {
-    final suffix = total > 1 ? ' ${index + 1}' : '';
-    switch (type.toLowerCase()) {
-      case 'train':
-        return 'Select arrival train station$suffix';
-      case 'bus':
-        return 'Select arrival bus terminal$suffix';
-      case 'flight':
-      default:
-        return 'Select arrival airport$suffix';
-    }
+    return 'Select arrival type';
   }
 
   String _getDeparturePlaceholder(String type, int index, int total) {
-    final suffix = total > 1 ? ' ${index + 1}' : '';
-    switch (type.toLowerCase()) {
-      case 'train':
-        return 'Select departure train station$suffix';
-      case 'bus':
-        return 'Select departure bus terminal$suffix';
-      case 'flight':
-      default:
-        return 'Select departure airport$suffix';
-    }
+    return 'Select departure type';
   }
 
   Future<void> _showTransitHubSelectionModal(
@@ -3636,11 +3659,7 @@ class _TripDateRangePickerDialogState
 
   bool get _canGoPrev {
     final prevMonth = DateTime(_visibleMonth.year, _visibleMonth.month - 1, 1);
-    final minMonth = DateTime(
-      widget.firstDate.year,
-      widget.firstDate.month,
-      1,
-    );
+    final minMonth = DateTime(widget.firstDate.year, widget.firstDate.month, 1);
     return !prevMonth.isBefore(minMonth);
   }
 
@@ -3718,9 +3737,7 @@ class _TripDateRangePickerDialogState
     return Dialog(
       backgroundColor: appTheme.white_A700,
       surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(28.0),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28.0)),
       clipBehavior: Clip.antiAlias,
       insetPadding: const EdgeInsets.symmetric(
         horizontal: 16.0,
@@ -3808,11 +3825,7 @@ class _TripDateRangePickerDialogState
                 ),
               ),
               const SizedBox(width: 4.0),
-              Icon(
-                Icons.arrow_drop_down,
-                size: 24.0,
-                color: appTheme.gray_800,
-              ),
+              Icon(Icons.arrow_drop_down, size: 24.0, color: appTheme.gray_800),
             ],
           ),
           Row(
@@ -3910,8 +3923,11 @@ class _TripDateRangePickerDialogState
     final isStart = _startDate != null && _isSameDay(_startDate!, cellDate);
     final isEnd = _endDate != null && _isSameDay(_endDate!, cellDate);
     final hasRange =
-        _startDate != null && _endDate != null && _endDate!.isAfter(_startDate!);
-    final isInRange = hasRange &&
+        _startDate != null &&
+        _endDate != null &&
+        _endDate!.isAfter(_startDate!);
+    final isInRange =
+        hasRange &&
         cellDate.isAfter(_startDate!) &&
         cellDate.isBefore(_endDate!);
     final isRangeStart = isStart && hasRange;
@@ -3931,9 +3947,7 @@ class _TripDateRangePickerDialogState
             children: [
               // Continuous range band
               if (isInRange)
-                Positioned.fill(
-                  child: Container(color: rangeBandColor),
-                ),
+                Positioned.fill(child: Container(color: rangeBandColor)),
               if (isRangeStart)
                 Positioned(
                   left: halfWidth,
@@ -4016,7 +4030,9 @@ class _TripDateRangePickerDialogState
                         '${cellDate.day}',
                         style: TextStyle(
                           fontSize: 14.0,
-                          fontWeight: isInRange ? FontWeight.w500 : FontWeight.w400,
+                          fontWeight: isInRange
+                              ? FontWeight.w500
+                              : FontWeight.w400,
                           color: isUnavailable
                               ? appTheme.gray_800.withValues(alpha: 0.38)
                               : appTheme.gray_800,
@@ -4082,9 +4098,9 @@ class _TripDateRangePickerDialogState
                 : () {
                     final start = _startDate!;
                     final end = _endDate ?? _startDate!;
-                    Navigator.of(context).pop(
-                      DateTimeRange(start: start, end: end),
-                    );
+                    Navigator.of(
+                      context,
+                    ).pop(DateTimeRange(start: start, end: end));
                   },
             child: Text(
               'OK',

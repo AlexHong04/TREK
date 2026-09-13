@@ -11,6 +11,7 @@ import '../models/services/i_auth_service.dart';
 import '../models/services/i_profile_service.dart'; // added this
 import '../main.dart';
 import '../widgets/custom_app_bar.dart';
+import '../widgets/destination_spending_rates_dialog.dart';
 import '../widgets/dual_currency_amount.dart';
 import 'budget_popup.dart';
 
@@ -102,14 +103,6 @@ class _WholeItineraryDetailScreenState
   Future<void> _checkWishlistWarning(
     WholeItineraryDetailViewModel viewModel,
   ) async {
-    final wishlist = viewModel.uiState.wishlist;
-
-    final hasWishlist = wishlist != null && wishlist.isNotEmpty;
-
-    final hasUncoveredWishlist =
-        hasWishlist &&
-        viewModel.uiState.wishlistItemsCoveredCount < wishlist.length;
-
     final hasExtraBudgetNeeded =
         viewModel.uiState.estimatedExtraBudgetNeeded > 0;
 
@@ -280,15 +273,27 @@ class _WholeItineraryDetailScreenState
 
   String _formatDisplayTime(dynamic activity) {
     final startTime = activity.startTime as String?;
+    final endTime = activity.endTime as String?;
+    String formattedStart = '';
     if (startTime != null && startTime.trim().isNotEmpty) {
       try {
         final parsed = DateFormat('HH:mm').parse(startTime.trim());
-        return DateFormat('hh:mm a').format(parsed);
+        formattedStart = DateFormat('hh:mm a').format(parsed);
       } catch (_) {
-        return startTime;
+        formattedStart = startTime;
       }
+    } else {
+      formattedStart = DateFormat('hh:mm a').format(activity.date);
     }
-    return DateFormat('hh:mm a').format(activity.date);
+
+    if (endTime != null && endTime.trim().isNotEmpty) {
+      try {
+        final parsedEnd = DateFormat('HH:mm').parse(endTime.trim());
+        final formattedEnd = DateFormat('hh:mm a').format(parsedEnd);
+        return '$formattedStart - $formattedEnd';
+      } catch (_) {}
+    }
+    return formattedStart;
   }
 
   Future<bool> _handleTopUp({
@@ -572,15 +577,20 @@ class _WholeItineraryDetailScreenState
                   height: 1.1,
                 ),
               ),
-              Text(
-                'BUDGET',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  fontFamily: 'Inter',
-                  color: appTheme.teal_A700,
-                  letterSpacing: 1.0,
-                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'BUDGET',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      fontFamily: 'Inter',
+                      color: appTheme.teal_A700,
+                      letterSpacing: 1.0,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -1213,14 +1223,18 @@ class _WholeItineraryDetailScreenState
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    _formatDisplayTime(activity),
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      fontFamily: 'Inter',
-                      color: appTheme.gray_800,
-                    ).copyWith(height: 1.2),
+                  Expanded(
+                    child: Text(
+                      _formatDisplayTime(activity),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Inter',
+                        color: appTheme.gray_800,
+                      ).copyWith(height: 1.2),
+                    ),
                   ),
                   if (!isReadOnly && isActivityNonEmpty)
                     GestureDetector(

@@ -404,7 +404,7 @@ class TravelInformationInputViewModel extends ChangeNotifier {
       ..add(TransitPoint(
         id: newId,
         location: '',
-        time: '06:00 PM',
+        time: '09:00 PM',
         type: 'Flight',
         date: defaultDate,
       ));
@@ -597,6 +597,16 @@ class TravelInformationInputViewModel extends ChangeNotifier {
   void removeWishlistItem(String item) {
     final updatedList = List<String>.from(_uiState.wishlistItems)..remove(item);
     _uiState = _uiState.copyWith(wishlistItems: updatedList);
+    notifyListeners();
+  }
+
+  void clearWishlist() {
+    _currentWishlistQuery = '';
+    _uiState = _uiState.copyWith(
+      wishlistItems: const [],
+      clearWishlistError: true,
+    );
+    clearSuggestions();
     notifyListeners();
   }
 
