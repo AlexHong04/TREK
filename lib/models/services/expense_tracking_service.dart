@@ -71,11 +71,13 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     }
 
     final bytes = await imageFile.readAsBytes();
-    final isJpeg = bytes.length >= 3 &&
+    final isJpeg =
+        bytes.length >= 3 &&
         bytes[0] == 0xFF &&
         bytes[1] == 0xD8 &&
         bytes[2] == 0xFF;
-    final isPng = bytes.length >= 8 &&
+    final isPng =
+        bytes.length >= 8 &&
         bytes[0] == 0x89 &&
         bytes[1] == 0x50 &&
         bytes[2] == 0x4E &&
@@ -144,9 +146,9 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     final hasSummaryLabel = RegExp(
       r'\b(?:grand\s+total|total|subtotal|amount\s+due|cash|change|tax|gst|sst)\b',
     ).hasMatch(normalized);
-    final amountCount = _receiptLines(receiptText)
-        .expand(_amountsFromLine)
-        .length;
+    final amountCount = _receiptLines(
+      receiptText,
+    ).expand(_amountsFromLine).length;
     return hasSummaryLabel && amountCount >= 2;
   }
 
@@ -219,7 +221,8 @@ class ExpenseTrackingService implements IExpenseTrackingService {
         candidateMonth,
         candidateDay,
       );
-      final isValidDate = candidateDate.year == candidateYear &&
+      final isValidDate =
+          candidateDate.year == candidateYear &&
           candidateDate.month == candidateMonth &&
           candidateDate.day == candidateDay;
       if (isValidDate) {
@@ -290,8 +293,18 @@ class ExpenseTrackingService implements IExpenseTrackingService {
 
   int? _monthNumber(String monthName) {
     const months = {
-      'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
-      'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12,
+      'jan': 1,
+      'feb': 2,
+      'mar': 3,
+      'apr': 4,
+      'may': 5,
+      'jun': 6,
+      'jul': 7,
+      'aug': 8,
+      'sep': 9,
+      'oct': 10,
+      'nov': 11,
+      'dec': 12,
     };
     return months[monthName.substring(0, 3).toLowerCase()];
   }
@@ -316,8 +329,10 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     final totalLabelIndex = lines.lastIndexWhere(_isFinalTotalLabel);
     if (totalLabelIndex >= 0) {
       for (final line in lines.skip(totalLabelIndex + 1).toList().reversed) {
-        if (!RegExp(r'\b(?:RM|MYR)\s*\d', caseSensitive: false)
-            .hasMatch(line)) {
+        if (!RegExp(
+          r'\b(?:RM|MYR)\s*\d',
+          caseSensitive: false,
+        ).hasMatch(line)) {
           continue;
         }
         final amounts = _amountsFromLine(line);
@@ -485,6 +500,38 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       }
     }
 
+    return null;
+  }
+
+  /// Receipt-level adjustments only; item-level discounts are already folded
+  /// into their related item by the item parser.
+  double? extractReceiptDiscount(String receiptText) {
+    final lines = _receiptLines(receiptText);
+    final subtotalIndex = lines.indexWhere(_isSubtotalLabel);
+    if (subtotalIndex < 0) return null;
+    for (final line in lines.skip(subtotalIndex + 1)) {
+      if (_isFinalTotalLabel(line)) break;
+      if (!RegExp(
+        r'\b(?:discount|voucher|rebate|promotion|promo)\b',
+        caseSensitive: false,
+      ).hasMatch(line))
+        continue;
+      final amounts = _amountsFromLine(line);
+      if (amounts.isNotEmpty) return amounts.last.abs();
+    }
+    return null;
+  }
+
+  double? extractReceiptRounding(String receiptText) {
+    final lines = _receiptLines(receiptText);
+    final roundingIndex = lines.indexWhere(
+      (line) => line.toLowerCase().contains('rounding'),
+    );
+    if (roundingIndex < 0) return null;
+    final directAmounts = _amountsFromLine(lines[roundingIndex]);
+    if (directAmounts.isNotEmpty) return directAmounts.last;
+    final inferred = _inferSummaryValues(lines)['rounding'];
+    if (inferred != null && inferred.abs() <= 1.0) return inferred;
     return null;
   }
 
@@ -979,7 +1026,9 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     final firstSummaryIndex = lines.indexWhere(
       (line) => _isSubtotalLabel(line) || _isFinalTotalLabel(line),
     );
-    final fallbackEnd = firstSummaryIndex < 0 ? lines.length : firstSummaryIndex;
+    final fallbackEnd = firstSummaryIndex < 0
+        ? lines.length
+        : firstSummaryIndex;
 
     for (var index = 0; index < fallbackEnd; index++) {
       final line = lines[index];
@@ -1007,9 +1056,8 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       }
 
       double? price;
-      for (final possiblePriceLine in lines
-          .skip(index + 1)
-          .take(fallbackEnd - index - 1)) {
+      for (final possiblePriceLine
+          in lines.skip(index + 1).take(fallbackEnd - index - 1)) {
         final amounts = _amountsFromLine(possiblePriceLine);
         if (amounts.isNotEmpty) {
           price = amounts.first;
@@ -1049,43 +1097,44 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       return const [];
     }
 
-    final names = lines
-        .sublist(itemHeaderIndex + 1, subtotalIndex)
-        .where((line) {
-          final normalized = line.trim();
-          final normalizedLower = normalized.toLowerCase();
-          final isColumnHeader = const {
-            'item',
-            'qty',
-            'quantity',
-            'amount',
-            'price',
-          }.contains(normalizedLower);
-          if (!RegExp(r'[a-zA-Z]').hasMatch(normalized) ||
-              isColumnHeader ||
-              _summaryLabelKind(normalized) != null ||
-              _isNonItemReceiptText(normalized) ||
-              _amountsFromLine(normalized).isNotEmpty ||
-              RegExp(r'^(?:inv|invoice)[-\s]', caseSensitive: false)
-                  .hasMatch(normalized) ||
-              RegExp(
-                r'^(?:pl(?:ease|eae)|thank|sample\s+recei)',
-                caseSensitive: false,
-              ).hasMatch(normalized)) {
-            return false;
-          }
-          if (RegExp(
-                r'\b(?:jalan|street|road|selangor|postcode|telephone|tel:)\b',
-                caseSensitive: false,
-              ).hasMatch(normalized) ||
-              (RegExp(r'\d').hasMatch(normalized) &&
-                  !normalizedLower.contains('item'))) {
-            return false;
-          }
-          final lettersOnly = normalized.replaceAll(RegExp(r'[^a-zA-Z]'), '');
-          return lettersOnly.isNotEmpty;
-        })
-        .toList();
+    final names = lines.sublist(itemHeaderIndex + 1, subtotalIndex).where((
+      line,
+    ) {
+      final normalized = line.trim();
+      final normalizedLower = normalized.toLowerCase();
+      final isColumnHeader = const {
+        'item',
+        'qty',
+        'quantity',
+        'amount',
+        'price',
+      }.contains(normalizedLower);
+      if (!RegExp(r'[a-zA-Z]').hasMatch(normalized) ||
+          isColumnHeader ||
+          _summaryLabelKind(normalized) != null ||
+          _isNonItemReceiptText(normalized) ||
+          _amountsFromLine(normalized).isNotEmpty ||
+          RegExp(
+            r'^(?:inv|invoice)[-\s]',
+            caseSensitive: false,
+          ).hasMatch(normalized) ||
+          RegExp(
+            r'^(?:pl(?:ease|eae)|thank|sample\s+recei)',
+            caseSensitive: false,
+          ).hasMatch(normalized)) {
+        return false;
+      }
+      if (RegExp(
+            r'\b(?:jalan|street|road|selangor|postcode|telephone|tel:)\b',
+            caseSensitive: false,
+          ).hasMatch(normalized) ||
+          (RegExp(r'\d').hasMatch(normalized) &&
+              !normalizedLower.contains('item'))) {
+        return false;
+      }
+      final lettersOnly = normalized.replaceAll(RegExp(r'[^a-zA-Z]'), '');
+      return lettersOnly.isNotEmpty;
+    }).toList();
     if (names.isEmpty) return const [];
 
     final prices = <double>[];
@@ -1116,10 +1165,11 @@ class ExpenseTrackingService implements IExpenseTrackingService {
         (sum, price) => sum + price,
       );
       double? printedSubtotal;
-      for (final amount in lines
-          .skip(amountHeaderIndex + 1)
-          .expand(_amountsFromLine)
-          .where((amount) => amount > 0)) {
+      for (final amount
+          in lines
+              .skip(amountHeaderIndex + 1)
+              .expand(_amountsFromLine)
+              .where((amount) => amount > 0)) {
         final difference = amount - currentSubtotal;
         if (difference >= 1 &&
             difference <= 9 &&
@@ -1159,12 +1209,10 @@ class ExpenseTrackingService implements IExpenseTrackingService {
   List<double> _amountsFromLine(String line) {
     return _amountPattern
         .allMatches(line)
-        .map(
-          (match) {
-            final value = match.group(1)!.replaceAll(' ', '');
-            return value.contains(',') ? value.replaceAll(',', '.') : value;
-          },
-        )
+        .map((match) {
+          final value = match.group(1)!.replaceAll(' ', '');
+          return value.contains(',') ? value.replaceAll(',', '.') : value;
+        })
         .map(double.tryParse)
         .whereType<double>()
         .toList();
@@ -1225,8 +1273,9 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     if (_isSubtotalLabel(normalized)) {
       return 'subtotal';
     }
-    if (RegExp(r'\b(?:service\s+tax|sales\s+tax|tax|gst|sst|[s35]{2}t)\b')
-        .hasMatch(normalized)) {
+    if (RegExp(
+      r'\b(?:service\s+tax|sales\s+tax|tax|gst|sst|[s35]{2}t)\b',
+    ).hasMatch(normalized)) {
       return 'tax';
     }
     if (normalized.contains('rounding')) return 'rounding';
@@ -1344,10 +1393,9 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       if (_isDiscountDescription(description) || amount < 0) {
         if (items.isEmpty || amount >= 0) continue;
         final previous = items.removeLast();
-        final adjustedTotal =
-            (previous.unitPrice * previous.quantity + amount)
-                .clamp(0.0, double.infinity)
-                .toDouble();
+        final adjustedTotal = (previous.unitPrice * previous.quantity + amount)
+            .clamp(0.0, double.infinity)
+            .toDouble();
         items.add(
           _ExtractedReceiptItem(
             name: previous.name,
@@ -1387,8 +1435,9 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       return false;
     }
     return normalized.length >= 6 &&
-        !RegExp(r'^(?:dewi|dewt|staff|server|cashier|rm|rn|myr)$')
-            .hasMatch(normalized);
+        !RegExp(
+          r'^(?:dewi|dewt|staff|server|cashier|rm|rn|myr)$',
+        ).hasMatch(normalized);
   }
 
   bool _isDiscountDescription(String line) {
@@ -1422,7 +1471,8 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       final normalizedLower = normalizedName.toLowerCase();
       final amount = amounts.last;
 
-      final isDiscount = amount < 0 ||
+      final isDiscount =
+          amount < 0 ||
           normalizedLower.contains('discount') ||
           normalizedLower.contains('%off') ||
           normalizedLower.contains('% off');
@@ -1448,8 +1498,10 @@ class ExpenseTrackingService implements IExpenseTrackingService {
           normalizedName.length < 3 ||
           _isReceiptLabel(normalizedName) ||
           _looksLikeAddress(normalizedName) ||
-          RegExp(r'^(?:rm|rn|myr)$', caseSensitive: false)
-              .hasMatch(normalizedName)) {
+          RegExp(
+            r'^(?:rm|rn|myr)$',
+            caseSensitive: false,
+          ).hasMatch(normalizedName)) {
         continue;
       }
 
@@ -1489,6 +1541,8 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     required String paymentMethod,
     required String currency,
     double taxAmount = 0.0,
+    double discountAmount = 0.0,
+    double roundingAmount = 0.0,
     String? receiptLocalPath,
   }) async {
     if (activitiesId.trim().isEmpty) {
@@ -1505,6 +1559,7 @@ class ExpenseTrackingService implements IExpenseTrackingService {
 
     validateExpenseItems(expenseItems);
     validateTaxAmount(taxAmount);
+    validateExpenseAdjustments(discountAmount, roundingAmount);
 
     final itemsWithCalculatedSubtotals = expenseItems
         .map(
@@ -1517,6 +1572,8 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     final totalAmount = calculateTotalExpense(
       itemsWithCalculatedSubtotals,
       taxAmount,
+      discountAmount,
+      roundingAmount,
     );
     validateTotalAmount(totalAmount);
 
@@ -1534,6 +1591,9 @@ class ExpenseTrackingService implements IExpenseTrackingService {
         expenseId: expenseId,
         activitiesId: activitiesId,
         totalAmount: totalAmount,
+        taxAmount: taxAmount,
+        discountAmount: discountAmount,
+        roundingAmount: roundingAmount,
         currency: originalCurrency,
         paymentMethod: paymentMethod.trim(),
         receiptImageUrl: receiptImageUrl,
@@ -1560,13 +1620,31 @@ class ExpenseTrackingService implements IExpenseTrackingService {
   double calculateTotalExpense(
     List<ExpenseItem> expenseItems, [
     double taxAmount = 0.0,
+    double discountAmount = 0.0,
+    double roundingAmount = 0.0,
   ]) {
     final itemsSubtotal = expenseItems.fold(
       0.0,
       (total, item) => total + item.subtotal,
     );
     final normalizedTax = taxAmount < 0 ? 0.0 : taxAmount;
-    return itemsSubtotal + normalizedTax;
+    final cents =
+        ((itemsSubtotal + normalizedTax - discountAmount + roundingAmount) *
+                100)
+            .round();
+    return cents / 100;
+  }
+
+  void validateExpenseAdjustments(
+    double discountAmount,
+    double roundingAmount,
+  ) {
+    if (discountAmount < 0 || discountAmount > 99999) {
+      throw ArgumentError('Discount must be between 0 and 99,999.');
+    }
+    if (roundingAmount.abs() > 1) {
+      throw ArgumentError('Rounding must be between -1.00 and 1.00.');
+    }
   }
 
   void validateExpenseItems(List<ExpenseItem> expenseItems) {
