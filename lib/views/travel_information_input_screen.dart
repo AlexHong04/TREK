@@ -664,6 +664,7 @@ class _TravelInformationInputScreenState
               // RenderFlex overflow in the confirmation dialog.
               FocusScope.of(context).unfocus();
               await Future.delayed(const Duration(milliseconds: 100));
+              if (!mounted) return;
 
               if (_formKey.currentState?.validate() ?? false) {
                 final destination = viewModel.uiState.selectedDestinations.join(
@@ -2978,7 +2979,11 @@ class _TravelInformationInputScreenState
                               setModalState(() {
                                 activeMode = 'Flight';
                               });
-                              viewModel.syncTransitType('Flight', index: index);
+                              if (isArrival) {
+                                viewModel.updateArrivalType(index, 'Flight');
+                              } else {
+                                viewModel.updateDepartureType(index, 'Flight');
+                              }
                             },
                           ),
                           const SizedBox(width: 4.0),
@@ -2990,7 +2995,11 @@ class _TravelInformationInputScreenState
                               setModalState(() {
                                 activeMode = 'Train';
                               });
-                              viewModel.syncTransitType('Train', index: index);
+                              if (isArrival) {
+                                viewModel.updateArrivalType(index, 'Train');
+                              } else {
+                                viewModel.updateDepartureType(index, 'Train');
+                              }
                             },
                           ),
                           const SizedBox(width: 4.0),
@@ -3002,7 +3011,11 @@ class _TravelInformationInputScreenState
                               setModalState(() {
                                 activeMode = 'Bus';
                               });
-                              viewModel.syncTransitType('Bus', index: index);
+                              if (isArrival) {
+                                viewModel.updateArrivalType(index, 'Bus');
+                              } else {
+                                viewModel.updateDepartureType(index, 'Bus');
+                              }
                             },
                           ),
                         ],
@@ -3126,19 +3139,17 @@ class _TravelInformationInputScreenState
                                 InkWell(
                                   onTap: () {
                                     final customName = searchQuery.trim();
-                                    viewModel.syncTransitType(
-                                      activeMode,
-                                      index: index,
-                                    );
                                     if (isArrival) {
-                                      viewModel.updateArrivalLocation(
+                                      viewModel.updateArrivalHub(
                                         index,
-                                        customName,
+                                        type: activeMode,
+                                        location: customName,
                                       );
                                     } else {
-                                      viewModel.updateDepartureLocation(
+                                      viewModel.updateDepartureHub(
                                         index,
-                                        customName,
+                                        type: activeMode,
+                                        location: customName,
                                       );
                                     }
                                     Navigator.pop(context);
@@ -3221,19 +3232,17 @@ class _TravelInformationInputScreenState
                                       isSelected: isSelected,
                                       isRecommended: true,
                                       onTap: () {
-                                        viewModel.syncTransitType(
-                                          activeMode,
-                                          index: index,
-                                        );
                                         if (isArrival) {
-                                          viewModel.updateArrivalLocation(
+                                          viewModel.updateArrivalHub(
                                             index,
-                                            hub,
+                                            type: activeMode,
+                                            location: hub,
                                           );
                                         } else {
-                                          viewModel.updateDepartureLocation(
+                                          viewModel.updateDepartureHub(
                                             index,
-                                            hub,
+                                            type: activeMode,
+                                            location: hub,
                                           );
                                         }
                                         Navigator.pop(context);
@@ -3270,19 +3279,17 @@ class _TravelInformationInputScreenState
                                       isSelected: isSelected,
                                       isRecommended: false,
                                       onTap: () {
-                                        viewModel.syncTransitType(
-                                          activeMode,
-                                          index: index,
-                                        );
                                         if (isArrival) {
-                                          viewModel.updateArrivalLocation(
+                                          viewModel.updateArrivalHub(
                                             index,
-                                            hub,
+                                            type: activeMode,
+                                            location: hub,
                                           );
                                         } else {
-                                          viewModel.updateDepartureLocation(
+                                          viewModel.updateDepartureHub(
                                             index,
-                                            hub,
+                                            type: activeMode,
+                                            location: hub,
                                           );
                                         }
                                         Navigator.pop(context);

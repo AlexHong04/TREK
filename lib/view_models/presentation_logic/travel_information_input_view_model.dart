@@ -511,20 +511,46 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     }
   }
 
+  void updateArrivalHub(
+    int index, {
+    required String type,
+    required String location,
+  }) {
+    if (index >= 0 && index < _uiState.arrivals.length) {
+      final updated = List<TransitPoint>.from(_uiState.arrivals);
+      updated[index] = updated[index].copyWith(type: type, location: location);
+      _uiState = _uiState.copyWith(arrivals: updated);
+      notifyListeners();
+    }
+  }
+
+  void updateDepartureHub(
+    int index, {
+    required String type,
+    required String location,
+  }) {
+    if (index >= 0 && index < _uiState.departures.length) {
+      final updated = List<TransitPoint>.from(_uiState.departures);
+      updated[index] = updated[index].copyWith(type: type, location: location);
+      _uiState = _uiState.copyWith(departures: updated);
+      notifyListeners();
+    }
+  }
+
   void syncTransitType(String type, {int? index}) {
     final updatedArrivals = _uiState.arrivals.asMap().entries.map((e) {
-      if (index == null || e.key == index || _uiState.arrivals.length == 1) {
+      if (index == null || e.key == index) {
         if (e.value.type != type) {
-          return e.value.copyWith(type: type, location: '');
+          return e.value.copyWith(type: type);
         }
       }
       return e.value;
     }).toList();
 
     final updatedDepartures = _uiState.departures.asMap().entries.map((e) {
-      if (index == null || e.key == index || _uiState.departures.length == 1) {
+      if (index == null || e.key == index) {
         if (e.value.type != type) {
-          return e.value.copyWith(type: type, location: '');
+          return e.value.copyWith(type: type);
         }
       }
       return e.value;
