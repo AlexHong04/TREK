@@ -92,13 +92,13 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
   /// True if budget is insufficient or overspent.
   bool get needsTopUp => hasExtraBudgetNeeded || (spentBudget > totalBudget);
 
-  /// Confirm is only allowed once every time slot has been filled, we are
-  /// not busy generating, and no extra budget is needed.
+  /// Confirm is allowed once not busy generating, at least one activity exists,
+  /// and no extra budget is needed.
   bool get canConfirmItinerary {
     return !_uiState.isLoading &&
         !_uiState.isRegeneratingPlan &&
-        _uiState.activities.isNotEmpty &&
-        !hasEmptyActivitySlots &&
+        _uiState.activities
+            .any((a) => a.destination.trim().isNotEmpty && a.status != 'empty') &&
         !(spentBudget > totalBudget) &&
         !needsTopUp;
   }
@@ -935,11 +935,14 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
       if (hasExtraBudgetNeeded) {
         return 'Cannot confirm itinerary while extra budget is needed. Please top up your budget first.';
       }
-      return 'Cannot confirm itinerary while some slots are empty or generation is in progress.';
+      return 'Cannot confirm itinerary while generation is in progress or budget is exceeded.';
     }
     try {
+      final validActivities = _uiState.activities
+          .where((a) => a.destination.trim().isNotEmpty && a.status != 'empty')
+          .toList();
       final success = await _itineraryService.saveItinerary(
-        _uiState.activities,
+        validActivities.isNotEmpty ? validActivities : _uiState.activities,
         destination: _uiState.destinationTitle,
         datesText: _uiState.datesText,
         budgetText: _uiState.budgetText,

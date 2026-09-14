@@ -979,113 +979,6 @@ class _WholeItineraryDetailScreenState
     );
   }
 
-  Widget _buildRegenerateInfoMessage(WholeItineraryDetailViewModel viewModel) {
-    final emptyCount = viewModel.uiState.activities
-        .where(
-          (a) =>
-      a.status == 'empty' ||
-          (a.destination.trim().isEmpty && a.description.trim().isEmpty),
-    )
-        .length;
-
-    if (viewModel.uiState.isRegeneratingPlan) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
-        decoration: BoxDecoration(
-          color: appTheme.teal_50,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: appTheme.teal_A700.withValues(alpha: 0.35),
-            width: 1.2,
-          ),
-        ),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.2,
-                color: appTheme.teal_A700,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'AI is crafting new activities based on your remaining plan...',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'Inter',
-                  color: appTheme.teal_800,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
-      decoration: BoxDecoration(
-        color: appTheme.teal_50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: appTheme.teal_A700.withValues(alpha: 0.35),
-          width: 1.2,
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: appTheme.white_A700,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.auto_awesome_rounded,
-              color: appTheme.teal_A700,
-              size: 16,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Plan Incomplete ($emptyCount empty slot${emptyCount > 1 ? 's' : ''})',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    fontFamily: 'Inter',
-                    color: appTheme.teal_800,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Auto-fill using your remaining itinerary as context',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    fontFamily: 'Inter',
-                    color: appTheme.blue_gray_700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildTimeline(
       BuildContext context,
       WholeItineraryDetailViewModel viewModel, {
@@ -1282,8 +1175,6 @@ class _WholeItineraryDetailScreenState
       BuildContext context,
       WholeItineraryDetailViewModel viewModel,
       ) {
-    final bool hasEmptySlots = viewModel.hasEmptyActivitySlots;
-    final bool isRegenerating = viewModel.uiState.isRegeneratingPlan;
     final bool needsTopUp = viewModel.needsTopUp;
 
     return Container(
@@ -1292,10 +1183,6 @@ class _WholeItineraryDetailScreenState
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (hasEmptySlots) ...[
-            _buildRegenerateInfoMessage(viewModel),
-            const SizedBox(height: 10),
-          ],
           Container(
             width: double.infinity,
             margin: const EdgeInsets.only(bottom: 12),
@@ -1413,82 +1300,9 @@ class _WholeItineraryDetailScreenState
                   ),
                   const SizedBox(width: 12),
                 ],
-                // Right: Regenerate Plan Button (if empty slots exist) OR Confirm Button (if all filled)
+                // Right: Confirm Button
                 Expanded(
-                  child: hasEmptySlots
-                      ? Container(
-                    decoration: BoxDecoration(
-                      color: isRegenerating
-                          ? appTheme.gray_400
-                          : appTheme.teal_A700,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: appTheme.teal_50,
-                          offset: const Offset(0, 4),
-                          blurRadius: 6,
-                        ),
-                      ],
-                    ),
-                    child: Material(
-                      color: appTheme.transparentCustom,
-                      borderRadius: BorderRadius.circular(16),
-                      child: InkWell(
-                        onTap: isRegenerating
-                            ? null
-                            : () =>
-                            viewModel.regeneratePlanFromRemaining(),
-                        borderRadius: BorderRadius.circular(16),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 16,
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              if (isRegenerating) ...[
-                                SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: appTheme.white_A700,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Regenerating...',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                    fontFamily: 'Inter',
-                                    color: appTheme.white_A700,
-                                  ).copyWith(height: 22 / 16),
-                                ),
-                              ] else ...[
-                                Icon(
-                                  Icons.auto_awesome_rounded,
-                                  size: 20,
-                                  color: appTheme.white_A700,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Regenerate Plan',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                    fontFamily: 'Inter',
-                                    color: appTheme.white_A700,
-                                  ).copyWith(height: 22 / 16),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  )
-                      : Container(
+                  child: Container(
                     decoration: BoxDecoration(
                       color: viewModel.canConfirmItinerary
                           ? appTheme.teal_A700
