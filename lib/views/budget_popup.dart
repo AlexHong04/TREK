@@ -362,14 +362,36 @@ Widget _buildActionButton({
   required String text,
   required VoidCallback? onPressed,
   Color? backgroundColor,
+  Color? foregroundColor,
+  Color? borderColor,
+  double height = 48,
+  double borderRadius = 24,
 }) {
+  final isDisabled = onPressed == null;
+
   return SizedBox(
     width: double.infinity,
-    height: 48,
+    height: height,
     child: ElevatedButton(
       style: ElevatedButton.styleFrom(
-        backgroundColor: backgroundColor ?? appTheme.teal_A700,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: backgroundColor ??
+            (isDisabled
+                ? Colors.grey.shade200
+                : appTheme.teal_A700),
+        foregroundColor: foregroundColor ??
+            (isDisabled
+                ? Colors.grey.shade400
+                : appTheme.white_A700),
+        disabledBackgroundColor: backgroundColor ??
+            Colors.grey.shade200,
+        disabledForegroundColor: foregroundColor ??
+            Colors.grey.shade400,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(borderRadius),
+          side: borderColor != null
+              ? BorderSide(color: borderColor)
+              : BorderSide.none,
+        ),
         elevation: 0,
       ),
       onPressed: onPressed,
@@ -379,7 +401,10 @@ Widget _buildActionButton({
           fontFamily: 'Inter',
           fontSize: 16,
           fontWeight: FontWeight.bold,
-          color: appTheme.white_A700,
+          color: foregroundColor ??
+              (isDisabled
+                  ? Colors.grey.shade400
+                  : appTheme.white_A700),
         ),
       ),
     ),
@@ -646,6 +671,8 @@ Future<void> showBudgetExceededDialog({
 
         actions: _buildActionButton(
           text: 'Continue',
+          backgroundColor: appTheme.teal_A700,
+          foregroundColor: appTheme.white_A700,
           onPressed: () {
             Navigator.of(dialogContext).pop();
             onContinue?.call();
@@ -692,6 +719,8 @@ Future<void> showBudgetExceededThresholdDialog({
 
         actions: _buildActionButton(
           text: 'Continue',
+          backgroundColor: appTheme.teal_A700,
+          foregroundColor: appTheme.white_A700,
           onPressed: () {
             Navigator.of(dialogContext).pop();
             onContinue?.call();
@@ -844,7 +873,9 @@ Future<void> showEndTripConfirmationDialog({
             Expanded(
               child: _buildActionButton(
                 text: 'Cancel',
-                backgroundColor: appTheme.redButton,
+                backgroundColor: appTheme.white_A700,
+                foregroundColor: appTheme.gray_200,
+                borderColor: appTheme.grey200,
                 onPressed: () {
                   // Close confirmation.
                   Navigator.of(dialogContext).pop();
@@ -862,6 +893,7 @@ Future<void> showEndTripConfirmationDialog({
             Expanded(
               child: _buildActionButton(
                 text: 'End Trip',
+                backgroundColor: appTheme.errorRed,
                 onPressed: () async {
                   await onEndTrip();
                 },
@@ -970,7 +1002,9 @@ Future<void> showInitialBudgetInsufficientDialog({
             Expanded(
               child: _buildActionButton(
                 text: 'Cancel',
-                backgroundColor: appTheme.redButton,
+                backgroundColor: appTheme.white_A700,
+                foregroundColor: appTheme.blue_gray_700,
+                borderColor: appTheme.blue_gray_50,
                 onPressed: () {
                   Navigator.of(dialogContext).pop();
                   onCancel?.call();
@@ -1006,6 +1040,8 @@ Future<void> showInitialBudgetInsufficientDialog({
 
                   return _buildActionButton(
                     text: 'Top-up',
+                    backgroundColor: appTheme.teal_A700,
+                    foregroundColor: appTheme.white_A700,
                     onPressed: isValid
                         ? () async {
                             final amount = double.parse(value.text.trim());
@@ -1070,6 +1106,8 @@ Future<void> _showSimpleBudgetDialog({
 
         actions: _buildActionButton(
           text: 'Continue',
+          backgroundColor: appTheme.teal_A700,
+          foregroundColor: appTheme.white_A700,
           onPressed: () {
             Navigator.of(dialogContext).pop();
             onContinue?.call();
@@ -1120,11 +1158,13 @@ Future<void> _showTwoButtonsBudgetDialog({
             Expanded(
               child: _buildActionButton(
                 text: 'Cancel',
+                backgroundColor: appTheme.white_A700,
+                foregroundColor: appTheme.blue_gray_700,
+                borderColor: appTheme.blue_gray_50,
                 onPressed: () {
                   Navigator.of(dialogContext).pop();
                   onCancel?.call();
                 },
-                backgroundColor: appTheme.errorRed,
               ),
             ),
 
@@ -1133,6 +1173,8 @@ Future<void> _showTwoButtonsBudgetDialog({
             Expanded(
               child: _buildActionButton(
                 text: 'Confirm',
+                backgroundColor: appTheme.teal_A700,
+                foregroundColor: appTheme.white_A700,
                 onPressed: () {
                   Navigator.of(dialogContext).pop();
                   onConfirm?.call();
@@ -1245,16 +1287,20 @@ Future<bool> showConfirmRemoveActivityDialog({
             Expanded(
               child: _buildActionButton(
                 text: 'Cancel',
+                backgroundColor: appTheme.white_A700,
+                foregroundColor: appTheme.blue_gray_700,
+                borderColor: appTheme.blue_gray_50,
                 onPressed: () {
                   Navigator.of(dialogContext).pop();
                 },
-                backgroundColor: appTheme.errorRed,
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: _buildActionButton(
                 text: 'Confirm',
+                backgroundColor: appTheme.teal_A700,
+                foregroundColor: appTheme.white_A700,
                 onPressed: () {
                   confirmed = true;
                   Navigator.of(dialogContext).pop();
@@ -1300,16 +1346,20 @@ Future<bool> showConfirmGenerateAlternativeDialog({
             Expanded(
               child: _buildActionButton(
                 text: 'Cancel',
+                backgroundColor: appTheme.white_A700,
+                foregroundColor: appTheme.blue_gray_700,
+                borderColor: appTheme.blue_gray_50,
                 onPressed: () {
                   Navigator.of(dialogContext).pop();
                 },
-                backgroundColor: appTheme.errorRed,
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: _buildActionButton(
                 text: 'Confirm',
+                backgroundColor: appTheme.teal_A700,
+                foregroundColor: appTheme.white_A700,
                 onPressed: () {
                   confirmed = true;
                   Navigator.of(dialogContext).pop();
