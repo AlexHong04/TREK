@@ -80,6 +80,25 @@ class BudgetService implements IBudgetService {
     return updatedTrip;
   }
 
+  // Future<bool> checkBudgetSufficiency({
+  //   required WholeTrip trip,
+  //   required String currentActivityId,
+  //   required double topupAmount,
+  // }) async {
+  //   List<Activity> remainingActivities = await _itineraryRepository
+  //       .fetchRemainingActivity(trip.tripId!, currentActivityId);
+  //   double totalRequired = 0.00;
+  //   for (var activity in remainingActivities) {
+  //     totalRequired += activity.allocatedBudget;
+  //   }
+  //   if (topupAmount < totalRequired) {
+  //     return false;
+  //   }
+  //   ;
+  //
+  //   return true;
+  // }
+
   Future<List<Activity>> getRemainingActivities(
     String tripId,
     DateTime currentDateTime,
@@ -266,6 +285,10 @@ class BudgetService implements IBudgetService {
       }
     }
 
+    // ----------------------------------------------------------
+    // PERFORM REALLOCATION
+    // ----------------------------------------------------------
+
     final List<Activity> modifiedActivities = [];
 
     for (final restaurant in remainingRestaurantActivities) {
@@ -305,6 +328,129 @@ class BudgetService implements IBudgetService {
 
     return modifiedActivities;
   }
+
+  // Future<List<Activity>> reallocateBudget(
+  //   String tripId,
+  //   Activity currentActivity,
+  //   double overspentAmount,
+  // ) async {
+  //   debugPrint('========== START BUDGET REALLOCATION ==========');
+  //   debugPrint('Trip ID: $tripId');
+  //   debugPrint('Current Activity ID: ${currentActivity.activitiesId}');
+  //   debugPrint('Current Activity: ${currentActivity.destination}');
+  //   debugPrint('Overspent Amount: RM ${overspentAmount.toStringAsFixed(2)}');
+  //
+  //   final allRemainingActivities = await getRemainingActivities(
+  //     tripId,
+  //     DateTime.now(),
+  //   );
+  //
+  //   debugPrint('Total remaining activities: ${allRemainingActivities.length}');
+  //
+  //   for (final activity in allRemainingActivities) {
+  //     debugPrint(
+  //       'Remaining Activity: '
+  //       '${activity.activitiesId} | '
+  //       '${activity.destination} | '
+  //       'Category: ${activity.activityCategory} | '
+  //       'Date: ${activity.date} | '
+  //       'Start: ${activity.startTime} | '
+  //       'Budget: RM ${activity.allocaDateTime = DateTime(
+  //       a.date.year,
+  //       a.date.month,
+  //       a.date.day,
+  //       int.parse(aParts[0]),
+  //       int.parse(aParts[1]),
+  //     );
+  //
+  //     final DateTime bDateTime = DateTime(
+  //       b.date.year,
+  //       b.date.month,
+  //       b.date.day,
+  //       int.parse(bParts[0]),
+  //       int.parse(bParts[1]),
+  //     );
+  //
+  //     return aDateTime.compareTo(bDateTime);
+  //   });
+  //
+  //   debugPrint(
+  //     'Remaining restaurants: '
+  //     '${remainingRestaurantActivities.length}',
+  //   );
+  //
+  //   if (remainingRestaurantActivities.isEmpty) {
+  //     debugPrint('[REALLOCATION FAILED] No remaining restaurant activities.');
+  //     debugPrint('========== END BUDGET REALLOCATION ==========');
+  //     return [];
+  //   }
+  //
+  //   // Divide the overspent amount equally
+  //   // among the remaining restaurants.
+  //   final int numberOfRemainingRestaurants =
+  //       remainingRestaurantActivities.length;
+  //
+  //   final double deductionPerRestaurant =
+  //       overspentAmount / numberOfRemainingRestaurants;
+  //
+  //   debugPrint('Number of restaurants: $numberOfRemainingRestaurants');
+  //
+  //   debugPrint('Total overspent: RM ${overspentAmount.toStringAsFixed(2)}');
+  //
+  //   debugPrint(
+  //     'Deduction per restaurant: '
+  //     'RM ${deductionPerRestaurant.toStringAsFixed(2)}',
+  //   );
+  //
+  //   final List<Activity> modifiedActivities = [];
+  //
+  //   for (final restaurant in remainingRestaurantActivities) {
+  //     final double oldBudget = restaurant.allocatedBudget;
+  //
+  //     final double newAllocatedBudget = oldBudget - deductionPerRestaurant;
+  //
+  //     final double finalAllocatedBudget = newAllocatedBudget < 0
+  //         ? 0.0
+  //         : newAllocatedBudget;
+  //
+  //     final updatedRestaurant = restaurant.copyWith(
+  //       allocatedBudget: finalAllocatedBudget,
+  //     );
+  //
+  //     // add if newAllocatedBudget < 0 or newAllocatedBudget < min price, skip the reallocation
+  //
+  //     modifiedActivities.add(updatedRestaurant);
+  //
+  //     debugPrint(
+  //       '[REALLOCATE] ${restaurant.activitiesId} | '
+  //       '${restaurant.destination}',
+  //     );
+  //
+  //     debugPrint('    Old Budget: RM ${oldBudget.toStringAsFixed(2)}');
+  //
+  //     debugPrint(
+  //       '    Deduction: RM ${deductionPerRestaurant.toStringAsFixed(2)}',
+  //     );
+  //
+  //     debugPrint(
+  //       '    New Budget: RM ${finalAllocatedBudget.toStringAsFixed(2)}',
+  //     );
+  //   }
+  //
+  //   debugPrint('========== REALLOCATION RESULT ==========');
+  //
+  //   for (final activity in modifiedActivities) {
+  //     debugPrint(
+  //       '${activity.activitiesId} | '
+  //       '${activity.destination} | '
+  //       'New Budget: RM ${activity.allocatedBudget.toStringAsFixed(2)}',
+  //     );
+  //   }
+  //
+  //   debugPrint('========== END BUDGET REALLOCATION ==========');
+  //
+  //   return modifiedActivities;
+  // }
 
   Future<int> calculateSufficientDays(
     String tripId,
@@ -367,63 +513,6 @@ class BudgetService implements IBudgetService {
   }
 
   // weisong
-  @override
-  Future<double> reconcileDayBudget({
-    required String tripId,
-    required String dayTripId,
-    required DateTime date,
-    required Map<String, double> activitySpentMap,
-  }) async {
-    // 1. Fetch all activities for the entire trip
-    final allActivities = await _itineraryRepository.fetchAllActivitiesByTrip(
-      tripId,
-    );
-
-    // 2. Filter activities for the target day
-    final dayActivities = allActivities.where((act) {
-      return act.dayTripId == dayTripId ||
-          (act.date.year == date.year &&
-              act.date.month == date.month &&
-              act.date.day == date.day);
-    }).toList();
-
-    if (dayActivities.isEmpty) return 0.0;
-
-    // 3. Sum up total allocated vs total spent for this specific day
-    double totalDayAllocated = 0.0;
-    double totalDaySpent = 0.0;
-
-    for (final act in dayActivities) {
-      totalDayAllocated += act.allocatedBudget;
-      totalDaySpent += (activitySpentMap[act.activitiesId] ?? 0.0);
-    }
-
-    // 4. Calculate Net Overspend:
-    // If totalDaySpent <= totalDayAllocated, the result is strictly 0.0.
-    final double netDayOverspend = (totalDaySpent - totalDayAllocated).clamp(
-      0.0,
-      double.infinity,
-    );
-
-    debugPrint('========== DAY BUDGET RECONCILIATION ==========');
-    debugPrint(
-      'DayTrip ID: $dayTripId | Date: ${date.toIso8601String().split('T').first}',
-    );
-    debugPrint('Day Allocated: RM ${totalDayAllocated.toStringAsFixed(2)}');
-    debugPrint('Day Spent: RM ${totalDaySpent.toStringAsFixed(2)}');
-    debugPrint('Net Day Overspend: RM ${netDayOverspend.toStringAsFixed(2)}');
-    debugPrint('==============================================');
-
-    // 5. Persist the updated day overspend in database/repository
-    final currentDay = await _itineraryRepository.getCurrentDay(dayTripId);
-    final updatedDay = currentDay.copyWith(overspendAmount: netDayOverspend);
-    await _itineraryRepository.updateDayTopUpBudget(
-      updatedDay,
-    ); // Or updateDayOverspend repository call
-
-    return netDayOverspend;
-  }
-
   // Reconciles EVERY activity/day against real spending and persists the
   // results, clearing stale per-day/per-activity overspend amounts left behind
   // by earlier submissions.
@@ -493,5 +582,89 @@ class BudgetService implements IBudgetService {
     }
 
     return totalTripOverspent;
+  }
+
+  // Recomputes the trip balance from the source of truth (the recorded
+  // expenses) and repairs `remaining_balance` when it has drifted.
+  //
+  // `remaining_balance` was previously only ever adjusted incrementally -
+  // `deductRemainingBudget` subtracts on each expense and `topUpBudget` adds -
+  // so an expense that is later edited, removed, or regenerated leaves it
+  // permanently wrong. Nothing recomputed it from the expense records, while the
+  // overspend columns self-heal through reconcileTripOverspend(). This is the
+  // missing symmetric half, and every remaining-budget decision in the app
+  // (sufficient days, the critical check, the reallocation ceiling) reads it.
+  @override
+  Future<({double totalBudget, double totalSpent, double remainingBalance})>
+  reconcileTripBalance({required String tripId}) async {
+    if (tripId.trim().isEmpty) {
+      return (totalBudget: 0.0, totalSpent: 0.0, remainingBalance: 0.0);
+    }
+
+    final trip = await _itineraryRepository.getTrip(tripId);
+    final activities = await _itineraryRepository.fetchAllActivitiesByTrip(
+      tripId,
+    );
+
+    final double storedBalance = trip.remainingBalance ?? 0.0;
+
+    // Defensive: with no activities there is nothing to verify the balance
+    // against, and summing an empty set would wrongly restore the full budget
+    // even when orphaned expenses still exist. Leave the stored value alone.
+    if (activities.isEmpty) {
+      debugPrint(
+        '[reconcileTripBalance] No activities for trip $tripId - '
+        'leaving the stored balance untouched.',
+      );
+      return (
+        totalBudget: trip.totalBudget,
+        totalSpent: (trip.totalBudget - storedBalance).clamp(
+          0.0,
+          double.infinity,
+        ),
+        remainingBalance: storedBalance,
+      );
+    }
+
+    // Total spent for the whole trip in a single query.
+    final spentSummary = await _itineraryRepository
+        .fetchSpentSummaryByActivityIds(
+          activities.map((a) => a.activitiesId).toList(),
+        );
+    final double totalSpent =
+        (spentSummary['totalSpent'] as num?)?.toDouble() ?? 0.0;
+
+    final double authoritativeBalance = trip.totalBudget - totalSpent;
+    final double drift = storedBalance - authoritativeBalance;
+
+    debugPrint('========== TRIP BALANCE RECONCILIATION ==========');
+    debugPrint('Trip: $tripId');
+    debugPrint(
+      'Total budget:          RM ${trip.totalBudget.toStringAsFixed(2)}',
+    );
+    debugPrint('Total spent:           RM ${totalSpent.toStringAsFixed(2)}');
+    debugPrint('Stored balance:        RM ${storedBalance.toStringAsFixed(2)}');
+    debugPrint(
+      'Authoritative balance: RM ${authoritativeBalance.toStringAsFixed(2)}',
+    );
+    debugPrint('Drift: RM ${drift.toStringAsFixed(2)}');
+    debugPrint('==================================================');
+
+    // Only write when the stored value is actually out of sync.
+    if (drift.abs() > 0.001) {
+      await _itineraryRepository.updateTripBudget(
+        trip.copyWith(remainingBalance: authoritativeBalance),
+      );
+      debugPrint(
+        '[reconcileTripBalance] Repaired RM ${drift.toStringAsFixed(2)} '
+        'of drift.',
+      );
+    }
+
+    return (
+      totalBudget: trip.totalBudget,
+      totalSpent: totalSpent,
+      remainingBalance: authoritativeBalance,
+    );
   }
 }

@@ -217,7 +217,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 Expanded(
                   child: _LogoutDialogButton(
                     text: 'Cancel',
-                    backgroundColor: appTheme.errorRed,
+                    backgroundColor: appTheme.white_A700,
+                    foregroundColor: appTheme.blue_gray_300,
+                    borderColor: appTheme.gray_200,
                     onPressed: () => Navigator.pop(dialogContext, false),
                   ),
                 ),
@@ -242,11 +244,17 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 class _LogoutDialogButton extends StatelessWidget {
   final String text;
   final Color backgroundColor;
+  /// Optional overrides so a non-destructive button can use the same neutral
+  /// treatment as the Discard button in the expense form.
+  final Color? foregroundColor;
+  final Color? borderColor;
   final VoidCallback onPressed;
 
   const _LogoutDialogButton({
     required this.text,
     required this.backgroundColor,
+    this.foregroundColor,
+    this.borderColor,
     required this.onPressed,
   });
 
@@ -258,7 +266,8 @@ class _LogoutDialogButton extends StatelessWidget {
         onPressed: onPressed,
         style: FilledButton.styleFrom(
           backgroundColor: backgroundColor,
-          foregroundColor: appTheme.white_A700,
+          foregroundColor: foregroundColor ?? appTheme.white_A700,
+          side: borderColor == null ? null : BorderSide(color: borderColor!),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),

@@ -2525,21 +2525,35 @@ class ActivityViewModel extends ChangeNotifier {
   }
 
   // weisong
-  // Reconciles EVERY trip day against real spending, persists each day's net
-  // overspend (which clears stale day values), and publishes the authoritative
-  // whole-trip overspentBudget to the top card.
+  // Reconciles the whole trip against real spending, in one pass:
+  //   - persists each day's net overspend (clearing stale day values)
+  //   - repairs `remaining_balance` when it has drifted from
+  //     `total_budget - SUM(expenses)`, which the incremental deduct/top-up
+  //     updates cannot detect on their own
+  //   - publishes the authoritative overspentBudget and budget figures to the UI
   Future<void> reconcileTripOverspend() async {
     if (_uiState.tripId.isEmpty) return;
     try {
       final totalTripOverspent = await _budgetService.reconcileTripOverspend(
         tripId: _uiState.tripId,
       );
+      final balance = await _budgetService.reconcileTripBalance(
+        tripId: _uiState.tripId,
+      );
+
       debugPrint(
         '>>> [DEBUG reconcileTripOverspend] Reconciled total overspent: '
         '${totalTripOverspent.toStringAsFixed(2)}',
       );
 
-      _uiState = _uiState.copyWith(overspentBudget: totalTripOverspent);
+      _uiState = _uiState.copyWith(
+        overspentBudget: totalTripOverspent,
+        totalBudget: balance.totalBudget,
+        // remainingBudget is a derived getter (totalBudget - spentBudget), so
+        // keeping spentBudget in step makes the on-screen figure match the
+        // reconciled DB balance.
+        spentBudget: balance.totalSpent,
+      );
       notifyListeners();
     } catch (e) {
       debugPrint('Error reconciling trip overspend: $e');

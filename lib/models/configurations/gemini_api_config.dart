@@ -53,7 +53,7 @@ class GeminiReceiptParseResult {
 class GeminiApiConfig {
   // Gemini API Key
   static const String _apiKey =
-      'AQ.Ab8RN6I-KX5slDyylnwRrTQFkIUvjmTEs6CB2309RUmE3NS39w';
+      'AQ.Ab8RN6Lymr_XH98EC38B2Po-XWNQmqksO4uCMLPgzCfWmCHSPA';
 
   static late final GenerativeModel _model;
 
@@ -955,6 +955,7 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
     - You MUST assign TRUE, REALISTIC market-rate costs for the activity's "allocatedBudget".
     - Realistic price ranges in Malaysia: meals at hawker stalls MYR 5-15, casual restaurants MYR 15-40, fine dining MYR 50+, attraction tickets MYR 10-80, public transit MYR 1-5, Grab rides MYR 5-20.
     - NEVER invent fake MYR 0.0 or insanely low prices for restaurants or paid attractions.
+    - You MUST also return "minPrice": the minimum realistic cost you canNOT go below for this venue (a hawker meal can never drop below MYR 5, a paid attraction can never be free). It MUST be <= "allocatedBudget", and 0.0 only for genuinely free places.
     - Public parks, sightseeing of landmarks, walking tours, and free attractions MUST have an "allocatedBudget" of 0.
     - Only assign costs to food/dining, transportation, and places that explicitly require entrance tickets.
     - The "allocatedBudget" MUST NOT exceed the Budget Ceiling of MYR ${budgetLimit.toStringAsFixed(2)}.
@@ -1274,51 +1275,63 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
 
     final prompt =
         '''
-    You are an expert travel itinerary budget recovery engine.
-    The tourist has reached a budget constraint. Re-plan their remaining itinerary slots to strictly fit the remaining funds.
+    You are an expert travel planner in Malaysia acting as a budget recovery engine.
+    The tourist has reached their budget ceiling. Re-plan their REMAINING itinerary slots so the whole trip still fits within the money left.
 
-    Context:
+    CONTEXT:
     - Location / Base: $locationConstraint
     - Current Date/Time: ${currentDate?.toIso8601String() ?? DateTime.now().toIso8601String()}$tripEndInfo
     - Already Spent So Far: MYR ${currentSpentBudget.toStringAsFixed(2)}
     - Remaining Budget Ceiling (total for ALL slots below): MYR ${effectiveRemainingBudget.toStringAsFixed(2)}
     - Number of Remaining Slots: ${sanitizedRemainingSlots.length}
 
-    Remaining Slots to Re-plan:
+    REMAINING SLOTS TO RE-PLAN:
     ${jsonEncode(sanitizedRemainingSlots)}
 
-    Rules:
+    CRITICAL EXCLUSION LIST (DUPLICATES STRICTLY PROHIBITED):
+    - Every "destination" in your response MUST be UNIQUE. Never use the same venue for two different slots.
+    - Do NOT use slight variations of a name to bypass this rule (e.g. "Petronas Twin Towers" and "Petronas Towers" are the same venue).
+
+    CRITICAL RULES:
     1. Strict Slot Count (1-to-1 Mapping):
        - You MUST return an array with EXACTLY ${sanitizedRemainingSlots.length} items.
        - For every slot, PRESERVE the exact "activitiesId" from the input. Do NOT generate new IDs.
+       - Do NOT drop a slot and do NOT invent an extra one, even if the budget is very tight.
     2. Category Preservation:
        - Match the slot's original category. If the original slot was a restaurant/food category, replace it with an affordable local food spot/hawker stall; do NOT replace a meal slot with a park.
        - Use the "timeOfDay" hint: morning slots should have breakfast options, afternoon slots should have lunch options, evening slots should have dinner options.
     3. Budget Distribution:
        - The sum of ALL "allocatedBudget" values across the returned items MUST be <= MYR ${effectiveRemainingBudget.toStringAsFixed(2)}.
-       - Distribute the budget sensibly across remaining days — do not spend everything on early slots and leave later days with nothing.
+       - Distribute the budget sensibly across remaining days - do not spend everything on early slots and leave later days with nothing.
        - If remaining budget is MYR 0 or near 0, use free activities (public parks, walking tours, free galleries) and minimal meal costs (hawker food MYR 5-10).
+       - Realistic Malaysian market rates: hawker meals MYR 5-15, casual restaurants MYR 15-40, attraction tickets MYR 10-80, public transit MYR 1-5.
+       - NEVER invent a fake MYR 0.0 price for a restaurant or a paid attraction.
+       - For every item you MUST also return "minPrice": the minimum realistic cost you canNOT go below for that venue (a hawker meal can never drop below MYR 5, a paid attraction can never be free). It MUST be <= "allocatedBudget", and 0.0 only for genuinely free places.
        - Public parks, walking tours, and free sights MUST have "allocatedBudget": 0.0.
+       - "activityCategory" MUST strictly be one of: "Attraction", "Restaurant", "Transportation".
     4. Geographic Proximity:
        - All venues must be within close walking distance or short public transit of $locationConstraint. Never suggest cross-city travel.
        - Activities on the same date should be geographically close to each other for a practical day plan.
-       - Every destination must be a specific, real-world Google Maps place name (no generic names like "Local Eatery").
+    5. Real, Verifiable Places:
+       - Every destination MUST be an EXACT, FULL official business name or landmark that exists on Google Maps in $tripDestination. No generic names (e.g. "Local Eatery", "Museum Visit").
+       - We programmatically verify each destination against Google Places API to fetch its photo. Obscure or non-existent venues are rejected, so only pick places guaranteed to have a Google Maps listing and photos.
 
     Output Schema:
-    Return ONLY a raw JSON array matching this structure (no markdown fences, no extra text):
+    Return ONLY a raw JSON array matching this structure (no markdown fences, no backticks, no extra commentary):
     [
       {
         "activitiesId": "exact activitiesId from input",
-        "destination": "Exact Place Name",
-        "description": "Short 1-sentence reason (e.g., Free entrance landmark near current location)",
-        "activityCategory": "Restaurant | Attraction | Transportation",
-        "allocatedBudget": 0.0
+        "destination": "Exact Business Name or Landmark",
+        "description": "Short 1-sentence reason (e.g., Free entrance landmark near your current location)",
+        "activityCategory": "Attraction",
+        "allocatedBudget": 0.0,
+        "minPrice": 0.0
       }
     ]
     ''';
 
     final url = Uri.parse(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=$_apiKey',
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=$_apiKey',
     );
 
     try {
