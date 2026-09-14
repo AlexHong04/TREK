@@ -31,6 +31,7 @@ class AppDatePickerDialog extends StatefulWidget {
   final DateTime firstDate;
   final DateTime lastDate;
   final SelectableDayPredicate? selectableDayPredicate;
+  final bool useOutlinedCancel;
 
   const AppDatePickerDialog({
     super.key,
@@ -38,6 +39,7 @@ class AppDatePickerDialog extends StatefulWidget {
     required this.firstDate,
     required this.lastDate,
     this.selectableDayPredicate,
+    this.useOutlinedCancel = false,
   });
 
   @override
@@ -120,6 +122,7 @@ class _AppDatePickerDialogState extends State<AppDatePickerDialog> {
                     child: _DatePickerActionButton(
                       label: 'Cancel',
                       backgroundColor: appTheme.errorRed,
+                      isOutlined: widget.useOutlinedCancel,
                       onPressed: () => Navigator.pop(context),
                     ),
                   ),
@@ -127,7 +130,6 @@ class _AppDatePickerDialogState extends State<AppDatePickerDialog> {
                   Expanded(
                     child: _DatePickerActionButton(
                       label: 'Confirm',
-                      backgroundColor: appTheme.teal_A700,
                       onPressed: () => Navigator.pop(context, _pendingDate),
                     ),
                   ),
@@ -143,12 +145,14 @@ class _AppDatePickerDialogState extends State<AppDatePickerDialog> {
 
 class _DatePickerActionButton extends StatelessWidget {
   final String label;
-  final Color backgroundColor;
+  final Color? backgroundColor;
+  final bool isOutlined;
   final VoidCallback onPressed;
 
   const _DatePickerActionButton({
     required this.label,
-    required this.backgroundColor,
+    this.backgroundColor,
+    this.isOutlined = false,
     required this.onPressed,
   });
 
@@ -156,16 +160,34 @@ class _DatePickerActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       height: 44,
-      child: FilledButton(
-        onPressed: onPressed,
-        style: FilledButton.styleFrom(
-          backgroundColor: backgroundColor,
-          foregroundColor: appTheme.white_A700,
-          shape: const StadiumBorder(),
-          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-        ),
-        child: Text(label),
-      ),
+      child: isOutlined
+          ? OutlinedButton(
+              onPressed: onPressed,
+              style: OutlinedButton.styleFrom(
+                backgroundColor: appTheme.white_A700,
+                foregroundColor: appTheme.blue_gray_300,
+                side: BorderSide(color: appTheme.gray_200, width: 1.5),
+                shape: const StadiumBorder(),
+                textStyle: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              child: Text(label),
+            )
+          : FilledButton(
+              onPressed: onPressed,
+              style: FilledButton.styleFrom(
+                backgroundColor: backgroundColor ?? appTheme.teal_A700,
+                foregroundColor: appTheme.white_A700,
+                shape: const StadiumBorder(),
+                textStyle: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              child: Text(label),
+            ),
     );
   }
 }

@@ -2979,6 +2979,7 @@ class _AvailableDateDialog extends StatelessWidget {
         initialDate: initialDate,
         firstDate: availableDates.first,
         lastDate: availableDates.last,
+        useOutlinedCancel: true,
         selectableDayPredicate: (date) => availableDates.any(
           (availableDate) => DateUtils.isSameDay(availableDate, date),
         ),
@@ -3061,11 +3062,12 @@ class _AvailableDateDialog extends StatelessWidget {
               child: SizedBox(
                 width: double.infinity,
                 height: 44,
-                child: FilledButton(
+                child: OutlinedButton(
                   onPressed: () => Navigator.pop(context),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: appTheme.teal_A700,
-                    foregroundColor: appTheme.white_A700,
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: appTheme.white_A700,
+                    foregroundColor: appTheme.blue_gray_300,
+                    side: BorderSide(color: appTheme.gray_200, width: 1.5),
                     shape: const StadiumBorder(),
                     textStyle: const TextStyle(
                       fontSize: 14,
