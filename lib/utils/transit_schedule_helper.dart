@@ -19,8 +19,18 @@ class TransitScheduleHelper {
         l.contains('klang')) {
       return 'Kuala Lumpur';
     }
+    if (l.contains('singapore') || l.contains('woodlands')) {
+      return 'Singapore';
+    }
+    if (l.contains('seremban') ||
+        l.contains('negeri sembilan') ||
+        l.contains('gemas') ||
+        l.contains('nilai')) {
+      return 'Negeri Sembilan';
+    }
     if (l.contains('penang') ||
         l.contains('butterworth') ||
+        l.contains('bukit mertajam') ||
         l.contains('nibong') ||
         l.contains('george town')) {
       return 'Penang';
@@ -28,6 +38,9 @@ class TransitScheduleHelper {
     if (l.contains('ipoh') ||
         l.contains('amanjaya') ||
         l.contains('taiping') ||
+        l.contains('kampar') ||
+        l.contains('tanjung malim') ||
+        l.contains('batu gajah') ||
         l.contains('perak')) {
       return 'Perak';
     }
@@ -37,7 +50,10 @@ class TransitScheduleHelper {
     if (l.contains('johor') ||
         l.contains('larkin') ||
         l.contains('senai') ||
-        l.contains('jb')) {
+        l.contains('jb') ||
+        l.contains('kluang') ||
+        l.contains('segamat') ||
+        l.contains('kulai')) {
       return 'Johor';
     }
     if (l.contains('kuantan') ||
@@ -48,6 +64,7 @@ class TransitScheduleHelper {
     }
     if (l.contains('langkawi') ||
         l.contains('alor setar') ||
+        l.contains('sungai petani') ||
         l.contains('kedah')) {
       return 'Kedah';
     }
@@ -82,6 +99,55 @@ class TransitScheduleHelper {
       return 'Sarawak';
     }
     return '';
+  }
+
+  /// Looks up real scheduled durations (in minutes) from KTMB GTFS data
+  /// for specific key train station pairs.
+  static int? _getGtfsStationPairDuration(String from, String to) {
+    final f = from.toLowerCase();
+    final t = to.toLowerCase();
+
+    bool match(String k1, String k2) =>
+        (f.contains(k1) && t.contains(k2)) || (f.contains(k2) && t.contains(k1));
+
+    // Shuttle Tebrau (JB Sentral <-> Woodlands, Singapore)
+    if (match('woodlands', 'jb') || match('singapore', 'jb')) return 5;
+
+    // KTMB ETS & Intercity core pairs
+    if (match('kl sentral', 'ipoh') || match('kuala lumpur', 'ipoh')) return 145; // ~2h 25m (ETS Platinum: 120m, Gold: 150m)
+    if (match('kl sentral', 'kampar') || match('kuala lumpur', 'kampar')) return 125; // ~2h 05m
+    if (match('kl sentral', 'tanjung malim') || match('kuala lumpur', 'tanjung malim')) return 80; // ~1h 20m
+    if (match('kl sentral', 'butterworth') || match('kuala lumpur', 'butterworth')) return 255; // ~4h 15m
+    if (match('kl sentral', 'bukit mertajam') || match('kuala lumpur', 'bukit mertajam')) return 205; // ~3h 25m
+    if (match('kl sentral', 'alor setar') || match('kuala lumpur', 'alor setar')) return 220; // ~3h 40m
+    if (match('kl sentral', 'sungai petani') || match('kuala lumpur', 'sungai petani')) return 220; // ~3h 40m
+    if (match('kl sentral', 'arau') || match('kuala lumpur', 'arau')) return 260; // ~4h 20m
+    if (match('kl sentral', 'padang besar') || match('kuala lumpur', 'padang besar')) return 270; // ~4h 30m
+    if (match('kl sentral', 'seremban') || match('kuala lumpur', 'seremban')) return 85; // ~1h 25m
+    if (match('kl sentral', 'gemas') || match('kuala lumpur', 'gemas')) return 140; // ~2h 20m
+    if (match('kl sentral', 'jb') || match('kuala lumpur', 'jb')) return 260; // ~4h 20m
+
+    // Perak <-> North
+    if (match('ipoh', 'butterworth')) return 105; // ~1h 45m
+    if (match('ipoh', 'bukit mertajam')) return 50; // ~50m
+    if (match('ipoh', 'alor setar')) return 80; // ~1h 20m
+    if (match('ipoh', 'padang besar')) return 115; // ~1h 55m
+    if (match('ipoh', 'arau')) return 105; // ~1h 45m
+    if (match('ipoh', 'kampar')) return 26; // ~26m
+
+    // Northern Corridor (Komuter Utara & ETS)
+    if (match('butterworth', 'padang besar')) return 105; // ~1h 45m
+    if (match('butterworth', 'arau')) return 95; // ~1h 35m
+    if (match('butterworth', 'alor setar')) return 65; // ~1h 05m
+    if (match('butterworth', 'sungai petani')) return 30; // ~30m
+    if (match('alor setar', 'padang besar')) return 40; // ~40m
+
+    // Southern Corridor
+    if (match('seremban', 'jb')) return 180; // ~3h 00m
+    if (match('gemas', 'jb')) return 125; // ~2h 05m
+    if (match('seremban', 'gemas')) return 60; // ~1h 00m
+
+    return null;
   }
 
   /// Calculates estimated travel duration in minutes based on transit mode and locations.
@@ -137,29 +203,63 @@ class TransitScheduleHelper {
       return 65; // ~1h 05m
     }
 
-    // 2. TRAIN (KTM ETS / Intercity / ERL)
+    // 2. TRAIN (KTMB ETS / Intercity / Komuter / Shuttle Tebrau)
     if (mode == 'train') {
+      // 2a. Direct station pair matching using KTMB GTFS timetables
+      final stationDuration = _getGtfsStationPairDuration(
+        fromLocation ?? '',
+        toLocation ?? '',
+      );
+      if (stationDuration != null) {
+        return stationDuration;
+      }
+
+      // 2b. Region-level fallback using KTMB GTFS timetables
       final pair = {fromRegion, toRegion};
       if (pair.contains('Kuala Lumpur') && pair.contains('Perak')) {
-        return 160; // ~2h 40m (KL Sentral - Ipoh)
+        return 145; // ~2h 25m (KTMB GTFS ETS: KL Sentral <-> Ipoh)
       }
       if (pair.contains('Kuala Lumpur') && pair.contains('Penang')) {
-        return 245; // ~4h 05m (KL Sentral - Butterworth)
+        return 255; // ~4h 15m (KTMB GTFS ETS: KL Sentral <-> Butterworth)
       }
       if (pair.contains('Kuala Lumpur') && pair.contains('Kedah')) {
-        return 285; // ~4h 45m (KL - Alor Setar)
+        return 220; // ~3h 40m (KTMB GTFS ETS: KL Sentral <-> Alor Setar)
       }
       if (pair.contains('Kuala Lumpur') && pair.contains('Perlis')) {
-        return 310; // ~5h 10m (KL - Arau / Padang Besar)
+        return 265; // ~4h 25m (KTMB GTFS ETS: KL Sentral <-> Arau / Padang Besar)
+      }
+      if (pair.contains('Kuala Lumpur') && pair.contains('Negeri Sembilan')) {
+        return 85; // ~1h 25m (KTMB GTFS ETS/Komuter: KL Sentral <-> Seremban)
       }
       if (pair.contains('Kuala Lumpur') && pair.contains('Melaka')) {
-        return 120; // ~2h 00m (KL - Batang Melaka / Tampin)
+        return 120; // ~2h 00m (KL <-> Batang Melaka / Tampin)
       }
       if (pair.contains('Kuala Lumpur') && pair.contains('Johor')) {
-        return 270; // ~4h 30m (KL - JB Sentral)
+        return 260; // ~4h 20m (KTMB GTFS ETS/Intercity: KL Sentral <-> JB Sentral)
       }
       if (pair.contains('Perak') && pair.contains('Penang')) {
-        return 100; // ~1h 40m (Ipoh - Butterworth)
+        return 105; // ~1h 45m (KTMB GTFS: Ipoh <-> Butterworth)
+      }
+      if (pair.contains('Perak') && pair.contains('Kedah')) {
+        return 80; // ~1h 20m (KTMB GTFS ETS: Ipoh <-> Alor Setar)
+      }
+      if (pair.contains('Perak') && pair.contains('Perlis')) {
+        return 115; // ~1h 55m (KTMB GTFS ETS: Ipoh <-> Padang Besar)
+      }
+      if (pair.contains('Penang') && pair.contains('Kedah')) {
+        return 65; // ~1h 05m (KTMB GTFS Komuter Utara: Butterworth <-> Alor Setar)
+      }
+      if (pair.contains('Penang') && pair.contains('Perlis')) {
+        return 105; // ~1h 45m (KTMB GTFS Komuter Utara: Butterworth <-> Padang Besar)
+      }
+      if (pair.contains('Kedah') && pair.contains('Perlis')) {
+        return 40; // ~40m (KTMB GTFS Komuter Utara: Alor Setar <-> Padang Besar)
+      }
+      if (pair.contains('Negeri Sembilan') && pair.contains('Johor')) {
+        return 150; // ~2h 30m (KTMB GTFS: Seremban/Gemas <-> JB Sentral)
+      }
+      if (pair.contains('Johor') && pair.contains('Singapore')) {
+        return 5; // 5m (KTMB GTFS Shuttle Tebrau: JB Sentral <-> Woodlands)
       }
       return 210; // ~3h 30m default train duration
     }
