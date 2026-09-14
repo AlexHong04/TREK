@@ -2591,7 +2591,8 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
   void initState() {
     super.initState();
     final initialItem = widget.initialItem;
-    final initialDateTime = initialItem?.expenseDateTime ??
+    final initialDateTime =
+        initialItem?.expenseDateTime ??
         context.read<ActivityViewModel>().selectedExpenseTimeWindow?.start ??
         DateTime.now();
     _selectedDate = initialDateTime;
@@ -2796,7 +2797,9 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
       return;
     }
     if (price == null || price < 0.10) {
-      widget.onValidationError('Unit price must be at least ${widget.currency} 0.10.');
+      widget.onValidationError(
+        'Unit price must be at least ${widget.currency} 0.10.',
+      );
       return;
     }
     if (price > 99999) {

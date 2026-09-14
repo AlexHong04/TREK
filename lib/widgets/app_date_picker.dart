@@ -9,6 +9,7 @@ Future<DateTime?> showAppDatePicker({
   required DateTime firstDate,
   required DateTime lastDate,
   SelectableDayPredicate? selectableDayPredicate,
+  String? helpText,
 }) {
   return showDialog<DateTime>(
     context: context,
@@ -21,6 +22,7 @@ Future<DateTime?> showAppDatePicker({
         firstDate: firstDate,
         lastDate: lastDate,
         selectableDayPredicate: selectableDayPredicate,
+        helpText: helpText,
       ),
     ),
   );
@@ -32,6 +34,7 @@ class AppDatePickerDialog extends StatefulWidget {
   final DateTime lastDate;
   final SelectableDayPredicate? selectableDayPredicate;
   final bool useOutlinedCancel;
+  final String? helpText;
 
   const AppDatePickerDialog({
     super.key,
@@ -40,6 +43,7 @@ class AppDatePickerDialog extends StatefulWidget {
     required this.lastDate,
     this.selectableDayPredicate,
     this.useOutlinedCancel = false,
+    this.helpText,
   });
 
   @override
@@ -74,7 +78,7 @@ class _AppDatePickerDialogState extends State<AppDatePickerDialog> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Select date',
+                    widget.helpText ?? 'Select date',
                     style: TextStyle(
                       color: appTheme.gray_900,
                       fontSize: 13,
@@ -119,18 +123,52 @@ class _AppDatePickerDialogState extends State<AppDatePickerDialog> {
               child: Row(
                 children: [
                   Expanded(
-                    child: _DatePickerActionButton(
-                      label: 'Cancel',
-                      backgroundColor: appTheme.errorRed,
-                      isOutlined: widget.useOutlinedCancel,
+                    child: OutlinedButton(
                       onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: appTheme.white_A700,
+                        foregroundColor: const Color(0xFF718096),
+                        padding: const EdgeInsets.symmetric(vertical: 13.0),
+                        elevation: 0,
+                        side: BorderSide(
+                          color: appTheme.gray_200,
+                          width: 1.5,
+                        ),
+                        shape: const StadiumBorder(),
+                      ),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(
+                          fontSize: 14.0,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Inter',
+                          color: Color(0xFF718096),
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: _DatePickerActionButton(
-                      label: 'Confirm',
+                    child: ElevatedButton(
                       onPressed: () => Navigator.pop(context, _pendingDate),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: appTheme.teal_A700,
+                        foregroundColor: appTheme.white_A700,
+                        padding: const EdgeInsets.symmetric(vertical: 13.0),
+                        elevation: 2.0,
+                        shadowColor:
+                            appTheme.teal_A700.withValues(alpha: 0.35),
+                        shape: const StadiumBorder(),
+                      ),
+                      child: const Text(
+                        'Confirm',
+                        style: TextStyle(
+                          fontSize: 14.0,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: 'Inter',
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -143,51 +181,3 @@ class _AppDatePickerDialogState extends State<AppDatePickerDialog> {
   }
 }
 
-class _DatePickerActionButton extends StatelessWidget {
-  final String label;
-  final Color? backgroundColor;
-  final bool isOutlined;
-  final VoidCallback onPressed;
-
-  const _DatePickerActionButton({
-    required this.label,
-    this.backgroundColor,
-    this.isOutlined = false,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 44,
-      child: isOutlined
-          ? OutlinedButton(
-              onPressed: onPressed,
-              style: OutlinedButton.styleFrom(
-                backgroundColor: appTheme.white_A700,
-                foregroundColor: appTheme.blue_gray_300,
-                side: BorderSide(color: appTheme.gray_200, width: 1.5),
-                shape: const StadiumBorder(),
-                textStyle: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              child: Text(label),
-            )
-          : FilledButton(
-              onPressed: onPressed,
-              style: FilledButton.styleFrom(
-                backgroundColor: backgroundColor ?? appTheme.teal_A700,
-                foregroundColor: appTheme.white_A700,
-                shape: const StadiumBorder(),
-                textStyle: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              child: Text(label),
-            ),
-    );
-  }
-}

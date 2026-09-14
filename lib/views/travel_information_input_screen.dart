@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../view_models/presentation_logic/travel_information_input_view_model.dart';
 
 import '../main.dart';
+import '../widgets/app_date_picker.dart';
 import '../widgets/custom_app_bar.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/destination_spending_rates_dialog.dart';
@@ -1000,24 +1001,27 @@ class _TravelInformationInputScreenState
                   Row(
                     children: [
                       Expanded(
-                        child: ElevatedButton(
+                        child: OutlinedButton(
                           onPressed: () =>
                               Navigator.of(dialogContext).pop(false),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: appTheme.errorRed,
-                            foregroundColor: appTheme.white_A700,
-                            padding: const EdgeInsets.symmetric(vertical: 13.0),
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: appTheme.white_A700,
+                            foregroundColor: const Color(0xFF718096),
+                            padding: const EdgeInsets.symmetric(vertical: 14.0),
                             elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12.0),
+                            side: BorderSide(
+                              color: appTheme.gray_200,
+                              width: 1.5,
                             ),
+                            shape: const StadiumBorder(),
                           ),
                           child: const Text(
                             'Cancel',
                             style: TextStyle(
-                              fontSize: 14.0,
-                              fontWeight: FontWeight.w700,
+                              fontSize: 15.0,
+                              fontWeight: FontWeight.w600,
                               fontFamily: 'Inter',
+                              color: Color(0xFF718096),
                             ),
                           ),
                         ),
@@ -1030,24 +1034,21 @@ class _TravelInformationInputScreenState
                           style: ElevatedButton.styleFrom(
                             backgroundColor: appTheme.teal_A700,
                             foregroundColor: appTheme.white_A700,
-                            padding: const EdgeInsets.symmetric(vertical: 13.0),
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12.0),
+                            padding: const EdgeInsets.symmetric(vertical: 14.0),
+                            elevation: 2.0,
+                            shadowColor: appTheme.teal_A700.withValues(
+                              alpha: 0.35,
                             ),
+                            shape: const StadiumBorder(),
                           ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                'Confirm',
-                                style: TextStyle(
-                                  fontSize: 14.0,
-                                  fontWeight: FontWeight.w700,
-                                  fontFamily: 'Inter',
-                                ),
-                              ),
-                            ],
+                          child: const Text(
+                            'Confirm',
+                            style: TextStyle(
+                              fontSize: 15.0,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: 'Inter',
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ),
@@ -3471,12 +3472,11 @@ class _TravelInformationInputScreenState
       initialDate = lastAllowed;
     }
 
-    final picked = await showDatePicker(
+    final picked = await showAppDatePicker(
       context: context,
       initialDate: initialDate,
       firstDate: effectiveFirstAllowed,
       lastDate: lastAllowed,
-      confirmText: 'Confirm',
       helpText: isArrival ? 'SELECT ARRIVAL DATE' : 'SELECT DEPARTURE DATE',
       selectableDayPredicate: (day) {
         final checkDate = DateTime(day.year, day.month, day.day);
@@ -3494,19 +3494,6 @@ class _TravelInformationInputScreenState
           return false;
         }
         return true;
-      },
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: appTheme.teal_A700,
-              onPrimary: appTheme.white_A700,
-              surface: appTheme.white_A700,
-              onSurface: appTheme.gray_800,
-            ),
-          ),
-          child: child!,
-        );
       },
     );
 
@@ -3609,6 +3596,8 @@ class _TravelInformationInputScreenState
     final picked = await showTimePicker(
       context: context,
       initialTime: initialTime,
+      cancelText: 'Cancel',
+      confirmText: 'Confirm',
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -3617,6 +3606,53 @@ class _TravelInformationInputScreenState
               onPrimary: appTheme.white_A700,
               surface: appTheme.white_A700,
               onSurface: appTheme.gray_800,
+            ),
+            timePickerTheme: TimePickerThemeData(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24.0),
+              ),
+              cancelButtonStyle: ButtonStyle(
+                backgroundColor: WidgetStateProperty.all(appTheme.white_A700),
+                foregroundColor:
+                    WidgetStateProperty.all(const Color(0xFF718096)),
+                side: WidgetStateProperty.all(
+                  BorderSide(
+                    color: appTheme.gray_200,
+                    width: 1.5,
+                  ),
+                ),
+                shape: WidgetStateProperty.all(const StadiumBorder()),
+                padding: WidgetStateProperty.all(
+                  const EdgeInsets.symmetric(horizontal: 20.0, vertical: 11.0),
+                ),
+                elevation: WidgetStateProperty.all(0),
+                textStyle: WidgetStateProperty.all(
+                  const TextStyle(
+                    fontSize: 14.0,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Inter',
+                  ),
+                ),
+              ),
+              confirmButtonStyle: ButtonStyle(
+                backgroundColor: WidgetStateProperty.all(appTheme.teal_A700),
+                foregroundColor: WidgetStateProperty.all(appTheme.white_A700),
+                elevation: WidgetStateProperty.all(2.0),
+                shadowColor: WidgetStateProperty.all(
+                  appTheme.teal_A700.withValues(alpha: 0.35),
+                ),
+                shape: WidgetStateProperty.all(const StadiumBorder()),
+                padding: WidgetStateProperty.all(
+                  const EdgeInsets.symmetric(horizontal: 20.0, vertical: 11.0),
+                ),
+                textStyle: WidgetStateProperty.all(
+                  const TextStyle(
+                    fontSize: 14.0,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: 'Inter',
+                  ),
+                ),
+              ),
             ),
           ),
           child: child!,
@@ -4163,10 +4199,12 @@ class _TravelInformationInputScreenState
                                 InkWell(
                                   onTap: () {
                                     final customName = searchQuery.trim();
-                                    final explicitErr =
-                                        viewModel.validateExplicitWord(customName);
+                                    final explicitErr = viewModel
+                                        .validateExplicitWord(customName);
                                     if (explicitErr != null) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
                                         SnackBar(
                                           content: Text(explicitErr),
                                           backgroundColor: appTheme.redButton,
@@ -5050,43 +5088,69 @@ class _TripDateRangePickerDialogState
   }
 
   Widget _buildActions() {
+    final bool canConfirm = _startDate != null;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16.0, 4.0, 12.0, 12.0),
+      padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 16.0),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(
-              'Cancel',
-              style: TextStyle(
-                fontSize: 14.0,
-                fontWeight: FontWeight.w500,
-                color: appTheme.teal_A700,
-                fontFamily: 'Inter',
+          Expanded(
+            child: OutlinedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: OutlinedButton.styleFrom(
+                backgroundColor: appTheme.white_A700,
+                foregroundColor: const Color(0xFF718096),
+                padding: const EdgeInsets.symmetric(vertical: 13.0),
+                elevation: 0,
+                side: BorderSide(
+                  color: appTheme.gray_200,
+                  width: 1.5,
+                ),
+                shape: const StadiumBorder(),
+              ),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(
+                  fontSize: 14.0,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Inter',
+                  color: Color(0xFF718096),
+                ),
               ),
             ),
           ),
-          const SizedBox(width: 8.0),
-          TextButton(
-            onPressed: _startDate == null
-                ? null
-                : () {
-                    final start = _startDate!;
-                    final end = _endDate ?? _startDate!;
-                    Navigator.of(
-                      context,
-                    ).pop(DateTimeRange(start: start, end: end));
-                  },
-            child: Text(
-              'Confirm',
-              style: TextStyle(
-                fontSize: 14.0,
-                fontWeight: FontWeight.w500,
-                color: _startDate != null
-                    ? appTheme.teal_A700
-                    : appTheme.teal_A700.withValues(alpha: 0.38),
-                fontFamily: 'Inter',
+          const SizedBox(width: 12.0),
+          Expanded(
+            child: ElevatedButton(
+              onPressed: canConfirm
+                  ? () {
+                      final start = _startDate!;
+                      final end = _endDate ?? _startDate!;
+                      Navigator.of(
+                        context,
+                      ).pop(DateTimeRange(start: start, end: end));
+                    }
+                  : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: appTheme.teal_A700,
+                disabledBackgroundColor:
+                    appTheme.teal_A700.withValues(alpha: 0.35),
+                foregroundColor: appTheme.white_A700,
+                disabledForegroundColor:
+                    appTheme.white_A700.withValues(alpha: 0.6),
+                padding: const EdgeInsets.symmetric(vertical: 13.0),
+                elevation: canConfirm ? 2.0 : 0,
+                shadowColor:
+                    appTheme.teal_A700.withValues(alpha: 0.35),
+                shape: const StadiumBorder(),
+              ),
+              child: const Text(
+                'Confirm',
+                style: TextStyle(
+                  fontSize: 14.0,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'Inter',
+                  color: Colors.white,
+                ),
               ),
             ),
           ),
