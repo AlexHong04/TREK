@@ -481,6 +481,14 @@ class AuthService extends ChangeNotifier implements IAuthService {
       await _checkDeviceEmailLoginStatus();
       return;
     }
+    // Email-change confirmation can complete in a browser or on another
+    // device. Refresh Auth first so the following profile load sees the new
+    // authoritative email immediately instead of waiting for another login.
+    try {
+      await _authRepository.refreshSession();
+    } on NetworkUnavailableException {
+      _setOffline(true);
+    }
     await refreshCurrentUser();
   }
 
@@ -727,9 +735,20 @@ class AuthService extends ChangeNotifier implements IAuthService {
     // A sign-out or account switch may have happened while the profile was
     // loading. Never publish data from that stale Auth session.
     if (_authRepository.currentUser?.id != authUser.id) return;
+    final authoritativeEmail = authUser.email.trim();
+    final pendingTarget = _pendingEmailChangeTarget;
+    final authHasConfirmedPendingChange = pendingTarget != null &&
+        authoritativeEmail.toLowerCase() == pendingTarget;
+    final synchronizedProfile = authHasConfirmedPendingChange &&
+        profile.email.trim().toLowerCase() !=
+            authoritativeEmail.toLowerCase()
+        ? profile.copyWith(email: authoritativeEmail)
+        : profile;
     _currentUser = access == null
-        ? profile
-        : profile.copyWith(hasPasswordSignIn: access.hasPasswordSignIn);
+        ? synchronizedProfile
+        : synchronizedProfile.copyWith(
+      hasPasswordSignIn: access.hasPasswordSignIn,
+    );
     final accountEmailChanged = previousUser != null &&
         previousUser.email.toLowerCase() != _currentUser!.email.toLowerCase();
     await _completePendingEmailChangeIfNeeded(
@@ -1096,7 +1115,7 @@ class AuthService extends ChangeNotifier implements IAuthService {
       return;
     }
     _pendingEmailChangeTarget = null;
-    _sessionMessage = 'Email changed successfully to ${user.email}.';
+    _sessionMessage = 'The email changed to ${user.email} successfully.';
     try {
       final preferences = await SharedPreferences.getInstance();
       await preferences.remove('trek.pending_email_change');

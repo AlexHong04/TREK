@@ -508,6 +508,13 @@ class EditAccountViewModel extends ChangeNotifier {
     final user = _authService.currentUser;
     final info = _authService.accountInfo;
     if (user == null || info == null) return;
+    final emailWasChanged = _uiState.accountEmail.isNotEmpty &&
+        _uiState.accountEmail.trim().toLowerCase() !=
+            user.email.trim().toLowerCase();
+    final emailChangeMessage = emailWasChanged
+        ? _authService.consumeSessionMessage() ??
+        'The email changed to ${user.email} successfully.'
+        : null;
     final shouldReplaceDraft = _uiState.accountEmail.isEmpty ||
         _uiState.newEmail == _uiState.accountEmail;
     final googleWasJustLinked =
@@ -515,6 +522,9 @@ class EditAccountViewModel extends ChangeNotifier {
     _uiState = _uiState.copyWith(
       accountEmail: user.email,
       newEmail: shouldReplaceDraft ? user.email : _uiState.newEmail,
+      emailChangeRequested:
+      emailWasChanged ? false : _uiState.emailChangeRequested,
+      successMessage: emailChangeMessage,
       googleEmail: info.googleEmail,
       isEmailVerified: user.isEmailVerified,
       hasPasswordSignIn: info.hasPasswordSignIn,
