@@ -3138,18 +3138,11 @@ class _TravelInformationInputScreenState
       return;
     }
 
-    // Transit 2+ arrival stays strictly within trip dates without +1 buffer.
-    // Departures (including Transit 2 departure) keep the +1 day buffer.
-    final bool allowBuffer = !isArrival || transitIndex == 0;
-    final tripFirstAllowed = (isArrival && transitIndex == 0)
-        ? startDate.subtract(const Duration(days: 1))
-        : startDate;
     final firstAllowed =
-        (minAllowedDate != null && minAllowedDate.isAfter(tripFirstAllowed))
+        (minAllowedDate != null && minAllowedDate.isAfter(startDate))
             ? minAllowedDate
-            : tripFirstAllowed;
-    final lastAllowed =
-        allowBuffer ? endDate.add(const Duration(days: 1)) : endDate;
+            : startDate;
+    final lastAllowed = endDate;
     final effectiveFirstAllowed =
         firstAllowed.isAfter(lastAllowed) ? lastAllowed : firstAllowed;
 
@@ -3172,11 +3165,7 @@ class _TravelInformationInputScreenState
       firstDate: effectiveFirstAllowed,
       lastDate: lastAllowed,
       confirmText: 'Confirm',
-      helpText: allowBuffer
-          ? (isArrival
-              ? 'SELECT ARRIVAL DATE (±1 DAY OF TRIP)'
-              : 'SELECT DEPARTURE DATE (±1 DAY OF TRIP)')
-          : (isArrival ? 'SELECT ARRIVAL DATE' : 'SELECT DEPARTURE DATE'),
+      helpText: isArrival ? 'SELECT ARRIVAL DATE' : 'SELECT DEPARTURE DATE',
       selectableDayPredicate: (day) {
         final checkDate = DateTime(day.year, day.month, day.day);
         if (minAllowedDate != null) {
@@ -3189,26 +3178,8 @@ class _TravelInformationInputScreenState
             return false;
           }
         }
-        if (!allowBuffer) {
-          if (checkDate.isBefore(startDate) || checkDate.isAfter(endDate)) {
-            return false;
-          }
-        }
-        // Dates strictly within this trip are always valid
-        if (!checkDate.isBefore(startDate) && !checkDate.isAfter(endDate)) {
-          return true;
-        }
-        // For ±1 day buffer on transit leg 0, check that it does not overlap another existing trip
-        for (final range in viewModel.uiState.unavailableDateRanges) {
-          final rStart = DateTime(
-            range.start.year,
-            range.start.month,
-            range.start.day,
-          );
-          final rEnd = DateTime(range.end.year, range.end.month, range.end.day);
-          if (!checkDate.isBefore(rStart) && !checkDate.isAfter(rEnd)) {
-            return false;
-          }
+        if (checkDate.isBefore(startDate) || checkDate.isAfter(endDate)) {
+          return false;
         }
         return true;
       },
