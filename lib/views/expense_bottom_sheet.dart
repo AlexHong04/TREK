@@ -839,7 +839,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
               ),
               IconButton(
                 onPressed: () => _confirmDeleteItem(index),
-                icon: Icon(Icons.delete_outline, color: appTheme.errorRed),
+                icon: Icon(Icons.delete_outline, color: appTheme.blue_gray_700),
               ),
             ],
           ),
@@ -1272,14 +1272,13 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     return SizedBox(
       width: double.infinity,
       height: 48,
-      child: ElevatedButton(
+      child: OutlinedButton(
         onPressed: () => Navigator.pop(dialogContext),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: appTheme.teal_A700,
-          foregroundColor: appTheme.white_A700,
-          elevation: 0,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: appTheme.blue_gray_700,
+          side: BorderSide(color: appTheme.gray_200),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(24),
           ),
         ),
         child: Text(
@@ -1661,7 +1660,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                       onPressed: uiState.isScanningReceipt
                           ? null
                           : () => _removeReceipt(uiState),
-                      icon: Icon(Icons.close, color: appTheme.errorRed),
+                      icon: Icon(Icons.close, color: appTheme.blue_gray_700),
                     ),
                   ],
                 ),
@@ -1924,9 +1923,8 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                               .read<ActivityViewModel>()
                               .cancelReceiptScan,
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: appTheme.white_A700,
-                            backgroundColor: appTheme.errorRed,
-                            side: BorderSide(color: appTheme.errorRed),
+                            foregroundColor: appTheme.blue_gray_700,
+                            side: BorderSide(color: appTheme.gray_200),
                             shape: StadiumBorder(),
                             textStyle: TextStyle(
                               fontFamily: 'Inter',
@@ -2136,7 +2134,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
       message:
           'This will discard changes in the item you are editing. '
           'Saved items will stay.',
-      confirmLabel: 'Reset Item',
+      confirmLabel: 'Reset',
       isDestructive: true,
     );
     if (!shouldClear || !mounted) return;
@@ -2178,7 +2176,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         title: 'Replace Unsaved Expense Items?',
         message:
             'Scanning this receipt will remove the current unsaved manual expense items. Do you want to continue?',
-        confirmLabel: 'Replace and Scan',
+        confirmLabel: 'Scan',
       );
 
       if (!replaceManualItems || !mounted) {
@@ -2412,10 +2410,9 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                       child: OutlinedButton(
                         onPressed: () => Navigator.pop(dialogContext, false),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: appTheme.white_A700,
-                          backgroundColor: appTheme.errorRed,
+                          foregroundColor: appTheme.blue_gray_700,
                           minimumSize: Size.fromHeight(48),
-                          side: BorderSide(color: appTheme.errorRed),
+                          side: BorderSide(color: appTheme.gray_200),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(24),
                           ),
@@ -2728,18 +2725,9 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                       child: OutlinedButton(
                         onPressed: () => Navigator.pop(dialogContext, false),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: isDestructive
-                              ? appTheme.blue_gray_700
-                              : appTheme.white_A700,
-                          backgroundColor: isDestructive
-                              ? null
-                              : appTheme.errorRed,
+                          foregroundColor: appTheme.blue_gray_700,
                           minimumSize: Size.fromHeight(48),
-                          side: BorderSide(
-                            color: isDestructive
-                                ? appTheme.gray_200
-                                : appTheme.errorRed,
-                          ),
+                          side: BorderSide(color: appTheme.gray_200),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(24),
                           ),
@@ -2756,9 +2744,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                       child: ElevatedButton(
                         onPressed: () => Navigator.pop(dialogContext, true),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: isDestructive
-                              ? appTheme.errorRed
-                              : appTheme.teal_A700,
+                          backgroundColor: appTheme.teal_A700,
                           foregroundColor: appTheme.white_A700,
                           minimumSize: Size.fromHeight(48),
                           elevation: 0,
@@ -3378,6 +3364,7 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
                         foregroundColor: appTheme.blue_gray_300,
                         side: BorderSide(color: appTheme.gray_200),
                         minimumSize: Size(100, 44),
+                        shape: StadiumBorder(),
                       ),
                       child: Text('Discard'),
                     ),
@@ -3388,6 +3375,7 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
                         backgroundColor: appTheme.teal_A700,
                         foregroundColor: appTheme.white_A700,
                         minimumSize: Size(98, 44),
+                        shape: StadiumBorder(),
                       ),
                       child: Text(
                         widget.initialItem == null ? 'Save' : 'Update Item',
