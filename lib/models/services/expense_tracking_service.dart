@@ -2007,6 +2007,10 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       return ExpenseProcessingResult.withinBudget;
     }
 
+    if (totalAllocatedBudget == 0.00 && isOverspend) {
+      return ExpenseProcessingResult.withinBudget;
+    }
+
     // Check critical overspend
     final bool isCritical = await detectCriticalOverspend(
       totalAllocatedBudget,
