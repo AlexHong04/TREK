@@ -1867,6 +1867,10 @@ class ActivityViewModel extends ChangeNotifier {
     return null;
   }
 
+  double roundCurrency(double value) {
+    return double.parse(value.toStringAsFixed(2));
+  }
+
   Future<bool> topUpBudget(double additionalAmount) async {
     debugPrint("Top up Budget");
     if (additionalAmount <= 0) {
@@ -1900,12 +1904,11 @@ class ActivityViewModel extends ChangeNotifier {
           activityId,
         );
 
+        final roundAdditionalAmount = roundCurrency(additionalAmount);
+
         // Calculate the NEW shortage.
         final double newShortageAmount =
-            (_uiState.shortageAmount - additionalAmount).clamp(
-              0.0,
-              double.infinity,
-            );
+            _uiState.shortageAmount - roundAdditionalAmount;
 
         debugPrint('========== TOP UP ==========');
         debugPrint('Previous shortage: ${_uiState.shortageAmount}');

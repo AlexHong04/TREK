@@ -807,8 +807,8 @@ Future<void> showBudgetRecoveryDialog({
 
                     final isValid =
                         amount != null &&
-                        amount >= minTopUp &&
-                        amount <= shortageAmount;
+                            amount >= roundCurrency(minTopUp) &&
+                            amount <= roundCurrency(shortageAmount);
 
                     return _buildActionButton(
                       text: 'Top-up',
@@ -874,7 +874,7 @@ Future<void> showEndTripConfirmationDialog({
               child: _buildActionButton(
                 text: 'Cancel',
                 backgroundColor: appTheme.white_A700,
-                foregroundColor: appTheme.gray_200,
+                foregroundColor: appTheme.blue_gray_700,
                 borderColor: appTheme.grey200,
                 onPressed: () {
                   // Close confirmation.
