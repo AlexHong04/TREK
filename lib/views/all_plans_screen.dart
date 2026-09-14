@@ -566,24 +566,45 @@ class _AllPlansScreenState extends State<AllPlansScreen> {
   }
 
   // weisong
-  // delete the trip only when it is still pending status in view all plan screen from profile
+  // Soft-deletes the trip from the view all plan screen.
+  // Only a trip that is still pending can be removed - an ongoing or completed
+  // trip is real history and must stay intact.
   Future<void> _confirmDelete(BuildContext context, WholeTrip trip) async {
+    if (trip.computedStatus.toLowerCase() != 'pending') return;
+
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete Plan'),
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        icon: Icon(Icons.warning_amber_rounded, color: appTheme.errorRed),
+        title: const Text('Delete this plan?'),
         content: Text(
-          'Are you sure you want to delete your trip to ${trip.destination}?',
+          'Your trip to ${trip.destination} will be removed from your plans. '
+          'Only pending plans can be deleted.',
         ),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: TextButton.styleFrom(foregroundColor: appTheme.redButton),
-            child: const Text('Delete'),
+          SizedBox(
+            width: double.maxFinite,
+            child: Row(
+              children: [
+                Expanded(
+                  child: _PlanDialogButton(
+                    text: 'Cancel',
+                    backgroundColor: appTheme.teal_A700,
+                    onPressed: () => Navigator.pop(dialogContext, false),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _PlanDialogButton(
+                    text: 'Delete',
+                    backgroundColor: appTheme.errorRed,
+                    onPressed: () => Navigator.pop(dialogContext, true),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -594,5 +615,35 @@ class _AllPlansScreenState extends State<AllPlansScreen> {
         trip.tripId,
       );
     }
+  }
+}
+
+class _PlanDialogButton extends StatelessWidget {
+  final String text;
+  final Color backgroundColor;
+  final VoidCallback onPressed;
+
+  const _PlanDialogButton({
+    required this.text,
+    required this.backgroundColor,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 46,
+      child: FilledButton(
+        onPressed: onPressed,
+        style: FilledButton.styleFrom(
+          backgroundColor: backgroundColor,
+          foregroundColor: appTheme.white_A700,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: Text(text),
+      ),
+    );
   }
 }

@@ -2591,10 +2591,11 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
   void initState() {
     super.initState();
     final initialItem = widget.initialItem;
-    _selectedDate = initialItem?.expenseDateTime ?? DateTime.now();
-    _selectedTime = TimeOfDay.fromDateTime(
-      initialItem?.expenseDateTime ?? DateTime.now(),
-    );
+    final initialDateTime = initialItem?.expenseDateTime ??
+        context.read<ActivityViewModel>().selectedExpenseTimeWindow?.start ??
+        DateTime.now();
+    _selectedDate = initialDateTime;
+    _selectedTime = TimeOfDay.fromDateTime(initialDateTime);
     _itemNameController.text =
         initialItem?.itemName ??
         (widget.itemNameHint == 'Unknown' ? 'Unknown' : '');
@@ -2794,8 +2795,8 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
       widget.onValidationError('Item quantity cannot exceed 9,999.');
       return;
     }
-    if (price == null || price <= 0) {
-      widget.onValidationError('Unit price must be greater than zero.');
+    if (price == null || price < 0.10) {
+      widget.onValidationError('Unit price must be at least ${widget.currency} 0.10.');
       return;
     }
     if (price > 99999) {
@@ -3019,7 +3020,7 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
                       child: _buildTextField(
                         'Unit Price (${widget.currency})',
                         _unitPriceController,
-                        '0.00',
+                        '0.10',
                         TextInputType.numberWithOptions(decimal: true),
                       ),
                     ),

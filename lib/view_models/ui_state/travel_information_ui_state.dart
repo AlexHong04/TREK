@@ -36,10 +36,8 @@ class TravelInformationUiState {
       departures.isNotEmpty ? departures.first.time : '09:00 PM';
   String get departureDate =>
       departures.isNotEmpty ? departures.first.date : '';
-  DateTime? get allowedTransitStartDate =>
-      startDate?.subtract(const Duration(days: 1));
-  DateTime? get allowedTransitEndDate =>
-      endDate?.add(const Duration(days: 1));
+  DateTime? get allowedTransitStartDate => startDate;
+  DateTime? get allowedTransitEndDate => endDate;
   String get hotelLocation => hotels.isNotEmpty ? hotels.first.location : '';
   String get hotelCheckInTime =>
       hotels.isNotEmpty ? hotels.first.checkInTime : '03:00 PM';

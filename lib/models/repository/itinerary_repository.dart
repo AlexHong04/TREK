@@ -637,6 +637,7 @@ class ItineraryRepository implements IItineraryRepository {
           .from('whole_trips')
           .select()
           .eq('user_id', customUserId)
+          .neq('status', 'deleted')
           .order('created_at', ascending: false);
 
       return (response as List)
@@ -687,6 +688,7 @@ class ItineraryRepository implements IItineraryRepository {
           .select()
           .eq('user_id', userId)
           .neq('status', 'completed')
+          .neq('status', 'deleted')
           .or(
             'status.eq.ongoing,and(start_date.lte.$endOfTodayIso,end_date.gte.$startOfTodayIso)',
           )
@@ -720,6 +722,7 @@ class ItineraryRepository implements IItineraryRepository {
           .from('whole_trips')
           .select()
           .eq('user_id', userId)
+          .neq('status', 'deleted')
           .order('end_date', ascending: false)
           .limit(1)
           .maybeSingle();
@@ -793,9 +796,12 @@ class ItineraryRepository implements IItineraryRepository {
 
   @override
   Future<void> deleteWholeTrip(String tripId) async {
+    // Soft delete: the row is kept and only flagged, so a plan removed from the
+    // "View All Plans" list stays recoverable and its expenses/history are
+    // never destroyed. Every user-facing trip query filters 'deleted' out.
     await SupabaseConfig.client
         .from('whole_trips')
-        .delete()
+        .update({'status': 'deleted'})
         .eq('trip_id', tripId);
   }
 }

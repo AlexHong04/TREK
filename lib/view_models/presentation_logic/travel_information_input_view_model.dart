@@ -307,8 +307,8 @@ class TravelInformationInputViewModel extends ChangeNotifier {
   void updateTripDates(DateTime start, DateTime end) {
     final startFormatted = start.toLocal().toString().split(' ')[0];
     final endFormatted = end.toLocal().toString().split(' ')[0];
-    final minDate = start.subtract(const Duration(days: 1));
-    final maxDate = end.add(const Duration(days: 1));
+    final minDate = start;
+    final maxDate = end;
 
     final updatedArrivals = _uiState.arrivals.map((arr) {
       if (arr.date.trim().isEmpty) {
@@ -1139,8 +1139,8 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     if (_uiState.startDate == null || _uiState.endDate == null) {
       return null;
     }
-    final minDate = _uiState.startDate!.subtract(const Duration(days: 1));
-    final maxDate = _uiState.endDate!.add(const Duration(days: 1));
+    final minDate = _uiState.startDate!;
+    final maxDate = _uiState.endDate!;
 
     for (int i = 0; i < _uiState.arrivals.length; i++) {
       final arr = _uiState.arrivals[i];
