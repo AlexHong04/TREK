@@ -872,19 +872,26 @@ class _WholeItineraryDetailScreenState
                                   color: appTheme.errorRed,
                                 ),
                                 const SizedBox(width: 5.0),
-                                ConstrainedBox(
-                                  constraints: const BoxConstraints(
-                                    maxWidth: 240,
-                                  ),
-                                  child: Text(
-                                    item,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      fontFamily: 'Inter',
-                                      color: appTheme.gray_800,
+                                // Flexible (not a bare ConstrainedBox) so a long
+                                // wishlist name shrinks to the width the line
+                                // actually has. A ConstrainedBox alone would
+                                // force the full 240dp inside a Row, which
+                                // overflows the chip on narrow screens.
+                                Flexible(
+                                  child: ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      maxWidth: 240,
+                                    ),
+                                    child: Text(
+                                      item,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        fontFamily: 'Inter',
+                                        color: appTheme.gray_800,
+                                      ),
                                     ),
                                   ),
                                 ),

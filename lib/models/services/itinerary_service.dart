@@ -1392,8 +1392,31 @@ class ItineraryService implements IItineraryService {
       }
     }
 
-    final double allocatedBudget =
+    final double rawAllocatedBudget =
         (item['allocatedBudget'] as num?)?.toDouble() ?? 0.0;
+
+    final String resolvedCategory =
+        item['activityCategory'] as String? ?? category;
+    final bool isRestaurant = resolvedCategory.toLowerCase() == 'restaurant';
+
+    final rawMinPrice = item['minPrice'] != null
+        ? (item['minPrice'] as num).toDouble()
+        : null;
+
+    // The alternative prompt asks Gemini for "minPrice" but it used to be
+    // dropped here, which left minAllocatedBudget null - so the budget
+    // reallocation treated this venue's minimum cost as MYR 0 and could trim it
+    // down to nothing. These are the same realism rules askGeminiForItinerary
+    // uses: food in Malaysia is never free, and a restaurant always has a floor.
+    final double allocatedBudget =
+        (isRestaurant && rawAllocatedBudget <= 0.0)
+            ? (rawMinPrice != null && rawMinPrice > 0 ? rawMinPrice : 8.0)
+            : rawAllocatedBudget;
+
+    final double? minPriceLocal =
+        isRestaurant && (rawMinPrice == null || rawMinPrice <= 0.0)
+            ? 5.0
+            : rawMinPrice;
 
     return Activity(
       activitiesId: existingActivityId,
@@ -1403,12 +1426,13 @@ class ItineraryService implements IItineraryService {
       activityImgUrl: imgUrl,
       date: slotDate,
       allocatedBudget: allocatedBudget,
+      minAllocatedBudget: minPriceLocal,
       overspendAmount: allocatedBudget > 0 ? 0 : null,
       status: 'pending',
       startTime: startTime,
       endTime: endTime,
       duration: item['duration'] as String? ?? '60 min',
-      activityCategory: item['activityCategory'] as String? ?? category,
+      activityCategory: resolvedCategory,
       isOverspend: false,
     );
   }
@@ -1900,8 +1924,31 @@ class ItineraryService implements IItineraryService {
     final revisedActivities = rawResponseList.map((item) {
       final actId = item['activitiesId']?.toString() ?? '';
       final originalActivity = activityLookup[actId];
-      final allocatedBudget =
+      final rawAllocatedBudget =
           (item['allocatedBudget'] as num?)?.toDouble() ?? 0.0;
+
+      final String resolvedCategory =
+          item['activityCategory']?.toString() ??
+              originalActivity?.activityCategory ??
+              'General';
+      final bool isRestaurant = resolvedCategory.toLowerCase() == 'restaurant';
+
+      final rawMinPrice = item['minPrice'] != null
+          ? (item['minPrice'] as num).toDouble()
+          : null;
+
+      // Same realism rules as askGeminiForItinerary: food in Malaysia is never
+      // free, and every restaurant carries a minimum cost floor so the budget
+      // reallocation can never trim it below a plausible price.
+      final double allocatedBudget =
+          (isRestaurant && rawAllocatedBudget <= 0.0)
+              ? (rawMinPrice != null && rawMinPrice > 0 ? rawMinPrice : 8.0)
+              : rawAllocatedBudget;
+
+      final double? minPriceLocal =
+          isRestaurant && (rawMinPrice == null || rawMinPrice <= 0.0)
+              ? 5.0
+              : rawMinPrice;
 
       return Activity(
         activitiesId: actId.isNotEmpty
@@ -1918,6 +1965,7 @@ class ItineraryService implements IItineraryService {
             : (originalActivity?.activityImgUrl ?? 'assets/logo.png'),
         date: originalActivity?.date ?? DateTime.now(),
         allocatedBudget: allocatedBudget,
+        minAllocatedBudget: minPriceLocal,
         overspendAmount: allocatedBudget > 0 ? 0 : null,
         status: item['status']?.toString() ?? 'pending',
         startTime:
@@ -1930,9 +1978,7 @@ class ItineraryService implements IItineraryService {
             item['duration']?.toString() ??
             originalActivity?.duration ??
             '60 min',
-        activityCategory:
-            item['activityCategory']?.toString() ??
-            (originalActivity?.activityCategory ?? 'General'),
+        activityCategory: resolvedCategory,
         isOverspend: false,
       );
     }).toList();

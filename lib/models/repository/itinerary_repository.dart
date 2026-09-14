@@ -584,6 +584,7 @@ class ItineraryRepository implements IItineraryRepository {
               'activity_img_url': activity.activityImgUrl,
               'date': activity.date.toIso8601String(),
               'allocated_budget': activity.allocatedBudget,
+              'min_allocated_budget': activity.minAllocatedBudget,
               'overspend_amount': activity.overspendAmount,
               'status': activity.status,
               'start_time': activity.startTime,
