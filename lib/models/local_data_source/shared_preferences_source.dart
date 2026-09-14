@@ -29,10 +29,14 @@ class ActivityLocalDataSource {
           .map((item) => Activity.fromJson(item as Map<String, dynamic>))
           .toList();
 
-      debugPrint('[LocalCache] Successfully restored ${list.length} activities for key: $_keyPrefix$tripId');
+      debugPrint(
+        '[LocalCache] Successfully restored ${list.length} activities for key: $_keyPrefix$tripId',
+      );
       return list;
     } catch (e, stack) {
-      debugPrint('[LocalCache] Error loading activities for key $_keyPrefix$tripId: $e\n$stack');
+      debugPrint(
+        '[LocalCache] Error loading activities for key $_keyPrefix$tripId: $e\n$stack',
+      );
       return null;
     }
   }
@@ -45,13 +49,65 @@ class ActivityLocalDataSource {
 
 class ExpenseDraftLocalDataSource {
   static const String _keyPrefix = 'expense_manual_draft_';
+  static const String _fullKeyPrefix = 'expense_full_draft_v1_';
 
   String _key({
     required String userId,
     required String tripId,
     required String activityId,
-  }) =>
-      '$_keyPrefix${userId}_${tripId}_$activityId';
+  }) => '$_keyPrefix${userId}_${tripId}_$activityId';
+
+  String _fullKey({
+    required String userId,
+    required String tripId,
+    required String activityId,
+  }) => '$_fullKeyPrefix${userId}_${tripId}_$activityId';
+
+  Future<void> saveFullDraft({
+    required String userId,
+    required String tripId,
+    required String activityId,
+    required Map<String, dynamic> draft,
+  }) async {
+    if (userId.isEmpty || tripId.isEmpty || activityId.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _fullKey(userId: userId, tripId: tripId, activityId: activityId),
+      jsonEncode(draft),
+    );
+  }
+
+  Future<Map<String, dynamic>?> loadFullDraft({
+    required String userId,
+    required String tripId,
+    required String activityId,
+  }) async {
+    if (userId.isEmpty || tripId.isEmpty || activityId.isEmpty) return null;
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(
+      _fullKey(userId: userId, tripId: tripId, activityId: activityId),
+    );
+    if (raw == null) return null;
+    try {
+      final decoded = jsonDecode(raw);
+      return decoded is Map ? Map<String, dynamic>.from(decoded) : null;
+    } catch (error) {
+      debugPrint('[ExpenseDraft] Error loading full draft: $error');
+      return null;
+    }
+  }
+
+  Future<void> clearFullDraft({
+    required String userId,
+    required String tripId,
+    required String activityId,
+  }) async {
+    if (userId.isEmpty || tripId.isEmpty || activityId.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(
+      _fullKey(userId: userId, tripId: tripId, activityId: activityId),
+    );
+  }
 
   Future<void> saveDraftItems({
     required String userId,

@@ -127,6 +127,8 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   bool _showUnknownItemPlaceholder = false;
   bool _isResettingExpenseForm = false;
   int _itemFormResetVersion = 0;
+  int _seenDraftRestoreVersion = 0;
+  Map<String, dynamic> _currentItemFormFields = {};
   String? _topMessage;
   Timer? _topMessageTimer;
 
@@ -146,6 +148,14 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         ? activity.startTime!
         : DateFormat.jm().format(activity.date);
     final uiState = context.watch<ActivityViewModel>().uiState;
+    final viewModel = context.read<ActivityViewModel>();
+    if (_seenDraftRestoreVersion != viewModel.expenseDraftRestoreVersion) {
+      _seenDraftRestoreVersion = viewModel.expenseDraftRestoreVersion;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _restoreDraftFormAppearance(viewModel);
+      });
+    }
     final showRecordedExpenses =
         !uiState.isLoadingRecordedExpenses &&
         uiState.recordedExpenses.isNotEmpty &&
@@ -735,6 +745,11 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                       _editingItemIndex! >= uiState.draftExpenseItems.length
                   ? null
                   : uiState.draftExpenseItems[_editingItemIndex!],
+              initialDraftFields: _currentItemFormFields,
+              onDraftChanged: (fields) {
+                _currentItemFormFields = fields;
+                _saveDraftFormAppearance();
+              },
               onChanged: (hasChanges) {
                 if (_hasUnfinishedItemFormChanges == hasChanges) return;
                 _hasUnfinishedItemFormChanges = hasChanges;
@@ -1293,7 +1308,10 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           InkWell(
-            onTap: () => setState(() => _showAdjustments = !_showAdjustments),
+            onTap: () {
+              setState(() => _showAdjustments = !_showAdjustments);
+              _saveDraftFormAppearance();
+            },
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -1322,9 +1340,9 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
             SizedBox(height: 6),
             if (_taxAsPercentage)
               InputDecorator(
-                decoration: _fieldDecoration(null).copyWith(
-                  contentPadding: EdgeInsets.only(left: 12),
-                ),
+                decoration: _fieldDecoration(
+                  null,
+                ).copyWith(contentPadding: EdgeInsets.only(left: 12)),
                 child: Row(
                   children: [
                     Text('%', style: TextStyle(color: appTheme.gray_900)),
@@ -1553,7 +1571,11 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.warning_amber_rounded, color: appTheme.errorRed, size: 18),
+                Icon(
+                  Icons.warning_amber_rounded,
+                  color: appTheme.errorRed,
+                  size: 18,
+                ),
                 SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -1928,6 +1950,8 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
       });
     }
     if (_taxAsPercentage) _updateDraftAdjustments();
+    _currentItemFormFields = {};
+    _saveDraftFormAppearance();
   }
 
   double _itemSubtotal(ActivityUiState uiState) => uiState.draftExpenseItems
@@ -1967,12 +1991,14 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         !discount.isFinite ||
         tax > ExpenseTrackingService.maxSafeExpenseAmount ||
         discount > ExpenseTrackingService.maxSafeExpenseAmount ||
-        rounding.abs() > 1) return;
+        rounding.abs() > 1)
+      return;
     context.read<ActivityViewModel>().setDraftAdjustments(
       tax,
       discount,
       rounding,
     );
+    _saveDraftFormAppearance();
   }
 
   void _toggleAutoRounding(bool enabled) {
@@ -1987,6 +2013,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         manualRounding: _parsePrice(_manualRoundingText) ?? 0.0,
       );
     }
+    _saveDraftFormAppearance();
   }
 
   void _confirmAdjustments() {
@@ -2014,6 +2041,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
       rounding,
     );
     FocusScope.of(context).unfocus();
+    _saveDraftFormAppearance();
   }
 
   double? _parsePrice(String value) {
@@ -2031,13 +2059,65 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     if (mounted) setState(() => _topMessage = null);
   }
 
+  void _saveDraftFormAppearance() {
+    if (!mounted) return;
+    context.read<ActivityViewModel>().saveExpenseDraftFormFields({
+      'taxText': _taxController.text,
+      'discountText': _discountController.text,
+      'roundingText': _roundingController.text,
+      'manualRoundingText': _manualRoundingText,
+      'taxAsPercentage': _taxAsPercentage,
+      'taxAmountBeforePercentage': _taxAmountBeforePercentage,
+      'showAdjustments': _showAdjustments,
+      'showItemForm': _showItemForm,
+      'editingItemIndex': _editingItemIndex,
+      'itemForm': _showItemForm
+          ? _currentItemFormFields
+          : const <String, dynamic>{},
+    });
+  }
+
+  void _restoreDraftFormAppearance(ActivityViewModel viewModel) {
+    final fields = viewModel.expenseDraftFormFields;
+    if (fields.isEmpty) return;
+    final savedIndex = fields['editingItemIndex'] as int?;
+    final validIndex =
+        savedIndex != null &&
+            savedIndex >= 0 &&
+            savedIndex < viewModel.uiState.draftExpenseItems.length
+        ? savedIndex
+        : null;
+    _taxController.text = fields['taxText'] as String? ?? '';
+    _discountController.text = fields['discountText'] as String? ?? '';
+    _roundingController.text = fields['roundingText'] as String? ?? '';
+    _manualRoundingText = fields['manualRoundingText'] as String? ?? '';
+    setState(() {
+      _taxAsPercentage = fields['taxAsPercentage'] == true;
+      _taxAmountBeforePercentage = (fields['taxAmountBeforePercentage'] as num?)
+          ?.toDouble();
+      _showAdjustments = fields['showAdjustments'] == true;
+      _editingItemIndex = validIndex;
+      _showItemForm = fields['showItemForm'] == true;
+      _currentItemFormFields = Map<String, dynamic>.from(
+        fields['itemForm'] as Map? ?? const {},
+      );
+      _hasUnfinishedItemFormChanges = _currentItemFormFields.isNotEmpty;
+      _hasAppliedOcrValues =
+          viewModel.uiState.receiptLocalPath.isNotEmpty &&
+          viewModel.uiState.ocrRawText.isNotEmpty;
+      _itemFormResetVersion++;
+    });
+  }
+
   void _editItem(ExpenseItem item, int index) {
+    _currentItemFormFields = {};
     setState(() {
       _showUnknownItemPlaceholder = false;
       _editingItemIndex = index;
       _showItemForm = true;
       _hasUnfinishedItemFormChanges = false;
     });
+    _saveDraftFormAppearance();
   }
 
   void _discardItem() {
@@ -2047,6 +2127,8 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
       _showItemForm = false;
       _hasUnfinishedItemFormChanges = false;
     });
+    _currentItemFormFields = {};
+    _saveDraftFormAppearance();
   }
 
   Future<void> _resetExpenseForm() async {
@@ -2103,6 +2185,8 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
       _showItemForm = true;
       _hasUnfinishedItemFormChanges = false;
     });
+    _currentItemFormFields = {};
+    _saveDraftFormAppearance();
   }
 
   bool _hasUnfinishedItem() {
@@ -2111,54 +2195,61 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
 
   Future<void> _scanReceipt() async {
     final viewModel = context.read<ActivityViewModel>();
+    final stateBeforeScan = viewModel.uiState;
     final hasUnsavedManualItems =
-        viewModel.uiState.draftExpenseItems.isNotEmpty || _hasUnfinishedItem();
+        stateBeforeScan.draftExpenseItems.isNotEmpty || _hasUnfinishedItem();
+    final hadAppliedReceipt =
+        stateBeforeScan.receiptLocalPath.isNotEmpty &&
+        (_hasAppliedOcrValues ||
+            stateBeforeScan.hasOcrDraftData ||
+            stateBeforeScan.ocrRawText.isNotEmpty);
 
-    if (hasUnsavedManualItems) {
-      final replaceManualItems = await _showConfirmationDialog(
-        title: 'Replace Unsaved Expense Items?',
-        message:
-            'Scanning this receipt will remove the current unsaved manual expense items. Do you want to continue?',
-        confirmLabel: 'Scan',
-      );
-
-      if (!replaceManualItems || !mounted) {
-        return;
+    void rejectScan() {
+      if (hadAppliedReceipt) {
+        viewModel.restoreExpenseScanState(stateBeforeScan);
+        setState(() => _hasAppliedOcrValues = true);
+      } else {
+        viewModel.discardPendingReceiptScan(
+          originalCurrency: stateBeforeScan.originalCurrency,
+        );
+        setState(() => _hasAppliedOcrValues = false);
       }
-
-      viewModel.clearDraftExpenseItemsForOcr();
-      _discardItem();
     }
 
     await viewModel.scanReceipt();
     if (!mounted) return;
 
-    setState(() => _hasAppliedOcrValues = false);
-
     final uiState = viewModel.uiState;
     if (uiState.errorMessage.isNotEmpty) {
+      if (hadAppliedReceipt) {
+        viewModel.restoreExpenseScanState(stateBeforeScan);
+      }
       _showValidationMessage(uiState.errorMessage);
       return;
     }
 
     if (uiState.ocrRawText.isNotEmpty) {
       final shouldApplyOcr = await _showOcrApplyDialog(uiState);
-      if (!shouldApplyOcr || !mounted) {
-        viewModel.removeReceiptAndOcrData();
-        _taxController.clear();
-        _discountController.clear();
-        _roundingController.clear();
-        _manualRoundingText = '';
-        setState(() {
-          _taxAsPercentage = false;
-          _taxAmountBeforePercentage = null;
-          _showAdjustments = false;
-          _hasAppliedOcrValues = false;
-          _showUnknownItemPlaceholder = false;
-          _editingItemIndex = null;
-          _showItemForm = false;
-        });
+      if (!mounted) return;
+      if (!shouldApplyOcr) {
+        rejectScan();
         return;
+      }
+
+      if (hasUnsavedManualItems) {
+        final replaceManualItems = await _showConfirmationDialog(
+          title: 'Replace Unsaved Expense Items?',
+          message:
+              'Applying this receipt will replace your current unsaved expense items. Do you want to continue?',
+          confirmLabel: 'Replace Items',
+        );
+        if (!mounted) return;
+        if (!replaceManualItems) {
+          rejectScan();
+          return;
+        }
+        viewModel.clearDraftExpenseItemsForOcr();
+        _discardItem();
       }
 
       var reviewReceiptDate = false;
@@ -2173,6 +2264,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         if (!mounted) return;
         reviewReceiptDate = !useReceiptDate;
       }
+      setState(() => _hasAppliedOcrValues = false);
       final itemCount = viewModel.applyOcrItemsToDraft();
       final updatedState = viewModel.uiState;
       final detectedTax = updatedState.draftTaxAmount;
@@ -2203,6 +2295,8 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
           _hasAppliedOcrValues = true;
           _hasUnfinishedItemFormChanges = false;
         });
+        _currentItemFormFields = {};
+        _saveDraftFormAppearance();
       } else {
         setState(() {
           _editingItemIndex = null;
@@ -2214,6 +2308,8 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
           'No item details were detected. "Unknown" was added temporarily; please replace it with the actual item name.',
         );
       }
+    } else if (uiState.errorMessage.isEmpty) {
+      rejectScan();
     }
   }
 
@@ -2492,6 +2588,8 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     if (mounted) {
       setState(() => _hasAppliedOcrValues = false);
     }
+    _currentItemFormFields = {};
+    _saveDraftFormAppearance();
   }
 
   Future<void> _confirmExpense() async {
@@ -2510,6 +2608,21 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     }
 
     if (viewModel.uiState.successMessage.isEmpty) return;
+
+    _taxController.clear();
+    _discountController.clear();
+    _roundingController.clear();
+    _currentItemFormFields = {};
+    setState(() {
+      _manualRoundingText = '';
+      _taxAsPercentage = false;
+      _taxAmountBeforePercentage = null;
+      _showAdjustments = false;
+      _showItemForm = false;
+      _editingItemIndex = null;
+      _hasAppliedOcrValues = false;
+      _hasUnfinishedItemFormChanges = false;
+    });
 
     // Haptic feedback on successful expense save.
     HapticFeedback.mediumImpact();
@@ -2754,6 +2867,8 @@ class _ExpenseItemForm extends StatefulWidget {
   final String currency;
   final String itemNameHint;
   final ExpenseItem? initialItem;
+  final Map<String, dynamic> initialDraftFields;
+  final ValueChanged<Map<String, dynamic>> onDraftChanged;
   final ValueChanged<bool> onChanged;
   final ValueChanged<ExpenseItem> onSave;
   final VoidCallback onDiscard;
@@ -2764,6 +2879,8 @@ class _ExpenseItemForm extends StatefulWidget {
     required this.currency,
     required this.itemNameHint,
     required this.initialItem,
+    required this.initialDraftFields,
+    required this.onDraftChanged,
     required this.onChanged,
     required this.onSave,
     required this.onDiscard,
@@ -2810,6 +2927,20 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
         ? ''
         : initialItem.unitPrice.toStringAsFixed(2);
 
+    if (widget.initialDraftFields.isNotEmpty) {
+      final fields = widget.initialDraftFields;
+      _itemNameController.text = fields['name'] as String? ?? '';
+      _descriptionController.text = fields['description'] as String? ?? '';
+      _merchantController.text = fields['merchant'] as String? ?? '';
+      _quantityController.text = fields['quantity'] as String? ?? '';
+      _unitPriceController.text = fields['unitPrice'] as String? ?? '';
+      final savedDate = DateTime.tryParse(fields['dateTime'] as String? ?? '');
+      if (savedDate != null) {
+        _selectedDate = savedDate;
+        _selectedTime = TimeOfDay.fromDateTime(savedDate);
+      }
+    }
+
     for (final controller in [
       _itemNameController,
       _descriptionController,
@@ -2852,6 +2983,24 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
   void _handleFieldChanged() {
     _refreshSubtotal();
     widget.onChanged(_hasUnfinishedItem());
+    _notifyDraftChanged();
+  }
+
+  void _notifyDraftChanged() {
+    widget.onDraftChanged({
+      'name': _itemNameController.text,
+      'description': _descriptionController.text,
+      'merchant': _merchantController.text,
+      'quantity': _quantityController.text,
+      'unitPrice': _unitPriceController.text,
+      'dateTime': DateTime(
+        _selectedDate.year,
+        _selectedDate.month,
+        _selectedDate.day,
+        _selectedTime.hour,
+        _selectedTime.minute,
+      ).toIso8601String(),
+    });
   }
 
   void _refreshSubtotal() {
@@ -2925,6 +3074,7 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
     if (date != null && mounted) {
       setState(() => _selectedDate = date);
       widget.onChanged(true);
+      _notifyDraftChanged();
     }
   }
 
@@ -2964,6 +3114,7 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
     if (time != null && mounted) {
       setState(() => _selectedTime = time);
       widget.onChanged(true);
+      _notifyDraftChanged();
     }
   }
 
@@ -3227,7 +3378,8 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
                 ValueListenableBuilder<double>(
                   valueListenable: _subtotalNotifier,
                   builder: (context, subtotal, _) {
-                    final canCalculate = subtotal.isFinite &&
+                    final canCalculate =
+                        subtotal.isFinite &&
                         subtotal <= ExpenseTrackingService.maxSafeExpenseAmount;
                     return Container(
                       padding: EdgeInsets.all(16),
