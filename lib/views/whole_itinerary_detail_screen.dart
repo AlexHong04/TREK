@@ -1381,7 +1381,7 @@ class _WholeItineraryDetailScreenState
                               viewModel.uiState.isRegeneratingPlan)
                               ? null
                               : () => viewModel.generateItinerary(
-                            suppressWarning: true,
+                            suppressWarning: false,
                           ),
                           borderRadius: BorderRadius.circular(16),
                           child: Padding(

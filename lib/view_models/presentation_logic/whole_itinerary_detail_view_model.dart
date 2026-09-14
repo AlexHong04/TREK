@@ -209,10 +209,10 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
       arrivals: arrivals ?? _uiState.arrivals,
       departures: departures ?? _uiState.departures,
       hotels: hotels ?? _uiState.hotels,
-      arrivalLocation: arrivalLocation,
-      arrivalTime: arrivalTime,
-      departureLocation: departureLocation,
-      departureTime: departureTime,
+      arrivalLocation: arrivalLocation ?? _uiState.arrivalLocation,
+      arrivalTime: arrivalTime ?? _uiState.arrivalTime,
+      departureLocation: departureLocation ?? _uiState.departureLocation,
+      departureTime: departureTime ?? _uiState.departureTime,
       hotelLocation: hotelLocation ?? _uiState.hotelLocation,
       hotelCheckInTime: hotelCheckInTime ?? _uiState.hotelCheckInTime,
       hotelCheckOutTime: hotelCheckOutTime ?? _uiState.hotelCheckOutTime,
@@ -269,6 +269,8 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         wishlistItemsCoveredCount: fetchedResult.wishlistItemsCoveredCount,
         estimatedExtraBudgetNeeded: fetchedResult.estimatedExtraBudgetNeeded,
         showWishlistWarning: shouldWarn,
+        futureSuggestions: resolvedSuggestions,
+        stashedActivities: const [],
         errorMessage: null,
       );
     } catch (e) {
@@ -416,6 +418,47 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _recalculateBudgetAndWishlistCoverage(List<Activity> currentActivities) {
+    final newTotalAllocated = currentActivities.fold(
+      0.0,
+      (sum, a) => sum + a.allocatedBudget,
+    );
+    final mathShortfall = (newTotalAllocated - totalBudget).clamp(
+      0.0,
+      double.infinity,
+    );
+
+    final wishlist = _uiState.wishlist ?? [];
+    int coveredCount = 0;
+    if (wishlist.isNotEmpty) {
+      final activeActivities = currentActivities
+          .where((a) => a.status != 'empty' && a.destination.trim().isNotEmpty)
+          .toList();
+      for (final w in wishlist) {
+        if (activeActivities.any((a) => _matchesWishlist(w, a.destination, a.description))) {
+          coveredCount++;
+        }
+      }
+    }
+
+    final int uncoveredCount = (wishlist.length - coveredCount).clamp(0, wishlist.length);
+    double resolvedExtra = mathShortfall;
+    if (uncoveredCount > 0) {
+      final unallocated = (totalBudget - newTotalAllocated).clamp(0.0, double.infinity);
+      final wishlistNeeded = (uncoveredCount * 30.0 - unallocated).clamp(0.0, double.infinity);
+      if (wishlistNeeded > resolvedExtra) {
+        resolvedExtra = wishlistNeeded;
+      }
+    }
+
+    _uiState = _uiState.copyWith(
+      activities: currentActivities,
+      totalAllocatedBudget: newTotalAllocated,
+      wishlistItemsCoveredCount: coveredCount,
+      estimatedExtraBudgetNeeded: resolvedExtra,
+    );
+  }
+
   // Remove the activity from the trip but retain the card placeholder
   void removeActivity(String activitiesId) {
     Activity? targetActivity;
@@ -436,7 +479,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
           startTime: activity.startTime,
           endTime: activity.endTime,
           duration: '',
-          activityCategory: '',
+          activityCategory: activity.activityCategory,
           isOverspend: false,
         );
       }
@@ -451,9 +494,9 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     }
 
     _uiState = _uiState.copyWith(
-      activities: updatedActivities,
       stashedActivities: updatedStash,
     );
+    _recalculateBudgetAndWishlistCoverage(updatedActivities);
 
     notifyListeners();
   }
@@ -482,7 +525,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
           startTime: activity.startTime,
           endTime: activity.endTime,
           duration: '',
-          activityCategory: '',
+          activityCategory: activity.activityCategory,
           isOverspend: false,
         );
       }
@@ -490,9 +533,9 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     }).toList();
 
     _uiState = _uiState.copyWith(
-      activities: updatedActivities,
       stashedActivities: updatedStash,
     );
+    _recalculateBudgetAndWishlistCoverage(updatedActivities);
 
     notifyListeners();
   }
@@ -740,8 +783,8 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         await Future.wait(transportFutures);
       }
 
+      _recalculateBudgetAndWishlistCoverage(updatedList);
       _uiState = _uiState.copyWith(
-        activities: updatedList,
         clearRegeneratingSlot: true,
         isLoading: false,
       );
@@ -815,40 +858,10 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         return act;
       }).toList();
 
-      final newTotalAllocated = updatedList.fold(
-        0.0,
-            (sum, a) => sum + a.allocatedBudget,
-      );
-      final mathShortfall = (newTotalAllocated - totalBudget).clamp(
-        0.0,
-        double.infinity,
-      );
-
-      // Recalculate covered wishlist
-      final wishlist = _uiState.wishlist ?? [];
-      int coveredCount = 0;
-      if (wishlist.isNotEmpty) {
-        final activeActivities = updatedList
-            .where(
-              (a) => a.status != 'empty' && a.destination.trim().isNotEmpty,
-        )
-            .toList();
-        for (final w in wishlist) {
-          if (activeActivities.any(
-                (a) => _matchesWishlist(w, a.destination, a.description),
-          )) {
-            coveredCount++;
-          }
-        }
-      }
-
+      _recalculateBudgetAndWishlistCoverage(updatedList);
       _uiState = _uiState.copyWith(
         isRegeneratingPlan: false,
-        activities: updatedList,
-        totalAllocatedBudget: newTotalAllocated,
-        wishlistItemsCoveredCount: coveredCount,
-        estimatedExtraBudgetNeeded: mathShortfall,
-        showWishlistWarning: false,
+        showWishlistWarning: _uiState.estimatedExtraBudgetNeeded > 0,
       );
     } catch (e) {
       _uiState = _uiState.copyWith(
