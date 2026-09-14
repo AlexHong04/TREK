@@ -1999,15 +1999,11 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     }
 
     if (activities.isEmpty) {
-      debugPrint(
-        'No remaining activities. '
-            'Skipping critical/recommendation/reallocation.',
-      );
-
       return ExpenseProcessingResult.withinBudget;
     }
 
-    if (totalAllocatedBudget == 0.00 && isOverspend) {
+    if (totalAllocatedBudget == 0.00 ||
+        remainingBudget >= totalAllocatedBudget) {
       return ExpenseProcessingResult.withinBudget;
     }
 
