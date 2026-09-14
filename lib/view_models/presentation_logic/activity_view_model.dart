@@ -1569,6 +1569,11 @@ class ActivityViewModel extends ChangeNotifier {
     List<Activity> activities,
   ) async {
     for (final activity in activities) {
+      if (activity.allocatedBudget <= 0) {
+        await _cancelActivityExpenseReminder(activity);
+        continue;
+      }
+
       final reminderTime = _activityEndDateTime(activity);
       if (reminderTime == null || !reminderTime.isAfter(DateTime.now())) {
         continue;
@@ -1622,6 +1627,8 @@ class ActivityViewModel extends ChangeNotifier {
 
     var activitiesWithoutExpenses = 0;
     for (final activity in activities) {
+      if (activity.allocatedBudget <= 0) continue;
+
       final activityEnd = _activityEndDateTime(activity);
       final isToday = _isSameDate(activity.date, now);
       if (!isToday || activityEnd == null || activityEnd.isAfter(reviewTime)) {

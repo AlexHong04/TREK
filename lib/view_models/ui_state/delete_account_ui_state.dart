@@ -4,7 +4,10 @@ import 'package:flutter/foundation.dart';
 class DeleteAccountUiState {
   final bool isDeleting;
   final bool isCancelling;
+
+  /// True after the server has soft-deleted and disabled the account.
   final bool deletionSucceeded;
+
   final String? errorMessage;
 
   const DeleteAccountUiState({

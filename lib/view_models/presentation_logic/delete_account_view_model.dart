@@ -14,7 +14,10 @@ class DeleteAccountViewModel extends ChangeNotifier {
   DeleteAccountUiState _uiState = const DeleteAccountUiState();
   DeleteAccountUiState get uiState => _uiState;
 
-  Future<void> deletePermanently() async {
+  /// Kept for compatibility with the existing confirmation screen.
+  Future<void> deletePermanently() => softDeleteAccount();
+
+  Future<void> softDeleteAccount() async {
     if (_uiState.isDeleting || _uiState.isCancelling) return;
     _uiState = _uiState.copyWith(isDeleting: true, clearErrorMessage: true);
     _notify();
@@ -29,7 +32,8 @@ class DeleteAccountViewModel extends ChangeNotifier {
       if (_disposed) return;
       _uiState = _uiState.copyWith(
         isDeleting: false,
-        errorMessage: 'No internet connection. Check your connection and try again.',
+        errorMessage:
+        'No internet connection. Check your connection and try again.',
       );
     } on AccountDeletionNotConfirmedException {
       if (_disposed) return;
@@ -41,7 +45,7 @@ class DeleteAccountViewModel extends ChangeNotifier {
       if (_disposed) return;
       _uiState = _uiState.copyWith(
         isDeleting: false,
-        errorMessage: 'Unable to delete the account. Please try again.',
+        errorMessage: 'Unable to deactivate the account. Please try again.',
       );
     }
     _notify();
@@ -62,13 +66,15 @@ class DeleteAccountViewModel extends ChangeNotifier {
       if (_disposed) return;
       _uiState = _uiState.copyWith(
         isCancelling: false,
-        errorMessage: 'No internet connection. Check your connection and try again.',
+        errorMessage:
+        'No internet connection. Check your connection and try again.',
       );
     } catch (_) {
       if (_disposed) return;
       _uiState = _uiState.copyWith(
         isCancelling: false,
-        errorMessage: 'Unable to cancel account deletion. Please try again.',
+        errorMessage:
+        'Unable to cancel account deletion. Please try again.',
       );
     }
     _notify();

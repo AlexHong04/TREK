@@ -1799,8 +1799,8 @@ class ExpenseTrackingService implements IExpenseTrackingService {
         throw ArgumentError('Item quantity cannot exceed 9,999.');
       }
 
-      if (item.unitPrice <= 0) {
-        throw ArgumentError('Item unit price must be greater than zero.');
+      if (item.unitPrice < 0.10) {
+        throw ArgumentError('Item unit price must be at least 0.10.');
       }
       if (item.unitPrice > 99999) {
         throw ArgumentError('Unit price cannot exceed 99,999.');
