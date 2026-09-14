@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import '../models/entities/activity.dart';
 import '../models/entities/expense.dart';
 import '../models/entities/expense_item.dart';
+import '../models/services/expense_tracking_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/explicit_word_validation.dart';
 import '../view_models/presentation_logic/activity_view_model.dart';
@@ -115,6 +116,8 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   final TextEditingController _discountController = TextEditingController();
   final TextEditingController _roundingController = TextEditingController();
   String _manualRoundingText = '';
+  bool _taxAsPercentage = false;
+  double? _taxAmountBeforePercentage;
   bool _showAdjustments = false;
   int? _editingItemIndex;
   bool _showItemForm = false;
@@ -122,6 +125,8 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   bool _hasAppliedOcrValues = false;
   bool _hasUnfinishedItemFormChanges = false;
   bool _showUnknownItemPlaceholder = false;
+  bool _isResettingExpenseForm = false;
+  int _itemFormResetVersion = 0;
   String? _topMessage;
   Timer? _topMessageTimer;
 
@@ -208,18 +213,38 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                           ),
                         ),
                         SizedBox(height: 20),
-                        Text(
-                          widget.viewOnly
-                              ? 'Expense History'
-                              : showRecordedExpenses
-                              ? 'Recorded Expenses'
-                              : 'Add Expense',
-                          style: TextStyle(
-                            color: appTheme.blueGray900,
-                            fontFamily: 'Inter',
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                          ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                widget.viewOnly
+                                    ? 'Expense History'
+                                    : showRecordedExpenses
+                                    ? 'Recorded Expenses'
+                                    : 'Add Expense',
+                                style: TextStyle(
+                                  color: appTheme.blueGray900,
+                                  fontFamily: 'Inter',
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            if (isExpenseFormMode && !widget.viewOnly)
+                              IconButton(
+                                tooltip: 'Reset expense form details',
+                                onPressed:
+                                    uiState.isSavingExpense ||
+                                        uiState.isPickingReceipt ||
+                                        uiState.isScanningReceipt ||
+                                        _isResettingExpenseForm ||
+                                        !_hasResettableExpenseDetails(uiState)
+                                    ? null
+                                    : _resetExpenseForm,
+                                icon: Icon(Icons.restart_alt_rounded),
+                                color: appTheme.teal_A700,
+                              ),
+                          ],
                         ),
                         SizedBox(height: 20),
                         _ExpenseActivitySummary(
@@ -317,7 +342,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
           width: double.infinity,
           height: 60,
           child: ElevatedButton(
-            onPressed: uiState.isSavingExpense
+            onPressed: uiState.isSavingExpense || _isResettingExpenseForm
                 ? null
                 : _showConfirmExpenseDialog,
             style: ElevatedButton.styleFrom(
@@ -339,6 +364,21 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         ),
       ],
     );
+  }
+
+  bool _hasResettableExpenseDetails(ActivityUiState uiState) {
+    return _hasUnfinishedItemFormChanges ||
+        uiState.draftTaxAmount != 0 ||
+        uiState.draftDiscountAmount != 0 ||
+        uiState.draftRoundingAmount != 0 ||
+        uiState.draftAutoRounding ||
+        uiState.paymentMethod.isNotEmpty ||
+        uiState.receiptLocalPath.isNotEmpty ||
+        uiState.ocrRawText.isNotEmpty ||
+        _taxController.text.trim().isNotEmpty ||
+        _discountController.text.trim().isNotEmpty ||
+        _roundingController.text.trim().isNotEmpty ||
+        _manualRoundingText.isNotEmpty;
   }
 
   String _activeExpenseCurrency(ActivityUiState uiState) {
@@ -564,7 +604,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                                   expense.discountAmount != 0 ||
                                   expense.roundingAmount != 0) ...[
                                 _buildRecordedAdjustmentLine(
-                                  'Tax',
+                                  'Tax & service charges',
                                   _formatExpenseCurrencyAmount(
                                     currency,
                                     expense.taxAmount,
@@ -647,7 +687,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   Widget _buildExpenseItemsSection(ActivityUiState uiState) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.fromLTRB(16, 20, 16, 16),
+      padding: EdgeInsets.fromLTRB(16, 14, 16, 16),
       decoration: BoxDecoration(
         color: appTheme.white_A700,
         border: Border.all(color: appTheme.gray_100),
@@ -663,17 +703,40 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'EXPENSE ITEMS',
-            style: TextStyle(
-              color: appTheme.blue_gray_300,
-              fontFamily: 'Inter',
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.5,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'EXPENSE ITEMS',
+                  style: TextStyle(
+                    color: appTheme.blue_gray_300,
+                    fontFamily: 'Inter',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Reset unsaved item changes',
+                constraints: BoxConstraints.tightFor(width: 36, height: 36),
+                padding: EdgeInsets.zero,
+                iconSize: 20,
+                onPressed:
+                    uiState.isSavingExpense ||
+                        uiState.isPickingReceipt ||
+                        uiState.isScanningReceipt ||
+                        _isResettingExpenseForm ||
+                        !_showItemForm ||
+                        !_hasUnfinishedItemFormChanges
+                    ? null
+                    : _resetCurrentItemForm,
+                icon: Icon(Icons.restart_alt_rounded),
+                color: appTheme.teal_A700,
+              ),
+            ],
           ),
-          SizedBox(height: 14),
+          SizedBox(height: 8),
           for (var index = 0; index < uiState.draftExpenseItems.length; index++)
             _buildSavedItemCard(
               uiState.draftExpenseItems[index],
@@ -683,7 +746,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
           if (_showItemForm)
             _ExpenseItemForm(
               key: ValueKey(
-                '${_editingItemIndex ?? 'new-item'}-$_showUnknownItemPlaceholder',
+                '${_editingItemIndex ?? 'new-item'}-$_showUnknownItemPlaceholder-$_itemFormResetVersion',
               ),
               currency: _activeExpenseCurrency(uiState),
               itemNameHint: _showUnknownItemPlaceholder ? 'Unknown' : 'Item',
@@ -693,7 +756,11 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                   ? null
                   : uiState.draftExpenseItems[_editingItemIndex!],
               onChanged: (hasChanges) {
+                if (_hasUnfinishedItemFormChanges == hasChanges) return;
                 _hasUnfinishedItemFormChanges = hasChanges;
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) setState(() {});
+                });
               },
               onSave: _saveItem,
               onDiscard: _discardItem,
@@ -1247,7 +1314,9 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         _roundingController.text = autoAmount;
       }
     }
-    if (_taxController.text.isEmpty && uiState.draftTaxAmount > 0) {
+    if (!_taxAsPercentage &&
+        _taxController.text.isEmpty &&
+        uiState.draftTaxAmount > 0) {
       _taxController.text = uiState.draftTaxAmount.toStringAsFixed(2);
     }
     return Container(
@@ -1287,30 +1356,104 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
           ),
           if (_showAdjustments) ...[
             SizedBox(height: 12),
-            Text('TAX', style: _fieldLabelStyle),
+            Text('TAX & SERVICE CHARGES', style: _fieldLabelStyle),
             SizedBox(height: 6),
-            TextField(
-              controller: _taxController,
-              style: TextStyle(color: appTheme.gray_900),
-              keyboardType: TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [
-                _ThousandsSeparatorInputFormatter(
-                  maximumIntegerDigits: 5,
-                  decimalDigits: 2,
-                  allowZero: true,
-                  maximumValue: 99999,
+            if (_taxAsPercentage)
+              InputDecorator(
+                decoration: _fieldDecoration(null).copyWith(
+                  contentPadding: EdgeInsets.only(left: 12),
                 ),
-              ],
-              onChanged: (_) => _updateDraftAdjustments(),
-              onSubmitted: (_) => _confirmAdjustments(),
-              decoration: _fieldDecoration('0.00').copyWith(
-                prefixIcon: _adjustmentCurrencyPrefix(currency),
-                prefixIconConstraints: BoxConstraints(
-                  minWidth: 0,
-                  minHeight: 0,
+                child: Row(
+                  children: [
+                    Text('%', style: TextStyle(color: appTheme.gray_900)),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: PopupMenuButton<int>(
+                        tooltip: 'Select percentage',
+                        initialValue: int.tryParse(_taxController.text),
+                        onSelected: (rate) {
+                          _taxController.text = rate.toString();
+                          _updateDraftAdjustments();
+                        },
+                        itemBuilder: (_) => [6, 8, 10, 16, 18]
+                            .map(
+                              (rate) => PopupMenuItem<int>(
+                                value: rate,
+                                child: Text('$rate%'),
+                              ),
+                            )
+                            .toList(),
+                        child: SizedBox(
+                          height: 48,
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  _taxController.text.isEmpty
+                                      ? 'Select rate'
+                                      : _taxController.text,
+                                  style: TextStyle(
+                                    color: _taxController.text.isEmpty
+                                        ? appTheme.blue_gray_300
+                                        : appTheme.gray_900,
+                                  ),
+                                ),
+                              ),
+                              Icon(
+                                Icons.arrow_drop_down,
+                                color: appTheme.blue_gray_300,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    Switch(
+                      value: true,
+                      onChanged: _switchTaxInputMode,
+                      activeThumbColor: appTheme.teal_A700,
+                    ),
+                  ],
+                ),
+              )
+            else
+              TextField(
+                controller: _taxController,
+                style: TextStyle(color: appTheme.gray_900),
+                keyboardType: TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  _ThousandsSeparatorInputFormatter(
+                    maximumIntegerDigits: 14,
+                    decimalDigits: 2,
+                    allowZero: true,
+                    maximumValue: ExpenseTrackingService.maxSafeExpenseAmount,
+                  ),
+                ],
+                onChanged: (_) => _updateDraftAdjustments(),
+                onSubmitted: (_) => _confirmAdjustments(),
+                decoration: _fieldDecoration('0.00').copyWith(
+                  prefixIcon: _adjustmentCurrencyPrefix(currency),
+                  prefixIconConstraints: BoxConstraints(
+                    minWidth: 0,
+                    minHeight: 0,
+                  ),
+                  suffixIcon: Switch(
+                    value: false,
+                    onChanged: _switchTaxInputMode,
+                    activeThumbColor: appTheme.teal_A700,
+                  ),
                 ),
               ),
-            ),
+            if (_taxAsPercentage) ...[
+              SizedBox(height: 6),
+              Text(
+                _taxController.text.trim().isEmpty
+                    ? 'Choose the percentage shown on your receipt'
+                    : 'Calculated: ${_formatExpenseCurrencyAmount(currency, _effectiveTaxAmount(uiState))} '
+                          'from item subtotal',
+                style: TextStyle(color: appTheme.blue_gray_300, fontSize: 12),
+              ),
+            ],
             SizedBox(height: 10),
             Text('DISCOUNT', style: _fieldLabelStyle),
             SizedBox(height: 6),
@@ -1320,10 +1463,10 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
               keyboardType: TextInputType.numberWithOptions(decimal: true),
               inputFormatters: [
                 _ThousandsSeparatorInputFormatter(
-                  maximumIntegerDigits: 5,
+                  maximumIntegerDigits: 14,
                   decimalDigits: 2,
                   allowZero: true,
-                  maximumValue: 99999,
+                  maximumValue: ExpenseTrackingService.maxSafeExpenseAmount,
                 ),
               ],
               onChanged: (_) => _updateDraftAdjustments(),
@@ -1443,6 +1586,22 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
               fontWeight: FontWeight.w600,
             ),
           ),
+          if (uiState.draftTotalAmount > uiState.remainingBudget + 0.005) ...[
+            SizedBox(height: 10),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.warning_amber_rounded, color: appTheme.errorRed, size: 18),
+                SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Over your remaining trip budget. Adjust this expense before confirming.',
+                    style: TextStyle(color: appTheme.errorRed, fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -1807,13 +1966,47 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         _hasUnfinishedItemFormChanges = false;
       });
     }
+    if (_taxAsPercentage) _updateDraftAdjustments();
+  }
+
+  double _itemSubtotal(ActivityUiState uiState) => uiState.draftExpenseItems
+      .fold<double>(0, (sum, item) => sum + item.subtotal);
+
+  double _effectiveTaxAmount(ActivityUiState uiState) {
+    final entered = _parsePrice(_taxController.text) ?? 0.0;
+    if (!_taxAsPercentage) return entered;
+    if (_taxController.text.trim().isEmpty) {
+      return _taxAmountBeforePercentage ?? 0.0;
+    }
+    return (_itemSubtotal(uiState) * entered).round() / 100;
+  }
+
+  void _switchTaxInputMode(bool usePercentage) {
+    if (_taxAsPercentage == usePercentage) return;
+    final uiState = context.read<ActivityViewModel>().uiState;
+    final amount = _effectiveTaxAmount(uiState);
+    setState(() {
+      _taxAsPercentage = usePercentage;
+      if (usePercentage) {
+        _taxAmountBeforePercentage = amount;
+        _taxController.clear();
+      } else {
+        _taxController.text = amount > 0 ? amount.toStringAsFixed(2) : '';
+        _taxAmountBeforePercentage = null;
+      }
+    });
+    _updateDraftAdjustments();
   }
 
   void _updateDraftAdjustments() {
-    final tax = _parsePrice(_taxController.text) ?? 0.0;
+    final tax = _effectiveTaxAmount(context.read<ActivityViewModel>().uiState);
     final discount = _parsePrice(_discountController.text) ?? 0.0;
     final rounding = _parsePrice(_roundingController.text) ?? 0.0;
-    if (tax > 99999 || discount > 99999 || rounding.abs() > 1) return;
+    if (!tax.isFinite ||
+        !discount.isFinite ||
+        tax > ExpenseTrackingService.maxSafeExpenseAmount ||
+        discount > ExpenseTrackingService.maxSafeExpenseAmount ||
+        rounding.abs() > 1) return;
     context.read<ActivityViewModel>().setDraftAdjustments(
       tax,
       discount,
@@ -1836,16 +2029,22 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   }
 
   void _confirmAdjustments() {
-    final tax = _parsePrice(_taxController.text) ?? 0.0;
+    final tax = _effectiveTaxAmount(context.read<ActivityViewModel>().uiState);
     final discount = _parsePrice(_discountController.text) ?? 0.0;
     final rounding = _parsePrice(_roundingController.text) ?? 0.0;
-    if (tax > 99999 || discount > 99999 || rounding.abs() > 1) {
+    if (!tax.isFinite ||
+        !discount.isFinite ||
+        tax > ExpenseTrackingService.maxSafeExpenseAmount ||
+        discount > ExpenseTrackingService.maxSafeExpenseAmount ||
+        rounding.abs() > 1) {
       _showValidationMessage(
-        'Tax and discount must be at most 99,999; rounding must be within -1.00 to 1.00.',
+        'Enter valid tax and discount amounts. Rounding must be within -1.00 to 1.00.',
       );
       return;
     }
-    _taxController.text = tax > 0 ? tax.toStringAsFixed(2) : '';
+    if (!_taxAsPercentage) {
+      _taxController.text = tax > 0 ? tax.toStringAsFixed(2) : '';
+    }
     _discountController.text = discount > 0 ? discount.toStringAsFixed(2) : '';
     _roundingController.text = rounding != 0 ? rounding.toStringAsFixed(2) : '';
     context.read<ActivityViewModel>().setDraftAdjustments(
@@ -1885,6 +2084,67 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
       _showUnknownItemPlaceholder = false;
       _editingItemIndex = null;
       _showItemForm = false;
+      _hasUnfinishedItemFormChanges = false;
+    });
+  }
+
+  Future<void> _resetExpenseForm() async {
+    final shouldClear = await _showConfirmationDialog(
+      title: 'Reset Expense Form?',
+      message:
+          'This clears your unfinished item edits, adjustments, payment method, '
+          'and selected receipt. Items already added will stay.',
+      confirmLabel: 'Reset',
+      isDestructive: true,
+    );
+    if (!shouldClear || !mounted) return;
+
+    final wasItemFormOpen = _showItemForm;
+    setState(() => _isResettingExpenseForm = true);
+    try {
+      await context.read<ActivityViewModel>().resetExpenseFormDetails();
+      if (!mounted) return;
+      FocusManager.instance.primaryFocus?.unfocus();
+      _topMessageTimer?.cancel();
+      _taxController.clear();
+      _discountController.clear();
+      _roundingController.clear();
+      setState(() {
+        _taxAsPercentage = false;
+        _taxAmountBeforePercentage = null;
+        _manualRoundingText = '';
+        _showAdjustments = false;
+        _hasAppliedOcrValues = false;
+        _showUnknownItemPlaceholder = false;
+        _editingItemIndex = null;
+        _itemFormResetVersion++;
+        _showItemForm = wasItemFormOpen;
+        _hasUnfinishedItemFormChanges = false;
+        _topMessage = null;
+        _isResettingExpenseForm = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _isResettingExpenseForm = false);
+      _showValidationMessage('Could not reset the form. Please try again.');
+    }
+  }
+
+  Future<void> _resetCurrentItemForm() async {
+    final shouldClear = await _showConfirmationDialog(
+      title: 'Reset Item Form?',
+      message:
+          'This will discard changes in the item you are editing. '
+          'Saved items will stay.',
+      confirmLabel: 'Reset Item',
+      isDestructive: true,
+    );
+    if (!shouldClear || !mounted) return;
+
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {
+      _showUnknownItemPlaceholder = false;
+      _itemFormResetVersion++;
       _hasUnfinishedItemFormChanges = false;
     });
   }
@@ -1949,6 +2209,8 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         _roundingController.clear();
         _manualRoundingText = '';
         setState(() {
+          _taxAsPercentage = false;
+          _taxAmountBeforePercentage = null;
           _showAdjustments = false;
           _hasAppliedOcrValues = false;
           _showUnknownItemPlaceholder = false;
@@ -1976,6 +2238,8 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
       final hasUnknownItem =
           updatedState.draftExpenseItems.length == 1 &&
           updatedState.draftExpenseItems.first.itemName == 'Unknown';
+      _taxAsPercentage = false;
+      _taxAmountBeforePercentage = null;
       _taxController.text = detectedTax > 0
           ? detectedTax.toStringAsFixed(2)
           : '';
@@ -2280,7 +2544,11 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     _discountController.clear();
     _roundingController.clear();
     _manualRoundingText = '';
-    setState(() => _showAdjustments = false);
+    setState(() {
+      _taxAsPercentage = false;
+      _taxAmountBeforePercentage = null;
+      _showAdjustments = false;
+    });
     if (mounted) {
       setState(() => _hasAppliedOcrValues = false);
     }
@@ -2337,7 +2605,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     if (_showItemForm && _hasUnfinishedItemFormChanges) {
       _showValidationMessage(
         _editingItemIndex == null
-            ? 'Tap Save Item before confirming the expense.'
+            ? 'Tap Save before confirming the expense.'
             : 'Tap Update Item before confirming the expense.',
       );
       return;
@@ -2374,6 +2642,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     if (!isConfirmed || !mounted) return;
 
     context.read<ActivityViewModel>().removeExpenseItem(index);
+    if (_taxAsPercentage) _updateDraftAdjustments();
     if (clearEditor || _editingItemIndex == index) {
       _discardItem();
     } else if (_editingItemIndex != null && _editingItemIndex! > index) {
@@ -2795,22 +3064,15 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
       widget.onValidationError('Item quantity must be greater than zero.');
       return;
     }
-    if (quantity > 9999) {
-      widget.onValidationError('Item quantity cannot exceed 9,999.');
-      return;
-    }
-    if (price == null || price < 0.10) {
+    if (price == null || !price.isFinite || price < 0.10) {
       widget.onValidationError(
         'Unit price must be at least ${widget.currency} 0.10.',
       );
       return;
     }
-    if (price > 99999) {
-      widget.onValidationError('Unit price cannot exceed 99,999.');
-      return;
-    }
-    if (quantity * price > 999999) {
-      widget.onValidationError('Item subtotal cannot exceed 999,999.');
+    if (price > ExpenseTrackingService.maxSafeExpenseAmount ||
+        quantity * price > ExpenseTrackingService.maxSafeExpenseAmount) {
+      widget.onValidationError('Item amount is too large to calculate safely.');
       return;
     }
 
@@ -2856,7 +3118,7 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
     if (controller == _quantityController) {
       return [
         _ThousandsSeparatorInputFormatter(
-          maximumIntegerDigits: 4,
+          maximumIntegerDigits: 15,
           decimalDigits: 0,
         ),
       ];
@@ -2864,7 +3126,7 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
     if (controller == _unitPriceController) {
       return [
         _ThousandsSeparatorInputFormatter(
-          maximumIntegerDigits: 5,
+          maximumIntegerDigits: 14,
           decimalDigits: 2,
           allowZero: true,
         ),
@@ -3036,6 +3298,8 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
                 ValueListenableBuilder<double>(
                   valueListenable: _subtotalNotifier,
                   builder: (context, subtotal, _) {
+                    final canCalculate = subtotal.isFinite &&
+                        subtotal <= ExpenseTrackingService.maxSafeExpenseAmount;
                     return Container(
                       padding: EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -3043,7 +3307,6 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
                             'Subtotal',
@@ -3054,30 +3317,51 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                'AMOUNT',
-                                style: TextStyle(
-                                  color: appTheme.blue_gray_300,
-                                  fontFamily: 'Inter',
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 1,
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  'AMOUNT',
+                                  style: TextStyle(
+                                    color: appTheme.blue_gray_300,
+                                    fontFamily: 'Inter',
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 1,
+                                  ),
                                 ),
-                              ),
-                              Text(
-                                _formatExpenseCurrencyAmount(
-                                  widget.currency,
-                                  subtotal,
-                                ),
-                                style: TextStyle(
-                                  fontFamily: 'Inter',
-                                  fontSize: 20,
-                                ),
-                              ),
-                            ],
+                                if (canCalculate)
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: Alignment.centerRight,
+                                      child: Text(
+                                        _formatExpenseCurrencyAmount(
+                                          widget.currency,
+                                          subtotal,
+                                        ),
+                                        style: TextStyle(
+                                          fontFamily: 'Inter',
+                                          fontSize: 20,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  Text(
+                                    'Too large to calculate safely',
+                                    textAlign: TextAlign.right,
+                                    style: TextStyle(
+                                      color: appTheme.errorRed,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -3106,9 +3390,7 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
                         minimumSize: Size(98, 44),
                       ),
                       child: Text(
-                        widget.initialItem == null
-                            ? 'Save Item'
-                            : 'Update Item',
+                        widget.initialItem == null ? 'Save' : 'Update Item',
                       ),
                     ),
                   ],

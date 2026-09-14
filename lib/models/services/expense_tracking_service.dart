@@ -87,6 +87,10 @@ class _ExtractedReceiptItem {
 }
 
 class ExpenseTrackingService implements IExpenseTrackingService {
+  // Double-precision calculations can safely represent whole cents below 2^53.
+  // This is a calculation-safety bound, not a spending-policy limit.
+  static const double maxSafeExpenseAmount = 90071992547409.91;
+
   final IItineraryRepository _itineraryRepository;
   final IBudgetService _budgetService;
   final IExpenseRepository _expenseRepository;
@@ -1766,10 +1770,12 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     double discountAmount,
     double roundingAmount,
   ) {
-    if (discountAmount < 0 || discountAmount > 99999) {
-      throw ArgumentError('Discount must be between 0 and 99,999.');
+    if (!discountAmount.isFinite ||
+        discountAmount < 0 ||
+        discountAmount > maxSafeExpenseAmount) {
+      throw ArgumentError('Enter a valid discount amount.');
     }
-    if (roundingAmount.abs() > 1) {
+    if (!roundingAmount.isFinite || roundingAmount.abs() > 1) {
       throw ArgumentError('Rounding must be between -1.00 and 1.00.');
     }
   }
@@ -1798,33 +1804,32 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       if (item.quantity <= 0) {
         throw ArgumentError('Item quantity must be greater than zero.');
       }
-      if (item.quantity > 9999) {
-        throw ArgumentError('Item quantity cannot exceed 9,999.');
-      }
-
-      if (item.unitPrice < 0.10) {
+      if (!item.unitPrice.isFinite || item.unitPrice < 0.10) {
         throw ArgumentError('Item unit price must be at least 0.10.');
       }
-      if (item.unitPrice > 99999) {
-        throw ArgumentError('Unit price cannot exceed 99,999.');
-      }
-      if (item.quantity * item.unitPrice > 999999) {
-        throw ArgumentError('Item subtotal cannot exceed 999,999.');
+      if (item.unitPrice > maxSafeExpenseAmount ||
+          !item.subtotal.isFinite ||
+          item.quantity * item.unitPrice > maxSafeExpenseAmount) {
+        throw ArgumentError('Item amount is too large to calculate safely.');
       }
     }
   }
 
   void validateTotalAmount(double totalAmount) {
-    if (totalAmount <= 0 || totalAmount > 999999) {
+    if (!totalAmount.isFinite ||
+        totalAmount <= 0 ||
+        totalAmount > maxSafeExpenseAmount) {
       throw ArgumentError(
-        'Amount must be a positive number within the allowed transaction limit.',
+        'Enter a positive amount that can be calculated safely.',
       );
     }
   }
 
   void validateTaxAmount(double taxAmount) {
-    if (taxAmount < 0 || taxAmount > 99999) {
-      throw ArgumentError('Tax amount must be between 0 and 99,999.');
+    if (!taxAmount.isFinite ||
+        taxAmount < 0 ||
+        taxAmount > maxSafeExpenseAmount) {
+      throw ArgumentError('Enter a valid tax and service charges amount.');
     }
   }
 

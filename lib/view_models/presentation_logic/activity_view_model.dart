@@ -41,6 +41,7 @@ class ActivityViewModel extends ChangeNotifier {
   final LocationSource _locationSource = LocationSource();
   final ExpenseDraftLocalDataSource _expenseDraftLocalDataSource =
       ExpenseDraftLocalDataSource();
+  Future<void> _pendingManualDraftSave = Future<void>.value();
 
   ActivityViewModel({
     IItineraryService? itineraryService,
@@ -191,7 +192,7 @@ class ActivityViewModel extends ChangeNotifier {
 
   void addExpenseItem(ExpenseItem item) {
     _updateDraftExpenseItems([..._uiState.draftExpenseItems, item]);
-    unawaited(_saveManualExpenseDraftForSelectedActivity());
+    _queueManualExpenseDraftSave();
   }
 
   void updateExpenseItem(int index, ExpenseItem item) {
@@ -203,7 +204,7 @@ class ActivityViewModel extends ChangeNotifier {
     final updatedItems = [..._uiState.draftExpenseItems];
     updatedItems[index] = item;
     _updateDraftExpenseItems(updatedItems);
-    unawaited(_saveManualExpenseDraftForSelectedActivity());
+    _queueManualExpenseDraftSave();
   }
 
   void removeExpenseItem(int index) {
@@ -218,7 +219,32 @@ class ActivityViewModel extends ChangeNotifier {
         .map((ocrIndex) => ocrIndex > index ? ocrIndex - 1 : ocrIndex)
         .toSet();
     _updateDraftExpenseItems(updatedItems, ocrItemIndexes: updatedOcrIndexes);
-    unawaited(_saveManualExpenseDraftForSelectedActivity());
+    _queueManualExpenseDraftSave();
+  }
+
+  Future<void> resetExpenseFormDetails() async {
+    final savedItems = _uiState.draftExpenseItems;
+    _uiState = _uiState.copyWith(
+      draftTaxAmount: 0.0,
+      draftDiscountAmount: 0.0,
+      draftRoundingAmount: 0.0,
+      draftAutoRounding: false,
+      draftTotalAmount: _expenseTrackingService.calculateTotalExpense(
+        savedItems,
+      ),
+      paymentMethod: '',
+      receiptLocalPath: '',
+      clearOcrData: true,
+      errorMessage: '',
+      successMessage: '',
+    );
+    notifyListeners();
+    _queueManualExpenseDraftSave();
+    try {
+      await _pendingManualDraftSave;
+    } catch (error) {
+      debugPrint('[ExpenseDraft] Unable to preserve items after reset: $error');
+    }
   }
 
   /// Removes only unsaved draft items after the tourist agrees to replace them
@@ -1153,20 +1179,39 @@ class ActivityViewModel extends ChangeNotifier {
   bool get _canUseManualExpenseDraft =>
       !_hasReceiptOrOcrDraft && _uiState.recordedExpenses.isEmpty;
 
-  Future<void> _saveManualExpenseDraftForSelectedActivity() async {
+  void _queueManualExpenseDraftSave() {
     final selectedActivity = _uiState.selectedActivity;
     if (selectedActivity == null) return;
+    final userId = _manualDraftUserId;
+    final tripId = _uiState.tripId;
+    final activityId = selectedActivity.activitiesId;
+    final canSaveDraft = _canUseManualExpenseDraft;
+    final items = _uiState.draftExpenseItems
+        .map((item) => item.toJson())
+        .toList();
 
-    if (!_canUseManualExpenseDraft) {
-      await _clearManualExpenseDraftForSelectedActivity();
-      return;
-    }
-
-    await _expenseDraftLocalDataSource.saveDraftItems(
-      userId: _manualDraftUserId,
-      tripId: _uiState.tripId,
-      activityId: selectedActivity.activitiesId,
-      items: _uiState.draftExpenseItems.map((item) => item.toJson()).toList(),
+    _pendingManualDraftSave = _pendingManualDraftSave
+        .catchError((Object error) {
+          debugPrint('[ExpenseDraft] Unable to save manual draft: $error');
+        })
+        .then(
+          (_) => canSaveDraft
+              ? _expenseDraftLocalDataSource.saveDraftItems(
+                  userId: userId,
+                  tripId: tripId,
+                  activityId: activityId,
+                  items: items,
+                )
+              : _expenseDraftLocalDataSource.clearDraftItems(
+                  userId: userId,
+                  tripId: tripId,
+                  activityId: activityId,
+                ),
+        );
+    unawaited(
+      _pendingManualDraftSave.catchError((Object error) {
+        debugPrint('[ExpenseDraft] Unable to save manual draft: $error');
+      }),
     );
   }
 
@@ -1202,11 +1247,20 @@ class ActivityViewModel extends ChangeNotifier {
   Future<void> _clearManualExpenseDraftForSelectedActivity() async {
     final selectedActivity = _uiState.selectedActivity;
     if (selectedActivity == null) return;
+    final userId = _manualDraftUserId;
+    final tripId = _uiState.tripId;
+    final activityId = selectedActivity.activitiesId;
+
+    try {
+      await _pendingManualDraftSave;
+    } catch (error) {
+      debugPrint('[ExpenseDraft] Pending save failed before clear: $error');
+    }
 
     await _expenseDraftLocalDataSource.clearDraftItems(
-      userId: _manualDraftUserId,
-      tripId: _uiState.tripId,
-      activityId: selectedActivity.activitiesId,
+      userId: userId,
+      tripId: tripId,
+      activityId: activityId,
     );
   }
 
