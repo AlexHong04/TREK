@@ -162,18 +162,13 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         !_isRecordingNewExpense;
     final isExpenseFormMode =
         !uiState.isLoadingRecordedExpenses && !showRecordedExpenses;
-    final hasMoreRecordedExpensesThanFit = uiState.recordedExpenses.length >= 2;
-    final canExpandSheet = isExpenseFormMode || hasMoreRecordedExpensesThanFit;
-    final recordedExpensesHeight = 0.62;
     final recordedExpenseCount = uiState.recordedExpenses.length;
-    final maxRecordedExpensesHeight = recordedExpenseCount >= 4
-        ? 0.90
-        : recordedExpenseCount == 3
-        ? 0.82
+    final initialRecordedExpensesHeight = recordedExpenseCount >= 3
+        ? 0.95
         : recordedExpenseCount == 2
-        ? 0.72
-        : recordedExpensesHeight;
-    final initialRecordedExpensesHeight = maxRecordedExpensesHeight;
+        ? 0.88
+        : 0.76;
+    const maxRecordedExpensesHeight = 0.95;
 
     return MediaQuery.removeViewInsets(
       context: context,
@@ -195,9 +190,9 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         snap: !isExpenseFormMode,
         snapSizes: isExpenseFormMode
             ? null
-            : hasMoreRecordedExpensesThanFit
-            ? [0.50, recordedExpensesHeight, maxRecordedExpensesHeight]
-            : [0.50, recordedExpensesHeight],
+            : initialRecordedExpensesHeight == maxRecordedExpensesHeight
+            ? [0.50, maxRecordedExpensesHeight]
+            : [0.50, initialRecordedExpensesHeight, maxRecordedExpensesHeight],
         shouldCloseOnMinExtent: true,
         builder: (context, scrollController) => Stack(
           fit: StackFit.expand,
@@ -210,7 +205,12 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                   top: false,
                   child: SingleChildScrollView(
                     controller: scrollController,
-                    padding: EdgeInsets.fromLTRB(24, 16, 24, 32),
+                    padding: EdgeInsets.fromLTRB(
+                      24,
+                      16,
+                      24,
+                      showRecordedExpenses && !widget.viewOnly ? 112 : 32,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -308,6 +308,23 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                 ),
               ),
             ),
+            if (showRecordedExpenses && !widget.viewOnly)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: SafeArea(
+                  top: false,
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(24, 12, 24, 12),
+                    decoration: BoxDecoration(
+                      color: appTheme.white_A700,
+                      border: Border(top: BorderSide(color: appTheme.gray_200)),
+                    ),
+                    child: _buildRecordNewExpenseButton(),
+                  ),
+                ),
+              ),
             if (_topMessage != null)
               Positioned(
                 top: 16,
@@ -439,32 +456,29 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
             padding: EdgeInsets.only(bottom: 10),
             child: Center(child: CircularProgressIndicator()),
           ),
-        if (!widget.viewOnly) ...[
-          SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            height: 56,
-            child: ElevatedButton.icon(
-              onPressed: () => setState(() => _isRecordingNewExpense = true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: appTheme.teal_A700,
-                foregroundColor: appTheme.white_A700,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-              icon: Icon(Icons.add),
-              label: Text(
-                'Record New Expense',
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ),
-        ],
       ],
+    );
+  }
+
+  Widget _buildRecordNewExpenseButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: ElevatedButton.icon(
+        onPressed: () => setState(() => _isRecordingNewExpense = true),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: appTheme.teal_A700,
+          foregroundColor: appTheme.white_A700,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        icon: const Icon(Icons.add),
+        label: const Text(
+          'Record New Expense',
+          style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w700),
+        ),
+      ),
     );
   }
 
