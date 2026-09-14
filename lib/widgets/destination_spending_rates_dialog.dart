@@ -14,6 +14,15 @@ class DestinationRateItem {
     required this.description,
     required this.keywords,
   });
+
+  /// Extracts the lower bound of the daily rate range in MYR (e.g. 'RM350 – RM480 / day' -> 350.0).
+  double get minRate {
+    final match = RegExp(r'RM\s*(\d+)').firstMatch(rateRange);
+    if (match != null) {
+      return double.tryParse(match.group(1)!) ?? 120.0;
+    }
+    return 120.0;
+  }
 }
 
 const List<DestinationRateItem> malaysiaDestinationRates = [
@@ -221,6 +230,22 @@ List<DestinationRateItem> findMatchingDestinations(String? destinationName) {
     }
   }
   return matchedList;
+}
+
+/// Returns the lowest minimum daily spending rate (in MYR) among the provided destinations.
+/// If multiple destinations are selected, selects the lowest minimum daily rate.
+double getMinimumDailySpendingRate(List<String> destinations) {
+  if (destinations.isEmpty) return 120.0;
+  final matched = findMatchingDestinations(destinations.join(', '));
+  if (matched.isEmpty) return 120.0;
+
+  double minVal = double.infinity;
+  for (final item in matched) {
+    if (item.minRate > 0 && item.minRate < minVal) {
+      minVal = item.minRate;
+    }
+  }
+  return minVal.isFinite ? minVal : 120.0;
 }
 
 Future<void> showDestinationSpendingRatesDialog(

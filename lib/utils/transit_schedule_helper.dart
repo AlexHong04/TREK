@@ -479,35 +479,6 @@ class TransitScheduleHelper {
 
   /// Recommended realistic departure schedules based on typical Malaysia timetables.
   static List<String> getPopularScheduleDepartureTimes(String transitType) {
-    final mode = transitType.toLowerCase();
-    if (mode == 'flight') {
-      return [
-        '08:00 AM',
-        '10:30 AM',
-        '01:15 PM',
-        '04:30 PM',
-        '07:00 PM',
-        '09:30 PM',
-      ];
-    }
-    if (mode == 'train') {
-      return [
-        '07:08 AM',
-        '08:47 AM',
-        '11:45 AM',
-        '03:30 PM',
-        '07:15 PM',
-        '09:10 PM',
-      ];
-    }
-    // Express Bus
-    return [
-      '08:00 AM',
-      '10:30 AM',
-      '02:00 PM',
-      '05:30 PM',
-      '08:30 PM',
-      '11:00 PM',
-    ];
+    return const [];
   }
 }
