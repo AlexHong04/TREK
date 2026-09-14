@@ -33,6 +33,9 @@ String? _validateExpenseItemName(String value) {
   if (!RegExp(r'^[A-Za-z0-9 -]+$').hasMatch(trimmed)) {
     return 'Item name may only contain letters, numbers, spaces, and dashes.';
   }
+  if (trimmed.contains('--')) {
+    return 'Item name cannot contain repeated dashes.';
+  }
   return _validateExpenseText('Item name', trimmed);
 }
 
@@ -70,8 +73,8 @@ String? _validateOptionalExpenseTextSymbols(String fieldName, String value) {
   if (!RegExp(r"^[A-Za-z0-9 .,!?&'()/-]+$").hasMatch(value)) {
     return "$fieldName contains an unsupported symbol. Use only . , ! ? & ' ( ) / or -.";
   }
-  if (RegExp(r"([^A-Za-z0-9\s])\1{3,}").hasMatch(value)) {
-    return '$fieldName cannot contain the same symbol more than 3 times in a row.';
+  if (RegExp(r"([^A-Za-z0-9\s])\1").hasMatch(value)) {
+    return '$fieldName cannot contain repeated symbols.';
   }
   return null;
 }
