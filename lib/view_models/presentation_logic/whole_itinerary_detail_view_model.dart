@@ -699,24 +699,106 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
       final updatedList = List<Activity>.from(_uiState.activities);
       updatedList[slotIndex] = newActivity;
 
-      // ── Regenerate adjacent transportation activities ──
-      // When an attraction is replaced, the transportation slots
-      // leading to / from it still reference the old destination.
-      // Ask Gemini to regenerate them with the correct origin/destination.
       final newDest = newActivity.destination;
       final city = destination.isNotEmpty
           ? destination
           : _uiState.destinationTitle;
+
+      // Indices whose venue changed, so the "Walk to ..." rows around them have
+      // to be rebuilt further down.
+      final changedVenueIndices = <int>{slotIndex};
+
+      // ── Reposition the nearest restaurant / attraction neighbours ──
+      // The replacement can sit in a completely different part of the city, so
+      // the nearest real venue on each side is re-picked around the new venue.
+      // Without this the day would ping-pong across the city. The fixed arrival
+      // (first) and departure (last) rows are never touched, and transportation
+      // rows are handled separately below.
+      final neighbourIndices = <int>[];
+      for (int i = slotIndex - 1; i > 0; i--) {
+        if (isRealVenue(updatedList[i]) && updatedList[i].status != 'empty') {
+          neighbourIndices.add(i);
+          break;
+        }
+      }
+      for (int i = slotIndex + 1; i < updatedList.length - 1; i++) {
+        if (isRealVenue(updatedList[i]) && updatedList[i].status != 'empty') {
+          neighbourIndices.add(i);
+          break;
+        }
+      }
+
+      for (final index in neighbourIndices) {
+        final neighbour = updatedList[index];
+        final neighbourCategory = neighbour.activityCategory;
+        // Everything else stays excluded, but the neighbour's own current name
+        // is allowed back: if it is already the best nearby option it is kept
+        // instead of being churned for the sake of change.
+        final excludedForNeighbour = <String>[
+          ..._uiState.stashedActivities
+              .where(isRealVenue)
+              .map((a) => a.destination),
+          ...updatedList.asMap().entries
+              .where((entry) => entry.key != index && isRealVenue(entry.value))
+              .map((entry) => entry.value.destination),
+        ];
+        try {
+          updatedList[index] =
+              await _itineraryService.generateAlternativeItinerary(
+            destination: city,
+            slotDate: neighbour.date,
+            startTime: neighbour.startTime ?? '09:00',
+            endTime: neighbour.endTime ?? '11:00',
+            category: neighbourCategory,
+            excludedActivity: excludedForNeighbour,
+            existingActivityId: neighbour.activitiesId,
+            dayTripId: neighbour.dayTripId,
+            budgetLimit: neighbour.allocatedBudget > 0
+                ? neighbour.allocatedBudget
+                : 50.0,
+            dayNumber: dayNumber,
+            preference: _uiState.preference,
+            constraints: _uiState.constraints,
+            // Anchoring both sides to the new venue is what pulls the neighbour
+            // into the same area: it becomes the prompt's target area.
+            previousActivityDestination: newDest,
+            nextActivityDestination: newDest,
+            isFirstDay: dayNumber == 1,
+            isLastDay: dayNumber == totalDays,
+            totalDays: totalDays,
+          );
+          changedVenueIndices.add(index);
+        } catch (e) {
+          // A neighbour that cannot be repositioned keeps its current venue.
+          debugPrint('Failed to reposition neighbouring venue: $e');
+        }
+      }
+
+      // ── Regenerate transportation around every changed venue ──
+      // A "Walk to ..." row next to a venue we just changed still names the old
+      // destination, so it is rebuilt from its final neighbours.
+      final transportIndices = <int>{};
+      for (final changed in changedVenueIndices) {
+        transportIndices.add(changed - 1);
+        transportIndices.add(changed + 1);
+      }
+      transportIndices.removeWhere(
+        (index) => index < 0 || index >= updatedList.length,
+      );
+
       final transportFutures = <Future<void>>[];
 
-      // Transportation BEFORE the replaced slot
-      if (slotIndex > 0 &&
-          updatedList[slotIndex - 1].activityCategory.toLowerCase() ==
-              'transportation') {
-        final transport = updatedList[slotIndex - 1];
-        // Find the origin: nearest non-empty, non-transport activity before it
-        String origin = _uiState.destinationTitle;
-        for (int i = slotIndex - 2; i >= 0; i--) {
+      for (final index in transportIndices) {
+        final transport = updatedList[index];
+        if (transport.activityCategory.toLowerCase() != 'transportation') {
+          continue;
+        }
+
+        // Origin: nearest place before the row. Destination: nearest place
+        // after it. Both are read from the settled list, so a repositioned
+        // neighbour is already reflected here.
+        String origin = city;
+        for (int i = index - 1; i >= 0; i--) {
           final a = updatedList[i];
           if (a.destination.isNotEmpty &&
               a.activityCategory.toLowerCase() != 'transportation') {
@@ -724,34 +806,9 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
             break;
           }
         }
-        transportFutures.add(
-          _itineraryService
-              .regenerateTransportation(
-            originPlace: origin,
-            destinationPlace: newDest,
-            city: city,
-            existingActivityId: transport.activitiesId,
-            dayTripId: transport.dayTripId,
-            date: transport.date,
-            startTime: transport.startTime,
-            endTime: transport.endTime,
-          )
-              .then<void>((updated) {
-            updatedList[slotIndex - 1] = updated;
-          }).catchError((e) {
-            debugPrint('Failed to regenerate preceding transport: $e');
-          }),
-        );
-      }
 
-      // Transportation AFTER the replaced slot
-      if (slotIndex < updatedList.length - 1 &&
-          updatedList[slotIndex + 1].activityCategory.toLowerCase() ==
-              'transportation') {
-        final transport = updatedList[slotIndex + 1];
-        // Find the destination: nearest non-empty, non-transport activity after it
-        String nextPlace = _uiState.destinationTitle;
-        for (int i = slotIndex + 2; i < updatedList.length; i++) {
+        String nextPlace = city;
+        for (int i = index + 1; i < updatedList.length; i++) {
           final a = updatedList[i];
           if (a.destination.isNotEmpty &&
               a.activityCategory.toLowerCase() != 'transportation') {
@@ -759,10 +816,11 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
             break;
           }
         }
+
         transportFutures.add(
           _itineraryService
               .regenerateTransportation(
-            originPlace: newDest,
+            originPlace: origin,
             destinationPlace: nextPlace,
             city: city,
             existingActivityId: transport.activitiesId,
@@ -772,9 +830,9 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
             endTime: transport.endTime,
           )
               .then<void>((updated) {
-            updatedList[slotIndex + 1] = updated;
+            updatedList[index] = updated;
           }).catchError((e) {
-            debugPrint('Failed to regenerate following transport: $e');
+            debugPrint('Failed to regenerate transportation at $index: $e');
           }),
         );
       }

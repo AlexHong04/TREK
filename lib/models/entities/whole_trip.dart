@@ -37,6 +37,12 @@ class WholeTrip {
     final s = status.toLowerCase();
     if(s == 'terminated') {
       return 'terminated';
+    } else if(s == 'deleted') {
+      // Soft-deleted plans keep their row for recovery, but they are not a real
+      // trip state: returning 'deleted' keeps them out of every status-based
+      // list (pending/ongoing/completed/terminated) instead of being mistaken
+      // for a completed trip once their end date passes.
+      return 'deleted';
     } else if(s == 'completed' || today.isAfter(tripEnd)) {
       return 'completed';
     } else if(today.isBefore(tripStart)) {

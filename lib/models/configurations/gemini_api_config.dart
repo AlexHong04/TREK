@@ -821,7 +821,7 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
     - Budget Ceiling: MYR ${budgetLimit.toStringAsFixed(2)}
     ${preference != null && preference.isNotEmpty ? '- Trip Theme / Preference: $preference (The replacement activity MUST align with this theme!)' : ''}
     ${(constraints != null && constraints.isNotEmpty) ? '- Personal Constraints: ${constraints.join(', ')} (You MUST strictly follow these constraints, e.g., dietary restrictions, accessibility needs!)' : ''}
-    ${surroundingContext.isNotEmpty ? '\n    SURROUNDING ACTIVITIES (for geographic coherence):\n$surroundingContext    - The replacement activity MUST be geographically close to these surrounding activities. Do NOT suggest a place on the opposite side of the city.' : ''}
+    ${surroundingContext.isNotEmpty ? '\n    SURROUNDING ACTIVITIES (for geographic coherence):\n$surroundingContext    - The replacement MUST be within a short walk (roughly 15 minutes or less) of the surrounding activities listed above.\n    - Stay in the SAME neighbourhood / area as those activities. Do NOT suggest a place on the opposite side of the city.\n    - A restaurant and an attraction placed next to each other MUST be walkable, so the traveler never needs a long Grab ride between them.' : ''}
     $dayPositionContext
     CRITICAL EXCLUSION LIST (DUPLICATES PROHIBITED):
     The user already has the following places in their itinerary or explicitly rejected them. You MUST NOT suggest any of these places:
