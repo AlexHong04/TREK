@@ -289,12 +289,16 @@ class TransitPoint {
 class HotelStay {
   final String id;
   final String location;
+  final String checkInDate;
+  final String checkOutDate;
   final String checkInTime;
   final String checkOutTime;
 
   const HotelStay({
     required this.id,
     this.location = '',
+    this.checkInDate = '',
+    this.checkOutDate = '',
     this.checkInTime = '03:00 PM',
     this.checkOutTime = '12:00 PM',
   });
@@ -302,12 +306,16 @@ class HotelStay {
   HotelStay copyWith({
     String? id,
     String? location,
+    String? checkInDate,
+    String? checkOutDate,
     String? checkInTime,
     String? checkOutTime,
   }) {
     return HotelStay(
       id: id ?? this.id,
       location: location ?? this.location,
+      checkInDate: checkInDate ?? this.checkInDate,
+      checkOutDate: checkOutDate ?? this.checkOutDate,
       checkInTime: checkInTime ?? this.checkInTime,
       checkOutTime: checkOutTime ?? this.checkOutTime,
     );
@@ -317,6 +325,8 @@ class HotelStay {
     return {
       'id': id,
       'location': location,
+      'checkInDate': checkInDate,
+      'checkOutDate': checkOutDate,
       'checkInTime': checkInTime,
       'checkOutTime': checkOutTime,
     };
@@ -326,6 +336,8 @@ class HotelStay {
     return HotelStay(
       id: json['id'] as String? ?? '',
       location: json['location'] as String? ?? '',
+      checkInDate: json['checkInDate'] as String? ?? '',
+      checkOutDate: json['checkOutDate'] as String? ?? '',
       checkInTime: json['checkInTime'] as String? ?? '03:00 PM',
       checkOutTime: json['checkOutTime'] as String? ?? '12:00 PM',
     );

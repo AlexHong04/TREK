@@ -290,6 +290,16 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     return null;
   }
 
+  BudgetRecommendation getBudgetRecommendationForCurrentTrip() {
+    final isForeign = preferredCurrency != 'MYR';
+    final days = numberOfDays > 0 ? numberOfDays : 1;
+    return getBudgetRecommendation(
+      destinations: _uiState.selectedDestinations,
+      numberOfDays: days,
+      isInternational: isForeign,
+    );
+  }
+
   String? validateBudget(String? value) {
     final trimmed = (value ?? '').trim();
     if (trimmed.isEmpty) {
@@ -300,24 +310,51 @@ class TravelInformationInputViewModel extends ChangeNotifier {
       return 'Please enter a valid positive budget amount';
     }
 
-    // Validation formula: (Minimum daily spending rate from spending rates * numberOfDays) * 20%
-    final minDailyRateMyr = getMinimumDailySpendingRate(
-      _uiState.selectedDestinations,
+    final isForeign = preferredCurrency != 'MYR';
+    final days = numberOfDays > 0 ? numberOfDays : 1;
+    final rec = getBudgetRecommendation(
+      destinations: _uiState.selectedDestinations,
+      numberOfDays: days,
+      isInternational: isForeign,
     );
-    final days = numberOfDays;
-    final minRequiredMyr = minDailyRateMyr * days * 0.20;
+    final minRequiredMyr = rec.minTotalMyr;
 
-    // Convert entered budget to MYR for threshold evaluation
+    // Convert required budget to preferred currency
     final rateToMyr = _cachedRateToMyr ?? 1.0;
-    final enteredMyr = parsed * rateToMyr;
+    final double minRequiredInPreferred = preferredCurrency == 'MYR'
+        ? minRequiredMyr
+        : (minRequiredMyr / (rateToMyr > 0 ? rateToMyr : 1.0));
+    final int displayMin = minRequiredInPreferred.round();
 
-    if (enteredMyr < minRequiredMyr) {
+    // Check if entered amount is below minimum (accounting for integer display rounding)
+    final bool isBelowMin =
+        parsed < displayMin && parsed < minRequiredInPreferred;
+
+    if (isBelowMin) {
+      final isMultiple = rec.matchedDestinations.length > 1;
+      final destNames = rec.matchedDestinations.isNotEmpty
+          ? rec.matchedDestinations.join(', ')
+          : _uiState.selectedDestinations.join(', ');
+      final daysText = '$days ${days > 1 ? "days" : "day"}';
+
       if (preferredCurrency == 'MYR') {
-        return 'Minimum budget required is RM ${minRequiredMyr.toStringAsFixed(0)}';
+        final formattedMin = displayMin.toString();
+        if (isMultiple) {
+          return 'Minimum budget for your selected destinations(s) is RM $formattedMin';
+        } else if (destNames.isNotEmpty) {
+          return 'Minimum budget for $destNames is RM $formattedMin';
+        } else {
+          return 'Minimum budget required is RM $formattedMin';
+        }
       } else {
-        final minRequiredPreferred =
-            minRequiredMyr / (rateToMyr > 0 ? rateToMyr : 1.0);
-        return 'Minimum budget required is $preferredCurrency ${minRequiredPreferred.toStringAsFixed(0)}';
+        final formattedMin = displayMin.toString();
+        if (isMultiple) {
+          return 'Minimum budget for your selected destinations(s) is $preferredCurrency $formattedMin';
+        } else if (destNames.isNotEmpty) {
+          return 'Minimum budget for $destNames is $preferredCurrency $formattedMin';
+        } else {
+          return 'Minimum budget required is $preferredCurrency $formattedMin';
+        }
       }
     }
 
@@ -417,14 +454,26 @@ class TravelInformationInputViewModel extends ChangeNotifier {
       //
       // If the user already entered End Departure (departures.last), it must be PRESERVED at departures.last!
       // The new transit departure must be inserted BEFORE departures.last (i.e. at departures.length - 1).
-      final prevPoint =
-          _uiState.arrivals.isNotEmpty ? _uiState.arrivals.last : null;
-      final transitType =
-          prevPoint?.type.isNotEmpty == true ? prevPoint!.type : 'Flight';
-      final transitDate =
-          prevPoint?.date.isNotEmpty == true ? prevPoint!.date : defaultArrivalDate;
-      final transitTime =
-          prevPoint?.time.isNotEmpty == true ? prevPoint!.time : '09:00 AM';
+      final prevPoint = _uiState.arrivals.isNotEmpty
+          ? _uiState.arrivals.last
+          : null;
+      final transitType = prevPoint?.type.isNotEmpty == true
+          ? prevPoint!.type
+          : 'Flight';
+      final prevDate = prevPoint?.date.isNotEmpty == true
+          ? prevPoint!.date
+          : defaultArrivalDate;
+      final prevTime = prevPoint?.time.isNotEmpty == true
+          ? prevPoint!.time
+          : '09:00 AM';
+      // Default the new transit departure to 1 hour after the previous arrival
+      final shifted = TransitScheduleHelper.calculateArrivalDateTime(
+        departureDate: prevDate,
+        departureTimeStr: prevTime,
+        minutesToAdd: 60,
+      );
+      final transitDate = shifted['date'] as String;
+      final transitTime = shifted['time'] as String;
 
       final durationMin = TransitScheduleHelper.getEstimatedDurationMinutes(
         transitType: transitType,
@@ -471,15 +520,17 @@ class TravelInformationInputViewModel extends ChangeNotifier {
       // When transitCount >= 2: START is Leg 0, END is Leg (length - 1).
       // Adding a transit adds an INTERMEDIATE transit before END!
       if (updatedDepartures.length <= 1) {
-        final prevDep =
-            updatedDepartures.isNotEmpty ? updatedDepartures.first : null;
-        final transitType =
-            prevDep?.type.isNotEmpty == true ? prevDep!.type : 'Train';
+        final prevDep = updatedDepartures.isNotEmpty
+            ? updatedDepartures.first
+            : null;
+        final transitType = prevDep?.type.isNotEmpty == true
+            ? prevDep!.type
+            : 'Train';
         final transitDate = defaultDepartureDate.isNotEmpty
             ? defaultDepartureDate
             : (prevDep?.date.isNotEmpty == true
-                ? prevDep!.date
-                : defaultArrivalDate);
+                  ? prevDep!.date
+                  : defaultArrivalDate);
 
         final newDep = TransitPoint(
           id: 'dep_$now',
@@ -500,12 +551,23 @@ class TravelInformationInputViewModel extends ChangeNotifier {
       } else {
         // Insert intermediate transit before the END leg
         final prevArrival = updatedArrivals[updatedArrivals.length - 2];
-        final transitType =
-            prevArrival.type.isNotEmpty ? prevArrival.type : 'Train';
-        final transitDate =
-            prevArrival.date.isNotEmpty ? prevArrival.date : defaultArrivalDate;
-        final transitTime =
-            prevArrival.time.isNotEmpty ? prevArrival.time : '09:00 AM';
+        final transitType = prevArrival.type.isNotEmpty
+            ? prevArrival.type
+            : 'Train';
+        final prevDate = prevArrival.date.isNotEmpty
+            ? prevArrival.date
+            : defaultArrivalDate;
+        final prevTime = prevArrival.time.isNotEmpty
+            ? prevArrival.time
+            : '09:00 AM';
+        // Default the new transit departure to 1 hour after the previous arrival
+        final shifted = TransitScheduleHelper.calculateArrivalDateTime(
+          departureDate: prevDate,
+          departureTimeStr: prevTime,
+          minutesToAdd: 60,
+        );
+        final transitDate = shifted['date'] as String;
+        final transitTime = shifted['time'] as String;
 
         final durationMin = TransitScheduleHelper.getEstimatedDurationMinutes(
           transitType: transitType,
@@ -623,10 +685,7 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     if (index >= 0 && index < _uiState.arrivals.length) {
       final updated = List<TransitPoint>.from(_uiState.arrivals);
       updated[index] = updated[index].copyWith(location: location);
-      _uiState = _uiState.copyWith(
-        arrivals: updated,
-        clearTransitError: true,
-      );
+      _uiState = _uiState.copyWith(arrivals: updated, clearTransitError: true);
       notifyListeners();
     }
   }
@@ -826,7 +885,8 @@ class TravelInformationInputViewModel extends ChangeNotifier {
       final updatedDepartures = List<TransitPoint>.from(_uiState.departures);
       updatedDepartures[index] = updatedDepartures[index].copyWith(date: date);
 
-      final isForeign = _uiState.preferredCurrency.trim().toUpperCase() != 'MYR';
+      final isForeign =
+          _uiState.preferredCurrency.trim().toUpperCase() != 'MYR';
       final targetArrIndex = isForeign ? index + 1 : index;
 
       final updatedArrivals = List<TransitPoint>.from(_uiState.arrivals);
@@ -885,7 +945,8 @@ class TravelInformationInputViewModel extends ChangeNotifier {
         updatedDepartures[index] = current.copyWith(type: type, location: '');
       }
 
-      final isForeign = _uiState.preferredCurrency.trim().toUpperCase() != 'MYR';
+      final isForeign =
+          _uiState.preferredCurrency.trim().toUpperCase() != 'MYR';
       final targetArrIndex = isForeign ? index + 1 : index;
 
       final updatedArrivals = List<TransitPoint>.from(_uiState.arrivals);
@@ -978,7 +1039,8 @@ class TravelInformationInputViewModel extends ChangeNotifier {
         location: location,
       );
 
-      final isForeign = _uiState.preferredCurrency.trim().toUpperCase() != 'MYR';
+      final isForeign =
+          _uiState.preferredCurrency.trim().toUpperCase() != 'MYR';
       final targetArrIndex = isForeign ? index + 1 : index;
 
       final updatedArrivals = List<TransitPoint>.from(_uiState.arrivals);
@@ -1010,7 +1072,8 @@ class TravelInformationInputViewModel extends ChangeNotifier {
       );
       notifyListeners();
 
-      if (type.toLowerCase() == 'bus' && targetArrIndex < _uiState.arrivals.length) {
+      if (type.toLowerCase() == 'bus' &&
+          targetArrIndex < _uiState.arrivals.length) {
         syncLegArrivalWithDepartureDurationAsync(targetArrIndex);
       }
     }
@@ -1088,7 +1151,8 @@ class TravelInformationInputViewModel extends ChangeNotifier {
       final updatedDepartures = List<TransitPoint>.from(_uiState.departures);
       updatedDepartures[index] = updatedDepartures[index].copyWith(time: time);
 
-      final isForeign = _uiState.preferredCurrency.trim().toUpperCase() != 'MYR';
+      final isForeign =
+          _uiState.preferredCurrency.trim().toUpperCase() != 'MYR';
       final targetArrIndex = isForeign ? index + 1 : index;
 
       final updatedArrivals = List<TransitPoint>.from(_uiState.arrivals);
@@ -1257,6 +1321,24 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     }
   }
 
+  void updateHotelCheckInDate(int index, String date) {
+    if (index >= 0 && index < _uiState.hotels.length) {
+      final updated = List<HotelStay>.from(_uiState.hotels);
+      updated[index] = updated[index].copyWith(checkInDate: date);
+      _uiState = _uiState.copyWith(hotels: updated);
+      notifyListeners();
+    }
+  }
+
+  void updateHotelCheckOutDate(int index, String date) {
+    if (index >= 0 && index < _uiState.hotels.length) {
+      final updated = List<HotelStay>.from(_uiState.hotels);
+      updated[index] = updated[index].copyWith(checkOutDate: date);
+      _uiState = _uiState.copyWith(hotels: updated);
+      notifyListeners();
+    }
+  }
+
   void setHotelCheckInTime(String time) => updateHotelCheckInTime(0, time);
 
   void setHotelCheckOutTime(String time) => updateHotelCheckOutTime(0, time);
@@ -1372,7 +1454,8 @@ class TravelInformationInputViewModel extends ChangeNotifier {
           if (i >= departures.length || departures[i].location.trim().isEmpty) {
             return 'Please select a departure location for Transit ${i + 1}';
           }
-          if (i + 1 >= arrivals.length || arrivals[i + 1].location.trim().isEmpty) {
+          if (i + 1 >= arrivals.length ||
+              arrivals[i + 1].location.trim().isEmpty) {
             return 'Please select an arrival location for Transit ${i + 1}';
           }
         }
@@ -1450,8 +1533,8 @@ class TravelInformationInputViewModel extends ChangeNotifier {
             final legName = i == 0
                 ? 'Start'
                 : (i == transitCount - 1 && transitCount > 1
-                    ? 'End'
-                    : 'Transit $i');
+                      ? 'End'
+                      : 'Transit $i');
             return '$legName departure and arrival locations cannot be the same (${departures[i].location})';
           }
         }
@@ -1483,10 +1566,10 @@ class TravelInformationInputViewModel extends ChangeNotifier {
               final label = isForeign
                   ? (i == 0 ? 'Start arrival' : 'Transit $i arrival')
                   : (i == 0
-                      ? 'Start arrival'
-                      : (i == arrivals.length - 1 && transitCount > 1
-                          ? 'End arrival'
-                          : 'Transit $i arrival'));
+                        ? 'Start arrival'
+                        : (i == arrivals.length - 1 && transitCount > 1
+                              ? 'End arrival'
+                              : 'Transit $i arrival'));
               return '$label date must be between $minStr and $maxStr';
             }
           }
@@ -1502,13 +1585,13 @@ class TravelInformationInputViewModel extends ChangeNotifier {
             if (pDay.isBefore(minDate) || pDay.isAfter(maxDate)) {
               final label = isForeign
                   ? (i == departures.length - 1
-                      ? 'End departure'
-                      : 'Transit ${i + 1} departure')
+                        ? 'End departure'
+                        : 'Transit ${i + 1} departure')
                   : (i == 0
-                      ? 'Start departure'
-                      : (i == departures.length - 1 && transitCount > 1
-                          ? 'End departure'
-                          : 'Transit $i departure'));
+                        ? 'Start departure'
+                        : (i == departures.length - 1 && transitCount > 1
+                              ? 'End departure'
+                              : 'Transit $i departure'));
               return '$label date must be between $minStr and $maxStr';
             }
           }
@@ -1518,11 +1601,13 @@ class TravelInformationInputViewModel extends ChangeNotifier {
 
     // 6. Chronological Date & Time Sequencing Checks
     if (isForeign) {
-      final startArrDT =
-          arrivals.isNotEmpty ? _parsePointDateTime(arrivals[0]) : null;
+      final startArrDT = arrivals.isNotEmpty
+          ? _parsePointDateTime(arrivals[0])
+          : null;
       if (transitCount == 1) {
-        final endDepDT =
-            departures.isNotEmpty ? _parsePointDateTime(departures[0]) : null;
+        final endDepDT = departures.isNotEmpty
+            ? _parsePointDateTime(departures[0])
+            : null;
         if (startArrDT != null &&
             endDepDT != null &&
             endDepDT.isBefore(startArrDT)) {
@@ -1531,8 +1616,9 @@ class TravelInformationInputViewModel extends ChangeNotifier {
       } else {
         DateTime? previousArrivalDT = startArrDT;
         for (int i = 0; i < transitCount - 1; i++) {
-          final depDT =
-              i < departures.length ? _parsePointDateTime(departures[i]) : null;
+          final depDT = i < departures.length
+              ? _parsePointDateTime(departures[i])
+              : null;
           final arrDT = i + 1 < arrivals.length
               ? _parsePointDateTime(arrivals[i + 1])
               : null;
@@ -1551,8 +1637,7 @@ class TravelInformationInputViewModel extends ChangeNotifier {
         }
 
         if (transitCount - 1 < departures.length) {
-          final finalDepDT =
-              _parsePointDateTime(departures[transitCount - 1]);
+          final finalDepDT = _parsePointDateTime(departures[transitCount - 1]);
           if (finalDepDT != null &&
               previousArrivalDT != null &&
               finalDepDT.isBefore(previousArrivalDT)) {
@@ -1562,10 +1647,12 @@ class TravelInformationInputViewModel extends ChangeNotifier {
       }
     } else {
       // Local Malaysian flow
-      final startDepDT =
-          departures.isNotEmpty ? _parsePointDateTime(departures[0]) : null;
-      final startArrDT =
-          arrivals.isNotEmpty ? _parsePointDateTime(arrivals[0]) : null;
+      final startDepDT = departures.isNotEmpty
+          ? _parsePointDateTime(departures[0])
+          : null;
+      final startArrDT = arrivals.isNotEmpty
+          ? _parsePointDateTime(arrivals[0])
+          : null;
       if (startDepDT != null &&
           startArrDT != null &&
           startArrDT.isBefore(startDepDT)) {
@@ -1574,10 +1661,12 @@ class TravelInformationInputViewModel extends ChangeNotifier {
 
       DateTime? previousArrivalDT = startArrDT;
       for (int i = 1; i < transitCount - 1; i++) {
-        final depDT =
-            i < departures.length ? _parsePointDateTime(departures[i]) : null;
-        final arrDT =
-            i < arrivals.length ? _parsePointDateTime(arrivals[i]) : null;
+        final depDT = i < departures.length
+            ? _parsePointDateTime(departures[i])
+            : null;
+        final arrDT = i < arrivals.length
+            ? _parsePointDateTime(arrivals[i])
+            : null;
 
         if (depDT != null &&
             previousArrivalDT != null &&
@@ -1595,10 +1684,8 @@ class TravelInformationInputViewModel extends ChangeNotifier {
       if (transitCount > 1 &&
           transitCount - 1 < departures.length &&
           transitCount - 1 < arrivals.length) {
-        final endDepDT =
-            _parsePointDateTime(departures[transitCount - 1]);
-        final endArrDT =
-            _parsePointDateTime(arrivals[transitCount - 1]);
+        final endDepDT = _parsePointDateTime(departures[transitCount - 1]);
+        final endArrDT = _parsePointDateTime(arrivals[transitCount - 1]);
 
         if (endDepDT != null &&
             previousArrivalDT != null &&

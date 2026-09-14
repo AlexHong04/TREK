@@ -344,6 +344,9 @@ class _TravelInformationInputScreenState
                                     ? viewModel.uiState.selectedDestinations
                                           .join(', ')
                                     : null,
+                                currency: preferredCurrency,
+                                numberOfDays: viewModel.numberOfDays,
+                                rateToMyr: viewModel.cachedRateToMyr,
                               ),
                               borderRadius: BorderRadius.circular(16),
                               child: Padding(
@@ -524,7 +527,83 @@ class _TravelInformationInputScreenState
                                             ],
                                           ),
                                         ))
-                                : null,
+                                : (viewModel
+                                              .uiState
+                                              .selectedDestinations
+                                              .length >
+                                          1
+                                      ? Builder(
+                                          builder: (context) {
+                                            final rec = viewModel
+                                                .getBudgetRecommendationForCurrentTrip();
+                                            final rate =
+                                                viewModel.cachedRateToMyr ??
+                                                1.0;
+                                            final minPref =
+                                                preferredCurrency == 'MYR'
+                                                ? rec.minTotalMyr
+                                                : (rec.minTotalMyr /
+                                                      (rate > 0 ? rate : 1.0));
+                                            final minText =
+                                                preferredCurrency == 'MYR'
+                                                ? 'RM ${minPref.toStringAsFixed(0)}'
+                                                : '$preferredCurrency ${minPref.toStringAsFixed(0)}';
+                                            final days = viewModel.numberOfDays;
+                                            final destNames =
+                                                rec
+                                                    .matchedDestinations
+                                                    .isNotEmpty
+                                                ? rec.matchedDestinations.join(
+                                                    ', ',
+                                                  )
+                                                : viewModel
+                                                      .uiState
+                                                      .selectedDestinations
+                                                      .join(', ');
+                                            return Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 14.0,
+                                                    vertical: 9.0,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: appTheme.teal_50
+                                                    .withValues(alpha: 0.45),
+                                                borderRadius:
+                                                    BorderRadius.circular(12.0),
+                                                border: Border.all(
+                                                  color: appTheme.teal_A700
+                                                      .withValues(alpha: 0.2),
+                                                  width: 1.0,
+                                                ),
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.insights_rounded,
+                                                    size: 15,
+                                                    color: appTheme.teal_700,
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Expanded(
+                                                    child: Text(
+                                                      'Combined Min ($destNames): $minText',
+                                                      style: TextStyle(
+                                                        fontSize: 11.5,
+                                                        fontFamily: 'Inter',
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        color:
+                                                            appTheme.teal_800,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                          },
+                                        )
+                                      : null),
                           );
                         },
                       ),
@@ -738,7 +817,8 @@ class _TravelInformationInputScreenState
                     'dates': _dateController.text,
                     'budget': finalBudget,
                     'preferredCurrency': preferredCurrency,
-                    'isForeign': preferredCurrency.trim().toUpperCase() != 'MYR',
+                    'isForeign':
+                        preferredCurrency.trim().toUpperCase() != 'MYR',
                     'preference': viewModel.uiState.selectedPreference,
                     'wishlist': viewModel.uiState.wishlistItems,
                     'arrivals': viewModel.uiState.arrivals
@@ -1825,6 +1905,7 @@ class _TravelInformationInputScreenState
               viewModel: viewModel,
               arrivalIndex: 0,
               cardTitle: 'ARRIVAL',
+              isStartOrEnd: true,
             ),
 
             if (transitCount == 1) ...[
@@ -1857,6 +1938,7 @@ class _TravelInformationInputScreenState
                 minAllowedTimeString: arrivals[0].time,
                 constraintLabel:
                     'Departure time cannot be earlier than arrival time (${arrivals[0].time}).',
+                isStartOrEnd: true,
               ),
             ] else ...[
               // Intermediate Transits: Transit 1 to Transit N-1
@@ -1981,6 +2063,7 @@ class _TravelInformationInputScreenState
                 minAllowedTimeString: arrivals[transitCount - 1].time,
                 constraintLabel:
                     'Final departure cannot be earlier than previous transit arrival.',
+                isStartOrEnd: true,
               ),
             ],
           ] else ...[
@@ -2004,6 +2087,7 @@ class _TravelInformationInputScreenState
               viewModel: viewModel,
               departureIndex: 0,
               cardTitle: 'DEPARTURE',
+              isStartOrEnd: true,
             ),
             const SizedBox(height: 12.0),
 
@@ -2019,6 +2103,7 @@ class _TravelInformationInputScreenState
               constraintLabel:
                   'Arrival cannot be earlier than departure time (${departures[0].time}).',
               autoSyncOnInvalid: true,
+              isStartOrEnd: true,
             ),
             const SizedBox(height: 12.0),
 
@@ -2176,6 +2261,7 @@ class _TravelInformationInputScreenState
                 minAllowedTimeString: arrivals[transitCount - 2].time,
                 constraintLabel:
                     'Departure cannot be earlier than previous arrival.',
+                isStartOrEnd: true,
               ),
               const SizedBox(height: 12.0),
 
@@ -2193,6 +2279,7 @@ class _TravelInformationInputScreenState
                 constraintLabel:
                     'Return arrival cannot be earlier than departure.',
                 autoSyncOnInvalid: true,
+                isStartOrEnd: true,
               ),
             ],
           ],
@@ -2260,6 +2347,7 @@ class _TravelInformationInputScreenState
     String? minAllowedTimeString,
     String? constraintLabel,
     bool autoSyncOnInvalid = false,
+    bool isStartOrEnd = false,
   }) {
     final arrivals = viewModel.uiState.arrivals;
     final arrival = arrivalIndex < arrivals.length
@@ -2288,6 +2376,7 @@ class _TravelInformationInputScreenState
             viewModel,
             isArrival: true,
             index: arrivalIndex,
+            isStartOrEnd: isStartOrEnd,
           ),
           borderRadius: BorderRadius.circular(10.0),
           child: Container(
@@ -2439,6 +2528,7 @@ class _TravelInformationInputScreenState
     String? minAllowedDateString,
     String? minAllowedTimeString,
     String? constraintLabel,
+    bool isStartOrEnd = false,
   }) {
     final departures = viewModel.uiState.departures;
     final departure = departureIndex < departures.length
@@ -2467,6 +2557,7 @@ class _TravelInformationInputScreenState
             viewModel,
             isArrival: false,
             index: departureIndex,
+            isStartOrEnd: isStartOrEnd,
           ),
           borderRadius: BorderRadius.circular(10.0),
           child: Container(
@@ -3242,6 +3333,7 @@ class _TravelInformationInputScreenState
                     ],
                   ],
                   const SizedBox(height: 10.0),
+                  // DATE PICKERS ROW
                   Row(
                     children: [
                       Expanded(
@@ -3249,7 +3341,104 @@ class _TravelInformationInputScreenState
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'CHECK-IN',
+                              'CHECK-IN DATE',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                fontFamily: 'Inter',
+                                color: appTheme.blue_gray_300,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 6.0),
+                            _buildDatePickerButton(
+                              context: context,
+                              date: hotel.checkInDate,
+                              isFullWidth: true,
+                              onTap: () {
+                                if (!hasDestinations) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: const Text(
+                                        'Please select destination state(s) first before setting hotel dates.',
+                                      ),
+                                      backgroundColor: appTheme.redButton,
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                  return;
+                                }
+                                _pickHotelDate(
+                                  context: context,
+                                  viewModel: viewModel,
+                                  initialDateString: hotel.checkInDate,
+                                  isCheckIn: true,
+                                  onDatePicked: (d) =>
+                                      viewModel.updateHotelCheckInDate(index, d),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12.0),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'CHECK-OUT DATE',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                fontFamily: 'Inter',
+                                color: appTheme.blue_gray_300,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 6.0),
+                            _buildDatePickerButton(
+                              context: context,
+                              date: hotel.checkOutDate,
+                              isFullWidth: true,
+                              onTap: () {
+                                if (!hasDestinations) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: const Text(
+                                        'Please select destination state(s) first before setting hotel dates.',
+                                      ),
+                                      backgroundColor: appTheme.redButton,
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                  return;
+                                }
+                                _pickHotelDate(
+                                  context: context,
+                                  viewModel: viewModel,
+                                  initialDateString: hotel.checkOutDate,
+                                  isCheckIn: false,
+                                  onDatePicked: (d) =>
+                                      viewModel.updateHotelCheckOutDate(index, d),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10.0),
+                  // TIME PICKERS ROW
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'CHECK-IN TIME',
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
@@ -3293,7 +3482,7 @@ class _TravelInformationInputScreenState
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'CHECK-OUT',
+                              'CHECK-OUT TIME',
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
@@ -3505,6 +3694,62 @@ class _TravelInformationInputScreenState
     }
   }
 
+  Future<void> _pickHotelDate({
+    required BuildContext context,
+    required TravelInformationInputViewModel viewModel,
+    required String initialDateString,
+    required bool isCheckIn,
+    required ValueChanged<String> onDatePicked,
+  }) async {
+    final startDate = viewModel.uiState.startDate;
+    final endDate = viewModel.uiState.endDate;
+
+    if (startDate == null || endDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Please select trip dates in the "WHEN?" section first.',
+          ),
+          backgroundColor: appTheme.redButton,
+        ),
+      );
+      return;
+    }
+
+    DateTime initialDate = isCheckIn ? startDate : endDate;
+    if (initialDateString.trim().isNotEmpty) {
+      final parsed = DateTime.tryParse(initialDateString.trim());
+      if (parsed != null) {
+        initialDate = parsed;
+      }
+    }
+    if (initialDate.isBefore(startDate)) {
+      initialDate = startDate;
+    } else if (initialDate.isAfter(endDate)) {
+      initialDate = endDate;
+    }
+
+    final picked = await showAppDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: startDate,
+      lastDate: endDate,
+      helpText: isCheckIn ? 'SELECT CHECK-IN DATE' : 'SELECT CHECK-OUT DATE',
+      selectableDayPredicate: (day) {
+        final checkDate = DateTime(day.year, day.month, day.day);
+        if (checkDate.isBefore(startDate) || checkDate.isAfter(endDate)) {
+          return false;
+        }
+        return true;
+      },
+    );
+
+    if (picked != null) {
+      final formatted = picked.toLocal().toString().split(' ')[0];
+      onDatePicked(formatted);
+    }
+  }
+
   int? _parseTimeToMinutes(String timeStr) {
     try {
       final trimmed = timeStr.trim();
@@ -3615,13 +3860,11 @@ class _TravelInformationInputScreenState
               ),
               cancelButtonStyle: ButtonStyle(
                 backgroundColor: WidgetStateProperty.all(appTheme.white_A700),
-                foregroundColor:
-                    WidgetStateProperty.all(const Color(0xFF718096)),
+                foregroundColor: WidgetStateProperty.all(
+                  const Color(0xFF718096),
+                ),
                 side: WidgetStateProperty.all(
-                  BorderSide(
-                    color: appTheme.gray_200,
-                    width: 1.5,
-                  ),
+                  BorderSide(color: appTheme.gray_200, width: 1.5),
                 ),
                 shape: WidgetStateProperty.all(const StadiumBorder()),
                 padding: WidgetStateProperty.all(
@@ -3784,6 +4027,7 @@ class _TravelInformationInputScreenState
     TravelInformationInputViewModel viewModel, {
     required bool isArrival,
     required int index,
+    bool isStartOrEnd = false,
   }) {
     final currentItem = isArrival
         ? (index < viewModel.uiState.arrivals.length
@@ -3826,16 +4070,50 @@ class _TravelInformationInputScreenState
             final bool isBusEnabled =
                 lockedMode == null || lockedMode.toLowerCase() == 'bus';
 
-            final destinationHubs = getTransitHubSuggestions(
-              destinations,
-              transitType: activeMode,
-            );
+            // For start/end: show ALL hubs, with recommended ones separated
+            // For transit: show destination-filtered hubs only
+            final List<String> recommendedHubs;
+            final List<String> allHubs;
 
-            final filteredHubs = query.isEmpty
-                ? destinationHubs
-                : destinationHubs
+            if (isStartOrEnd) {
+              // Get destination-specific recommended hubs
+              recommendedHubs = destinations.isNotEmpty
+                  ? getTransitHubSuggestions(
+                      destinations,
+                      transitType: activeMode,
+                    )
+                  : <String>[];
+
+              // Get ALL hubs for this transport type
+              final allHubsFull = getAllTransitHubs(transitType: activeMode);
+
+              // Remove recommended from all to avoid duplicates
+              final recommendedSet = recommendedHubs.toSet();
+              allHubs = allHubsFull
+                  .where((h) => !recommendedSet.contains(h))
+                  .toList();
+            } else {
+              recommendedHubs = <String>[];
+              allHubs = getTransitHubSuggestions(
+                destinations,
+                transitType: activeMode,
+              );
+            }
+
+            // Apply search filter to both lists
+            final filteredRecommended = query.isEmpty
+                ? recommendedHubs
+                : recommendedHubs
                       .where((a) => a.toLowerCase().contains(query))
                       .toList();
+
+            final filteredAll = query.isEmpty
+                ? allHubs
+                : allHubs
+                      .where((a) => a.toLowerCase().contains(query))
+                      .toList();
+
+            final filteredHubs = [...filteredRecommended, ...filteredAll];
 
             final isTrain = activeMode.toLowerCase() == 'train';
             final isBus = activeMode.toLowerCase() == 'bus';
@@ -3852,8 +4130,9 @@ class _TravelInformationInputScreenState
                       ? 'Search bus terminal (e.g. TBS, Larkin)...'
                       : 'Search airport or city (e.g. KLIA, Penang)...');
 
-            final bool hasExactMatch =
-                filteredHubs.any((h) => h.toLowerCase() == query);
+            final bool hasExactMatch = filteredHubs.any(
+              (h) => h.toLowerCase() == query,
+            );
             final bool canAddCustom = query.isNotEmpty && !hasExactMatch;
 
             return Container(
@@ -4257,7 +4536,75 @@ class _TravelInformationInputScreenState
                                 ),
                               ],
 
-                              if (destinations.isNotEmpty) ...[
+                              if (isStartOrEnd && filteredRecommended.isNotEmpty) ...[
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 10.0),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.star_rounded,
+                                        size: 14,
+                                        color: appTheme.teal_A700,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'RECOMMENDED FOR ${destinations.join(", ").toUpperCase()}',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w800,
+                                          fontFamily: 'Inter',
+                                          color: appTheme.teal_A700,
+                                          letterSpacing: 0.8,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                ...filteredRecommended.map((hub) {
+                                  final isSelected = currentSelected == hub;
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 8.0),
+                                    child: _buildTransitHubModalItem(
+                                      transitHub: hub,
+                                      transitType: activeMode,
+                                      isSelected: isSelected,
+                                      isRecommended: true,
+                                      onTap: () {
+                                        if (isArrival) {
+                                          viewModel.updateArrivalHub(
+                                            index,
+                                            type: activeMode,
+                                            location: hub,
+                                          );
+                                        } else {
+                                          viewModel.updateDepartureHub(
+                                            index,
+                                            type: activeMode,
+                                            location: hub,
+                                          );
+                                        }
+                                        Navigator.pop(context);
+                                      },
+                                    ),
+                                  );
+                                }),
+                                if (filteredAll.isNotEmpty) ...[
+                                  const SizedBox(height: 8.0),
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 10.0),
+                                    child: Text(
+                                      'ALL ${typeLabel.toUpperCase()}S',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                        fontFamily: 'Inter',
+                                        color: appTheme.blue_gray_300,
+                                        letterSpacing: 0.8,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ] else if (!isStartOrEnd && destinations.isNotEmpty) ...[
                                 Padding(
                                   padding: const EdgeInsets.only(bottom: 10.0),
                                   child: Text(
@@ -4271,9 +4618,24 @@ class _TravelInformationInputScreenState
                                     ),
                                   ),
                                 ),
+                              ] else if (isStartOrEnd && filteredRecommended.isEmpty && filteredAll.isNotEmpty) ...[
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 10.0),
+                                  child: Text(
+                                    'ALL ${typeLabel.toUpperCase()}S',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      fontFamily: 'Inter',
+                                      color: appTheme.blue_gray_300,
+                                      letterSpacing: 0.8,
+                                    ),
+                                  ),
+                                ),
                               ],
 
-                              ...filteredHubs.map((hub) {
+                              // Remaining hubs (all for start/end, or filtered for transit)
+                              ...(isStartOrEnd ? filteredAll : filteredHubs).map((hub) {
                                 final isSelected = currentSelected == hub;
                                 return Padding(
                                   padding: const EdgeInsets.only(bottom: 8.0),
@@ -4382,6 +4744,7 @@ class _TravelInformationInputScreenState
     required String transitType,
     required bool isSelected,
     required VoidCallback onTap,
+    bool isRecommended = false,
   }) {
     return InkWell(
       onTap: onTap,
@@ -4389,10 +4752,18 @@ class _TravelInformationInputScreenState
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),
         decoration: BoxDecoration(
-          color: isSelected ? appTheme.gray_50_01 : appTheme.white_A700,
+          color: isSelected
+              ? appTheme.gray_50_01
+              : (isRecommended
+                    ? appTheme.teal_50.withValues(alpha: 0.35)
+                    : appTheme.white_A700),
           borderRadius: BorderRadius.circular(12.0),
           border: Border.all(
-            color: isSelected ? appTheme.teal_A700 : appTheme.gray_100,
+            color: isSelected
+                ? appTheme.teal_A700
+                : (isRecommended
+                      ? appTheme.teal_A700.withValues(alpha: 0.35)
+                      : appTheme.gray_100),
             width: isSelected ? 1.5 : 1.0,
           ),
         ),
@@ -4401,13 +4772,17 @@ class _TravelInformationInputScreenState
             Container(
               padding: const EdgeInsets.all(8.0),
               decoration: BoxDecoration(
-                color: isSelected ? appTheme.teal_50 : appTheme.gray_50_01,
+                color: (isSelected || isRecommended)
+                    ? appTheme.teal_50
+                    : appTheme.gray_50_01,
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 _getTransitHubIcon(transitType),
                 size: 18.0,
-                color: isSelected ? appTheme.teal_A700 : appTheme.blue_gray_300,
+                color: (isSelected || isRecommended)
+                    ? appTheme.teal_A700
+                    : appTheme.blue_gray_300,
               ),
             ),
             const SizedBox(width: 12.0),
@@ -4416,12 +4791,19 @@ class _TravelInformationInputScreenState
                 transitHub,
                 style: TextStyle(
                   fontSize: 14,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  fontWeight: (isSelected || isRecommended)
+                      ? FontWeight.w700
+                      : FontWeight.w500,
                   fontFamily: 'Inter',
                   color: isSelected ? appTheme.teal_A700 : appTheme.gray_800,
                 ),
               ),
             ),
+            if (isRecommended) ...[
+              const SizedBox(width: 6.0),
+              Icon(Icons.star_rounded, size: 16.0, color: appTheme.teal_A700),
+              const SizedBox(width: 4.0),
+            ],
             Icon(
               isSelected
                   ? Icons.check_circle_rounded
@@ -5019,10 +5401,7 @@ class _TripDateRangePickerDialogState
                 foregroundColor: const Color(0xFF718096),
                 padding: const EdgeInsets.symmetric(vertical: 13.0),
                 elevation: 0,
-                side: BorderSide(
-                  color: appTheme.gray_200,
-                  width: 1.5,
-                ),
+                side: BorderSide(color: appTheme.gray_200, width: 1.5),
                 shape: const StadiumBorder(),
               ),
               child: const Text(
@@ -5050,15 +5429,16 @@ class _TripDateRangePickerDialogState
                   : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: appTheme.teal_A700,
-                disabledBackgroundColor:
-                    appTheme.teal_A700.withValues(alpha: 0.35),
+                disabledBackgroundColor: appTheme.teal_A700.withValues(
+                  alpha: 0.35,
+                ),
                 foregroundColor: appTheme.white_A700,
-                disabledForegroundColor:
-                    appTheme.white_A700.withValues(alpha: 0.6),
+                disabledForegroundColor: appTheme.white_A700.withValues(
+                  alpha: 0.6,
+                ),
                 padding: const EdgeInsets.symmetric(vertical: 13.0),
                 elevation: canConfirm ? 2.0 : 0,
-                shadowColor:
-                    appTheme.teal_A700.withValues(alpha: 0.35),
+                shadowColor: appTheme.teal_A700.withValues(alpha: 0.35),
                 shape: const StadiumBorder(),
               ),
               child: const Text(
