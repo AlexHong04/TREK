@@ -154,12 +154,14 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         !uiState.isLoadingRecordedExpenses && !showRecordedExpenses;
     final hasMoreRecordedExpensesThanFit = uiState.recordedExpenses.length >= 2;
     final canExpandSheet = isExpenseFormMode || hasMoreRecordedExpensesThanFit;
-    final recordedExpensesHeight = 0.75;
+    final recordedExpensesHeight = 0.62;
     final recordedExpenseCount = uiState.recordedExpenses.length;
-    final maxRecordedExpensesHeight = recordedExpenseCount >= 3
+    final maxRecordedExpensesHeight = recordedExpenseCount >= 4
         ? 0.90
+        : recordedExpenseCount == 3
+        ? 0.82
         : recordedExpenseCount == 2
-        ? 0.80
+        ? 0.72
         : recordedExpensesHeight;
     final initialRecordedExpensesHeight = maxRecordedExpensesHeight;
 
@@ -367,12 +369,14 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   }
 
   bool _hasResettableExpenseDetails(ActivityUiState uiState) {
-    return _hasUnfinishedItemFormChanges ||
+    return uiState.draftExpenseItems.isNotEmpty ||
+        _hasUnfinishedItemFormChanges ||
         uiState.draftTaxAmount != 0 ||
         uiState.draftDiscountAmount != 0 ||
         uiState.draftRoundingAmount != 0 ||
         uiState.draftAutoRounding ||
         uiState.paymentMethod.isNotEmpty ||
+        uiState.originalCurrency != 'MYR' ||
         uiState.receiptLocalPath.isNotEmpty ||
         uiState.ocrRawText.isNotEmpty ||
         _taxController.text.trim().isNotEmpty ||
@@ -569,6 +573,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                 _buildDetailDialogHeader(
                   title: 'Expense #$expenseNumber',
                   icon: Icons.receipt_long_outlined,
+                  dialogContext: dialogContext,
                 ),
                 SizedBox(height: 18),
                 Flexible(
@@ -674,8 +679,6 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                     ),
                   ),
                 ),
-                SizedBox(height: 18),
-                _buildDialogCancelButton(dialogContext),
               ],
             ),
           ),
@@ -703,38 +706,15 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'EXPENSE ITEMS',
-                  style: TextStyle(
-                    color: appTheme.blue_gray_300,
-                    fontFamily: 'Inter',
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-              ),
-              IconButton(
-                tooltip: 'Reset unsaved item changes',
-                constraints: BoxConstraints.tightFor(width: 36, height: 36),
-                padding: EdgeInsets.zero,
-                iconSize: 20,
-                onPressed:
-                    uiState.isSavingExpense ||
-                        uiState.isPickingReceipt ||
-                        uiState.isScanningReceipt ||
-                        _isResettingExpenseForm ||
-                        !_showItemForm ||
-                        !_hasUnfinishedItemFormChanges
-                    ? null
-                    : _resetCurrentItemForm,
-                icon: Icon(Icons.restart_alt_rounded),
-                color: appTheme.teal_A700,
-              ),
-            ],
+          Text(
+            'EXPENSE ITEMS',
+            style: TextStyle(
+              color: appTheme.blue_gray_300,
+              fontFamily: 'Inter',
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.5,
+            ),
           ),
           SizedBox(height: 8),
           for (var index = 0; index < uiState.draftExpenseItems.length; index++)
@@ -860,6 +840,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         title: _buildDetailDialogHeader(
           title: item.itemName,
           icon: Icons.inventory_2_outlined,
+          dialogContext: dialogContext,
         ),
         content: SingleChildScrollView(
           child: Column(
@@ -938,8 +919,6 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
             ],
           ),
         ),
-        actionsPadding: EdgeInsets.fromLTRB(20, 0, 20, 18),
-        actions: [_buildDialogCancelButton(dialogContext)],
       ),
     );
   }
@@ -947,6 +926,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
   Widget _buildDetailDialogHeader({
     required String title,
     required IconData icon,
+    required BuildContext dialogContext,
   }) {
     return Row(
       children: [
@@ -969,6 +949,11 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
               fontWeight: FontWeight.w700,
             ),
           ),
+        ),
+        IconButton(
+          tooltip: 'Close',
+          onPressed: () => Navigator.pop(dialogContext),
+          icon: Icon(Icons.close, color: appTheme.blue_gray_700),
         ),
       ],
     );
@@ -1112,6 +1097,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                 _buildDetailDialogHeader(
                   title: 'Receipt Image',
                   icon: Icons.image_outlined,
+                  dialogContext: dialogContext,
                 ),
                 SizedBox(height: 14),
                 Expanded(
@@ -1129,8 +1115,6 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
                     ),
                   ),
                 ),
-                SizedBox(height: 16),
-                _buildDialogCancelButton(dialogContext),
               ],
             ),
           ),
@@ -1264,27 +1248,6 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildDialogCancelButton(BuildContext dialogContext) {
-    return SizedBox(
-      width: double.infinity,
-      height: 48,
-      child: OutlinedButton(
-        onPressed: () => Navigator.pop(dialogContext),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: appTheme.blue_gray_700,
-          side: BorderSide(color: appTheme.gray_200),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-        ),
-        child: Text(
-          'Cancel',
-          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-        ),
       ),
     );
   }
@@ -2090,14 +2053,13 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     final shouldClear = await _showConfirmationDialog(
       title: 'Reset Expense Form?',
       message:
-          'This clears your unfinished item edits, adjustments, payment method, '
-          'and selected receipt. Items already added will stay.',
+          'This removes all unconfirmed items, adjustments, payment details, '
+          'and the selected receipt for this activity.',
       confirmLabel: 'Reset',
       isDestructive: true,
     );
     if (!shouldClear || !mounted) return;
 
-    final wasItemFormOpen = _showItemForm;
     setState(() => _isResettingExpenseForm = true);
     try {
       await context.read<ActivityViewModel>().resetExpenseFormDetails();
@@ -2116,7 +2078,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         _showUnknownItemPlaceholder = false;
         _editingItemIndex = null;
         _itemFormResetVersion++;
-        _showItemForm = wasItemFormOpen;
+        _showItemForm = false;
         _hasUnfinishedItemFormChanges = false;
         _topMessage = null;
         _isResettingExpenseForm = false;
@@ -2126,25 +2088,6 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
       setState(() => _isResettingExpenseForm = false);
       _showValidationMessage('Could not reset the form. Please try again.');
     }
-  }
-
-  Future<void> _resetCurrentItemForm() async {
-    final shouldClear = await _showConfirmationDialog(
-      title: 'Reset Item Form?',
-      message:
-          'This will discard changes in the item you are editing. '
-          'Saved items will stay.',
-      confirmLabel: 'Reset',
-      isDestructive: true,
-    );
-    if (!shouldClear || !mounted) return;
-
-    FocusManager.instance.primaryFocus?.unfocus();
-    setState(() {
-      _showUnknownItemPlaceholder = false;
-      _itemFormResetVersion++;
-      _hasUnfinishedItemFormChanges = false;
-    });
   }
 
   void _startNewItem() {
@@ -2577,7 +2520,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
       title: 'Expense #$expenseNumber Saved',
       message:
           'Expense #$expenseNumber has been successfully recorded. Would you like to record another expense for this activity?',
-      confirmLabel: 'Yes, Record Another',
+      confirmLabel: 'Record Another',
     );
     await viewModel.refreshSpentAmounts();
     if (!mounted) return;
@@ -2603,7 +2546,7 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
       _showValidationMessage(
         _editingItemIndex == null
             ? 'Tap Save before confirming the expense.'
-            : 'Tap Update Item before confirming the expense.',
+            : 'Tap Update before confirming the expense.',
       );
       return;
     }
@@ -3378,7 +3321,7 @@ class _ExpenseItemFormState extends State<_ExpenseItemForm> {
                         shape: StadiumBorder(),
                       ),
                       child: Text(
-                        widget.initialItem == null ? 'Save' : 'Update Item',
+                        widget.initialItem == null ? 'Save' : 'Update',
                       ),
                     ),
                   ],

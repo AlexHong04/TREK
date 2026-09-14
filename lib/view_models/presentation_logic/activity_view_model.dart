@@ -223,28 +223,24 @@ class ActivityViewModel extends ChangeNotifier {
   }
 
   Future<void> resetExpenseFormDetails() async {
-    final savedItems = _uiState.draftExpenseItems;
     _uiState = _uiState.copyWith(
+      draftExpenseItems: const [],
       draftTaxAmount: 0.0,
       draftDiscountAmount: 0.0,
       draftRoundingAmount: 0.0,
       draftAutoRounding: false,
-      draftTotalAmount: _expenseTrackingService.calculateTotalExpense(
-        savedItems,
-      ),
+      draftTotalAmount: 0.0,
       paymentMethod: '',
+      originalCurrency: _expenseCurrency,
       receiptLocalPath: '',
       clearOcrData: true,
+      ocrDraftItemIndexes: const {},
+      draftTaxFromOcr: false,
       errorMessage: '',
       successMessage: '',
     );
     notifyListeners();
-    _queueManualExpenseDraftSave();
-    try {
-      await _pendingManualDraftSave;
-    } catch (error) {
-      debugPrint('[ExpenseDraft] Unable to preserve items after reset: $error');
-    }
+    await _clearManualExpenseDraftForSelectedActivity();
   }
 
   /// Removes only unsaved draft items after the tourist agrees to replace them
