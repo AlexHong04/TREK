@@ -732,7 +732,7 @@ class TripSummaryScreen extends StatelessWidget {
                   Expanded(
                     child: _buildRecommendationDialogButton(
                       text: 'Cancel',
-                      backgroundColor: appTheme.redButton,
+                      isOutlined: true,
                       height: 44,
                       onPressed: () => Navigator.pop(dialogContext, false),
                     ),
@@ -844,27 +844,49 @@ class TripSummaryScreen extends StatelessWidget {
   Widget _buildRecommendationDialogButton({
     required String text,
     required VoidCallback onPressed,
-    Color? backgroundColor,
+    bool isOutlined = false,
     double height = 48,
   }) {
     return SizedBox(
       width: double.infinity,
       height: height,
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: backgroundColor ?? appTheme.teal_A700,
-          foregroundColor: appTheme.white_A700,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-        ),
-        child: Text(
-          text,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-        ),
-      ),
+      child: isOutlined
+          ? OutlinedButton(
+              onPressed: onPressed,
+              style: OutlinedButton.styleFrom(
+                backgroundColor: appTheme.white_A700,
+                foregroundColor: appTheme.blue_gray_300,
+                side: BorderSide(color: appTheme.gray_200, width: 1.5),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+              ),
+              child: Text(
+                text,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            )
+          : ElevatedButton(
+              onPressed: onPressed,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: appTheme.teal_A700,
+                foregroundColor: appTheme.white_A700,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+              ),
+              child: Text(
+                text,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
     );
   }
 
