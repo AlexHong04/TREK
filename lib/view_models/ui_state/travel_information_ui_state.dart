@@ -7,6 +7,7 @@ class TravelInformationUiState {
   final String? selectedEmergencyFund;
   final String? errorMessage;
   final String? wishlistError;
+  final String? transitError;
   final List<String> selectedDestinations;
   final List<String> wishlistItems;
   final List<String> suggestions;
@@ -51,6 +52,7 @@ class TravelInformationUiState {
     this.selectedEmergencyFund,
     this.errorMessage,
     this.wishlistError,
+    this.transitError,
     this.selectedDestinations = const [],
     this.wishlistItems = const [],
     this.suggestions = const [],
@@ -88,6 +90,8 @@ class TravelInformationUiState {
     String? errorMessage,
     String? wishlistError,
     bool clearWishlistError = false,
+    String? transitError,
+    bool clearTransitError = false,
     List<String>? selectedDestinations,
     List<String>? wishlistItems,
     List<String>? suggestions,
@@ -179,6 +183,9 @@ class TravelInformationUiState {
       wishlistError: clearWishlistError
           ? null
           : (wishlistError ?? this.wishlistError),
+      transitError: clearTransitError
+          ? null
+          : (transitError ?? this.transitError),
       selectedDestinations: selectedDestinations ?? this.selectedDestinations,
       wishlistItems: wishlistItems ?? this.wishlistItems,
       suggestions: suggestions ?? this.suggestions,

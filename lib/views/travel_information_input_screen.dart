@@ -1762,6 +1762,45 @@ class _TravelInformationInputScreenState
           ),
           const SizedBox(height: 12.0),
 
+          if (viewModel.uiState.transitError != null) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 12.0),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12.0,
+                vertical: 8.0,
+              ),
+              decoration: BoxDecoration(
+                color: appTheme.redButton.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10.0),
+                border: Border.all(
+                  color: appTheme.redButton.withValues(alpha: 0.35),
+                  width: 1.0,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.error_outline_rounded,
+                    size: 16.0,
+                    color: appTheme.redButton,
+                  ),
+                  const SizedBox(width: 8.0),
+                  Expanded(
+                    child: Text(
+                      viewModel.uiState.transitError!,
+                      style: TextStyle(
+                        fontSize: 12.0,
+                        color: appTheme.redButton,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
           if (isForeign) ...[
             // ==================== FOREIGN TRAVELER FLOW ====================
             // START HEADER
@@ -4124,6 +4163,19 @@ class _TravelInformationInputScreenState
                                 InkWell(
                                   onTap: () {
                                     final customName = searchQuery.trim();
+                                    final explicitErr =
+                                        viewModel.validateExplicitWord(customName);
+                                    if (explicitErr != null) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(explicitErr),
+                                          backgroundColor: appTheme.redButton,
+                                          behavior: SnackBarBehavior.floating,
+                                          duration: const Duration(seconds: 2),
+                                        ),
+                                      );
+                                      return;
+                                    }
                                     if (isArrival) {
                                       viewModel.updateArrivalHub(
                                         index,

@@ -530,7 +530,10 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     if (index >= 0 && index < _uiState.arrivals.length) {
       final updated = List<TransitPoint>.from(_uiState.arrivals);
       updated[index] = updated[index].copyWith(location: location);
-      _uiState = _uiState.copyWith(arrivals: updated);
+      _uiState = _uiState.copyWith(
+        arrivals: updated,
+        clearTransitError: true,
+      );
       notifyListeners();
     }
   }
@@ -970,7 +973,10 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     if (index >= 0 && index < _uiState.departures.length) {
       final updated = List<TransitPoint>.from(_uiState.departures);
       updated[index] = updated[index].copyWith(location: location);
-      _uiState = _uiState.copyWith(departures: updated);
+      _uiState = _uiState.copyWith(
+        departures: updated,
+        clearTransitError: true,
+      );
       notifyListeners();
     }
   }
@@ -1182,40 +1188,324 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  String? validateTransitDates() {
-    if (_uiState.startDate == null || _uiState.endDate == null) {
+  DateTime? _parsePointDateTime(TransitPoint point) {
+    final trimmedDate = point.date.trim();
+    if (trimmedDate.isEmpty) return null;
+    final parsedDate = DateTime.tryParse(trimmedDate);
+    if (parsedDate == null) return null;
+    final minutes = _parseTimeToMinutes(point.time);
+    if (minutes == null) return parsedDate;
+    return DateTime(
+      parsedDate.year,
+      parsedDate.month,
+      parsedDate.day,
+      minutes ~/ 60,
+      minutes % 60,
+    );
+  }
+
+  void clearTransitError() {
+    if (_uiState.transitError != null) {
+      _uiState = _uiState.copyWith(clearTransitError: true);
+      notifyListeners();
+    }
+  }
+
+  String? validateTransit() {
+    final arrivals = _uiState.arrivals;
+    final departures = _uiState.departures;
+    final isForeign = _uiState.preferredCurrency.trim().toUpperCase() != 'MYR';
+    final transitCount = arrivals.length > departures.length
+        ? arrivals.length
+        : departures.length;
+
+    final hasAnyTransitLocation =
+        arrivals.any((a) => a.location.trim().isNotEmpty) ||
+        departures.any((d) => d.location.trim().isNotEmpty);
+
+    // If single leg and no transit locations are specified, transit is completely optional
+    if (transitCount <= 1 && !hasAnyTransitLocation) {
       return null;
     }
-    final minDate = _uiState.startDate!;
-    final maxDate = _uiState.endDate!;
 
-    for (int i = 0; i < _uiState.arrivals.length; i++) {
-      final arr = _uiState.arrivals[i];
-      if (arr.date.trim().isNotEmpty) {
-        final parsed = DateTime.tryParse(arr.date.trim());
-        if (parsed != null &&
-            (parsed.isBefore(minDate) || parsed.isAfter(maxDate))) {
-          final minStr = minDate.toLocal().toString().split(' ')[0];
-          final maxStr = maxDate.toLocal().toString().split(' ')[0];
-          return 'Arrival ${i + 1} date must be between $minStr and $maxStr';
+    // 1. Destinations check: If transit is specified, destination states must be selected first
+    if (hasAnyTransitLocation && _uiState.selectedDestinations.isEmpty) {
+      return 'Please select destination state(s) first before entering transit details';
+    }
+
+    // 2. Inappropriate / Explicit word check
+    for (int i = 0; i < arrivals.length; i++) {
+      final loc = arrivals[i].location.trim();
+      if (loc.isNotEmpty) {
+        final err = validateExplicitWord(loc);
+        if (err != null) return err;
+      }
+    }
+
+    for (int i = 0; i < departures.length; i++) {
+      final loc = departures[i].location.trim();
+      if (loc.isNotEmpty) {
+        final err = validateExplicitWord(loc);
+        if (err != null) return err;
+      }
+    }
+
+    // 3. Completeness & Empty location check
+    if (transitCount > 1) {
+      if (isForeign) {
+        // Foreign mode
+        if (arrivals.isEmpty || arrivals[0].location.trim().isEmpty) {
+          return 'Please select an arrival location for Start Arrival';
+        }
+        for (int i = 0; i < transitCount - 1; i++) {
+          if (i >= departures.length || departures[i].location.trim().isEmpty) {
+            return 'Please select a departure location for Transit ${i + 1}';
+          }
+          if (i + 1 >= arrivals.length || arrivals[i + 1].location.trim().isEmpty) {
+            return 'Please select an arrival location for Transit ${i + 1}';
+          }
+        }
+        if (transitCount - 1 >= departures.length ||
+            departures[transitCount - 1].location.trim().isEmpty) {
+          return 'Please select a departure location for End Departure';
+        }
+      } else {
+        // Local Malaysian mode
+        if (departures.isEmpty || departures[0].location.trim().isEmpty) {
+          return 'Please select a departure location for Start Departure';
+        }
+        if (arrivals.isEmpty || arrivals[0].location.trim().isEmpty) {
+          return 'Please select an arrival location for Start Arrival';
+        }
+        for (int i = 1; i < transitCount - 1; i++) {
+          if (i >= departures.length || departures[i].location.trim().isEmpty) {
+            return 'Please select a departure location for Transit $i';
+          }
+          if (i >= arrivals.length || arrivals[i].location.trim().isEmpty) {
+            return 'Please select an arrival location for Transit $i';
+          }
+        }
+        if (transitCount - 1 >= departures.length ||
+            departures[transitCount - 1].location.trim().isEmpty) {
+          return 'Please select a departure location for End Departure';
+        }
+        if (transitCount - 1 >= arrivals.length ||
+            arrivals[transitCount - 1].location.trim().isEmpty) {
+          return 'Please select an arrival location for End Arrival';
+        }
+      }
+    } else {
+      // transitCount == 1
+      if (isForeign) {
+        final hasArr =
+            arrivals.isNotEmpty && arrivals[0].location.trim().isNotEmpty;
+        final hasDep =
+            departures.isNotEmpty && departures[0].location.trim().isNotEmpty;
+        if (hasArr && !hasDep) {
+          return 'Please select a departure location for End';
+        } else if (!hasArr && hasDep) {
+          return 'Please select an arrival location for Start';
+        }
+      } else {
+        final hasDep =
+            departures.isNotEmpty && departures[0].location.trim().isNotEmpty;
+        final hasArr =
+            arrivals.isNotEmpty && arrivals[0].location.trim().isNotEmpty;
+        if (hasDep && !hasArr) {
+          return 'Please select an arrival location for Start';
+        } else if (!hasDep && hasArr) {
+          return 'Please select a departure location for Start';
         }
       }
     }
 
-    for (int i = 0; i < _uiState.departures.length; i++) {
-      final dep = _uiState.departures[i];
-      if (dep.date.trim().isNotEmpty) {
-        final parsed = DateTime.tryParse(dep.date.trim());
-        if (parsed != null &&
-            (parsed.isBefore(minDate) || parsed.isAfter(maxDate))) {
-          final minStr = minDate.toLocal().toString().split(' ')[0];
-          final maxStr = maxDate.toLocal().toString().split(' ')[0];
-          return 'Departure ${i + 1} date must be between $minStr and $maxStr';
+    // 4. Same origin and destination check
+    if (isForeign) {
+      for (int i = 0; i < transitCount - 1; i++) {
+        if (i < departures.length && i + 1 < arrivals.length) {
+          final depLoc = departures[i].location.trim().toLowerCase();
+          final arrLoc = arrivals[i + 1].location.trim().toLowerCase();
+          if (depLoc.isNotEmpty && arrLoc.isNotEmpty && depLoc == arrLoc) {
+            return 'Transit ${i + 1} departure and arrival locations cannot be the same (${departures[i].location})';
+          }
+        }
+      }
+    } else {
+      for (int i = 0; i < transitCount; i++) {
+        if (i < departures.length && i < arrivals.length) {
+          final depLoc = departures[i].location.trim().toLowerCase();
+          final arrLoc = arrivals[i].location.trim().toLowerCase();
+          if (depLoc.isNotEmpty && arrLoc.isNotEmpty && depLoc == arrLoc) {
+            final legName = i == 0
+                ? 'Start'
+                : (i == transitCount - 1 && transitCount > 1
+                    ? 'End'
+                    : 'Transit $i');
+            return '$legName departure and arrival locations cannot be the same (${departures[i].location})';
+          }
         }
       }
     }
+
+    // 5. Trip Date Range Checks (within startDate and endDate)
+    if (_uiState.startDate != null && _uiState.endDate != null) {
+      final minDate = DateTime(
+        _uiState.startDate!.year,
+        _uiState.startDate!.month,
+        _uiState.startDate!.day,
+      );
+      final maxDate = DateTime(
+        _uiState.endDate!.year,
+        _uiState.endDate!.month,
+        _uiState.endDate!.day,
+      );
+      final minStr = minDate.toLocal().toString().split(' ')[0];
+      final maxStr = maxDate.toLocal().toString().split(' ')[0];
+
+      for (int i = 0; i < arrivals.length; i++) {
+        final arr = arrivals[i];
+        if (arr.date.trim().isNotEmpty) {
+          final parsed = DateTime.tryParse(arr.date.trim());
+          if (parsed != null) {
+            final pDay = DateTime(parsed.year, parsed.month, parsed.day);
+            if (pDay.isBefore(minDate) || pDay.isAfter(maxDate)) {
+              final label = isForeign
+                  ? (i == 0 ? 'Start arrival' : 'Transit $i arrival')
+                  : (i == 0
+                      ? 'Start arrival'
+                      : (i == arrivals.length - 1 && transitCount > 1
+                          ? 'End arrival'
+                          : 'Transit $i arrival'));
+              return '$label date must be between $minStr and $maxStr';
+            }
+          }
+        }
+      }
+
+      for (int i = 0; i < departures.length; i++) {
+        final dep = departures[i];
+        if (dep.date.trim().isNotEmpty) {
+          final parsed = DateTime.tryParse(dep.date.trim());
+          if (parsed != null) {
+            final pDay = DateTime(parsed.year, parsed.month, parsed.day);
+            if (pDay.isBefore(minDate) || pDay.isAfter(maxDate)) {
+              final label = isForeign
+                  ? (i == departures.length - 1
+                      ? 'End departure'
+                      : 'Transit ${i + 1} departure')
+                  : (i == 0
+                      ? 'Start departure'
+                      : (i == departures.length - 1 && transitCount > 1
+                          ? 'End departure'
+                          : 'Transit $i departure'));
+              return '$label date must be between $minStr and $maxStr';
+            }
+          }
+        }
+      }
+    }
+
+    // 6. Chronological Date & Time Sequencing Checks
+    if (isForeign) {
+      final startArrDT =
+          arrivals.isNotEmpty ? _parsePointDateTime(arrivals[0]) : null;
+      if (transitCount == 1) {
+        final endDepDT =
+            departures.isNotEmpty ? _parsePointDateTime(departures[0]) : null;
+        if (startArrDT != null &&
+            endDepDT != null &&
+            endDepDT.isBefore(startArrDT)) {
+          return 'End departure cannot be earlier than start arrival in Malaysia';
+        }
+      } else {
+        DateTime? previousArrivalDT = startArrDT;
+        for (int i = 0; i < transitCount - 1; i++) {
+          final depDT =
+              i < departures.length ? _parsePointDateTime(departures[i]) : null;
+          final arrDT = i + 1 < arrivals.length
+              ? _parsePointDateTime(arrivals[i + 1])
+              : null;
+
+          if (depDT != null &&
+              previousArrivalDT != null &&
+              depDT.isBefore(previousArrivalDT)) {
+            return 'Transit ${i + 1} departure cannot be earlier than previous arrival';
+          }
+          if (arrDT != null && depDT != null && arrDT.isBefore(depDT)) {
+            return 'Transit ${i + 1} arrival cannot be earlier than departure';
+          }
+          if (arrDT != null) {
+            previousArrivalDT = arrDT;
+          }
+        }
+
+        if (transitCount - 1 < departures.length) {
+          final finalDepDT =
+              _parsePointDateTime(departures[transitCount - 1]);
+          if (finalDepDT != null &&
+              previousArrivalDT != null &&
+              finalDepDT.isBefore(previousArrivalDT)) {
+            return 'End departure cannot be earlier than previous transit arrival';
+          }
+        }
+      }
+    } else {
+      // Local Malaysian flow
+      final startDepDT =
+          departures.isNotEmpty ? _parsePointDateTime(departures[0]) : null;
+      final startArrDT =
+          arrivals.isNotEmpty ? _parsePointDateTime(arrivals[0]) : null;
+      if (startDepDT != null &&
+          startArrDT != null &&
+          startArrDT.isBefore(startDepDT)) {
+        return 'Start arrival cannot be earlier than start departure';
+      }
+
+      DateTime? previousArrivalDT = startArrDT;
+      for (int i = 1; i < transitCount - 1; i++) {
+        final depDT =
+            i < departures.length ? _parsePointDateTime(departures[i]) : null;
+        final arrDT =
+            i < arrivals.length ? _parsePointDateTime(arrivals[i]) : null;
+
+        if (depDT != null &&
+            previousArrivalDT != null &&
+            depDT.isBefore(previousArrivalDT)) {
+          return 'Transit $i departure cannot be earlier than previous arrival';
+        }
+        if (arrDT != null && depDT != null && arrDT.isBefore(depDT)) {
+          return 'Transit $i arrival cannot be earlier than departure';
+        }
+        if (arrDT != null) {
+          previousArrivalDT = arrDT;
+        }
+      }
+
+      if (transitCount > 1 &&
+          transitCount - 1 < departures.length &&
+          transitCount - 1 < arrivals.length) {
+        final endDepDT =
+            _parsePointDateTime(departures[transitCount - 1]);
+        final endArrDT =
+            _parsePointDateTime(arrivals[transitCount - 1]);
+
+        if (endDepDT != null &&
+            previousArrivalDT != null &&
+            endDepDT.isBefore(previousArrivalDT)) {
+          return 'End departure cannot be earlier than previous transit arrival';
+        }
+        if (endDepDT != null &&
+            endArrDT != null &&
+            endArrDT.isBefore(endDepDT)) {
+          return 'End arrival cannot be earlier than end departure';
+        }
+      }
+    }
+
     return null;
   }
+
+  String? validateTransitDates() => validateTransit();
 
   String? validateHotels() {
     final hasHotel = _uiState.hotels.any((h) => h.location.trim().isNotEmpty);
@@ -1260,18 +1550,26 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     final String? destinationError = validateDestinations();
     final String? dateError = validateDate(date);
     final String? budgetError = validateBudget(budget);
-    final String? transitDateError = validateTransitDates();
+    final String? transitError = validateTransit();
     final String? hotelError = validateHotels();
+
+    if (transitError != null) {
+      _uiState = _uiState.copyWith(transitError: transitError);
+      notifyListeners();
+    } else if (_uiState.transitError != null) {
+      _uiState = _uiState.copyWith(clearTransitError: true);
+      notifyListeners();
+    }
 
     if (destinationError != null ||
         dateError != null ||
         budgetError != null ||
-        transitDateError != null ||
+        transitError != null ||
         hotelError != null) {
       return destinationError ??
           dateError ??
           budgetError ??
-          transitDateError ??
+          transitError ??
           hotelError ??
           'Please complete the form';
     }
