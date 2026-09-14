@@ -58,6 +58,9 @@ class WholeItineraryDetailScreen extends StatefulWidget {
         ); // changed this
         final resolvedTripId = tripId ?? trip?.tripId ?? '';
 
+        final isForeign = args?['isForeign'] as bool? ??
+            (profileService.preferredCurrency.trim().toUpperCase() != 'MYR');
+
         if (isReadOnly && (tripId != null || trip != null)) {
           vm.loadSavedTrip(tripId: resolvedTripId, trip: trip);
         } else {
@@ -73,6 +76,7 @@ class WholeItineraryDetailScreen extends StatefulWidget {
             arrivals: arrivals,
             departures: departures,
             hotels: hotels,
+            isForeign: isForeign,
             arrivalLocation: args?['arrivalLocation'] as String?,
             arrivalTime: args?['arrivalTime'] as String?,
             departureLocation: args?['departureLocation'] as String?,

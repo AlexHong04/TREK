@@ -737,6 +737,8 @@ class _TravelInformationInputScreenState
                     'destination': destination,
                     'dates': _dateController.text,
                     'budget': finalBudget,
+                    'preferredCurrency': preferredCurrency,
+                    'isForeign': preferredCurrency.trim().toUpperCase() != 'MYR',
                     'preference': viewModel.uiState.selectedPreference,
                     'wishlist': viewModel.uiState.wishlistItems,
                     'arrivals': viewModel.uiState.arrivals
@@ -3824,25 +3826,14 @@ class _TravelInformationInputScreenState
             final bool isBusEnabled =
                 lockedMode == null || lockedMode.toLowerCase() == 'bus';
 
-            final recommendedHubs = getTransitHubSuggestions(
+            final destinationHubs = getTransitHubSuggestions(
               destinations,
               transitType: activeMode,
             );
-            final allHubs = getAllTransitHubs(transitType: activeMode);
 
-            final filteredRecommended = query.isEmpty
-                ? recommendedHubs
-                : recommendedHubs
-                      .where((a) => a.toLowerCase().contains(query))
-                      .toList();
-
-            final otherHubs = allHubs
-                .where((a) => !recommendedHubs.contains(a))
-                .toList();
-
-            final filteredOthers = query.isEmpty
-                ? otherHubs
-                : otherHubs
+            final filteredHubs = query.isEmpty
+                ? destinationHubs
+                : destinationHubs
                       .where((a) => a.toLowerCase().contains(query))
                       .toList();
 
@@ -3855,21 +3846,14 @@ class _TravelInformationInputScreenState
             final String modalTitle = isArrival
                 ? 'Select Arrival $typeLabel'
                 : 'Select Departure $typeLabel';
-            final String otherHeader = isTrain
-                ? 'OTHER MALAYSIA TRAIN STATIONS'
-                : (isBus
-                      ? 'OTHER MALAYSIA BUS TERMINALS'
-                      : 'OTHER MALAYSIA AIRPORTS');
             final String searchHint = isTrain
                 ? 'Search train station (e.g. KL Sentral, Ipoh)...'
                 : (isBus
                       ? 'Search bus terminal (e.g. TBS, Larkin)...'
                       : 'Search airport or city (e.g. KLIA, Penang)...');
 
-            final bool hasExactMatch = [
-              ...filteredRecommended,
-              ...filteredOthers,
-            ].any((h) => h.toLowerCase() == query);
+            final bool hasExactMatch =
+                filteredHubs.any((h) => h.toLowerCase() == query);
             final bool canAddCustom = query.isNotEmpty && !hasExactMatch;
 
             return Container(
@@ -3918,8 +3902,8 @@ class _TravelInformationInputScreenState
                               const SizedBox(height: 2),
                               Text(
                                 destinations.isNotEmpty
-                                    ? 'Based on your selected destinations'
-                                    : 'Major $typeLabel Options in Malaysia',
+                                    ? 'Destination: ${destinations.join(", ")}'
+                                    : 'Select $typeLabel',
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontFamily: 'Inter',
@@ -4163,10 +4147,7 @@ class _TravelInformationInputScreenState
 
                   // Hubs List
                   Expanded(
-                    child:
-                        (filteredRecommended.isEmpty &&
-                            filteredOthers.isEmpty &&
-                            !canAddCustom)
+                    child: (filteredHubs.isEmpty && !canAddCustom)
                         ? Center(
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
@@ -4178,7 +4159,9 @@ class _TravelInformationInputScreenState
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  'No $typeLabel options found',
+                                  destinations.isNotEmpty
+                                      ? 'No $typeLabel found for ${destinations.join(", ")}'
+                                      : 'No $typeLabel options found',
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontFamily: 'Inter',
@@ -4274,105 +4257,49 @@ class _TravelInformationInputScreenState
                                 ),
                               ],
 
-                              if (destinations.isNotEmpty &&
-                                  filteredRecommended.isNotEmpty) ...[
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.stars_rounded,
-                                      size: 15,
-                                      color: appTheme.teal_A700,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      'RECOMMENDED FOR YOUR TRIP',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w800,
-                                        fontFamily: 'Inter',
-                                        color: appTheme.teal_A700,
-                                        letterSpacing: 0.8,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8.0),
-                                ...filteredRecommended.map((hub) {
-                                  final isSelected = currentSelected == hub;
-                                  return Padding(
-                                    padding: const EdgeInsets.only(bottom: 8.0),
-                                    child: _buildTransitHubModalItem(
-                                      transitHub: hub,
-                                      transitType: activeMode,
-                                      isSelected: isSelected,
-                                      isRecommended: true,
-                                      onTap: () {
-                                        if (isArrival) {
-                                          viewModel.updateArrivalHub(
-                                            index,
-                                            type: activeMode,
-                                            location: hub,
-                                          );
-                                        } else {
-                                          viewModel.updateDepartureHub(
-                                            index,
-                                            type: activeMode,
-                                            location: hub,
-                                          );
-                                        }
-                                        Navigator.pop(context);
-                                      },
-                                    ),
-                                  );
-                                }),
-                                const SizedBox(height: 12.0),
-                              ],
-
-                              if (filteredOthers.isNotEmpty) ...[
-                                if (destinations.isNotEmpty &&
-                                    filteredRecommended.isNotEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 8.0),
-                                    child: Text(
-                                      otherHeader,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w800,
-                                        fontFamily: 'Inter',
-                                        color: appTheme.blue_gray_300,
-                                        letterSpacing: 0.8,
-                                      ),
+                              if (destinations.isNotEmpty) ...[
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 10.0),
+                                  child: Text(
+                                    'AVAILABLE IN ${destinations.join(", ").toUpperCase()}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      fontFamily: 'Inter',
+                                      color: appTheme.blue_gray_300,
+                                      letterSpacing: 0.8,
                                     ),
                                   ),
-                                ...filteredOthers.map((hub) {
-                                  final isSelected = currentSelected == hub;
-                                  return Padding(
-                                    padding: const EdgeInsets.only(bottom: 8.0),
-                                    child: _buildTransitHubModalItem(
-                                      transitHub: hub,
-                                      transitType: activeMode,
-                                      isSelected: isSelected,
-                                      isRecommended: false,
-                                      onTap: () {
-                                        if (isArrival) {
-                                          viewModel.updateArrivalHub(
-                                            index,
-                                            type: activeMode,
-                                            location: hub,
-                                          );
-                                        } else {
-                                          viewModel.updateDepartureHub(
-                                            index,
-                                            type: activeMode,
-                                            location: hub,
-                                          );
-                                        }
-                                        Navigator.pop(context);
-                                      },
-                                    ),
-                                  );
-                                }),
+                                ),
                               ],
+
+                              ...filteredHubs.map((hub) {
+                                final isSelected = currentSelected == hub;
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 8.0),
+                                  child: _buildTransitHubModalItem(
+                                    transitHub: hub,
+                                    transitType: activeMode,
+                                    isSelected: isSelected,
+                                    onTap: () {
+                                      if (isArrival) {
+                                        viewModel.updateArrivalHub(
+                                          index,
+                                          type: activeMode,
+                                          location: hub,
+                                        );
+                                      } else {
+                                        viewModel.updateDepartureHub(
+                                          index,
+                                          type: activeMode,
+                                          location: hub,
+                                        );
+                                      }
+                                      Navigator.pop(context);
+                                    },
+                                  ),
+                                );
+                              }),
                             ],
                           ),
                   ),
@@ -4454,7 +4381,6 @@ class _TravelInformationInputScreenState
     required String transitHub,
     required String transitType,
     required bool isSelected,
-    required bool isRecommended,
     required VoidCallback onTap,
   }) {
     return InkWell(
@@ -4466,11 +4392,7 @@ class _TravelInformationInputScreenState
           color: isSelected ? appTheme.gray_50_01 : appTheme.white_A700,
           borderRadius: BorderRadius.circular(12.0),
           border: Border.all(
-            color: isSelected
-                ? appTheme.teal_A700
-                : (isRecommended
-                      ? appTheme.teal_A700.withValues(alpha: 0.35)
-                      : appTheme.gray_100),
+            color: isSelected ? appTheme.teal_A700 : appTheme.gray_100,
             width: isSelected ? 1.5 : 1.0,
           ),
         ),
@@ -4479,17 +4401,13 @@ class _TravelInformationInputScreenState
             Container(
               padding: const EdgeInsets.all(8.0),
               decoration: BoxDecoration(
-                color: isSelected
-                    ? appTheme.teal_50
-                    : (isRecommended ? appTheme.teal_50 : appTheme.gray_50_01),
+                color: isSelected ? appTheme.teal_50 : appTheme.gray_50_01,
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 _getTransitHubIcon(transitType),
                 size: 18.0,
-                color: (isSelected || isRecommended)
-                    ? appTheme.teal_A700
-                    : appTheme.blue_gray_300,
+                color: isSelected ? appTheme.teal_A700 : appTheme.blue_gray_300,
               ),
             ),
             const SizedBox(width: 12.0),

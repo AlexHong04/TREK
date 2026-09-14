@@ -403,69 +403,140 @@ class TravelInformationInputViewModel extends ChangeNotifier {
     final defaultDepartureDate = _uiState.endDate != null
         ? _uiState.endDate!.toLocal().toString().split(' ')[0]
         : '';
+    final isForeign = _uiState.preferredCurrency.trim().toUpperCase() != 'MYR';
 
-    final hasPreviousDeparture = _uiState.departures.isNotEmpty;
-    final prevDeparture = hasPreviousDeparture
-        ? _uiState.departures.last
-        : null;
+    final updatedArrivals = List<TransitPoint>.from(_uiState.arrivals);
+    final updatedDepartures = List<TransitPoint>.from(_uiState.departures);
 
-    // Inherit arrival type from previous leg's departure (e.g. Flight, Train, Bus)
-    final inheritedArrivalType = prevDeparture?.type.isNotEmpty == true
-        ? prevDeparture!.type
-        : 'Flight';
+    if (isForeign) {
+      // In Foreign mode:
+      // arrivals[0] = Start Arrival (flight landing in Malaysia)
+      // arrivals[1..N] = Transit Arrivals (destination of each transit)
+      // departures[0..N-1] = Transit Departures (origin of each transit)
+      // departures.last = End Departure (flight leaving Malaysia)
+      //
+      // If the user already entered End Departure (departures.last), it must be PRESERVED at departures.last!
+      // The new transit departure must be inserted BEFORE departures.last (i.e. at departures.length - 1).
+      final prevPoint =
+          _uiState.arrivals.isNotEmpty ? _uiState.arrivals.last : null;
+      final transitType =
+          prevPoint?.type.isNotEmpty == true ? prevPoint!.type : 'Flight';
+      final transitDate =
+          prevPoint?.date.isNotEmpty == true ? prevPoint!.date : defaultArrivalDate;
+      final transitTime =
+          prevPoint?.time.isNotEmpty == true ? prevPoint!.time : '09:00 AM';
 
-    // Default arrival date to previous departure date (or trip start date)
-    final inheritedArrivalDate = prevDeparture?.date.isNotEmpty == true
-        ? prevDeparture!.date
-        : defaultArrivalDate;
-
-    // Default arrival time to previous departure time (or 09:00 AM)
-    final inheritedArrivalTime = prevDeparture?.time.isNotEmpty == true
-        ? prevDeparture!.time
-        : '09:00 AM';
-
-    String finalArrivalDate = inheritedArrivalDate;
-    String finalArrivalTime = inheritedArrivalTime;
-
-    // Calculate realistic arrival date/time based on transport duration
-    if (prevDeparture != null) {
       final durationMin = TransitScheduleHelper.getEstimatedDurationMinutes(
-        transitType: inheritedArrivalType,
-        fromLocation: prevDeparture.location,
+        transitType: transitType,
+        fromLocation: '',
         toLocation: '',
         selectedDestinations: _uiState.selectedDestinations,
       );
       final calculated = TransitScheduleHelper.calculateArrivalDateTime(
-        departureDate: inheritedArrivalDate,
-        departureTimeStr: inheritedArrivalTime,
+        departureDate: transitDate,
+        departureTimeStr: transitTime,
         minutesToAdd: durationMin,
       );
-      finalArrivalDate = calculated['date'] as String;
-      finalArrivalTime = calculated['time'] as String;
-    }
+      final transitArrivalDate = calculated['date'] as String;
+      final transitArrivalTime = calculated['time'] as String;
 
-    final updatedArrivals = List<TransitPoint>.from(_uiState.arrivals)
-      ..add(
-        TransitPoint(
-          id: 'arr_$now',
-          location: '',
-          time: finalArrivalTime,
-          type: inheritedArrivalType,
-          date: finalArrivalDate,
-        ),
+      final newTransitDeparture = TransitPoint(
+        id: 'dep_$now',
+        location: '',
+        time: transitTime,
+        type: transitType,
+        date: transitDate,
       );
-    final updatedDepartures = List<TransitPoint>.from(_uiState.departures)
-      ..add(
-        TransitPoint(
+      final newTransitArrival = TransitPoint(
+        id: 'arr_$now',
+        location: '',
+        time: transitArrivalTime,
+        type: transitType,
+        date: transitArrivalDate,
+      );
+
+      if (updatedDepartures.isNotEmpty) {
+        // Insert before End Departure so the user's End Departure is preserved as departures.last!
+        updatedDepartures.insert(
+          updatedDepartures.length - 1,
+          newTransitDeparture,
+        );
+      } else {
+        updatedDepartures.add(newTransitDeparture);
+      }
+      updatedArrivals.add(newTransitArrival);
+    } else {
+      // Local Malaysian mode:
+      // When transitCount == 1: START is Leg 0. Adding a leg creates END (Leg 1).
+      // When transitCount >= 2: START is Leg 0, END is Leg (length - 1).
+      // Adding a transit adds an INTERMEDIATE transit before END!
+      if (updatedDepartures.length <= 1) {
+        final prevDep =
+            updatedDepartures.isNotEmpty ? updatedDepartures.first : null;
+        final transitType =
+            prevDep?.type.isNotEmpty == true ? prevDep!.type : 'Train';
+        final transitDate = defaultDepartureDate.isNotEmpty
+            ? defaultDepartureDate
+            : (prevDep?.date.isNotEmpty == true
+                ? prevDep!.date
+                : defaultArrivalDate);
+
+        final newDep = TransitPoint(
           id: 'dep_$now',
           location: '',
           time: '09:00 PM',
-          type: inheritedArrivalType,
-          date: defaultDepartureDate.isNotEmpty
-              ? defaultDepartureDate
-              : finalArrivalDate,
-        ),
-      );
+          type: transitType,
+          date: transitDate,
+        );
+        final newArr = TransitPoint(
+          id: 'arr_$now',
+          location: '',
+          time: '11:00 PM',
+          type: transitType,
+          date: transitDate,
+        );
+        updatedArrivals.add(newArr);
+        updatedDepartures.add(newDep);
+      } else {
+        // Insert intermediate transit before the END leg
+        final prevArrival = updatedArrivals[updatedArrivals.length - 2];
+        final transitType =
+            prevArrival.type.isNotEmpty ? prevArrival.type : 'Train';
+        final transitDate =
+            prevArrival.date.isNotEmpty ? prevArrival.date : defaultArrivalDate;
+        final transitTime =
+            prevArrival.time.isNotEmpty ? prevArrival.time : '09:00 AM';
+
+        final durationMin = TransitScheduleHelper.getEstimatedDurationMinutes(
+          transitType: transitType,
+          fromLocation: '',
+          toLocation: '',
+          selectedDestinations: _uiState.selectedDestinations,
+        );
+        final calculated = TransitScheduleHelper.calculateArrivalDateTime(
+          departureDate: transitDate,
+          departureTimeStr: transitTime,
+          minutesToAdd: durationMin,
+        );
+
+        final newDep = TransitPoint(
+          id: 'dep_$now',
+          location: '',
+          time: transitTime,
+          type: transitType,
+          date: transitDate,
+        );
+        final newArr = TransitPoint(
+          id: 'arr_$now',
+          location: '',
+          time: calculated['time'] as String,
+          type: transitType,
+          date: calculated['date'] as String,
+        );
+        updatedDepartures.insert(updatedDepartures.length - 1, newDep);
+        updatedArrivals.insert(updatedArrivals.length - 1, newArr);
+      }
+    }
 
     _uiState = _uiState.copyWith(
       arrivals: updatedArrivals,
@@ -475,18 +546,40 @@ class TravelInformationInputViewModel extends ChangeNotifier {
   }
 
   void removeTransitLeg(int index) {
+    final isForeign = _uiState.preferredCurrency.trim().toUpperCase() != 'MYR';
     final updatedArrivals = List<TransitPoint>.from(_uiState.arrivals);
     final updatedDepartures = List<TransitPoint>.from(_uiState.departures);
 
-    if (updatedArrivals.length > 1 &&
-        index >= 0 &&
-        index < updatedArrivals.length) {
-      updatedArrivals.removeAt(index);
-    }
-    if (updatedDepartures.length > 1 &&
-        index >= 0 &&
-        index < updatedDepartures.length) {
-      updatedDepartures.removeAt(index);
+    if (isForeign) {
+      // In Foreign mode:
+      // index is the transit arrival index (1, 2, ...).
+      // Corresponding transit departure is at index - 1 (0, 1, ...).
+      // departures.last is the End Departure and must NEVER be deleted when removing an intermediate transit!
+      final arrivalIndex = index;
+      final departureIndex = index - 1;
+
+      if (updatedArrivals.length > 1 &&
+          arrivalIndex >= 1 &&
+          arrivalIndex < updatedArrivals.length) {
+        updatedArrivals.removeAt(arrivalIndex);
+      }
+      if (updatedDepartures.length > 1 &&
+          departureIndex >= 0 &&
+          departureIndex < updatedDepartures.length - 1) {
+        updatedDepartures.removeAt(departureIndex);
+      }
+    } else {
+      // Local Malaysian mode: Leg index is identical in arrivals and departures
+      if (updatedArrivals.length > 1 &&
+          index >= 0 &&
+          index < updatedArrivals.length) {
+        updatedArrivals.removeAt(index);
+      }
+      if (updatedDepartures.length > 1 &&
+          index >= 0 &&
+          index < updatedDepartures.length) {
+        updatedDepartures.removeAt(index);
+      }
     }
 
     _uiState = _uiState.copyWith(
@@ -733,10 +826,13 @@ class TravelInformationInputViewModel extends ChangeNotifier {
       final updatedDepartures = List<TransitPoint>.from(_uiState.departures);
       updatedDepartures[index] = updatedDepartures[index].copyWith(date: date);
 
+      final isForeign = _uiState.preferredCurrency.trim().toUpperCase() != 'MYR';
+      final targetArrIndex = isForeign ? index + 1 : index;
+
       final updatedArrivals = List<TransitPoint>.from(_uiState.arrivals);
-      if (index + 1 < updatedArrivals.length && date.isNotEmpty) {
+      if (targetArrIndex < updatedArrivals.length && date.isNotEmpty) {
         final curDep = updatedDepartures[index];
-        final nextArr = updatedArrivals[index + 1];
+        final nextArr = updatedArrivals[targetArrIndex];
         final durationMin = TransitScheduleHelper.getEstimatedDurationMinutes(
           transitType: curDep.type,
           fromLocation: curDep.location,
@@ -748,7 +844,7 @@ class TravelInformationInputViewModel extends ChangeNotifier {
           departureTimeStr: curDep.time,
           minutesToAdd: durationMin,
         );
-        updatedArrivals[index + 1] = nextArr.copyWith(
+        updatedArrivals[targetArrIndex] = nextArr.copyWith(
           time: calculated['time'] as String,
           date: calculated['date'] as String,
         );
@@ -789,9 +885,12 @@ class TravelInformationInputViewModel extends ChangeNotifier {
         updatedDepartures[index] = current.copyWith(type: type, location: '');
       }
 
+      final isForeign = _uiState.preferredCurrency.trim().toUpperCase() != 'MYR';
+      final targetArrIndex = isForeign ? index + 1 : index;
+
       final updatedArrivals = List<TransitPoint>.from(_uiState.arrivals);
-      if (index + 1 < updatedArrivals.length) {
-        final nextArr = updatedArrivals[index + 1];
+      if (targetArrIndex < updatedArrivals.length) {
+        final nextArr = updatedArrivals[targetArrIndex];
         final durationMin = TransitScheduleHelper.getEstimatedDurationMinutes(
           transitType: type,
           fromLocation: updatedDepartures[index].location,
@@ -803,7 +902,7 @@ class TravelInformationInputViewModel extends ChangeNotifier {
           departureTimeStr: updatedDepartures[index].time,
           minutesToAdd: durationMin,
         );
-        updatedArrivals[index + 1] = nextArr.copyWith(
+        updatedArrivals[targetArrIndex] = nextArr.copyWith(
           type: type,
           location: nextArr.type != type ? '' : nextArr.location,
           time: calculated['time'] as String,
@@ -879,9 +978,12 @@ class TravelInformationInputViewModel extends ChangeNotifier {
         location: location,
       );
 
+      final isForeign = _uiState.preferredCurrency.trim().toUpperCase() != 'MYR';
+      final targetArrIndex = isForeign ? index + 1 : index;
+
       final updatedArrivals = List<TransitPoint>.from(_uiState.arrivals);
-      if (index + 1 < updatedArrivals.length) {
-        final nextArr = updatedArrivals[index + 1];
+      if (targetArrIndex < updatedArrivals.length) {
+        final nextArr = updatedArrivals[targetArrIndex];
         final durationMin = TransitScheduleHelper.getEstimatedDurationMinutes(
           transitType: type,
           fromLocation: location,
@@ -894,7 +996,7 @@ class TravelInformationInputViewModel extends ChangeNotifier {
           minutesToAdd: durationMin,
         );
 
-        updatedArrivals[index + 1] = nextArr.copyWith(
+        updatedArrivals[targetArrIndex] = nextArr.copyWith(
           type: type,
           location: nextArr.type != type ? '' : nextArr.location,
           time: calculated['time'] as String,
@@ -908,8 +1010,8 @@ class TravelInformationInputViewModel extends ChangeNotifier {
       );
       notifyListeners();
 
-      if (type.toLowerCase() == 'bus' && index + 1 < _uiState.arrivals.length) {
-        syncLegArrivalWithDepartureDurationAsync(index + 1);
+      if (type.toLowerCase() == 'bus' && targetArrIndex < _uiState.arrivals.length) {
+        syncLegArrivalWithDepartureDurationAsync(targetArrIndex);
       }
     }
   }
@@ -986,10 +1088,13 @@ class TravelInformationInputViewModel extends ChangeNotifier {
       final updatedDepartures = List<TransitPoint>.from(_uiState.departures);
       updatedDepartures[index] = updatedDepartures[index].copyWith(time: time);
 
+      final isForeign = _uiState.preferredCurrency.trim().toUpperCase() != 'MYR';
+      final targetArrIndex = isForeign ? index + 1 : index;
+
       final updatedArrivals = List<TransitPoint>.from(_uiState.arrivals);
-      if (index + 1 < updatedArrivals.length) {
+      if (targetArrIndex < updatedArrivals.length) {
         final curDep = updatedDepartures[index];
-        final nextArr = updatedArrivals[index + 1];
+        final nextArr = updatedArrivals[targetArrIndex];
 
         final durationMin = TransitScheduleHelper.getEstimatedDurationMinutes(
           transitType: curDep.type,
@@ -1004,7 +1109,7 @@ class TravelInformationInputViewModel extends ChangeNotifier {
           minutesToAdd: durationMin,
         );
 
-        updatedArrivals[index + 1] = nextArr.copyWith(
+        updatedArrivals[targetArrIndex] = nextArr.copyWith(
           time: calculated['time'] as String,
           date: calculated['date'] as String,
         );
@@ -1017,17 +1122,20 @@ class TravelInformationInputViewModel extends ChangeNotifier {
       notifyListeners();
 
       if (updatedDepartures[index].type.toLowerCase() == 'bus' &&
-          index + 1 < _uiState.arrivals.length) {
-        syncLegArrivalWithDepartureDurationAsync(index + 1);
+          targetArrIndex < _uiState.arrivals.length) {
+        syncLegArrivalWithDepartureDurationAsync(targetArrIndex);
       }
     }
   }
 
   void syncLegArrivalWithDepartureDuration(int legIndex) {
-    if (legIndex > 0 &&
+    final isForeign = _uiState.preferredCurrency.trim().toUpperCase() != 'MYR';
+    final depIndex = isForeign ? legIndex - 1 : legIndex;
+    if (legIndex >= 0 &&
         legIndex < _uiState.arrivals.length &&
-        legIndex - 1 < _uiState.departures.length) {
-      final prevDep = _uiState.departures[legIndex - 1];
+        depIndex >= 0 &&
+        depIndex < _uiState.departures.length) {
+      final prevDep = _uiState.departures[depIndex];
       final curArr = _uiState.arrivals[legIndex];
       final durationMin = TransitScheduleHelper.getEstimatedDurationMinutes(
         transitType: curArr.type.isNotEmpty ? curArr.type : prevDep.type,
@@ -1051,10 +1159,13 @@ class TravelInformationInputViewModel extends ChangeNotifier {
   }
 
   Future<void> syncLegArrivalWithDepartureDurationAsync(int legIndex) async {
-    if (legIndex > 0 &&
+    final isForeign = _uiState.preferredCurrency.trim().toUpperCase() != 'MYR';
+    final depIndex = isForeign ? legIndex - 1 : legIndex;
+    if (legIndex >= 0 &&
         legIndex < _uiState.arrivals.length &&
-        legIndex - 1 < _uiState.departures.length) {
-      final prevDep = _uiState.departures[legIndex - 1];
+        depIndex >= 0 &&
+        depIndex < _uiState.departures.length) {
+      final prevDep = _uiState.departures[depIndex];
       final curArr = _uiState.arrivals[legIndex];
       final durationMin =
           await TransitScheduleHelper.getEstimatedDurationMinutesAsync(

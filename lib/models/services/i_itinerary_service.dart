@@ -21,6 +21,7 @@ abstract interface class IItineraryService {
     List<TransitPoint>? arrivals,
     List<TransitPoint>? departures,
     List<HotelStay>? hotels,
+    bool isForeign = false,
     String? arrivalLocation,
     String? arrivalTime,
     String? departureLocation,
