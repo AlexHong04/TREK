@@ -1993,6 +1993,15 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       throw Exception('Update overspend details failed: $success');
     }
 
+    if (activities.isEmpty) {
+      debugPrint(
+        'No remaining activities. '
+            'Skipping critical/recommendation/reallocation.',
+      );
+
+      return ExpenseProcessingResult.withinBudget;
+    }
+
     // Check critical overspend
     final bool isCritical = await detectCriticalOverspend(
       totalAllocatedBudget,
