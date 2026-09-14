@@ -495,7 +495,7 @@ Widget _buildInitialTopUpCard(
   required String? Function({
     String? symbol,
     required String value,
-    required double minTopUp,
+    double? minTopUp,
     required double shortageAmount,
   })
   validateTopUpAmount,
@@ -897,10 +897,11 @@ double roundCurrency(double value) {
 Future<void> showInitialBudgetInsufficientDialog({
   required BuildContext context,
   required double shortageAmount,
-  required double minTopUp,
+  double? minTopUp,
   required double validationShortageAmount,
   required double validationMinTopUp,
   int? wishlistCovered,
+  required bool hasUncoveredWishlist,
   String? symbol,
   required String warningText,
   VoidCallback? onCancel,
@@ -909,7 +910,7 @@ Future<void> showInitialBudgetInsufficientDialog({
   required String? Function({
     String? symbol,
     required String value,
-    required double minTopUp,
+    double? minTopUp,
     required double shortageAmount,
   })
   validateTopUpAmount,
@@ -923,7 +924,7 @@ Future<void> showInitialBudgetInsufficientDialog({
       return BaseBudgetDialog(
         title: 'Budget Insufficient',
 
-        summaryCard: wishlistCovered != null
+        summaryCard: hasUncoveredWishlist
             ? _buildWishlistSummaryCard(
                 primaryLabel: 'Estimated Budget Shortage Amount',
                 primaryValue: shortageAmount,
@@ -944,7 +945,7 @@ Future<void> showInitialBudgetInsufficientDialog({
         contentCard: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            wishlistCovered != null
+            hasUncoveredWishlist
                 ? _buildInitialTopUpCard(
                     controller,
                     symbol: symbol ?? 'MYR',
@@ -991,17 +992,17 @@ Future<void> showInitialBudgetInsufficientDialog({
 
                   bool isValid = false;
 
-                  if (wishlistCovered != null) {
+                  if (hasUncoveredWishlist) {
                     isValid =
                         enteredAmount != null &&
                         enteredAmount ==
                             roundCurrency(validationShortageAmount);
+                  } else {
+                    isValid =
+                        enteredAmount != null &&
+                            enteredAmount >= roundCurrency(validationMinTopUp) &&
+                            enteredAmount <= roundCurrency(validationShortageAmount);
                   }
-
-                  isValid =
-                      enteredAmount != null &&
-                      enteredAmount >= roundCurrency(validationMinTopUp) &&
-                      enteredAmount <= roundCurrency(validationShortageAmount);
 
                   return _buildActionButton(
                     text: 'Top-up',

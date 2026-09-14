@@ -441,6 +441,7 @@ class _WholeItineraryDetailScreenState
           wishlistCovered: hasWishlist
               ? viewModel.uiState.wishlistItemsCoveredCount
               : null,
+          hasUncoveredWishlist: hasUncoveredWishlist,
           symbol: viewModel.preferredCurrency,
           warningText:
           'Insufficient top-up amount will trigger '
