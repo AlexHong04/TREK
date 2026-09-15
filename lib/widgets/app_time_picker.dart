@@ -7,8 +7,9 @@ import '../theme/app_theme.dart';
 Future<TimeOfDay?> showAppTimePicker({
   required BuildContext context,
   required TimeOfDay initialTime,
-  required bool Function(TimeOfDay) isSelectable,
+  bool Function(TimeOfDay)? isSelectable,
 }) {
+  final selectable = isSelectable ?? (_) => true;
   return showDialog<TimeOfDay>(
     context: context,
     barrierColor: appTheme.gray_900.withValues(alpha: 0.25),
@@ -17,7 +18,7 @@ Future<TimeOfDay?> showAppTimePicker({
       removeBottom: true,
       child: _AppTimePickerDialog(
         initialTime: initialTime,
-        isSelectable: isSelectable,
+        isSelectable: selectable,
       ),
     ),
   );

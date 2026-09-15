@@ -7,6 +7,7 @@ import '../view_models/presentation_logic/travel_information_input_view_model.da
 
 import '../main.dart';
 import '../widgets/app_date_picker.dart';
+import '../widgets/app_time_picker.dart';
 import '../widgets/custom_app_bar.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/destination_spending_rates_dialog.dart';
@@ -3706,74 +3707,11 @@ class _TravelInformationInputScreenState
       initialTime = TimeOfDay(hour: hour, minute: minute);
     } catch (_) {}
 
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: initialTime,
-      cancelText: 'Cancel',
-      confirmText: 'Confirm',
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: appTheme.teal_A700,
-              onPrimary: appTheme.white_A700,
-              surface: appTheme.white_A700,
-              onSurface: appTheme.gray_800,
-            ),
-            timePickerTheme: TimePickerThemeData(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24.0),
-              ),
-              cancelButtonStyle: ButtonStyle(
-                backgroundColor: WidgetStateProperty.all(appTheme.white_A700),
-                foregroundColor: WidgetStateProperty.all(
-                  const Color(0xFF718096),
-                ),
-                side: WidgetStateProperty.all(
-                  BorderSide(color: appTheme.gray_200, width: 1.5),
-                ),
-                shape: WidgetStateProperty.all(const StadiumBorder()),
-                padding: WidgetStateProperty.all(
-                  const EdgeInsets.symmetric(horizontal: 20.0, vertical: 11.0),
-                ),
-                elevation: WidgetStateProperty.all(0),
-                textStyle: WidgetStateProperty.all(
-                  const TextStyle(
-                    fontSize: 14.0,
-                    fontWeight: FontWeight.w600,
-                    fontFamily: 'Inter',
-                  ),
-                ),
-              ),
-              confirmButtonStyle: ButtonStyle(
-                backgroundColor: WidgetStateProperty.all(appTheme.teal_A700),
-                foregroundColor: WidgetStateProperty.all(appTheme.white_A700),
-                elevation: WidgetStateProperty.all(2.0),
-                shadowColor: WidgetStateProperty.all(
-                  appTheme.teal_A700.withValues(alpha: 0.35),
-                ),
-                shape: WidgetStateProperty.all(const StadiumBorder()),
-                padding: WidgetStateProperty.all(
-                  const EdgeInsets.symmetric(horizontal: 20.0, vertical: 11.0),
-                ),
-                textStyle: WidgetStateProperty.all(
-                  const TextStyle(
-                    fontSize: 14.0,
-                    fontWeight: FontWeight.w700,
-                    fontFamily: 'Inter',
-                  ),
-                ),
-              ),
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-
-    if (picked != null) {
-      if (minAllowedTimeString != null && minAllowedTimeString.isNotEmpty) {
-        bool isEarlier = false;
+    // Compute selectable constraint based on minAllowedTimeString and dates
+    bool Function(TimeOfDay)? isSelectable;
+    if (minAllowedTimeString != null && minAllowedTimeString.isNotEmpty) {
+      final minMinutes = _parseTimeToMinutes(minAllowedTimeString);
+      if (minMinutes != null) {
         final chosenD = (compareDate != null && compareDate.isNotEmpty)
             ? DateTime.tryParse(compareDate)
             : null;
@@ -3784,58 +3722,24 @@ class _TravelInformationInputScreenState
         if (chosenD != null && minD != null) {
           final cDay = DateTime(chosenD.year, chosenD.month, chosenD.day);
           final mDay = DateTime(minD.year, minD.month, minD.day);
-          if (cDay.isBefore(mDay)) {
-            isEarlier = true;
-          } else if (cDay.isAtSameMomentAs(mDay)) {
-            final pickedMinutes = picked.hour * 60 + picked.minute;
-            final minMinutes = _parseTimeToMinutes(minAllowedTimeString);
-            if (minMinutes != null && pickedMinutes < minMinutes) {
-              isEarlier = true;
-            }
+          if (cDay.isAtSameMomentAs(mDay)) {
+            isSelectable = (t) => (t.hour * 60 + t.minute) >= minMinutes;
+          } else if (cDay.isBefore(mDay)) {
+            isSelectable = (_) => false;
           }
         } else {
-          final pickedMinutes = picked.hour * 60 + picked.minute;
-          final minMinutes = _parseTimeToMinutes(minAllowedTimeString);
-          if (minMinutes != null && pickedMinutes < minMinutes) {
-            isEarlier = true;
-          }
-        }
-
-        if (isEarlier) {
-          if (autoSyncOnInvalid) {
-            // AUTOMATIC CHECK: Auto-sync arrival to minimum valid calculated time!
-            onTimePicked(minAllowedTimeString);
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'Selected time was too early for travel duration. Auto-synced arrival to $minAllowedTimeString.',
-                  ),
-                  backgroundColor: appTheme.teal_A700,
-                  duration: const Duration(seconds: 3),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            }
-            return;
-          } else {
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    constraintLabel ??
-                        'Time cannot be earlier than $minAllowedTimeString.',
-                  ),
-                  backgroundColor: appTheme.redButton,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            }
-            return;
-          }
+          isSelectable = (t) => (t.hour * 60 + t.minute) >= minMinutes;
         }
       }
+    }
 
+    final picked = await showAppTimePicker(
+      context: context,
+      initialTime: initialTime,
+      isSelectable: isSelectable,
+    );
+
+    if (picked != null) {
       final hour = picked.hourOfPeriod == 0 ? 12 : picked.hourOfPeriod;
       final minute = picked.minute.toString().padLeft(2, '0');
       final period = picked.period == DayPeriod.am ? 'AM' : 'PM';
