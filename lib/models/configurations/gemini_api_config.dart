@@ -301,156 +301,72 @@ $receiptText
       );
     }
 
-    final String rawStartTime;
-    final String day1StartTime24H;
-    if (!isForeign &&
-        resolvedDepartures.isNotEmpty &&
-        resolvedDepartures.first.location.trim().isNotEmpty &&
-        resolvedDepartures.first.time.trim().isNotEmpty) {
-      rawStartTime = resolvedDepartures.first.time;
-      day1StartTime24H = _formatTo24Hour(rawStartTime, '09:00');
-    } else {
-      rawStartTime = (resolvedArrivals.isNotEmpty &&
-              resolvedArrivals.first.time.trim().isNotEmpty)
-          ? resolvedArrivals.first.time
-          : (arrivalTime != null && arrivalTime.trim().isNotEmpty
-              ? arrivalTime
-              : '09:00 AM');
-      day1StartTime24H = _formatTo24Hour(rawStartTime, '09:00');
-    }
+    final String rawStartTime = (resolvedArrivals.isNotEmpty &&
+            resolvedArrivals.first.time.trim().isNotEmpty)
+        ? resolvedArrivals.first.time
+        : (arrivalTime != null && arrivalTime.trim().isNotEmpty
+            ? arrivalTime
+            : '09:00 AM');
+    final String day1StartTime24H = _formatTo24Hour(rawStartTime, '09:00');
 
     final String finalDayEndTime24H;
     final bool hasFinalDeparture;
     final String rawDepartureTime;
-    if (!isForeign) {
-      if (resolvedDepartures.length > 1 &&
-          resolvedDepartures.last.location.trim().isNotEmpty &&
-          resolvedDepartures.last.time.trim().isNotEmpty) {
-        hasFinalDeparture = true;
-        rawDepartureTime = resolvedDepartures.last.time;
-        finalDayEndTime24H = _formatTo24Hour(rawDepartureTime, '21:00');
-      } else {
-        hasFinalDeparture = false;
-        rawDepartureTime = '09:00 PM';
-        finalDayEndTime24H = '21:00';
-      }
+    if (resolvedDepartures.isNotEmpty &&
+        resolvedDepartures.last.location.trim().isNotEmpty &&
+        resolvedDepartures.last.time.trim().isNotEmpty) {
+      hasFinalDeparture = true;
+      rawDepartureTime = resolvedDepartures.last.time;
+      finalDayEndTime24H = _formatTo24Hour(rawDepartureTime, '21:00');
     } else {
-      if (resolvedDepartures.isNotEmpty &&
-          resolvedDepartures.last.location.trim().isNotEmpty &&
-          resolvedDepartures.last.time.trim().isNotEmpty) {
-        hasFinalDeparture = true;
-        rawDepartureTime = resolvedDepartures.last.time;
-        finalDayEndTime24H = _formatTo24Hour(rawDepartureTime, '21:00');
-      } else {
-        hasFinalDeparture = false;
-        rawDepartureTime = '09:00 PM';
-        finalDayEndTime24H = '21:00';
+      hasFinalDeparture = false;
+      rawDepartureTime = '09:00 PM';
+      finalDayEndTime24H = '21:00';
+    }
+
+    final StringBuffer sb = StringBuffer();
+    sb.writeln('    - TRAVEL ARRIVAL & DEPARTURE FLOW:');
+    if (resolvedArrivals.isNotEmpty &&
+        resolvedArrivals.first.location.trim().isNotEmpty) {
+      sb.writeln('      * Day 1 Arrival Time: $day1StartTime24H ($rawStartTime) at "${resolvedArrivals.first.location}" (${resolvedArrivals.first.type}).');
+      sb.writeln('      * CRITICAL FOR DAY 1 START TIME:');
+      sb.writeln('        The traveler only begins Day 1 upon arrival at $day1StartTime24H ($rawStartTime).');
+      sb.writeln('        Day 1\'s very first activity MUST start strictly at $day1StartTime24H ("startTime": "$day1StartTime24H") with arrival transfer from "${resolvedArrivals.first.location}"!');
+      sb.writeln('        NEVER schedule any activity before $day1StartTime24H on Day 1!');
+    } else {
+      sb.writeln('      * Day 1 Schedule: Day 1 starts normally at 09:00 with morning sightseeing or breakfast.');
+    }
+
+    if (resolvedArrivals.length > 1) {
+      sb.writeln('    - Additional Intermediate Transit Legs:');
+      for (int i = 0; i < resolvedArrivals.length - 1; i++) {
+        final arr = resolvedArrivals[i + 1];
+        final dep = i < resolvedDepartures.length ? resolvedDepartures[i] : null;
+        if (dep != null && dep.location.trim().isNotEmpty) {
+          sb.writeln('      * Transit ${i + 1}: Depart from "${dep.location}"${dep.date.isNotEmpty ? ' on ${dep.date}' : ''} at ${dep.time} via ${dep.type}, arriving at "${arr.location}" at ${arr.time}. Schedule this Transportation connection on that day!');
+        } else {
+          sb.writeln('      * Transit ${i + 1} Arrival (${arr.type}): ${arr.location}${arr.date.isNotEmpty ? ' on ${arr.date}' : ''} at ${arr.time}');
+        }
       }
     }
 
-    final String transitFlowPrompt;
-    if (!isForeign) {
-      // Local Malaysian Flow:
-      // START: Leg 1 Departure (origin) -> Leg 1 Arrival (destination) -> Transit Journey
-      // INTERMEDIATE: Leg i Departure -> Leg i Arrival
-      // END: Final Departure -> Final Return Arrival
-      final bool hasStartDeparture = resolvedDepartures.isNotEmpty &&
-          resolvedDepartures.first.location.trim().isNotEmpty;
-      final bool hasStartArrival = resolvedArrivals.isNotEmpty &&
-          resolvedArrivals.first.location.trim().isNotEmpty;
-
-      final StringBuffer sb = StringBuffer();
-      sb.writeln('    - LOCAL MALAYSIAN TRAVEL FLOW (START):');
-      if (hasStartDeparture && hasStartArrival) {
-        sb.writeln('      * START Leg 1 Departure: Departs from "${resolvedDepartures.first.location}" at ${resolvedDepartures.first.time} (${_formatTo24Hour(resolvedDepartures.first.time, '09:00')}) via ${resolvedDepartures.first.type}.');
-        sb.writeln('      * START Leg 1 Arrival: Arrives in "$destination" at "${resolvedArrivals.first.location}" at ${resolvedArrivals.first.time} (${_formatTo24Hour(resolvedArrivals.first.time, '11:00')}) via ${resolvedArrivals.first.type}.');
-        sb.writeln('      * CRITICAL MANDATORY FIRST ACTIVITY ON DAY 1 (TRANSIT JOURNEY):');
-        sb.writeln('        - The very first activity on Day 1 MUST BE the transit connection:');
-        sb.writeln('          * "destination": "${resolvedArrivals.first.location}"');
-        sb.writeln('          * "activityCategory": "Transportation"');
-        sb.writeln('          * "description": "Travel from ${resolvedDepartures.first.location} to ${resolvedArrivals.first.location} via ${resolvedDepartures.first.type}"');
-        sb.writeln('          * "startTime": "${_formatTo24Hour(resolvedDepartures.first.time, '09:00')}"');
-        sb.writeln('          * "endTime": "${_formatTo24Hour(resolvedArrivals.first.time, '11:00')}"');
-        sb.writeln('        - All subsequent Day 1 activities (sightseeing, hotel check-in, lunch) MUST strictly start AFTER ${_formatTo24Hour(resolvedArrivals.first.time, '11:00')}!');
-      } else if (hasStartArrival) {
-        sb.writeln('      * Day 1 Arrival Time: $day1StartTime24H ($rawStartTime) at "${resolvedArrivals.first.location}" (${resolvedArrivals.first.type}).');
-        sb.writeln('      * Day 1 activities in "$destination" begin strictly at $day1StartTime24H.');
-      } else {
-        sb.writeln('      * Day 1 starts at 09:00.');
-      }
-
-      if (resolvedDepartures.length > 2 && resolvedArrivals.length > 2) {
-        sb.writeln('    - INTERMEDIATE TRANSIT LEGS:');
-        for (int idx = 1; idx < resolvedDepartures.length - 1; idx++) {
-          final dep = resolvedDepartures[idx];
-          final arr = resolvedArrivals[idx];
-          sb.writeln('      * Transit $idx: Depart from "${dep.location}"${dep.date.isNotEmpty ? ' on ${dep.date}' : ''} at ${dep.time} via ${dep.type}, arriving at "${arr.location}" at ${arr.time}. Schedule this Transportation connection on that day!');
-        }
-      }
-
-      if (hasFinalDeparture) {
-        sb.writeln('    - LOCAL MALAYSIAN TRAVEL FLOW (END / RETURN):');
-        sb.writeln('      * The traveler concludes their trip and returns home on Day $numberOfDays:');
-        sb.writeln('        - Return Departure: Departs from "${resolvedDepartures.last.location}"${resolvedDepartures.last.date.isNotEmpty ? ' on ${resolvedDepartures.last.date}' : ''} at ${resolvedDepartures.last.time} (${_formatTo24Hour(resolvedDepartures.last.time, '21:00')}) via ${resolvedDepartures.last.type}.');
-        if (resolvedArrivals.length > 1) {
-          sb.writeln('        - Return Arrival: Arrives back at "${resolvedArrivals.last.location}" at ${resolvedArrivals.last.time}.');
-        }
-        sb.writeln('      * CRITICAL FOR FINAL DAY (MANDATORY RETURN ACTIVITY):');
-        sb.writeln('        - All sightseeing and meals on Day $numberOfDays MUST conclude before ${resolvedDepartures.last.time}!');
-        sb.writeln('        - The absolute LAST activity on Day $numberOfDays MUST be the return departure transfer:');
-        sb.writeln('          * "destination": "${resolvedDepartures.last.location}"');
-        sb.writeln('          * "activityCategory": "Transportation"');
-        sb.writeln('          * "description": "Return travel: Depart from ${resolvedDepartures.last.location}${resolvedArrivals.length > 1 ? ' to ${resolvedArrivals.last.location}' : ''} via ${resolvedDepartures.last.type}"');
-        sb.writeln('          * "endTime": "${resolvedDepartures.last.time}"');
-        sb.writeln('          * "startTime": 45-90 minutes before ${resolvedDepartures.last.time}');
-        sb.writeln('        - DO NOT schedule dinner or attractions after ${resolvedDepartures.last.time} on the final day!');
-      } else {
-        sb.writeln('    - FINAL DAY SCHEDULE:');
-        sb.writeln('      * Final day concludes normally in the evening at 21:00 without an extra departure transfer.');
-      }
-      transitFlowPrompt = sb.toString();
+    if (hasFinalDeparture) {
+      sb.writeln('    - Traveler Departure & Final Day End Time:');
+      sb.writeln('      * Final Day (Day $numberOfDays) Departure Time: $finalDayEndTime24H ($rawDepartureTime) at "${resolvedDepartures.last.location}" (${resolvedDepartures.last.type}).');
+      sb.writeln('      * CRITICAL FOR FINAL DAY END TIME:');
+      sb.writeln('        All activities on Day $numberOfDays MUST conclude by $finalDayEndTime24H ($rawDepartureTime).');
+      sb.writeln('        The absolute LAST activity on the final day MUST be:');
+      sb.writeln('          * "destination": "${resolvedDepartures.last.location}"');
+      sb.writeln('          * "activityCategory": "Transportation"');
+      sb.writeln('          * "description": "Travel to ${resolvedDepartures.last.location} for departure via ${resolvedDepartures.last.type}"');
+      sb.writeln('          * "endTime": "${resolvedDepartures.last.time}"');
+      sb.writeln('          * "startTime": 45-90 minutes before ${resolvedDepartures.last.time}');
+      sb.writeln('        ABSOLUTELY DO NOT schedule any activities after $finalDayEndTime24H on Day $numberOfDays!');
     } else {
-      // Foreign Traveler Flow:
-      // START: Arrival into Malaysia at arrivals[0]
-      // INTERMEDIATE: Departures[i] -> Arrivals[i+1]
-      // END: Departures.last out of Malaysia
-      final StringBuffer sb = StringBuffer();
-      sb.writeln('    - FOREIGN TRAVELER ARRIVAL & DEPARTURE FLOW:');
-      if (resolvedArrivals.isNotEmpty) {
-        sb.writeln('      * Day 1 Arrival Time: $day1StartTime24H ($rawStartTime) at "${resolvedArrivals.first.location}" (${resolvedArrivals.first.type}).');
-        sb.writeln('      * CRITICAL FOR DAY 1 START TIME:');
-        sb.writeln('        The traveler only begins Day 1 upon arrival at $day1StartTime24H ($rawStartTime).');
-        sb.writeln('        Day 1\'s very first activity MUST start strictly at $day1StartTime24H ("startTime": "$day1StartTime24H") with arrival transfer from "${resolvedArrivals.first.location}"!');
-        sb.writeln('        NEVER schedule any activity before $day1StartTime24H on Day 1!');
-      } else {
-        sb.writeln('      * Day 1 Schedule: Day 1 starts normally at 09:00 with morning sightseeing or breakfast.');
-      }
-
-      if (resolvedArrivals.length > 1) {
-        sb.writeln('    - Additional Transit Arrivals:');
-        for (final a in resolvedArrivals.skip(1)) {
-          sb.writeln('      * Arrival (${a.type}): ${a.location}${a.date.isNotEmpty ? ' on ${a.date}' : ''} at ${a.time}');
-        }
-      }
-
-      if (hasFinalDeparture) {
-        sb.writeln('    - Traveler Departure & Final Day End Time:');
-        sb.writeln('      * Final Day (Day $numberOfDays) Departure Time: $finalDayEndTime24H ($rawDepartureTime) at "${resolvedDepartures.last.location}" (${resolvedDepartures.last.type}).');
-        sb.writeln('      * CRITICAL FOR FINAL DAY END TIME:');
-        sb.writeln('        All activities on Day $numberOfDays MUST conclude by $finalDayEndTime24H ($rawDepartureTime).');
-        sb.writeln('        The absolute LAST activity on the final day MUST be:');
-        sb.writeln('          * "destination": "${resolvedDepartures.last.location}"');
-        sb.writeln('          * "activityCategory": "Transportation"');
-        sb.writeln('          * "description": "Travel to ${resolvedDepartures.last.location} for departure via ${resolvedDepartures.last.type}"');
-        sb.writeln('          * "endTime": "${resolvedDepartures.last.time}"');
-        sb.writeln('          * "startTime": 45-90 minutes before ${resolvedDepartures.last.time}');
-        sb.writeln('        ABSOLUTELY DO NOT schedule any activities after $finalDayEndTime24H on Day $numberOfDays!');
-      } else {
-        sb.writeln('    - FINAL DAY SCHEDULE:');
-        sb.writeln('      * Final day concludes normally in the evening at 21:00 without an extra departure transfer.');
-      }
-      transitFlowPrompt = sb.toString();
+      sb.writeln('    - FINAL DAY SCHEDULE:');
+      sb.writeln('      * Final day concludes normally in the evening at 21:00 without an extra departure transfer.');
     }
+    final String transitFlowPrompt = sb.toString();
 
     final prompt =
         '''
@@ -467,7 +383,11 @@ $receiptText
 $transitFlowPrompt
     ${resolvedHotels.isNotEmpty ? '''- Accommodation / Hotel:
 ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.value.location} (Check-in: ${e.value.checkInTime}, Check-out: ${e.value.checkOutTime})').join('\n')}
-      * CRITICAL FOR HOTEL: Daily activities should conveniently route to/from this accommodation area. Factor in hotel check-in on Day 1 (around ${resolvedHotels.first.checkInTime}) and check-out on the final day (around ${resolvedHotels.last.checkOutTime}).''' : ''}
+      * CRITICAL FOR HOTEL:
+        - Daily activities should conveniently route to/from this accommodation area.
+        - Day 1 Hotel Check-in (around ${resolvedHotels.first.checkInTime}): This is ONLY a brief 30-45 minute stop to check in or drop off luggage. It MUST NOT replace or delay Day 1's daytime activities!
+        - The traveler actively explores sights, eats meals, and visits attractions BOTH BEFORE (morning/midday) and AFTER (afternoon/evening) hotel check-in!
+        - Final day hotel check-out is around ${resolvedHotels.last.checkOutTime}.''' : ''}
     ${(constraints != null && constraints.isNotEmpty) ? '- Personal Constraints: ' + constraints.join(', ') + ' (You MUST strictly follow these constraints when suggesting places, e.g., food restrictions or accessibility!)' : ''}
     ${(futureSuggestions != null && futureSuggestions.isNotEmpty) ? '- Budget Distribution: ' + futureSuggestions.map((e) => '${e.activityCategory}: ${e.suggestedAmount}%').join(', ') + ' (You MUST strictly allocate the provided Budget according to these category percentages!)' : ''}
     ${(wishlist != null && wishlist.isNotEmpty) ? '- Wishlist Items: ' + wishlist.join(', ') + (strictBudget ? '''
@@ -529,7 +449,7 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
     - The user provided a target budget of MYR $budget for the entire $numberOfDays-day trip.
     - HARD BUDGET LIMIT: "totalAllocatedBudget" MUST BE LESS THAN OR EQUAL TO MYR $budget (totalAllocatedBudget <= $budget). NEVER exceed MYR $budget!
     - PRICING GUIDELINES:
-      * Meals: Hawker stalls, kopitiams, mamak eateries (MYR 5.00 - 12.00 per meal). Food is NEVER free (minimum MYR 4.00 per meal). If budget is extremely tight, schedule fewer or lighter meals within budget.
+      * Meals: Hawker stalls, kopitiams, mamak eateries (MYR 5.00 - 12.00 per meal). Food is NEVER free (minimum MYR 4.00 per meal). If budget is tight, pick affordable local hawkers/mamak stalls (MYR 5.00 - 7.00 per meal), but ALWAYS include 3 proper meals for a full day. NEVER skip or reduce meals to cut budget!
       * Transport: WALKING (MYR 0.0) whenever possible. Public transit (MYR 2.00 - 4.00) only when needed.
       * Non-wishlist attractions: MUST be FREE (public parks, heritage streets, temples, beaches, etc.) with allocatedBudget: 0.0.
       * Wishlist items: Prioritize including affordable wishlist items within MYR $budget. If an individual wishlist item cannot fit alongside necessary meals, omit it.
@@ -540,7 +460,16 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
       * If all wishlist items are included and totalAllocatedBudget <= $budget:
         - "estimatedExtraBudgetNeeded" = 0.0.
     '''}
-    
+
+    CRITICAL RULE FOR PRICE RANGE & OVERSPEND FLOORS (allocatedBudget vs minPrice):
+    - For EVERY paid activity (especially "Restaurant" and paid "Attraction"):
+      * Assign a realistic price range [Min Price, Max Price] in MYR.
+      * "allocatedBudget" MUST represent the UPPER BOUND / MAX estimated budget for this activity. This is the amount initially allocated and counted towards totalAllocatedBudget.
+      * "minPrice" MUST represent the LOWER BOUND / MINIMUM FLOOR PRICE (the rock-bottom cost you cannot go below for this venue, e.g. cheapest hawker meal floor MYR 5.00-6.00, or lowest entrance ticket). This floor is stored in the database for overspend budget reallocation!
+      * Rule: 0.0 <= minPrice <= allocatedBudget.
+      * Example: A hawker meal costing MYR 6 - 12 MUST have allocatedBudget: 12.0 and minPrice: 6.0. A cafe/restaurant meal costing MYR 18 - 35 MUST have allocatedBudget: 35.0 and minPrice: 18.0.
+      * For free activities (parks, heritage streets, free landmarks, walking transport): BOTH "allocatedBudget" and "minPrice" MUST be strictly 0.0.
+
     CRITICAL RULE FOR ROUTING:
     - Group activities geographically within "$destination"! Each day of the itinerary MUST focus on ONE specific area or neighborhood within "$destination" (for example, if "$destination" is Penang, Day 1 could focus on George Town Heritage Zone, Day 2 on Batu Ferringhi / Teluk Bahang, Day 3 on Bayan Lepas; if "$destination" is Melaka, Day 1 on Bandar Hilir / Jonker, Day 2 on Ayer Keroh).
     - Do NOT jump across distant parts of the city/state on the same day. Every single activity on a given "dayNumber" MUST be found within that day's designated area in "$destination" to minimize travel time.
@@ -554,9 +483,21 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
       * The final day ends at $finalDayEndTime24H${hasFinalDeparture ? ' with the traveler reaching their departure hub "${resolvedDepartures.last.location}"' : ''}.
       * All intermediate days strictly start at 09:00 and end at 21:00.
       * Provide a complete continuous schedule filling the active hours, with connecting transportation between destinations.
-    - The endTime of each activity must smoothly connect to the startTime of the next activity without large gaps.
+      - The endTime of each activity must smoothly connect to the startTime of the next activity without large gaps.
     - Do not schedule any activities before $day1StartTime24H on Day 1, or after $finalDayEndTime24H on the final day. 
     - On intermediate days, the last activity of the day should reach 21:00.${hasFinalDeparture ? ' On the final day with departure, the final activity MUST be the departure transfer to "${resolvedDepartures.last.location}" ending at $finalDayEndTime24H.' : ''}
+
+    CRITICAL RULE FOR ACTIVITY DENSITY (MANDATORY FULL-DAY SCHEDULE FOR EVERY DAY INCLUDING DAY 1):
+    - NO SPARSE OR LAZY DAYS: Day 1 and all subsequent days MUST be rich, vibrant, and packed with activities throughout active hours!
+    - Day 1 Density:
+      * Day 1 MUST NOT just consist of arrival/check-in and dinner! Even if hotel check-in is at 15:00, schedule morning/midday sightseeing and lunch prior to check-in, plus afternoon/evening sightseeing and dinner after check-in.
+      * Day 1 MUST include AT LEAST 2 to 3 distinct destination Attractions/Sightseeing spots, in addition to meals and transport!
+    - Intermediate Full Days Density:
+      * Every full day MUST include AT LEAST 2 to 4 major Attractions/Sightseeing spots, 3 Meals (Breakfast, Lunch, Dinner), and Transport connections.
+    - STRICTLY FORBIDDEN TO CUT ACTIVITIES FOR BUDGET:
+      * You are STRICTLY FORBIDDEN from reducing the number of activities or skipping meals to satisfy a low budget!
+      * If budget is tight, fill the schedule with FREE attractions (public heritage streets, temples, waterfront walks, beaches, night markets with allocatedBudget: 0.0 and minPrice: 0.0) and choose budget hawker meals (allocatedBudget: 5.0 - 8.0, minPrice: 5.0).
+      * An itinerary must ALWAYS feel complete, lively, and packed with destinations!
 
     CRITICAL RULE FOR COMPOSITION & TRANSPORTATION:
     - Meal planning:
@@ -617,11 +558,11 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
     - dayNumber (int): Sequential day (1 for Day 1, 2 for Day 2...).
     - destination (String): EXACT, FULL official business name or landmark on Google Maps. No generic names.
     - imageKeyword (String): Landmark name or generic food type (e.g. "Nasi Lemak" instead of restaurant name).
-    - allocatedBudget (double): Max estimated cost or fixed price in MYR. 0.0 for free.
+    - allocatedBudget (double): UPPER BOUND / MAX estimated cost or fixed price in MYR. 0.0 for free.
     - duration (String): e.g., "60-90 min".
     - activityCategory (String): MUST be "Transportation", "Attraction", or "Restaurant".
     - startTime/endTime (String): 24-hour format "HH:mm". Note: Day 1's first activity startTime MUST be "$day1StartTime24H".
-    - minPrice (double): Min estimated cost in MYR. Set to 0.0 or null if free/fixed.
+    - minPrice (double): LOWER BOUND / MINIMUM FLOOR cost in MYR that cannot be reduced further (e.g. hawker food floor MYR 5.0-6.0). MUST be <= allocatedBudget, and 0.0 only for free places.
     ''';
 
     int retries = 3;
@@ -1148,10 +1089,14 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
     2. Geographic & Time Coherence:
        - New activities must be logically close in distance and route to the remaining activities on that day.
        - If a slot falls around lunch (12:00-14:00) or dinner (18:00-20:30), prefer suggesting a "Restaurant".
-    3. Realistic Places & Budget:
+    3. Realistic Places, Price Ranges & Overspend Floor:
        - Every destination MUST be an EXACT, FULL official business name or landmark on Google Maps in $destinationCity.
        - The total allocatedBudget across all returned slots should fit within MYR ${remainingBudget.toStringAsFixed(2)}.
-       - Public parks, walking tours, and free landmarks MUST have an allocatedBudget of 0.0.
+       - For every paid activity (especially "Restaurant" and paid "Attraction"):
+         * Assign a realistic price range [Min Price, Max Price].
+         * "allocatedBudget" MUST represent the UPPER BOUND / MAX estimated budget.
+         * "minPrice" MUST represent the LOWER BOUND / MINIMUM FLOOR PRICE (the rock-bottom cost you cannot go below, e.g. hawker meal floor MYR 5.00). It MUST be <= "allocatedBudget".
+       - Public parks, walking tours, and free landmarks MUST have allocatedBudget: 0.0 and minPrice: 0.0.
        - "activityCategory" MUST strictly be one of: "Attraction", "Restaurant", "Transportation".
 
     Format your response as a valid JSON array of objects:
@@ -1162,6 +1107,7 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
         "imageKeyword": "Landmark or food name",
         "description": "Short 1-2 sentence description",
         "allocatedBudget": 0.0,
+        "minPrice": 0.0,
         "duration": "60-90 min",
         "activityCategory": "Attraction",
         "startTime": "HH:mm",

@@ -101,51 +101,540 @@ class TransitScheduleHelper {
     return '';
   }
 
-  /// Looks up real scheduled durations (in minutes) from KTMB GTFS data
-  /// for specific key train station pairs.
+  /// Returns estimated direct rail travel duration in minutes
+  /// for known Malaysian railway station pairs.
+  ///
+  /// IMPORTANT:
+  /// - These are estimated in-train travel durations.
+  /// - They do not include waiting time, transfer time, walking time,
+  ///   or delays.
+  /// - Returns null when there is no known direct/common rail connection.
+  /// - Station matching is intentionally name-based so it works with
+  ///   the station names used in destinationTrainStations.
   static int? _getGtfsStationPairDuration(String from, String to) {
-    final f = from.toLowerCase();
-    final t = to.toLowerCase();
+    final f = from.toLowerCase().trim();
+    final t = to.toLowerCase().trim();
 
-    bool match(String k1, String k2) =>
-        (f.contains(k1) && t.contains(k2)) || (f.contains(k2) && t.contains(k1));
+    // ---------------------------------------------------------------------------
+    // Helper
+    // ---------------------------------------------------------------------------
 
-    // Shuttle Tebrau (JB Sentral <-> Woodlands, Singapore)
-    if (match('woodlands', 'jb') || match('singapore', 'jb')) return 5;
+    bool match(String k1, String k2) {
+      return (f.contains(k1) && t.contains(k2)) ||
+          (f.contains(k2) && t.contains(k1));
+    }
 
-    // KTMB ETS & Intercity core pairs
-    if (match('kl sentral', 'ipoh') || match('kuala lumpur', 'ipoh')) return 145; // ~2h 25m (ETS Platinum: 120m, Gold: 150m)
-    if (match('kl sentral', 'kampar') || match('kuala lumpur', 'kampar')) return 125; // ~2h 05m
-    if (match('kl sentral', 'tanjung malim') || match('kuala lumpur', 'tanjung malim')) return 80; // ~1h 20m
-    if (match('kl sentral', 'butterworth') || match('kuala lumpur', 'butterworth')) return 255; // ~4h 15m
-    if (match('kl sentral', 'bukit mertajam') || match('kuala lumpur', 'bukit mertajam')) return 205; // ~3h 25m
-    if (match('kl sentral', 'alor setar') || match('kuala lumpur', 'alor setar')) return 220; // ~3h 40m
-    if (match('kl sentral', 'sungai petani') || match('kuala lumpur', 'sungai petani')) return 220; // ~3h 40m
-    if (match('kl sentral', 'arau') || match('kuala lumpur', 'arau')) return 260; // ~4h 20m
-    if (match('kl sentral', 'padang besar') || match('kuala lumpur', 'padang besar')) return 270; // ~4h 30m
-    if (match('kl sentral', 'seremban') || match('kuala lumpur', 'seremban')) return 85; // ~1h 25m
-    if (match('kl sentral', 'gemas') || match('kuala lumpur', 'gemas')) return 140; // ~2h 20m
-    if (match('kl sentral', 'jb') || match('kuala lumpur', 'jb')) return 260; // ~4h 20m
+    // ===========================================================================
+    // KLANG VALLEY / KUALA LUMPUR
+    // ===========================================================================
 
-    // Perak <-> North
-    if (match('ipoh', 'butterworth')) return 105; // ~1h 45m
-    if (match('ipoh', 'bukit mertajam')) return 50; // ~50m
-    if (match('ipoh', 'alor setar')) return 80; // ~1h 20m
-    if (match('ipoh', 'padang besar')) return 115; // ~1h 55m
-    if (match('ipoh', 'arau')) return 105; // ~1h 45m
-    if (match('ipoh', 'kampar')) return 26; // ~26m
+    // KL Sentral <-> Kuala Lumpur Railway Station
+    if (match('kl sentral', 'kuala lumpur railway station')) {
+      return 5;
+    }
 
-    // Northern Corridor (Komuter Utara & ETS)
-    if (match('butterworth', 'padang besar')) return 105; // ~1h 45m
-    if (match('butterworth', 'arau')) return 95; // ~1h 35m
-    if (match('butterworth', 'alor setar')) return 65; // ~1h 05m
-    if (match('butterworth', 'sungai petani')) return 30; // ~30m
-    if (match('alor setar', 'padang besar')) return 40; // ~40m
+    // KL Sentral <-> Kepong Sentral
+    if (match('kl sentral', 'kepong')) {
+      return 25;
+    }
 
-    // Southern Corridor
-    if (match('seremban', 'jb')) return 180; // ~3h 00m
-    if (match('gemas', 'jb')) return 125; // ~2h 05m
-    if (match('seremban', 'gemas')) return 60; // ~1h 00m
+    // KL Sentral <-> Bandar Tasik Selatan
+    if (match('kl sentral', 'bandar tasik selatan')) {
+      return 15;
+    }
+
+    // KL Sentral <-> Subang Jaya
+    if (match('kl sentral', 'subang jaya')) {
+      return 25;
+    }
+
+    // KL Sentral <-> Kajang
+    if (match('kl sentral', 'kajang')) {
+      return 40;
+    }
+
+    // KL Sentral <-> Rawang
+    if (match('kl sentral', 'rawang')) {
+      return 45;
+    }
+
+    // KL Sentral <-> Klang
+    if (match('kl sentral', 'klang')) {
+      return 55;
+    }
+
+    // KL Sentral <-> Tanjung Malim
+    if (match('kl sentral', 'tanjung malim')) {
+      return 80;
+    }
+
+    // ---------------------------------------------------------------------------
+    // Other Klang Valley combinations
+    // ---------------------------------------------------------------------------
+
+    // Kepong <-> Rawang
+    if (match('kepong', 'rawang')) {
+      return 25;
+    }
+
+    // Kepong <-> Kajang
+    if (match('kepong', 'kajang')) {
+      return 55;
+    }
+
+    // Kepong <-> Subang Jaya
+    if (match('kepong', 'subang jaya')) {
+      return 40;
+    }
+
+    // Kepong <-> Klang
+    if (match('kepong', 'klang')) {
+      return 50;
+    }
+
+    // Kepong <-> Bandar Tasik Selatan
+    if (match('kepong', 'bandar tasik selatan')) {
+      return 40;
+    }
+
+    // Kajang <-> Bandar Tasik Selatan
+    if (match('kajang', 'bandar tasik selatan')) {
+      return 25;
+    }
+
+    // Kajang <-> Seremban
+    if (match('kajang', 'seremban')) {
+      return 40;
+    }
+
+    // Kajang <-> Nilai
+    if (match('kajang', 'nilai')) {
+      return 25;
+    }
+
+    // Rawang <-> Tanjung Malim
+    if (match('rawang', 'tanjung malim')) {
+      return 40;
+    }
+
+    // Rawang <-> Subang Jaya
+    if (match('rawang', 'subang jaya')) {
+      return 55;
+    }
+
+    // Klang <-> Subang Jaya
+    if (match('klang', 'subang jaya')) {
+      return 25;
+    }
+
+    // ===========================================================================
+    // KUALA LUMPUR -> PERAK
+    // ===========================================================================
+
+    if (match('kl sentral', 'tanjung malim')) {
+      return 80;
+    }
+
+    if (match('kl sentral', 'kampar')) {
+      return 125;
+    }
+
+    if (match('kl sentral', 'batu gajah')) {
+      return 135;
+    }
+
+    if (match('kl sentral', 'ipoh')) {
+      return 145;
+    }
+
+    if (match('kl sentral', 'kuala kangsar')) {
+      return 165;
+    }
+
+    if (match('kl sentral', 'taiping')) {
+      return 180;
+    }
+
+    if (match('kl sentral', 'tapah road')) {
+      return 120;
+    }
+
+    // ===========================================================================
+    // PERAK INTERNAL
+    // ===========================================================================
+
+    if (match('tanjung malim', 'tapah road')) {
+      return 40;
+    }
+
+    if (match('tapah road', 'kampar')) {
+      return 20;
+    }
+
+    if (match('kampar', 'batu gajah')) {
+      return 20;
+    }
+
+    if (match('kampar', 'ipoh')) {
+      return 26;
+    }
+
+    if (match('batu gajah', 'ipoh')) {
+      return 20;
+    }
+
+    if (match('ipoh', 'kuala kangsar')) {
+      return 30;
+    }
+
+    if (match('ipoh', 'taiping')) {
+      return 50;
+    }
+
+    if (match('kuala kangsar', 'taiping')) {
+      return 25;
+    }
+
+    // ===========================================================================
+    // KUALA LUMPUR -> PENANG
+    // ===========================================================================
+
+    if (match('kl sentral', 'butterworth')) {
+      return 255;
+    }
+
+    if (match('kl sentral', 'bukit mertajam')) {
+      return 205;
+    }
+
+    if (match('kl sentral', 'nibong tebal')) {
+      return 190;
+    }
+
+    // ===========================================================================
+    // PENANG INTERNAL
+    // ===========================================================================
+
+    if (match('butterworth', 'bukit mertajam')) {
+      return 20;
+    }
+
+    if (match('butterworth', 'nibong tebal')) {
+      return 40;
+    }
+
+    if (match('bukit mertajam', 'nibong tebal')) {
+      return 25;
+    }
+
+    // ===========================================================================
+    // PENANG -> KEDAH
+    // ===========================================================================
+
+    if (match('butterworth', 'sungai petani')) {
+      return 30;
+    }
+
+    if (match('bukit mertajam', 'sungai petani')) {
+      return 25;
+    }
+
+    if (match('nibong tebal', 'sungai petani')) {
+      return 20;
+    }
+
+    if (match('butterworth', 'alor setar')) {
+      return 65;
+    }
+
+    if (match('bukit mertajam', 'alor setar')) {
+      return 60;
+    }
+
+    if (match('nibong tebal', 'alor setar')) {
+      return 80;
+    }
+
+    if (match('sungai petani', 'alor setar')) {
+      return 35;
+    }
+
+    // ===========================================================================
+    // PENANG -> PERLIS
+    // ===========================================================================
+
+    if (match('butterworth', 'arau')) {
+      return 95;
+    }
+
+    if (match('bukit mertajam', 'arau')) {
+      return 90;
+    }
+
+    if (match('nibong tebal', 'arau')) {
+      return 110;
+    }
+
+    if (match('butterworth', 'padang besar')) {
+      return 105;
+    }
+
+    if (match('bukit mertajam', 'padang besar')) {
+      return 100;
+    }
+
+    if (match('nibong tebal', 'padang besar')) {
+      return 120;
+    }
+
+    // ===========================================================================
+    // KEDAH INTERNAL
+    // ===========================================================================
+
+    if (match('sungai petani', 'alor setar')) {
+      return 35;
+    }
+
+    if (match('sungai petani', 'arau')) {
+      return 60;
+    }
+
+    if (match('sungai petani', 'padang besar')) {
+      return 75;
+    }
+
+    if (match('alor setar', 'arau')) {
+      return 20;
+    }
+
+    if (match('alor setar', 'padang besar')) {
+      return 40;
+    }
+
+    // ===========================================================================
+    // PERLIS INTERNAL
+    // ===========================================================================
+
+    if (match('arau', 'padang besar')) {
+      return 20;
+    }
+
+    // ===========================================================================
+    // KUALA LUMPUR -> KEDAH
+    // ===========================================================================
+
+    if (match('kl sentral', 'sungai petani')) {
+      return 220;
+    }
+
+    if (match('kl sentral', 'alor setar')) {
+      return 220;
+    }
+
+    if (match('kl sentral', 'arau')) {
+      return 260;
+    }
+
+    if (match('kl sentral', 'padang besar')) {
+      return 270;
+    }
+
+    // ===========================================================================
+    // KUALA LUMPUR -> NEGERI SEMBILAN
+    // ===========================================================================
+
+    if (match('kl sentral', 'nilai')) {
+      return 50;
+    }
+
+    if (match('kl sentral', 'seremban')) {
+      return 85;
+    }
+
+    if (match('kl sentral', 'rembau')) {
+      return 105;
+    }
+
+    if (match('kl sentral', 'gemas')) {
+      return 140;
+    }
+
+    // ===========================================================================
+    // NEGERI SEMBILAN INTERNAL
+    // ===========================================================================
+
+    if (match('nilai', 'seremban')) {
+      return 25;
+    }
+
+    if (match('nilai', 'rembau')) {
+      return 50;
+    }
+
+    if (match('nilai', 'gemas')) {
+      return 100;
+    }
+
+    if (match('seremban', 'rembau')) {
+      return 30;
+    }
+
+    if (match('seremban', 'gemas')) {
+      return 60;
+    }
+
+    if (match('rembau', 'gemas')) {
+      return 40;
+    }
+
+    // ===========================================================================
+    // KUALA LUMPUR -> MELAKA
+    // ===========================================================================
+
+    if (match('kl sentral', 'pulau sebang')) {
+      return 120;
+    }
+
+    if (match('kl sentral', 'tampin')) {
+      return 120;
+    }
+
+    if (match('kl sentral', 'batang melaka')) {
+      return 120;
+    }
+
+    // ===========================================================================
+    // NEGERI SEMBILAN -> MELAKA
+    // ===========================================================================
+
+    if (match('seremban', 'pulau sebang')) {
+      return 50;
+    }
+
+    if (match('seremban', 'tampin')) {
+      return 50;
+    }
+
+    if (match('seremban', 'batang melaka')) {
+      return 60;
+    }
+
+    if (match('gemas', 'pulau sebang')) {
+      return 50;
+    }
+
+    if (match('gemas', 'tampin')) {
+      return 50;
+    }
+
+    if (match('gemas', 'batang melaka')) {
+      return 60;
+    }
+
+    // ===========================================================================
+    // KUALA LUMPUR -> JOHOR
+    // ===========================================================================
+
+    if (match('kl sentral', 'gemas')) {
+      return 140;
+    }
+
+    if (match('kl sentral', 'segamat')) {
+      return 180;
+    }
+
+    if (match('kl sentral', 'kluang')) {
+      return 220;
+    }
+
+    if (match('kl sentral', 'kulai')) {
+      return 245;
+    }
+
+    if (match('kl sentral', 'kempas baru')) {
+      return 255;
+    }
+
+    if (match('kl sentral', 'jb sentral')) {
+      return 260;
+    }
+
+    // ===========================================================================
+    // JOHOR INTERNAL
+    // ===========================================================================
+
+    if (match('gemas', 'segamat')) {
+      return 45;
+    }
+
+    if (match('gemas', 'kluang')) {
+      return 90;
+    }
+
+    if (match('gemas', 'kulai')) {
+      return 120;
+    }
+
+    if (match('gemas', 'kempas baru')) {
+      return 135;
+    }
+
+    if (match('gemas', 'jb sentral')) {
+      return 150;
+    }
+
+    if (match('segamat', 'kluang')) {
+      return 55;
+    }
+
+    if (match('segamat', 'kulai')) {
+      return 90;
+    }
+
+    if (match('segamat', 'kempas baru')) {
+      return 105;
+    }
+
+    if (match('segamat', 'jb sentral')) {
+      return 120;
+    }
+
+    if (match('kluang', 'kulai')) {
+      return 50;
+    }
+
+    if (match('kluang', 'kempas baru')) {
+      return 65;
+    }
+
+    if (match('kluang', 'jb sentral')) {
+      return 80;
+    }
+
+    if (match('kulai', 'kempas baru')) {
+      return 25;
+    }
+
+    if (match('kulai', 'jb sentral')) {
+      return 35;
+    }
+
+    if (match('kempas baru', 'jb sentral')) {
+      return 15;
+    }
+
+    // ===========================================================================
+    // JOHOR <-> SINGAPORE
+    // ===========================================================================
+
+    if (match('jb sentral', 'woodlands') ||
+        match('jb sentral', 'singapore')) {
+      return 5;
+    }
+
+    // ===========================================================================
+    // NO KNOWN DIRECT ROUTE
+    // ===========================================================================
 
     return null;
   }

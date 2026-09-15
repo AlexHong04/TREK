@@ -366,6 +366,7 @@ class _TravelInformationInputScreenState
                               decimal: true,
                             ),
                             validator: viewModel.validateBudget,
+                            warningText: viewModel.getBudgetSuggestion(value.text),
                             bottomWidget:
                                 (enteredAmount != null && enteredAmount > 0)
                                 ? (preferredCurrency != 'MYR'
@@ -548,7 +549,6 @@ class _TravelInformationInputScreenState
                                                 preferredCurrency == 'MYR'
                                                 ? 'RM ${minPref.toStringAsFixed(0)}'
                                                 : '$preferredCurrency ${minPref.toStringAsFixed(0)}';
-                                            final days = viewModel.numberOfDays;
                                             final destNames =
                                                 rec
                                                     .matchedDestinations
@@ -1778,7 +1778,6 @@ class _TravelInformationInputScreenState
     final transitCount = arrivals.length > departures.length
         ? arrivals.length
         : departures.length;
-    final isForeign = viewModel.preferredCurrency.trim().toUpperCase() != 'MYR';
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -1884,10 +1883,8 @@ class _TravelInformationInputScreenState
             ),
           ],
 
-          if (isForeign) ...[
-            // ==================== FOREIGN TRAVELER FLOW ====================
-            // START HEADER
-            Text(
+          // START HEADER
+          Text(
               'START',
               style: TextStyle(
                 fontSize: 11,
@@ -2066,226 +2063,9 @@ class _TravelInformationInputScreenState
                 isStartOrEnd: true,
               ),
             ],
-          ] else ...[
-            // ==================== LOCAL MALAYSIAN FLOW ====================
-            // START HEADER
-            Text(
-              'START',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                fontFamily: 'Inter',
-                color: appTheme.teal_700,
-                letterSpacing: 0.5,
-              ),
-            ),
-            const SizedBox(height: 8.0),
-
-            // Top: DEPARTURE
-            _buildTransitLegDepartureCard(
-              context: context,
-              viewModel: viewModel,
-              departureIndex: 0,
-              cardTitle: 'DEPARTURE',
-              isStartOrEnd: true,
-            ),
-            const SizedBox(height: 12.0),
-
-            // Top: ARRIVAL
-            _buildTransitLegArrivalCard(
-              context: context,
-              viewModel: viewModel,
-              arrivalIndex: 0,
-              cardTitle: 'ARRIVAL',
-              minAllowedDate: DateTime.tryParse(departures[0].date),
-              minAllowedDateString: departures[0].date,
-              minAllowedTimeString: departures[0].time,
-              constraintLabel:
-                  'Arrival cannot be earlier than departure time (${departures[0].time}).',
-              autoSyncOnInvalid: true,
-              isStartOrEnd: true,
-            ),
-            const SizedBox(height: 12.0),
-
-            // TRANSIT JOURNEY
-            _buildTransitConnectionCardFromPoints(
-              context: context,
-              viewModel: viewModel,
-              departurePoint: departures[0],
-              arrivalPoint: arrivals[0],
-              journeyTitle: 'TRANSIT JOURNEY (Leg 1)',
-              syncArrivalIndex: 0,
-              originLabel: departures[0].location.isNotEmpty
-                  ? departures[0].location
-                  : 'Start Departure',
-              destinationLabel: arrivals[0].location.isNotEmpty
-                  ? arrivals[0].location
-                  : 'Destination Arrival',
-            ),
-
-            if (transitCount > 1) ...[
-              // Intermediate Transits: i = 1 to transitCount - 2
-              for (int i = 1; i < transitCount - 1; i++) ...[
-                const SizedBox(height: 14.0),
-                Divider(color: appTheme.gray_100, height: 1.0),
-                const SizedBox(height: 14.0),
-
-                // TRANSIT HEADER with delete button
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'TRANSIT $i',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        fontFamily: 'Inter',
-                        color: appTheme.teal_700,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    InkWell(
-                      onTap: () => _removeArrivalAndDeparture(i, viewModel),
-                      borderRadius: BorderRadius.circular(8.0),
-                      child: Padding(
-                        padding: const EdgeInsets.all(4.0),
-                        child: Icon(
-                          Icons.close_rounded,
-                          size: 18.0,
-                          color: appTheme.blue_gray_300,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8.0),
-
-                // DEPARTURE
-                _buildTransitLegDepartureCard(
-                  context: context,
-                  viewModel: viewModel,
-                  departureIndex: i,
-                  cardTitle: 'DEPARTURE (TRANSIT $i)',
-                  minAllowedDate: DateTime.tryParse(arrivals[i - 1].date),
-                  minAllowedDateString: arrivals[i - 1].date,
-                  minAllowedTimeString: arrivals[i - 1].time,
-                  constraintLabel:
-                      'Departure cannot be earlier than previous arrival.',
-                ),
-                const SizedBox(height: 12.0),
-
-                // ARRIVAL
-                _buildTransitLegArrivalCard(
-                  context: context,
-                  viewModel: viewModel,
-                  arrivalIndex: i,
-                  cardTitle: 'ARRIVAL (TRANSIT $i)',
-                  minAllowedDate: DateTime.tryParse(departures[i].date),
-                  minAllowedDateString: departures[i].date,
-                  minAllowedTimeString: departures[i].time,
-                  constraintLabel: 'Arrival cannot be earlier than departure.',
-                  autoSyncOnInvalid: true,
-                ),
-                const SizedBox(height: 12.0),
-
-                // TRANSIT JOURNEY
-                _buildTransitConnectionCardFromPoints(
-                  context: context,
-                  viewModel: viewModel,
-                  departurePoint: departures[i],
-                  arrivalPoint: arrivals[i],
-                  journeyTitle: 'TRANSIT JOURNEY (Transit $i)',
-                  syncArrivalIndex: i,
-                  originLabel: departures[i].location.isNotEmpty
-                      ? departures[i].location
-                      : 'Transit $i Departure',
-                  destinationLabel: arrivals[i].location.isNotEmpty
-                      ? arrivals[i].location
-                      : 'Transit $i Arrival',
-                ),
-              ],
-            ],
-
-            const SizedBox(height: 14.0),
-            // Middle Add Button
-            _buildAddTransitMiddleButton(
-              onTap: () => _addArrivalAndDeparture(viewModel),
-            ),
-
-            if (transitCount > 1) ...[
-              const SizedBox(height: 14.0),
-              Divider(color: appTheme.gray_100, height: 1.0),
-              const SizedBox(height: 14.0),
-
-              // End Transit Header with delete button
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'END',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      fontFamily: 'Inter',
-                      color: appTheme.teal_700,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  InkWell(
-                    onTap: () =>
-                        _removeArrivalAndDeparture(transitCount - 1, viewModel),
-                    borderRadius: BorderRadius.circular(8.0),
-                    child: Padding(
-                      padding: const EdgeInsets.all(4.0),
-                      child: Icon(
-                        Icons.close_rounded,
-                        size: 18.0,
-                        color: appTheme.blue_gray_300,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8.0),
-
-              // DEPARTURE (END)
-              _buildTransitLegDepartureCard(
-                context: context,
-                viewModel: viewModel,
-                departureIndex: transitCount - 1,
-                cardTitle: 'DEPARTURE',
-                minAllowedDate: DateTime.tryParse(
-                  arrivals[transitCount - 2].date,
-                ),
-                minAllowedDateString: arrivals[transitCount - 2].date,
-                minAllowedTimeString: arrivals[transitCount - 2].time,
-                constraintLabel:
-                    'Departure cannot be earlier than previous arrival.',
-                isStartOrEnd: true,
-              ),
-              const SizedBox(height: 12.0),
-
-              // ARRIVAL (END)
-              _buildTransitLegArrivalCard(
-                context: context,
-                viewModel: viewModel,
-                arrivalIndex: transitCount - 1,
-                cardTitle: 'ARRIVAL (END)',
-                minAllowedDate: DateTime.tryParse(
-                  departures[transitCount - 1].date,
-                ),
-                minAllowedDateString: departures[transitCount - 1].date,
-                minAllowedTimeString: departures[transitCount - 1].time,
-                constraintLabel:
-                    'Return arrival cannot be earlier than departure.',
-                autoSyncOnInvalid: true,
-                isStartOrEnd: true,
-              ),
-            ],
           ],
-        ],
-      ),
-    );
+        ),
+      );
   }
 
   Widget _buildAddTransitMiddleButton({
@@ -3373,6 +3153,7 @@ class _TravelInformationInputScreenState
                                   viewModel: viewModel,
                                   initialDateString: hotel.checkInDate,
                                   isCheckIn: true,
+                                  hotel: hotel,
                                   onDatePicked: (d) =>
                                       viewModel.updateHotelCheckInDate(index, d),
                                 );
@@ -3419,6 +3200,7 @@ class _TravelInformationInputScreenState
                                   viewModel: viewModel,
                                   initialDateString: hotel.checkOutDate,
                                   isCheckIn: false,
+                                  hotel: hotel,
                                   onDatePicked: (d) =>
                                       viewModel.updateHotelCheckOutDate(index, d),
                                 );
@@ -3700,6 +3482,7 @@ class _TravelInformationInputScreenState
     required String initialDateString,
     required bool isCheckIn,
     required ValueChanged<String> onDatePicked,
+    HotelStay? hotel,
   }) async {
     final startDate = viewModel.uiState.startDate;
     final endDate = viewModel.uiState.endDate;
@@ -3716,29 +3499,86 @@ class _TravelInformationInputScreenState
       return;
     }
 
-    DateTime initialDate = isCheckIn ? startDate : endDate;
+    final otherDateStr = isCheckIn ? hotel?.checkOutDate : hotel?.checkInDate;
+    final otherDate = (otherDateStr != null && otherDateStr.trim().isNotEmpty)
+        ? DateTime.tryParse(otherDateStr.trim())
+        : null;
+
+    DateTime firstAllowed = startDate;
+    DateTime lastAllowed = endDate;
+
+    if (isCheckIn) {
+      // Check-in date MUST be before check-out date (cannot be same day or after)
+      if (otherDate != null) {
+        lastAllowed = otherDate.subtract(const Duration(days: 1));
+        if (lastAllowed.isBefore(startDate)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Check-out date is already on the first day of the trip. Please adjust check-out date first.',
+              ),
+              backgroundColor: appTheme.redButton,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          return;
+        }
+      }
+    } else {
+      // Check-out date MUST be after check-in date (cannot be same day or before)
+      if (otherDate != null) {
+        firstAllowed = otherDate.add(const Duration(days: 1));
+        if (firstAllowed.isAfter(endDate)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Check-in date is already on the last day of the trip. Please adjust check-in date first.',
+              ),
+              backgroundColor: appTheme.redButton,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          return;
+        }
+      }
+    }
+
+    DateTime initialDate = isCheckIn ? firstAllowed : lastAllowed;
     if (initialDateString.trim().isNotEmpty) {
       final parsed = DateTime.tryParse(initialDateString.trim());
       if (parsed != null) {
         initialDate = parsed;
       }
     }
-    if (initialDate.isBefore(startDate)) {
-      initialDate = startDate;
-    } else if (initialDate.isAfter(endDate)) {
-      initialDate = endDate;
+    if (initialDate.isBefore(firstAllowed)) {
+      initialDate = firstAllowed;
+    } else if (initialDate.isAfter(lastAllowed)) {
+      initialDate = lastAllowed;
     }
 
     final picked = await showAppDatePicker(
       context: context,
       initialDate: initialDate,
-      firstDate: startDate,
-      lastDate: endDate,
+      firstDate: firstAllowed,
+      lastDate: lastAllowed,
       helpText: isCheckIn ? 'SELECT CHECK-IN DATE' : 'SELECT CHECK-OUT DATE',
       selectableDayPredicate: (day) {
         final checkDate = DateTime(day.year, day.month, day.day);
-        if (checkDate.isBefore(startDate) || checkDate.isAfter(endDate)) {
+        if (checkDate.isBefore(firstAllowed) || checkDate.isAfter(lastAllowed)) {
           return false;
+        }
+        if (otherDate != null) {
+          final normalizedOther =
+              DateTime(otherDate.year, otherDate.month, otherDate.day);
+          if (checkDate.isAtSameMomentAs(normalizedOther)) {
+            return false;
+          }
+          if (isCheckIn && !checkDate.isBefore(normalizedOther)) {
+            return false;
+          }
+          if (!isCheckIn && !checkDate.isAfter(normalizedOther)) {
+            return false;
+          }
         }
         return true;
       },
