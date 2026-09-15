@@ -527,86 +527,72 @@ class FinancialDashboardScreen extends StatelessWidget {
         if (categories.isNotEmpty)
           LayoutBuilder(
             builder: (context, constraints) {
-              final textScale = math.max(
-                1.0,
-                MediaQuery.textScalerOf(context).scale(11) / 11,
-              );
-              final chartWidth = math.max(
-                constraints.maxWidth,
-                categories.length * 160 * textScale,
-              );
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              return Stack(
+                key: const ValueKey('expense-chart'),
                 children: [
-                  SingleChildScrollView(
-                    key: const ValueKey('expense-chart-scroll'),
-                    scrollDirection: Axis.horizontal,
-                    child: SizedBox(
-                      width: chartWidth,
-                      child: Column(
-                        children: [
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(minHeight: 130),
-                            child: Align(
-                              alignment: Alignment.bottomCenter,
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: categories
-                                    .map(
-                                      (item) => Expanded(
-                                        child: _ExpenseBars(
-                                          category: item,
-                                          maximumAmount: maximumAmount,
-                                        ),
-                                      ),
-                                    )
-                                    .toList(),
-                              ),
-                            ),
-                          ),
-                          Container(
-                            key: const ValueKey('expense-chart-baseline'),
-                            height: 1,
-                            color: appTheme.blue_gray_300,
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                  Column(
+                    children: [
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 130),
+                        child: Align(
+                          alignment: Alignment.bottomCenter,
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
                             children: categories
                                 .map(
                                   (item) => Expanded(
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                      ),
-                                      child: Text(
-                                        item.name,
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          color: appTheme.gray_800,
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
+                                    child: _ExpenseBars(
+                                      category: item,
+                                      maximumAmount: maximumAmount,
                                     ),
                                   ),
                                 )
                                 .toList(),
                           ),
-                        ],
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 8),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: categories
+                            .map(
+                              (item) => Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                  ),
+                                  child: Text(
+                                    item.name,
+                                    key: ValueKey(
+                                      'expense-category-${item.name}',
+                                    ),
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: appTheme.gray_800,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ],
                   ),
-                  if (chartWidth > constraints.maxWidth) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      'Swipe to view all categories',
-                      style: TextStyle(
-                        color: appTheme.blue_gray_700,
-                        fontSize: 11,
+                  for (var index = 1; index < categories.length; index++)
+                    Positioned(
+                      left:
+                          constraints.maxWidth * index / categories.length -
+                          0.5,
+                      top: 0,
+                      bottom: 0,
+                      width: 1,
+                      child: ColoredBox(
+                        key: ValueKey('expense-category-divider-$index'),
+                        color: appTheme.blue_gray_300,
                       ),
                     ),
-                  ],
                 ],
               );
             },
@@ -788,6 +774,7 @@ class _CurrencyAmountPairText extends StatelessWidget {
   final bool scaleDown;
 
   const _CurrencyAmountPairText({
+    super.key,
     required this.primaryText,
     required this.secondaryText,
     required this.primaryStyle,
@@ -2002,9 +1989,9 @@ class _SummaryRow extends StatelessWidget {
     final secondaryAmountText = viewModel.formatSecondaryMoney(amount);
     final amountColor = amount < 0 ? appTheme.errorRed : appTheme.white_A700;
     final amountText = _CurrencyAmountPairText(
+      key: ValueKey('summary-amount-$label'),
       primaryText: primaryAmountText,
       secondaryText: secondaryAmountText,
-      scaleDown: false,
       primaryStyle: _amountStyle.copyWith(color: amountColor),
       secondaryStyle: TextStyle(
         color: amount < 0
@@ -2060,10 +2047,36 @@ class _SummaryRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: LayoutBuilder(
         builder: (context, constraints) {
+          // Reserve enough space for the full currency/amount line, including
+          // the negative balance badge's padding and warning icon.
+          final primaryWidth = _measureTextWidth(
+            context,
+            _displayMyrCode(primaryAmountText),
+            amountText.primaryStyle,
+          );
+          final secondaryWidth = secondaryAmountText == null
+              ? 0.0
+              : _measureTextWidth(
+                  context,
+                  '≈ ${_displayMyrCode(secondaryAmountText)}',
+                  amountText.secondaryStyle,
+                );
+          final requiredAmountWidth =
+              math.max(primaryWidth, secondaryWidth) +
+              (amount < 0 ? 38 : 0) +
+              2;
+          final amountWidth = math.max(
+            constraints.maxWidth * 0.43,
+            requiredAmountWidth,
+          );
+          final textScale = MediaQuery.textScalerOf(context).scale(13) / 13;
           final useStackedLayout =
               constraints.maxWidth < 280 ||
-              MediaQuery.textScalerOf(context).scale(13) > 18;
+              textScale > 1.38 ||
+              amountWidth > constraints.maxWidth - 52 - 100 * textScale;
           if (useStackedLayout) {
+            final leadingInset =
+                requiredAmountWidth <= constraints.maxWidth - 40 ? 40.0 : 0.0;
             return Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -2075,8 +2088,17 @@ class _SummaryRow extends StatelessWidget {
                   ],
                 ),
                 Padding(
-                  padding: const EdgeInsets.only(left: 40, top: 8),
-                  child: SizedBox(width: double.infinity, child: amountWidget),
+                  padding: EdgeInsets.only(left: leadingInset, top: 8),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: SizedBox(
+                      width: math.min(
+                        amountWidth,
+                        constraints.maxWidth - leadingInset,
+                      ),
+                      child: amountWidget,
+                    ),
+                  ),
                 ),
               ],
             );
@@ -2087,12 +2109,27 @@ class _SummaryRow extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(child: labelWidget),
               const SizedBox(width: 12),
-              SizedBox(width: constraints.maxWidth * 0.43, child: amountWidget),
+              SizedBox(width: amountWidth, child: amountWidget),
             ],
           );
         },
       ),
     );
+  }
+
+  double _measureTextWidth(BuildContext context, String text, TextStyle style) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: DefaultTextStyle.of(context).style.merge(style),
+      ),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+    )..layout();
+    final width = painter.width.ceilToDouble();
+    painter.dispose();
+    return width;
   }
 
   TextStyle get _amountStyle => TextStyle(
@@ -2130,7 +2167,7 @@ class _LegendChip extends StatelessWidget {
               children: [
                 Container(width: 8, height: 8, color: color),
                 const SizedBox(width: 10),
-                Text(label),
+                Flexible(child: Text(label)),
               ],
             ),
           ),
@@ -2157,7 +2194,7 @@ class _ExpenseBars extends StatelessWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
@@ -2169,7 +2206,7 @@ class _ExpenseBars extends StatelessWidget {
               color: appTheme.blue_gray_700,
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 6),
           Expanded(
             child: _AmountBar(
               barKey: ValueKey('expense-actual-${category.name}'),
@@ -2353,9 +2390,11 @@ class _BreakdownRow extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 9),
-                Text(
-                  category.name,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
+                Flexible(
+                  child: Text(
+                    category.name,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
                 ),
               ],
             ),
