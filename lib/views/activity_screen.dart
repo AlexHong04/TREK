@@ -1058,27 +1058,33 @@ class _ActivityScreenState extends State<ActivityScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              if (showWarning) ...[
-                Icon(
-                  Icons.warning_amber_rounded,
-                  size: 14,
-                  color: appTheme.errorRed,
+          // The warning glyph + label breathe while the card is in its warning
+          // state, so an OVERSPENT breach reads as a live alert rather than a
+          // static red number.
+          _OverspentPulse(
+            active: showWarning,
+            child: Row(
+              children: [
+                if (showWarning) ...[
+                  Icon(
+                    Icons.warning_amber_rounded,
+                    size: 14,
+                    color: appTheme.errorRed,
+                  ),
+                  const SizedBox(width: 4.0),
+                ],
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    fontFamily: 'Inter',
+                    color: showWarning ? appTheme.errorRed : appTheme.gray_800,
+                    letterSpacing: 0.5,
+                  ),
                 ),
-                const SizedBox(width: 4.0),
               ],
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  fontFamily: 'Inter',
-                  color: showWarning ? appTheme.errorRed : appTheme.gray_800,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ],
+            ),
           ),
           const SizedBox(height: 6.0),
           amountWidget ??
@@ -1380,6 +1386,27 @@ class _ActivityScreenState extends State<ActivityScreen> {
         ? appTheme.expenseOverspendText
         : appTheme.teal_700;
 
+    // Share of this activity's allocated budget already consumed. Shown as a
+    // badge on the card's top-right corner so the tourist can see at a glance
+    // how much of each activity's budget is gone.
+    //
+    // Once spending passes the allocation the exact percentage stops being
+    // useful (a number above 100% is less actionable than simply flagging it),
+    // so it reads "Over budget" - the same wording a free slot uses, since a
+    // free slot is over its RM0 allocation as soon as anything is spent on it.
+    final String usageLabel;
+    if (isOverBudget) {
+      usageLabel = 'Over budget';
+    } else if (activity.allocatedBudget > 0) {
+      usageLabel = '${((spent / activity.allocatedBudget) * 100).round()}% used';
+    } else {
+      usageLabel = '0% used';
+    }
+
+    // Badge colours follow the SAME bands as the whole-trip usage indicator:
+    // yellow from 50% and red from 90% of this activity's allocation.
+    final usageColors = _activityUsageColors(activity, spent);
+
     debugPrint('----------------------------------------');
     debugPrint('[ActivityScreen] Destination: ${activity.destination}');
     debugPrint(
@@ -1418,7 +1445,30 @@ class _ActivityScreenState extends State<ActivityScreen> {
                   topLeft: Radius.circular(12),
                   topRight: Radius.circular(12),
                 ),
-                child: _buildAdaptiveImage(activity.activityImgUrl),
+                child: Stack(
+                  children: [
+                    _buildAdaptiveImage(activity.activityImgUrl),
+                    // How much of this activity's allocated budget is used, in
+                    // the card's top-right corner.
+                    Positioned(
+                      top: 12,
+                      right: 12,
+                      child: _buildChip(
+                        backgroundColor: usageColors.background,
+                        textColor: usageColors.text,
+                        child: Text(
+                          usageLabel,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            fontFamily: 'Inter',
+                            color: usageColors.text,
+                          ).copyWith(height: 1.2),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.only(top: 20, left: 20, right: 20),
@@ -1691,5 +1741,116 @@ class _ActivityScreenState extends State<ActivityScreen> {
     } else {
       return appTheme.teal_A700;
     }
+  }
+
+  /// Colours for an activity card's budget-usage badge.
+  ///
+  /// Deliberately uses the SAME bands as the whole-trip usage indicator
+  /// ([_getSpentRemainingColor] and [_getBudgetProgressColor]): normal below
+  /// 50%, **yellow from 50%** and **red from 90%** of this activity's
+  /// allocation.
+  ///
+  /// A free slot (`allocatedBudget == 0`) has no percentage bands to fall into,
+  /// so it stays neutral while untouched and turns red as soon as anything at
+  /// all is spent on it - any spend there is already an overspend.
+  ({Color background, Color text}) _activityUsageColors(
+    Activity activity,
+    double spent,
+  ) {
+    if (activity.allocatedBudget <= 0) {
+      final bool hasSpend = spent > 0;
+      return (
+        background: hasSpend
+            ? appTheme.wholeAlertBudgetStroke
+            : appTheme.teal_50,
+        text: hasSpend ? appTheme.expenseOverspendText : appTheme.teal_700,
+      );
+    }
+
+    final double ratio = spent / activity.allocatedBudget;
+
+    if (ratio >= 0.90) {
+      return (
+        background: appTheme.wholeAlertBudgetStroke,
+        text: appTheme.expenseOverspendText,
+      );
+    }
+
+    if (ratio >= 0.50) {
+      return (background: appTheme.amber_200, text: appTheme.lime_900);
+    }
+
+    return (background: appTheme.teal_50, text: appTheme.teal_700);
+  }
+}
+
+/// Drives a slow "breathing" fade on the OVERSPENT card's warning glyph and
+/// label.
+///
+/// Only animates while [active] is true, so a healthy budget costs nothing: the
+/// controller is stopped and released at zero opacity-phase whenever the trip
+/// is not overspent. Honours the platform "reduce motion" accessibility setting
+/// by falling back to the plain, un-animated child.
+class _OverspentPulse extends StatefulWidget {
+  const _OverspentPulse({required this.active, required this.child});
+
+  /// Whether the warning state is currently showing.
+  final bool active;
+
+  /// The glyph + label to pulse.
+  final Widget child;
+
+  @override
+  State<_OverspentPulse> createState() => _OverspentPulseState();
+}
+
+class _OverspentPulseState extends State<_OverspentPulse>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 850),
+  );
+
+  /// Never fades past ~45% so the label stays legible at the trough of the
+  /// pulse - this is an attention cue, not a blink.
+  late final Animation<double> _opacity = Tween<double>(begin: 0.45, end: 1.0)
+      .animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+
+  @override
+  void initState() {
+    super.initState();
+    _syncAnimation();
+  }
+
+  @override
+  void didUpdateWidget(covariant _OverspentPulse oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.active != widget.active) _syncAnimation();
+  }
+
+  void _syncAnimation() {
+    if (widget.active) {
+      _controller.repeat(reverse: true);
+    } else {
+      _controller.stop();
+      _controller.value = 0.0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.active) return widget.child;
+
+    final bool reduceMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    if (reduceMotion) return widget.child;
+
+    return FadeTransition(opacity: _opacity, child: widget.child);
   }
 }

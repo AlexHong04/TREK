@@ -41,6 +41,22 @@ class PersonalConstraintManagementViewModel extends ChangeNotifier {
     'Vegan': 'Vegetarian',
   };
 
+  /// One-way implications: choosing the key already covers the values, so the
+  /// values are shown but locked.
+  ///
+  /// Deliberately NOT part of [_conflicts]. A conflict is mutual exclusion -
+  /// picking Halal clears Non-Halal, and picking Non-Halal clears Halal. Halal
+  /// and No Alcohol are not mutually exclusive: a halal trip keeps both, but
+  /// "No Alcohol" adds nothing once Halal is chosen, so it is locked instead.
+  ///
+  /// The rule is also one-way. Choosing "No Alcohol" on its own says nothing
+  /// about Halal, so Halal stays enabled in that direction. Note the pair spans
+  /// categories - Cultural & Religious implies Food Exclusions - which is why
+  /// this cannot be expressed with the per-pair [_conflicts] lookup.
+  static const Map<String, List<String>> _implies = {
+    'Halal': ['No Alcohol'],
+  };
+
   PersonalConstraintManagementUiState _uiState =
   const PersonalConstraintManagementUiState();
   PersonalConstraintManagementUiState get uiState => _uiState;
@@ -228,14 +244,28 @@ class PersonalConstraintManagementViewModel extends ChangeNotifier {
         .where((option) => option.isSelected)
         .map((option) => option.name)
         .toSet();
+
+    // Options already covered by a stronger constraint the traveller chose.
+    // Derived from the final selection each time, so the lock lifts again as
+    // soon as the implying option is deselected.
+    final impliedNames = <String>{
+      for (final name in finalSelectedNames) ...?_implies[name],
+    };
+
     return sanitized.map((option) {
       final conflict = _conflicts[option.name];
       final disabledByConflict =
           !option.isSelected &&
               conflict != null &&
               finalSelectedNames.contains(conflict);
+      // Applied whether or not the option is currently ticked: the implication
+      // comes from the other constraint, not from this one's own state. Its
+      // selection is left untouched so nothing is silently added to or removed
+      // from what gets saved.
+      final disabledByImplication = impliedNames.contains(option.name);
       return option.copyWith(
-        isDisabled: option.id.isEmpty || disabledByConflict,
+        isDisabled:
+            option.id.isEmpty || disabledByConflict || disabledByImplication,
       );
     }).toList(growable: false);
   }
