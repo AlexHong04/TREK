@@ -367,7 +367,7 @@ class ProfileScreen extends StatelessWidget {
                 Expanded(
                   child: _LogoutDialogButton(
                     text: 'Cancel',
-                    backgroundColor: appTheme.teal_A700,
+                    outlined: true,
                     onPressed: () => Navigator.pop(dialogContext, false),
                   ),
                 ),
@@ -375,7 +375,6 @@ class ProfileScreen extends StatelessWidget {
                 Expanded(
                   child: _LogoutDialogButton(
                     text: 'Confirm',
-                    backgroundColor: appTheme.errorRed,
                     onPressed: () => Navigator.pop(dialogContext, true),
                   ),
                 ),
@@ -392,29 +391,47 @@ class ProfileScreen extends StatelessWidget {
 
 class _LogoutDialogButton extends StatelessWidget {
   final String text;
-  final Color backgroundColor;
+  final bool outlined;
   final VoidCallback onPressed;
 
   const _LogoutDialogButton({
     required this.text,
-    required this.backgroundColor,
+    this.outlined = false,
     required this.onPressed,
   });
 
   @override
   Widget build(BuildContext context) {
+    final label = Text(
+      text,
+      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+    );
+
     return SizedBox(
-      height: 46,
-      child: FilledButton(
+      height: 48,
+      child: outlined
+          ? OutlinedButton(
         onPressed: onPressed,
-        style: FilledButton.styleFrom(
-          backgroundColor: backgroundColor,
-          foregroundColor: appTheme.white_A700,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: appTheme.blue_gray_300,
+          backgroundColor: appTheme.white_A700,
+          side: BorderSide(color: appTheme.gray_200, width: 1.5),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(999),
           ),
         ),
-        child: Text(text),
+        child: label,
+      )
+          : FilledButton(
+        onPressed: onPressed,
+        style: FilledButton.styleFrom(
+          backgroundColor: appTheme.teal_A700,
+          foregroundColor: appTheme.white_A700,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(999),
+          ),
+        ),
+        child: label,
       ),
     );
   }

@@ -410,7 +410,7 @@ class _EditAccountScreenState extends State<EditAccountScreen>
         icon: Icon(Icons.warning_amber_rounded, color: appTheme.errorRed),
         title: const Text('Request account deletion?'),
         content: const Text(
-          'This starts the permanent deletion process. You will still receive one final confirmation before anything is deleted.',
+          'This starts the deletion process. After final confirmation, your account will be disabled and retained for 30 days before permanent deletion.',
         ),
         actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
         actions: [
@@ -421,7 +421,7 @@ class _EditAccountScreenState extends State<EditAccountScreen>
                 Expanded(
                   child: _DeletionDialogButton(
                     text: 'Cancel',
-                    backgroundColor: appTheme.teal_A700,
+                    outlined: true,
                     onPressed: () => Navigator.pop(dialogContext, false),
                   ),
                 ),
@@ -429,7 +429,6 @@ class _EditAccountScreenState extends State<EditAccountScreen>
                 Expanded(
                   child: _DeletionDialogButton(
                     text: 'Continue',
-                    backgroundColor: appTheme.errorRed,
                     onPressed: () => Navigator.pop(dialogContext, true),
                   ),
                 ),
@@ -445,29 +444,47 @@ class _EditAccountScreenState extends State<EditAccountScreen>
 
 class _DeletionDialogButton extends StatelessWidget {
   final String text;
-  final Color backgroundColor;
+  final bool outlined;
   final VoidCallback onPressed;
 
   const _DeletionDialogButton({
     required this.text,
-    required this.backgroundColor,
+    this.outlined = false,
     required this.onPressed,
   });
 
   @override
   Widget build(BuildContext context) {
+    final label = Text(
+      text,
+      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+    );
+
     return SizedBox(
-      height: 46,
-      child: FilledButton(
+      height: 48,
+      child: outlined
+          ? OutlinedButton(
         onPressed: onPressed,
-        style: FilledButton.styleFrom(
-          backgroundColor: backgroundColor,
-          foregroundColor: appTheme.white_A700,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: appTheme.blue_gray_300,
+          backgroundColor: appTheme.white_A700,
+          side: BorderSide(color: appTheme.gray_200, width: 1.5),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(999),
           ),
         ),
-        child: Text(text),
+        child: label,
+      )
+          : FilledButton(
+        onPressed: onPressed,
+        style: FilledButton.styleFrom(
+          backgroundColor: appTheme.teal_A700,
+          foregroundColor: appTheme.white_A700,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(999),
+          ),
+        ),
+        child: label,
       ),
     );
   }

@@ -265,11 +265,14 @@ class UserRepository implements IUserRepository {
     required String currency,
   }) async {
     try {
-      await _client.from(_usersTable).update({
+      final updatedRow = await _client.from(_usersTable).update({
         'full_name': InputValidator.normalizeDisplayName(fullName),
         'currency': currency.trim().toUpperCase(),
         'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }).eq('user_id', userId);
+      }).eq('user_id', userId).select('user_id').maybeSingle();
+      if (updatedRow == null) {
+        throw StateError('The profile update was not permitted.');
+      }
     } catch (error) {
       rethrowAsNetworkUnavailable<void>(error);
     }
@@ -300,10 +303,20 @@ class UserRepository implements IUserRepository {
       final publicUrl = _client.storage
           .from(_profilePicturesBucket)
           .getPublicUrl(storagePath);
-      await _client.from(_usersTable).update({
+      final updatedRow = await _client.from(_usersTable).update({
         'profile_picture': publicUrl,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }).eq('user_id', userId);
+      }).eq('user_id', userId).select('user_id').maybeSingle();
+      if (updatedRow == null) {
+        try {
+          await _client.storage
+              .from(_profilePicturesBucket)
+              .remove([storagePath]);
+        } catch (_) {
+          // Keep the original permission error if cleanup also fails.
+        }
+        throw StateError('The profile picture update was not permitted.');
+      }
       final oldPaths = previousPictures
           .where((picture) => picture.name.isNotEmpty)
           .map((picture) => '$userId/${picture.name}')
@@ -335,10 +348,13 @@ class UserRepository implements IUserRepository {
       if (paths.isNotEmpty) {
         await _client.storage.from(_profilePicturesBucket).remove(paths);
       }
-      await _client.from(_usersTable).update({
+      final updatedRow = await _client.from(_usersTable).update({
         'profile_picture': null,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }).eq('user_id', userId);
+      }).eq('user_id', userId).select('user_id').maybeSingle();
+      if (updatedRow == null) {
+        throw StateError('The profile picture update was not permitted.');
+      }
     } catch (error) {
       rethrowAsNetworkUnavailable<void>(error);
     }

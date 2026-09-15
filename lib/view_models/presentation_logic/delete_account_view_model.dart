@@ -14,10 +14,10 @@ class DeleteAccountViewModel extends ChangeNotifier {
   DeleteAccountUiState _uiState = const DeleteAccountUiState();
   DeleteAccountUiState get uiState => _uiState;
 
-  /// Kept for compatibility with the existing confirmation screen.
-  Future<void> deletePermanently() => softDeleteAccount();
+  /// Kept for compatibility with the existing confirmation screen and service.
+  Future<void> deletePermanently() => scheduleAccountDeletion();
 
-  Future<void> softDeleteAccount() async {
+  Future<void> scheduleAccountDeletion() async {
     if (_uiState.isDeleting || _uiState.isCancelling) return;
     _uiState = _uiState.copyWith(isDeleting: true, clearErrorMessage: true);
     _notify();
@@ -45,7 +45,8 @@ class DeleteAccountViewModel extends ChangeNotifier {
       if (_disposed) return;
       _uiState = _uiState.copyWith(
         isDeleting: false,
-        errorMessage: 'Unable to deactivate the account. Please try again.',
+        errorMessage:
+        'Unable to schedule account deletion. Please try again.',
       );
     }
     _notify();

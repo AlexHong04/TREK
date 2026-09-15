@@ -24,7 +24,7 @@ class DeleteAccountConfirmationScreen extends StatelessWidget {
           child: AuthPage(
             title: 'Final Confirmation',
             subtitle:
-            'Your deletion request has been confirmed. This final action cannot be undone.',
+            'Your account will be disabled now and permanently deleted after 30 days.',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -36,7 +36,7 @@ class DeleteAccountConfirmationScreen extends StatelessWidget {
                     border: Border.all(color: appTheme.wholeAlertBudgetStroke),
                   ),
                   child: Text(
-                    'Deleting removes your TREK account, profile picture, personal constraints and associated app data.',
+                    'Your TREK data will be retained for 30 days, then permanently deleted. You cannot sign in or register another account with this email during that time.',
                     style: TextStyle(
                       color: appTheme.wholeAlertBudgetText,
                       height: 1.45,
@@ -67,7 +67,7 @@ class DeleteAccountConfirmationScreen extends StatelessWidget {
                     ),
                   )
                       : const Icon(Icons.delete_forever_outlined),
-                  label: const Text('Delete Permanently'),
+                  label: const Text('Confirm Deletion'),
                 ),
                 const SizedBox(height: 10),
                 TextButton(
@@ -95,9 +95,9 @@ class DeleteAccountConfirmationScreen extends StatelessWidget {
       barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
         icon: Icon(Icons.delete_forever_outlined, color: appTheme.errorRed),
-        title: const Text('Permanently delete account?'),
+        title: const Text('Schedule account deletion?'),
         content: const Text(
-          'This is your final confirmation. Your account and associated TREK data cannot be recovered.',
+          'Your account will be disabled immediately and permanently deleted after 30 days. An administrator can reactivate it before the deadline.',
         ),
         actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
         actions: [
@@ -108,15 +108,14 @@ class DeleteAccountConfirmationScreen extends StatelessWidget {
                 Expanded(
                   child: _DeleteAccountDialogButton(
                     text: 'Cancel',
-                    backgroundColor: appTheme.teal_A700,
+                    outlined: true,
                     onPressed: () => Navigator.pop(dialogContext, false),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: _DeleteAccountDialogButton(
-                    text: 'Delete',
-                    backgroundColor: appTheme.errorRed,
+                    text: 'Confirm',
                     onPressed: () => Navigator.pop(dialogContext, true),
                   ),
                 ),
@@ -132,29 +131,47 @@ class DeleteAccountConfirmationScreen extends StatelessWidget {
 
 class _DeleteAccountDialogButton extends StatelessWidget {
   final String text;
-  final Color backgroundColor;
+  final bool outlined;
   final VoidCallback onPressed;
 
   const _DeleteAccountDialogButton({
     required this.text,
-    required this.backgroundColor,
+    this.outlined = false,
     required this.onPressed,
   });
 
   @override
   Widget build(BuildContext context) {
+    final label = Text(
+      text,
+      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+    );
+
     return SizedBox(
-      height: 46,
-      child: FilledButton(
+      height: 48,
+      child: outlined
+          ? OutlinedButton(
         onPressed: onPressed,
-        style: FilledButton.styleFrom(
-          backgroundColor: backgroundColor,
-          foregroundColor: appTheme.white_A700,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: appTheme.blue_gray_300,
+          backgroundColor: appTheme.white_A700,
+          side: BorderSide(color: appTheme.gray_200, width: 1.5),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(999),
           ),
         ),
-        child: Text(text),
+        child: label,
+      )
+          : FilledButton(
+        onPressed: onPressed,
+        style: FilledButton.styleFrom(
+          backgroundColor: appTheme.teal_A700,
+          foregroundColor: appTheme.white_A700,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(999),
+          ),
+        ),
+        child: label,
       ),
     );
   }

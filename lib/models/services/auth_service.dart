@@ -439,11 +439,12 @@ class AuthService extends ChangeNotifier implements IAuthService {
     } on RepositoryAccountDeletionNotConfirmedException {
       throw const AccountDeletionNotConfirmedException();
     }
-    // The server-side deletion is already complete. From this point, local
-    // cleanup failures must not turn a successful deletion into an error.
+    // The server has disabled the account and scheduled its hard deletion.
+    // Local cleanup failures must not turn that successful request into an error.
     // Store the message before sign-out emits the signed-out event and creates
     // the next LoginViewModel, which consumes this one-time message.
-    _sessionMessage = 'Your account has been deleted successfully.';
+    _sessionMessage =
+    'Your account is disabled and scheduled for permanent deletion in 30 days.';
     try {
       await _userRepository.clearCachedUserProfile(user.authId);
     } catch (_) {
@@ -452,7 +453,7 @@ class AuthService extends ChangeNotifier implements IAuthService {
     try {
       await _authRepository.signOut();
     } catch (_) {
-      // The Auth user has already been removed server-side.
+      // The account has already been disabled server-side.
     }
     await _clearSessionState(clearCache: false);
   }

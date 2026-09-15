@@ -51,7 +51,7 @@ class InputValidator {
   static final RegExp _emailLocalSegment = RegExp(
     r"^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+$",
   );
-  static final RegExp _personalGmailUsername = RegExp(r'^[A-Za-z0-9]+$');
+  static final RegExp _personalGmailUsername = RegExp(r'^[A-Za-z0-9.]+$');
   static final RegExp _domainLabel = RegExp(r'^[A-Za-z0-9-]+$');
   static final RegExp _domainTopLevel = RegExp(
     r'^(?:[A-Za-z]{2,63}|xn--[A-Za-z0-9-]{2,59})$',
@@ -146,11 +146,12 @@ class InputValidator {
 
     if (_gmailDomains.contains(domain)) {
       if (!_personalGmailUsername.hasMatch(local)) {
-        return 'Personal Gmail addresses can use only letters and numbers '
-            'before @.';
+        return 'Personal Gmail addresses can use only letters, numbers, and '
+            'single periods before @.';
       }
 
-      if (_reservedGmailUsernames.contains(local.toLowerCase())) {
+      final canonicalGmailUsername = local.replaceAll('.', '').toLowerCase();
+      if (_reservedGmailUsernames.contains(canonicalGmailUsername)) {
         return 'This Gmail address is reserved and cannot be used.';
       }
     }
