@@ -1022,6 +1022,7 @@ class ActivityViewModel extends ChangeNotifier {
   /// confirmation dialog. Invalid drafts must not ask the tourist to confirm.
   bool validateExpenseDraftBeforeConfirmation() {
     try {
+      _validateAttachedReceiptWasScanned();
       if (_uiState.paymentMethod.trim().isEmpty) {
         throw ArgumentError('Please select a payment method.');
       }
@@ -1064,6 +1065,7 @@ class ActivityViewModel extends ChangeNotifier {
     }
 
     try {
+      _validateAttachedReceiptWasScanned();
       _expenseTrackingService.validateTaxAmount(_uiState.draftTaxAmount);
       _expenseTrackingService.validateExpenseAdjustments(
         _uiState.draftDiscountAmount,
@@ -1147,6 +1149,14 @@ class ActivityViewModel extends ChangeNotifier {
       );
     }
     notifyListeners();
+  }
+
+  void _validateAttachedReceiptWasScanned() {
+    if (_uiState.receiptLocalPath.isNotEmpty && _uiState.ocrRawText.isEmpty) {
+      throw ArgumentError(
+        'The selected receipt was not scanned successfully. Remove it or scan a valid receipt before confirming the expense.',
+      );
+    }
   }
 
   /// Builds the dedicated budget-alert message when the activity is nearly /

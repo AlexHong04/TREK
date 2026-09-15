@@ -2235,10 +2235,9 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
 
     final uiState = viewModel.uiState;
     if (uiState.errorMessage.isNotEmpty) {
-      if (hadAppliedReceipt) {
-        viewModel.restoreExpenseScanState(stateBeforeScan);
-      }
-      _showValidationMessage(uiState.errorMessage);
+      final scanError = uiState.errorMessage;
+      rejectScan();
+      _showValidationMessage(scanError);
       return;
     }
 
