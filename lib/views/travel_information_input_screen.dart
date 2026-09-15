@@ -2151,13 +2151,27 @@ class _TravelInformationInputScreenState
         ),
         const SizedBox(height: 6.0),
         InkWell(
-          onTap: () => _showTransitHubSelectionModal(
-            context,
-            viewModel,
-            isArrival: true,
-            index: arrivalIndex,
-            isStartOrEnd: isStartOrEnd,
-          ),
+          onTap: () {
+            String? connLoc;
+            if (!isStartOrEnd && arrivalIndex > 0) {
+              if (arrivalIndex - 1 < viewModel.uiState.departures.length) {
+                final d = viewModel.uiState.departures[arrivalIndex - 1].location;
+                if (d.isNotEmpty) connLoc = d;
+              }
+            } else if (isStartOrEnd && viewModel.uiState.departures.isNotEmpty) {
+              final d = viewModel.uiState.departures.first.location;
+              if (d.isNotEmpty) connLoc = d;
+            }
+
+            _showTransitHubSelectionModal(
+              context,
+              viewModel,
+              isArrival: true,
+              index: arrivalIndex,
+              isStartOrEnd: isStartOrEnd,
+              connectedLocation: connLoc,
+            );
+          },
           borderRadius: BorderRadius.circular(10.0),
           child: Container(
             width: double.infinity,
@@ -2332,13 +2346,25 @@ class _TravelInformationInputScreenState
         ),
         const SizedBox(height: 6.0),
         InkWell(
-          onTap: () => _showTransitHubSelectionModal(
-            context,
-            viewModel,
-            isArrival: false,
-            index: departureIndex,
-            isStartOrEnd: isStartOrEnd,
-          ),
+          onTap: () {
+            String? connLoc;
+            if (!isStartOrEnd && departureIndex + 1 < viewModel.uiState.arrivals.length) {
+              final a = viewModel.uiState.arrivals[departureIndex + 1].location;
+              if (a.isNotEmpty) connLoc = a;
+            } else if (isStartOrEnd && viewModel.uiState.arrivals.isNotEmpty) {
+              final a = viewModel.uiState.arrivals.last.location;
+              if (a.isNotEmpty) connLoc = a;
+            }
+
+            _showTransitHubSelectionModal(
+              context,
+              viewModel,
+              isArrival: false,
+              index: departureIndex,
+              isStartOrEnd: isStartOrEnd,
+              connectedLocation: connLoc,
+            );
+          },
           borderRadius: BorderRadius.circular(10.0),
           child: Container(
             width: double.infinity,
@@ -3868,6 +3894,7 @@ class _TravelInformationInputScreenState
     required bool isArrival,
     required int index,
     bool isStartOrEnd = false,
+    String? connectedLocation,
   }) {
     final currentItem = isArrival
         ? (index < viewModel.uiState.arrivals.length
@@ -3910,48 +3937,57 @@ class _TravelInformationInputScreenState
             final bool isBusEnabled =
                 lockedMode == null || lockedMode.toLowerCase() == 'bus';
 
-            // For start/end: show ALL hubs, with recommended ones separated
-            // For transit: show destination-filtered hubs only
-            final List<String> recommendedHubs;
-            final List<String> allHubs;
+            // 1. Raw candidate hubs: destination-recommended + all available hubs
+            final List<String> rawRecommended = destinations.isNotEmpty
+                ? getTransitHubSuggestions(
+                    destinations,
+                    transitType: activeMode,
+                  )
+                : <String>[];
 
-            if (isStartOrEnd) {
-              // Get destination-specific recommended hubs
-              recommendedHubs = destinations.isNotEmpty
-                  ? getTransitHubSuggestions(
-                      destinations,
-                      transitType: activeMode,
-                    )
-                  : <String>[];
+            final allHubsFull = getAllTransitHubs(transitType: activeMode);
+            final rawRecommendedSet = rawRecommended.toSet();
+            final List<String> rawAll = allHubsFull
+                .where((h) => !rawRecommendedSet.contains(h))
+                .toList();
 
-              // Get ALL hubs for this transport type
-              final allHubsFull = getAllTransitHubs(transitType: activeMode);
-
-              // Remove recommended from all to avoid duplicates
-              final recommendedSet = recommendedHubs.toSet();
-              allHubs = allHubsFull
-                  .where((h) => !recommendedSet.contains(h))
-                  .toList();
-            } else {
-              recommendedHubs = <String>[];
-              allHubs = getTransitHubSuggestions(
-                destinations,
+            // 2. Filter candidate hubs by direct route availability
+            // If connectedLocation is known, ONLY show destinations with valid direct routes
+            bool isHubReachable(String hub) {
+              if (connectedLocation == null || connectedLocation.trim().isEmpty) {
+                return true;
+              }
+              final fromLoc = isArrival ? connectedLocation : hub;
+              final toLoc = isArrival ? hub : connectedLocation;
+              return TransitScheduleHelper.isRouteAvailable(
                 transitType: activeMode,
+                fromLocation: fromLoc,
+                toLocation: toLoc,
               );
             }
 
-            // Apply search filter to both lists
+            final List<String> recommendedHubs =
+                rawRecommended.where(isHubReachable).toList();
+            final List<String> allHubs =
+                rawAll.where(isHubReachable).toList();
+
+            bool matchQuery(String hub) {
+              if (query.isEmpty) return true;
+              final h = hub.toLowerCase();
+              if (h.contains(query)) return true;
+              final normQ = query.replaceAll('central', 'sentral');
+              final normH = h.replaceAll('central', 'sentral');
+              return normH.contains(normQ);
+            }
+
+            // Apply search query filter to both lists
             final filteredRecommended = query.isEmpty
                 ? recommendedHubs
-                : recommendedHubs
-                      .where((a) => a.toLowerCase().contains(query))
-                      .toList();
+                : recommendedHubs.where(matchQuery).toList();
 
             final filteredAll = query.isEmpty
                 ? allHubs
-                : allHubs
-                      .where((a) => a.toLowerCase().contains(query))
-                      .toList();
+                : allHubs.where(matchQuery).toList();
 
             final filteredHubs = [...filteredRecommended, ...filteredAll];
 
@@ -3967,11 +4003,17 @@ class _TravelInformationInputScreenState
             final String searchHint = isTrain
                 ? 'Search train station (e.g. KL Sentral, Ipoh)...'
                 : (isBus
-                      ? 'Search bus terminal (e.g. TBS, Larkin)...'
+                      ? 'Search bus terminal (e.g. TBS, KL Sentral, Larkin)...'
                       : 'Search airport or city (e.g. KLIA, Penang)...');
 
             final bool hasExactMatch = filteredHubs.any(
-              (h) => h.toLowerCase() == query,
+              (h) {
+                final hLow = h.toLowerCase();
+                if (hLow == query) return true;
+                final normQ = query.replaceAll('central', 'sentral');
+                final normH = hLow.replaceAll('central', 'sentral');
+                return normH == normQ;
+              },
             );
             final bool canAddCustom = query.isNotEmpty && !hasExactMatch;
 
@@ -4268,26 +4310,33 @@ class _TravelInformationInputScreenState
                   Expanded(
                     child: (filteredHubs.isEmpty && !canAddCustom)
                         ? Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.search_off_rounded,
-                                  size: 48,
-                                  color: appTheme.blue_gray_300,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  destinations.isNotEmpty
-                                      ? 'No $typeLabel found for ${destinations.join(", ")}'
-                                      : 'No $typeLabel options found',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontFamily: 'Inter',
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.alt_route_rounded,
+                                    size: 48,
                                     color: appTheme.blue_gray_300,
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    (connectedLocation != null && connectedLocation.trim().isNotEmpty)
+                                        ? 'No direct $typeLabel routes available ${isArrival ? "from" : "to"}\n"$connectedLocation"'
+                                        : (destinations.isNotEmpty
+                                            ? 'No $typeLabel found for ${destinations.join(", ")}'
+                                            : 'No $typeLabel options found'),
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 13.5,
+                                      height: 1.4,
+                                      fontFamily: 'Inter',
+                                      color: appTheme.blue_gray_300,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           )
                         : ListView(
@@ -4296,6 +4345,49 @@ class _TravelInformationInputScreenState
                               vertical: 12.0,
                             ),
                             children: [
+                              // Route connectivity hint banner
+                              if (connectedLocation != null && connectedLocation.trim().isNotEmpty) ...[
+                                Container(
+                                  margin: const EdgeInsets.only(bottom: 12.0),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12.0,
+                                    vertical: 8.0,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: appTheme.teal_50,
+                                    borderRadius: BorderRadius.circular(8.0),
+                                    border: Border.all(
+                                      color: appTheme.teal_A700.withValues(alpha: 0.25),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.alt_route_rounded,
+                                        size: 16,
+                                        color: appTheme.teal_A700,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          isArrival
+                                              ? 'Direct routes departing from: $connectedLocation'
+                                              : 'Direct routes arriving at: $connectedLocation',
+                                          style: TextStyle(
+                                            fontSize: 11.5,
+                                            fontWeight: FontWeight.w600,
+                                            fontFamily: 'Inter',
+                                            color: appTheme.teal_A700,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+
                               // Custom entry option
                               if (canAddCustom) ...[
                                 InkWell(
@@ -4316,6 +4408,28 @@ class _TravelInformationInputScreenState
                                       );
                                       return;
                                     }
+
+                                    if (connectedLocation != null && connectedLocation.trim().isNotEmpty) {
+                                      final fromLoc = isArrival ? connectedLocation : customName;
+                                      final toLoc = isArrival ? customName : connectedLocation;
+                                      final routeOk = TransitScheduleHelper.isRouteAvailable(
+                                        transitType: activeMode,
+                                        fromLocation: fromLoc,
+                                        toLocation: toLoc,
+                                      );
+                                      if (!routeOk) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text('No direct $activeMode route available between "$connectedLocation" and "$customName"'),
+                                            backgroundColor: appTheme.redButton,
+                                            behavior: SnackBarBehavior.floating,
+                                            duration: const Duration(seconds: 3),
+                                          ),
+                                        );
+                                        return;
+                                      }
+                                    }
+
                                     if (isArrival) {
                                       viewModel.updateArrivalHub(
                                         index,
@@ -4376,7 +4490,7 @@ class _TravelInformationInputScreenState
                                 ),
                               ],
 
-                              if (isStartOrEnd && filteredRecommended.isNotEmpty) ...[
+                              if (filteredRecommended.isNotEmpty) ...[
                                 Padding(
                                   padding: const EdgeInsets.only(bottom: 10.0),
                                   child: Row(
@@ -4388,7 +4502,9 @@ class _TravelInformationInputScreenState
                                       ),
                                       const SizedBox(width: 4),
                                       Text(
-                                        'RECOMMENDED FOR ${destinations.join(", ").toUpperCase()}',
+                                        destinations.isNotEmpty
+                                            ? 'RECOMMENDED FOR ${destinations.join(", ").toUpperCase()}'
+                                            : 'RECOMMENDED $typeLabel'.toUpperCase(),
                                         style: TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.w800,
@@ -4433,7 +4549,7 @@ class _TravelInformationInputScreenState
                                   Padding(
                                     padding: const EdgeInsets.only(bottom: 10.0),
                                     child: Text(
-                                      'ALL ${typeLabel.toUpperCase()}S',
+                                      'OTHER AVAILABLE ${typeLabel.toUpperCase()}S',
                                       style: TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.w800,
@@ -4444,25 +4560,11 @@ class _TravelInformationInputScreenState
                                     ),
                                   ),
                                 ],
-                              ] else if (!isStartOrEnd && destinations.isNotEmpty) ...[
+                              ] else if (filteredAll.isNotEmpty) ...[
                                 Padding(
                                   padding: const EdgeInsets.only(bottom: 10.0),
                                   child: Text(
-                                    'AVAILABLE IN ${destinations.join(", ").toUpperCase()}',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w800,
-                                      fontFamily: 'Inter',
-                                      color: appTheme.blue_gray_300,
-                                      letterSpacing: 0.8,
-                                    ),
-                                  ),
-                                ),
-                              ] else if (isStartOrEnd && filteredRecommended.isEmpty && filteredAll.isNotEmpty) ...[
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 10.0),
-                                  child: Text(
-                                    'ALL ${typeLabel.toUpperCase()}S',
+                                    'AVAILABLE ${typeLabel.toUpperCase()}S',
                                     style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w800,
@@ -4474,8 +4576,8 @@ class _TravelInformationInputScreenState
                                 ),
                               ],
 
-                              // Remaining hubs (all for start/end, or filtered for transit)
-                              ...(isStartOrEnd ? filteredAll : filteredHubs).map((hub) {
+                              // Remaining available hubs
+                              ...filteredAll.map((hub) {
                                 final isSelected = currentSelected == hub;
                                 return Padding(
                                   padding: const EdgeInsets.only(bottom: 8.0),

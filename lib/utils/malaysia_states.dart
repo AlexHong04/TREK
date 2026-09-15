@@ -212,6 +212,7 @@ const Map<String, List<String>> destinationBusTerminals = {
   ],
   'Kuala Lumpur': [
     'Terminal Bersepadu Selatan (TBS - Kuala Lumpur)',
+    'KL Sentral Bus Terminal (Kuala Lumpur)',
     'Hentian Duta Bus Terminal',
     'Pekeliling Bus Terminal',
   ],
@@ -299,6 +300,7 @@ const List<String> defaultMalaysiaTrainStations = [
 
 const List<String> defaultMalaysiaBusTerminals = [
   'Terminal Bersepadu Selatan (TBS - Kuala Lumpur)',
+  'KL Sentral Bus Terminal (Kuala Lumpur)',
   'Penang Sentral Bus Terminal (Butterworth)',
   'Larkin Sentral Bus Terminal (Johor Bahru)',
   'Terminal Amanjaya (Ipoh)',
@@ -359,11 +361,15 @@ List<String> getTransitHubSuggestions(
     results.addAll(defaultList);
   }
 
-  // 3. If query is provided, filter by query
+  // 3. If query is provided, filter by query (supporting central/sentral interchangeably)
   if (cleanQuery.isNotEmpty) {
-    final filtered = results
-        .where((hub) => hub.toLowerCase().contains(cleanQuery))
-        .toList();
+    final normQ = cleanQuery.replaceAll('central', 'sentral');
+    final filtered = results.where((hub) {
+      final h = hub.toLowerCase();
+      if (h.contains(cleanQuery)) return true;
+      final normH = h.replaceAll('central', 'sentral');
+      return normH.contains(normQ);
+    }).toList();
     return filtered;
   }
 

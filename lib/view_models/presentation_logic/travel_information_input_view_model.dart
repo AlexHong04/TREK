@@ -1421,6 +1421,52 @@ class TravelInformationInputViewModel extends ChangeNotifier {
       }
     }
 
+    // 4b. Direct transit route availability validation (Bus, Train, Flight)
+    for (int i = 0; i < transitCount - 1; i++) {
+      if (i < departures.length && i + 1 < arrivals.length) {
+        final depPoint = departures[i];
+        final arrPoint = arrivals[i + 1];
+        final depLoc = depPoint.location.trim();
+        final arrLoc = arrPoint.location.trim();
+        if (depLoc.isNotEmpty && arrLoc.isNotEmpty) {
+          final mode = depPoint.type.isNotEmpty
+              ? depPoint.type
+              : (arrPoint.type.isNotEmpty ? arrPoint.type : 'Flight');
+          final isAvailable = TransitScheduleHelper.isRouteAvailable(
+            transitType: mode,
+            fromLocation: depLoc,
+            toLocation: arrLoc,
+          );
+          if (!isAvailable) {
+            return 'Transit ${i + 1}: No direct $mode route available from "$depLoc" to "$arrLoc". Please select a connected route or change transit mode.';
+          }
+        }
+      }
+    }
+
+    if (transitCount == 1 &&
+        arrivals.isNotEmpty &&
+        departures.isNotEmpty &&
+        arrivals[0].location.trim().isNotEmpty &&
+        departures[0].location.trim().isNotEmpty) {
+      final startLoc = arrivals[0].location.trim();
+      final endLoc = departures[0].location.trim();
+      final mode = arrivals[0].type.isNotEmpty
+          ? arrivals[0].type
+          : departures[0].type;
+      final startReg = TransitScheduleHelper.extractRegion(startLoc);
+      final endReg = TransitScheduleHelper.extractRegion(endLoc);
+      final isStartEast = startReg == 'Sabah' || startReg == 'Sarawak';
+      final isEndEast = endReg == 'Sabah' || endReg == 'Sarawak';
+
+      if ((mode.toLowerCase() == 'train' || mode.toLowerCase() == 'bus') &&
+          (isStartEast != isEndEast ||
+              (startReg == 'Sabah' && endReg == 'Sarawak') ||
+              (startReg == 'Sarawak' && endReg == 'Sabah'))) {
+        return 'Invalid route: $mode cannot travel across separate regions ($startReg <-> $endReg).';
+      }
+    }
+
     // 5. Trip Date Range Checks (within startDate and endDate)
     if (_uiState.startDate != null && _uiState.endDate != null) {
       final minDate = DateTime(
