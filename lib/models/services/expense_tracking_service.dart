@@ -2104,7 +2104,7 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     debugPrint("🔥 calculateOverspendPercentage CALLED");
 
     // final double allocatedBudget = currentActivity.allocatedBudget;
-    final double allocatedBudget = currentActivity.allocatedBudget <= 0
+    final double allocatedBudget = currentActivity.allocatedBudget <= 10
         ? 10.0
         : currentActivity.allocatedBudget;
 
