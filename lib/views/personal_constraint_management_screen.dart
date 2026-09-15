@@ -202,10 +202,16 @@ class _ConstraintChip extends StatelessWidget {
             color: isSelected ? appTheme.teal_A700 : appTheme.gray_200,
           ),
           labelStyle: TextStyle(
-            color: isDisabled
-                ? appTheme.blue_gray_300
-                : isSelected
+            // isSelected is checked FIRST so a ticked-but-locked chip still
+            // reads as on. "No Alcohol" is locked the moment "Halal" is picked,
+            // but it keeps its selection, and greying the label would hide that
+            // and make it look like the choice was dropped. ChoiceChip already
+            // resolves the fill and the border in favour of the selected state
+            // when the chip is disabled, so only the label needs this.
+            color: isSelected
                 ? appTheme.teal_700
+                : isDisabled
+                ? appTheme.blue_gray_300
                 : appTheme.blue_gray_700,
             fontSize: 12,
           ),

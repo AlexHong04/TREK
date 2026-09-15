@@ -2024,6 +2024,33 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       throw Exception('Update critical details failed: $success');
     }
 
+    // A slot with NO allocated budget was never funded - free landmarks are
+    // generated at 0.0, and transportation frequently comes back as 0 too. So
+    // spending on it is UNPLANNED spend rather than a budget breach, and the
+    // activity-level machinery is a poor fit for it: the "threshold" is only an
+    // artefact of flooring a zero allocation to RM10 (giving an RM11.50 limit),
+    // and acting on it would re-allocate future restaurants or re-plan the whole
+    // trip over what is often a RM1 fare.
+    //
+    // The spend has ALREADY been taken out of the trip's balance by
+    // deductRemainingBudget() when the expense was confirmed, so absorbing it
+    // here is all that is needed: leave the future allocations untouched and let
+    // the regular near/over-budget notification tell the tourist.
+    //
+    // This sits after the trip-level critical check on purpose, so a genuinely
+    // unaffordable trip is never hidden - it just cannot be escalated by an
+    // unfunded slot on its own.
+    if (currentActivity.allocatedBudget <= 0) {
+      debugPrint(
+        'Zero-allocated slot overspent by '
+        'RM${overspentAmount.toStringAsFixed(2)} - absorbed from trip slack '
+        '(buffer RM${(remainingBudget - totalAllocatedBudget).toStringAsFixed(2)}). '
+        'No reallocation or re-plan.',
+      );
+
+      return ExpenseProcessingResult.withinBudget;
+    }
+
     // Check overspend threshold
     final bool isAboveThreshold = await calculateOverspendPercentage(
       currentActivity,

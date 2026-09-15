@@ -1457,6 +1457,18 @@ class ItineraryService implements IItineraryService {
     final imageKeyword =
         (item['imageKeyword'] ?? item['image_keyword'] ?? destName) as String;
 
+    // A walking row is labelled "Walk to <venue>" on purpose - that label IS the
+    // row's meaning, and the venue's own row (immediately next to it) already
+    // carries the canonical Google Places name.
+    //
+    // Both resolvers below used to overwrite this label with the venue's name:
+    // Google's text search fuzzily matches "Walk to Pavilion KL" straight back
+    // to "Pavilion Kuala Lumpur", and the Wikipedia resolver's correctedTitle
+    // does the same. That collapsed the walking row into an exact duplicate of
+    // the venue row beneath it. Keep the walking label; only the image is taken
+    // from the lookup.
+    final bool isWalkingRow = destName.toLowerCase().startsWith('walk to ');
+
     String imgUrl = '';
     String finalDestinationTitle = destName;
     bool resolvedByGooglePlaces = false;
@@ -1467,7 +1479,8 @@ class ItineraryService implements IItineraryService {
         final place = await GooglePlacesApiConfig.searchPlace(destName);
         if (place != null) {
           resolvedByGooglePlaces = true;
-          if (place['name'] != null &&
+          if (!isWalkingRow &&
+              place['name'] != null &&
               place['name'].toString().isNotEmpty) {
             finalDestinationTitle = place['name'];
           }
@@ -1497,7 +1510,10 @@ class ItineraryService implements IItineraryService {
           lockIndex: 0,
         );
         imgUrl = resolved.imageUrl;
-        finalDestinationTitle = resolved.correctedTitle;
+        // Never rename a walking row - see the isWalkingRow note above.
+        if (!isWalkingRow) {
+          finalDestinationTitle = resolved.correctedTitle;
+        }
       } catch (_) {}
     }
 

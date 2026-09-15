@@ -103,9 +103,9 @@ class _TravelInformationInputScreenState
   }
 
   void _removeArrivalAndDeparture(
-    int index,
-    TravelInformationInputViewModel viewModel,
-  ) {
+      int index,
+      TravelInformationInputViewModel viewModel,
+      ) {
     viewModel.removeTransitLeg(index);
   }
 
@@ -190,25 +190,25 @@ class _TravelInformationInputScreenState
                       CustomTextField(
                         sectionTitle: 'WISHLIST',
                         titleTrailing:
-                            viewModel.uiState.wishlistItems.isNotEmpty
+                        viewModel.uiState.wishlistItems.isNotEmpty
                             ? GestureDetector(
-                                onTap: () {
-                                  _wishlistController.clear();
-                                  viewModel.clearWishlist();
-                                },
-                                child: Text(
-                                  'Clear all',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    fontFamily: 'Inter',
-                                    color: appTheme.teal_A700,
-                                  ),
-                                ),
-                              )
+                          onTap: () {
+                            _wishlistController.clear();
+                            viewModel.clearWishlist();
+                          },
+                          child: Text(
+                            'Clear all',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              fontFamily: 'Inter',
+                              color: appTheme.teal_A700,
+                            ),
+                          ),
+                        )
                             : null,
                         hintText:
-                            viewModel.uiState.selectedDestinations.isNotEmpty
+                        viewModel.uiState.selectedDestinations.isNotEmpty
                             ? 'Search places in ${viewModel.uiState.selectedDestinations.join(", ")}...'
                             : 'Search wishlist...',
                         prefixIcon: Icons.favorite_outline,
@@ -251,14 +251,14 @@ class _TravelInformationInputScreenState
                                   shrinkWrap: true,
                                   physics: const NeverScrollableScrollPhysics(),
                                   itemCount:
-                                      viewModel.uiState.suggestions.length,
+                                  viewModel.uiState.suggestions.length,
                                   separatorBuilder: (context, index) => Divider(
                                     color: appTheme.gray_100,
                                     height: 1.0,
                                   ),
                                   itemBuilder: (context, index) {
                                     final suggestion =
-                                        viewModel.uiState.suggestions[index];
+                                    viewModel.uiState.suggestions[index];
                                     return ListTile(
                                       title: Text(
                                         suggestion,
@@ -294,11 +294,11 @@ class _TravelInformationInputScreenState
                                 children: viewModel.uiState.wishlistItems
                                     .map(
                                       (item) => _buildWishlistChip(
-                                        item,
+                                    item,
                                         () =>
-                                            viewModel.removeWishlistItem(item),
-                                      ),
-                                    )
+                                        viewModel.removeWishlistItem(item),
+                                  ),
+                                )
                                     .toList(),
                               ),
                             ],
@@ -338,12 +338,12 @@ class _TravelInformationInputScreenState
                               onTap: () => showDestinationSpendingRatesDialog(
                                 context,
                                 currentDestination:
-                                    viewModel
-                                        .uiState
-                                        .selectedDestinations
-                                        .isNotEmpty
+                                viewModel
+                                    .uiState
+                                    .selectedDestinations
+                                    .isNotEmpty
                                     ? viewModel.uiState.selectedDestinations
-                                          .join(', ')
+                                    .join(', ')
                                     : null,
                                 currency: preferredCurrency,
                                 numberOfDays: viewModel.numberOfDays,
@@ -369,242 +369,242 @@ class _TravelInformationInputScreenState
                             validator: viewModel.validateBudget,
                             warningText: viewModel.getBudgetSuggestion(value.text),
                             bottomWidget:
-                                (enteredAmount != null && enteredAmount > 0)
+                            (enteredAmount != null && enteredAmount > 0)
                                 ? (preferredCurrency != 'MYR'
-                                      ? FutureBuilder<double?>(
-                                          future: viewModel.getExchangeRate(
-                                            fromCurrency: preferredCurrency,
-                                            toCurrency: 'MYR',
+                                ? FutureBuilder<double?>(
+                              future: viewModel.getExchangeRate(
+                                fromCurrency: preferredCurrency,
+                                toCurrency: 'MYR',
+                              ),
+                              builder: (context, snapshot) {
+                                final rate = snapshot.data;
+                                final convertedMyr = rate != null
+                                    ? enteredAmount * rate
+                                    : null;
+                                return Container(
+                                  padding:
+                                  const EdgeInsets.symmetric(
+                                    horizontal: 14.0,
+                                    vertical: 10.0,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: appTheme.teal_50
+                                        .withValues(alpha: 0.45),
+                                    borderRadius:
+                                    BorderRadius.circular(12.0),
+                                    border: Border.all(
+                                      color: appTheme.teal_A700
+                                          .withValues(alpha: 0.2),
+                                      width: 1.0,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment:
+                                    MainAxisAlignment
+                                        .spaceBetween,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons
+                                                .currency_exchange_rounded,
+                                            size: 16,
+                                            color:
+                                            appTheme.teal_700,
                                           ),
-                                          builder: (context, snapshot) {
-                                            final rate = snapshot.data;
-                                            final convertedMyr = rate != null
-                                                ? enteredAmount * rate
-                                                : null;
-                                            return Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 14.0,
-                                                    vertical: 10.0,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: appTheme.teal_50
-                                                    .withValues(alpha: 0.45),
-                                                borderRadius:
-                                                    BorderRadius.circular(12.0),
-                                                border: Border.all(
-                                                  color: appTheme.teal_A700
-                                                      .withValues(alpha: 0.2),
-                                                  width: 1.0,
-                                                ),
-                                              ),
-                                              child: Row(
-                                                mainAxisAlignment:
-                                                    MainAxisAlignment
-                                                        .spaceBetween,
-                                                children: [
-                                                  Row(
-                                                    children: [
-                                                      Icon(
-                                                        Icons
-                                                            .currency_exchange_rounded,
-                                                        size: 16,
-                                                        color:
-                                                            appTheme.teal_700,
-                                                      ),
-                                                      const SizedBox(width: 6),
-                                                      Text(
-                                                        'Equivalent Value:',
-                                                        style: TextStyle(
-                                                          fontSize: 12,
-                                                          fontWeight:
-                                                              FontWeight.w600,
-                                                          fontFamily: 'Inter',
-                                                          color: appTheme
-                                                              .blue_gray_700,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  Column(
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment.end,
-                                                    mainAxisSize:
-                                                        MainAxisSize.min,
-                                                    children: [
-                                                      Text(
-                                                        convertedMyr != null
-                                                            ? '$preferredCurrency ${enteredAmount.toStringAsFixed(2)}'
-                                                            : 'Converting...',
-                                                        style: TextStyle(
-                                                          fontSize: 14,
-                                                          fontWeight:
-                                                              FontWeight.w800,
-                                                          fontFamily: 'Inter',
-                                                          color:
-                                                              appTheme.teal_800,
-                                                        ),
-                                                      ),
-                                                      Text(
-                                                        convertedMyr != null
-                                                            ? 'MYR ${convertedMyr.toStringAsFixed(2)}'
-                                                            : 'Calculating...',
-                                                        style: TextStyle(
-                                                          fontSize: 11,
-                                                          fontWeight:
-                                                              FontWeight.w600,
-                                                          fontFamily: 'Inter',
-                                                          color: appTheme
-                                                              .blue_gray_700,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ],
-                                              ),
-                                            );
-                                          },
-                                        )
-                                      : Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 14.0,
-                                            vertical: 10.0,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: appTheme.teal_50.withValues(
-                                              alpha: 0.45,
-                                            ),
-                                            borderRadius: BorderRadius.circular(
-                                              12.0,
-                                            ),
-                                            border: Border.all(
-                                              color: appTheme.teal_A700
-                                                  .withValues(alpha: 0.2),
-                                              width: 1.0,
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            'Equivalent Value:',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight:
+                                              FontWeight.w600,
+                                              fontFamily: 'Inter',
+                                              color: appTheme
+                                                  .blue_gray_700,
                                             ),
                                           ),
-                                          child: Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              Row(
-                                                children: [
-                                                  Icon(
-                                                    Icons
-                                                        .account_balance_wallet_outlined,
-                                                    size: 16,
-                                                    color: appTheme.teal_700,
-                                                  ),
-                                                  const SizedBox(width: 6),
-                                                  Text(
-                                                    'Total Trip Budget:',
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                      fontFamily: 'Inter',
-                                                      color: appTheme
-                                                          .blue_gray_700,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                              Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.end,
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Text(
-                                                    'MYR ${enteredAmount.toStringAsFixed(2)}',
-                                                    style: TextStyle(
-                                                      fontSize: 14,
-                                                      fontWeight:
-                                                          FontWeight.w800,
-                                                      fontFamily: 'Inter',
-                                                      color: appTheme.teal_800,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ],
+                                        ],
+                                      ),
+                                      Column(
+                                        crossAxisAlignment:
+                                        CrossAxisAlignment.end,
+                                        mainAxisSize:
+                                        MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            convertedMyr != null
+                                                ? '$preferredCurrency ${enteredAmount.toStringAsFixed(2)}'
+                                                : 'Converting...',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight:
+                                              FontWeight.w800,
+                                              fontFamily: 'Inter',
+                                              color:
+                                              appTheme.teal_800,
+                                            ),
                                           ),
-                                        ))
+                                          Text(
+                                            convertedMyr != null
+                                                ? 'MYR ${convertedMyr.toStringAsFixed(2)}'
+                                                : 'Calculating...',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight:
+                                              FontWeight.w600,
+                                              fontFamily: 'Inter',
+                                              color: appTheme
+                                                  .blue_gray_700,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            )
+                                : Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14.0,
+                                vertical: 10.0,
+                              ),
+                              decoration: BoxDecoration(
+                                color: appTheme.teal_50.withValues(
+                                  alpha: 0.45,
+                                ),
+                                borderRadius: BorderRadius.circular(
+                                  12.0,
+                                ),
+                                border: Border.all(
+                                  color: appTheme.teal_A700
+                                      .withValues(alpha: 0.2),
+                                  width: 1.0,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment:
+                                MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons
+                                            .account_balance_wallet_outlined,
+                                        size: 16,
+                                        color: appTheme.teal_700,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Total Trip Budget:',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight:
+                                          FontWeight.w600,
+                                          fontFamily: 'Inter',
+                                          color: appTheme
+                                              .blue_gray_700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Column(
+                                    crossAxisAlignment:
+                                    CrossAxisAlignment.end,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        'MYR ${enteredAmount.toStringAsFixed(2)}',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight:
+                                          FontWeight.w800,
+                                          fontFamily: 'Inter',
+                                          color: appTheme.teal_800,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ))
                                 : (viewModel
-                                              .uiState
-                                              .selectedDestinations
-                                              .length >
-                                          1
-                                      ? Builder(
-                                          builder: (context) {
-                                            final rec = viewModel
-                                                .getBudgetRecommendationForCurrentTrip();
-                                            final rate =
-                                                viewModel.cachedRateToMyr ??
-                                                1.0;
-                                            final minPref =
-                                                preferredCurrency == 'MYR'
-                                                ? rec.minTotalMyr
-                                                : (rec.minTotalMyr /
-                                                      (rate > 0 ? rate : 1.0));
-                                            final minText =
-                                                preferredCurrency == 'MYR'
-                                                ? 'RM ${minPref.toStringAsFixed(0)}'
-                                                : '$preferredCurrency ${minPref.toStringAsFixed(0)}';
-                                            final destNames =
-                                                rec
-                                                    .matchedDestinations
-                                                    .isNotEmpty
-                                                ? rec.matchedDestinations.join(
-                                                    ', ',
-                                                  )
-                                                : viewModel
-                                                      .uiState
-                                                      .selectedDestinations
-                                                      .join(', ');
-                                            return Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 14.0,
-                                                    vertical: 9.0,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: appTheme.teal_50
-                                                    .withValues(alpha: 0.45),
-                                                borderRadius:
-                                                    BorderRadius.circular(12.0),
-                                                border: Border.all(
-                                                  color: appTheme.teal_A700
-                                                      .withValues(alpha: 0.2),
-                                                  width: 1.0,
-                                                ),
-                                              ),
-                                              child: Row(
-                                                children: [
-                                                  Icon(
-                                                    Icons.insights_rounded,
-                                                    size: 15,
-                                                    color: appTheme.teal_700,
-                                                  ),
-                                                  const SizedBox(width: 8),
-                                                  Expanded(
-                                                    child: Text(
-                                                      'Combined Min ($destNames): $minText',
-                                                      style: TextStyle(
-                                                        fontSize: 11.5,
-                                                        fontFamily: 'Inter',
-                                                        fontWeight:
-                                                            FontWeight.w600,
-                                                        color:
-                                                            appTheme.teal_800,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            );
-                                          },
-                                        )
-                                      : null),
+                                .uiState
+                                .selectedDestinations
+                                .length >
+                                1
+                                ? Builder(
+                              builder: (context) {
+                                final rec = viewModel
+                                    .getBudgetRecommendationForCurrentTrip();
+                                final rate =
+                                    viewModel.cachedRateToMyr ??
+                                        1.0;
+                                final minPref =
+                                preferredCurrency == 'MYR'
+                                    ? rec.minTotalMyr
+                                    : (rec.minTotalMyr /
+                                    (rate > 0 ? rate : 1.0));
+                                final minText =
+                                preferredCurrency == 'MYR'
+                                    ? 'RM ${minPref.toStringAsFixed(0)}'
+                                    : '$preferredCurrency ${minPref.toStringAsFixed(0)}';
+                                final destNames =
+                                rec
+                                    .matchedDestinations
+                                    .isNotEmpty
+                                    ? rec.matchedDestinations.join(
+                                  ', ',
+                                )
+                                    : viewModel
+                                    .uiState
+                                    .selectedDestinations
+                                    .join(', ');
+                                return Container(
+                                  padding:
+                                  const EdgeInsets.symmetric(
+                                    horizontal: 14.0,
+                                    vertical: 9.0,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: appTheme.teal_50
+                                        .withValues(alpha: 0.45),
+                                    borderRadius:
+                                    BorderRadius.circular(12.0),
+                                    border: Border.all(
+                                      color: appTheme.teal_A700
+                                          .withValues(alpha: 0.2),
+                                      width: 1.0,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.insights_rounded,
+                                        size: 15,
+                                        color: appTheme.teal_700,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          'Combined Min ($destNames): $minText',
+                                          style: TextStyle(
+                                            fontSize: 11.5,
+                                            fontFamily: 'Inter',
+                                            fontWeight:
+                                            FontWeight.w600,
+                                            color:
+                                            appTheme.teal_800,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            )
+                                : null),
                           );
                         },
                       ),
@@ -624,8 +624,8 @@ class _TravelInformationInputScreenState
   }
 
   Widget _buildTravelPreferencesSection(
-    TravelInformationInputViewModel viewModel,
-  ) {
+      TravelInformationInputViewModel viewModel,
+      ) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24.0),
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
@@ -695,11 +695,11 @@ class _TravelInformationInputScreenState
                         pref.label,
                         style: TextStyle(fontSize: 14, fontFamily: 'Inter')
                             .copyWith(
-                              color: isSelected
-                                  ? appTheme.teal_A700
-                                  : appTheme.blue_gray_700,
-                              height: 1.21,
-                            ),
+                          color: isSelected
+                              ? appTheme.teal_A700
+                              : appTheme.blue_gray_700,
+                          height: 1.21,
+                        ),
                       ),
                     ],
                   ),
@@ -806,7 +806,7 @@ class _TravelInformationInputScreenState
                 if (confirmed != true || !mounted) return;
 
                 final finalBudget =
-                    (preferredCurrency != 'MYR' && convertedBudgetInMyr != null)
+                (preferredCurrency != 'MYR' && convertedBudgetInMyr != null)
                     ? convertedBudgetInMyr.toStringAsFixed(2)
                     : _budgetController.text;
 
@@ -819,7 +819,7 @@ class _TravelInformationInputScreenState
                     'budget': finalBudget,
                     'preferredCurrency': preferredCurrency,
                     'isForeign':
-                        preferredCurrency.trim().toUpperCase() != 'MYR',
+                    preferredCurrency.trim().toUpperCase() != 'MYR',
                     'preference': viewModel.uiState.selectedPreference,
                     'wishlist': viewModel.uiState.wishlistItems,
                     'arrivals': viewModel.uiState.arrivals
@@ -982,8 +982,8 @@ class _TravelInformationInputScreenState
                                   icon: Icons.account_balance_wallet_rounded,
                                   label: 'Budget',
                                   value:
-                                      (currency == 'MYR' ||
-                                          convertedBudgetInMyr == null)
+                                  (currency == 'MYR' ||
+                                      convertedBudgetInMyr == null)
                                       ? '$currency $budget'
                                       : '$currency $budget (≈ MYR ${convertedBudgetInMyr.toStringAsFixed(2)})',
                                 ),
@@ -1019,7 +1019,7 @@ class _TravelInformationInputScreenState
                                     icon: Icons.hotel_rounded,
                                     label: 'Accommodation',
                                     value:
-                                        '$hotelCount stay${hotelCount > 1 ? 's' : ''}',
+                                    '$hotelCount stay${hotelCount > 1 ? 's' : ''}',
                                   ),
                                 ],
                                 if (arrivalCount > 0 || departureCount > 0) ...[
@@ -1031,7 +1031,7 @@ class _TravelInformationInputScreenState
                                     icon: Icons.flight_takeoff_rounded,
                                     label: 'Transit',
                                     value:
-                                        '${arrivalCount + departureCount} transit hub(s)',
+                                    '${arrivalCount + departureCount} transit hub(s)',
                                   ),
                                 ],
                               ],
@@ -1220,9 +1220,9 @@ class _TravelInformationInputScreenState
   }
 
   Widget _buildDestinationSection(
-    BuildContext context,
-    TravelInformationInputViewModel viewModel,
-  ) {
+      BuildContext context,
+      TravelInformationInputViewModel viewModel,
+      ) {
     return FormField<List<String>>(
       initialValue: viewModel.uiState.selectedDestinations,
       autovalidateMode: AutovalidateMode.onUserInteraction,
@@ -1321,83 +1321,83 @@ class _TravelInformationInputScreenState
                     Expanded(
                       child: selectedDestinations.isEmpty
                           ? Text(
-                              'Select destination state(s)...',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w400,
-                                fontFamily: 'Inter',
-                                color: appTheme.blue_gray_300,
-                              ),
-                            )
+                        'Select destination state(s)...',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w400,
+                          fontFamily: 'Inter',
+                          color: appTheme.blue_gray_300,
+                        ),
+                      )
                           : Wrap(
-                              spacing: 8.0,
-                              runSpacing: 8.0,
-                              children: [
-                                ...selectedDestinations.map(
-                                  (dest) => _buildDestinationChip(dest, () {
-                                    viewModel.removeDestination(dest);
-                                    field.didChange(
-                                      viewModel.uiState.selectedDestinations,
-                                    );
-                                    field.validate();
-                                  }),
+                        spacing: 8.0,
+                        runSpacing: 8.0,
+                        children: [
+                          ...selectedDestinations.map(
+                                (dest) => _buildDestinationChip(dest, () {
+                              viewModel.removeDestination(dest);
+                              field.didChange(
+                                viewModel.uiState.selectedDestinations,
+                              );
+                              field.validate();
+                            }),
+                          ),
+                          GestureDetector(
+                            onTap: () async {
+                              await _showDestinationSelectionModal(
+                                context,
+                                viewModel,
+                                onSelectionChanged: () {
+                                  field.didChange(
+                                    viewModel
+                                        .uiState
+                                        .selectedDestinations,
+                                  );
+                                  field.validate();
+                                },
+                              );
+                              field.didChange(
+                                viewModel.uiState.selectedDestinations,
+                              );
+                              field.validate();
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10.0,
+                                vertical: 6.0,
+                              ),
+                              decoration: BoxDecoration(
+                                color: appTheme.gray_50_01,
+                                borderRadius: BorderRadius.circular(20.0),
+                                border: Border.all(
+                                  color: appTheme.gray_200,
+                                  width: 1.0,
                                 ),
-                                GestureDetector(
-                                  onTap: () async {
-                                    await _showDestinationSelectionModal(
-                                      context,
-                                      viewModel,
-                                      onSelectionChanged: () {
-                                        field.didChange(
-                                          viewModel
-                                              .uiState
-                                              .selectedDestinations,
-                                        );
-                                        field.validate();
-                                      },
-                                    );
-                                    field.didChange(
-                                      viewModel.uiState.selectedDestinations,
-                                    );
-                                    field.validate();
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10.0,
-                                      vertical: 6.0,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: appTheme.gray_50_01,
-                                      borderRadius: BorderRadius.circular(20.0),
-                                      border: Border.all(
-                                        color: appTheme.gray_200,
-                                        width: 1.0,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          Icons.add,
-                                          size: 14.0,
-                                          color: appTheme.teal_A700,
-                                        ),
-                                        const SizedBox(width: 4.0),
-                                        Text(
-                                          'Add',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w600,
-                                            fontFamily: 'Inter',
-                                            color: appTheme.teal_A700,
-                                          ),
-                                        ),
-                                      ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.add,
+                                    size: 14.0,
+                                    color: appTheme.teal_A700,
+                                  ),
+                                  const SizedBox(width: 4.0),
+                                  Text(
+                                    'Add',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      fontFamily: 'Inter',
+                                      color: appTheme.teal_A700,
                                     ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(width: 6.0),
                     Icon(
@@ -1457,10 +1457,10 @@ class _TravelInformationInputScreenState
   }
 
   Future<void> _showDestinationSelectionModal(
-    BuildContext context,
-    TravelInformationInputViewModel viewModel, {
-    VoidCallback? onSelectionChanged,
-  }) {
+      BuildContext context,
+      TravelInformationInputViewModel viewModel, {
+        VoidCallback? onSelectionChanged,
+      }) {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1590,114 +1590,114 @@ class _TravelInformationInputScreenState
                   Expanded(
                     child: filteredList.isEmpty
                         ? Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.search_off_rounded,
+                            size: 48,
+                            color: appTheme.blue_gray_300,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'No destinations found',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontFamily: 'Inter',
+                              color: appTheme.blue_gray_300,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                        : ListView.separated(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20.0,
+                        vertical: 12.0,
+                      ),
+                      itemCount: filteredList.length,
+                      separatorBuilder: (context, index) =>
+                      const SizedBox(height: 8.0),
+                      itemBuilder: (context, index) {
+                        final item = filteredList[index];
+                        final isSelected = viewModel
+                            .uiState
+                            .selectedDestinations
+                            .contains(item.name);
+
+                        return InkWell(
+                          onTap: () {
+                            viewModel.toggleDestination(item.name);
+                            onSelectionChanged?.call();
+                            setModalState(() {});
+                          },
+                          borderRadius: BorderRadius.circular(12.0),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14.0,
+                              vertical: 12.0,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? appTheme.gray_50_01
+                                  : appTheme.white_A700,
+                              borderRadius: BorderRadius.circular(12.0),
+                              border: Border.all(
+                                color: isSelected
+                                    ? appTheme.teal_A700
+                                    : appTheme.gray_100,
+                                width: isSelected ? 1.5 : 1.0,
+                              ),
+                            ),
+                            child: Row(
                               children: [
-                                Icon(
-                                  Icons.search_off_rounded,
-                                  size: 48,
-                                  color: appTheme.blue_gray_300,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'No destinations found',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontFamily: 'Inter',
-                                    color: appTheme.blue_gray_300,
+                                Container(
+                                  padding: const EdgeInsets.all(8.0),
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? appTheme.teal_50
+                                        : appTheme.gray_50_01,
+                                    shape: BoxShape.circle,
                                   ),
+                                  child: Icon(
+                                    Icons.map_outlined,
+                                    size: 18.0,
+                                    color: isSelected
+                                        ? appTheme.teal_A700
+                                        : appTheme.blue_gray_300,
+                                  ),
+                                ),
+                                const SizedBox(width: 12.0),
+                                Expanded(
+                                  child: Text(
+                                    item.name,
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: isSelected
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                      fontFamily: 'Inter',
+                                      color: isSelected
+                                          ? appTheme.teal_A700
+                                          : appTheme.gray_800,
+                                    ),
+                                  ),
+                                ),
+                                Icon(
+                                  isSelected
+                                      ? Icons.check_circle_rounded
+                                      : Icons.radio_button_unchecked,
+                                  color: isSelected
+                                      ? appTheme.teal_A700
+                                      : appTheme.gray_200,
+                                  size: 22.0,
                                 ),
                               ],
                             ),
-                          )
-                        : ListView.separated(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20.0,
-                              vertical: 12.0,
-                            ),
-                            itemCount: filteredList.length,
-                            separatorBuilder: (context, index) =>
-                                const SizedBox(height: 8.0),
-                            itemBuilder: (context, index) {
-                              final item = filteredList[index];
-                              final isSelected = viewModel
-                                  .uiState
-                                  .selectedDestinations
-                                  .contains(item.name);
-
-                              return InkWell(
-                                onTap: () {
-                                  viewModel.toggleDestination(item.name);
-                                  onSelectionChanged?.call();
-                                  setModalState(() {});
-                                },
-                                borderRadius: BorderRadius.circular(12.0),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14.0,
-                                    vertical: 12.0,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isSelected
-                                        ? appTheme.gray_50_01
-                                        : appTheme.white_A700,
-                                    borderRadius: BorderRadius.circular(12.0),
-                                    border: Border.all(
-                                      color: isSelected
-                                          ? appTheme.teal_A700
-                                          : appTheme.gray_100,
-                                      width: isSelected ? 1.5 : 1.0,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(8.0),
-                                        decoration: BoxDecoration(
-                                          color: isSelected
-                                              ? appTheme.teal_50
-                                              : appTheme.gray_50_01,
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: Icon(
-                                          Icons.map_outlined,
-                                          size: 18.0,
-                                          color: isSelected
-                                              ? appTheme.teal_A700
-                                              : appTheme.blue_gray_300,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12.0),
-                                      Expanded(
-                                        child: Text(
-                                          item.name,
-                                          style: TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: isSelected
-                                                ? FontWeight.w700
-                                                : FontWeight.w500,
-                                            fontFamily: 'Inter',
-                                            color: isSelected
-                                                ? appTheme.teal_A700
-                                                : appTheme.gray_800,
-                                          ),
-                                        ),
-                                      ),
-                                      Icon(
-                                        isSelected
-                                            ? Icons.check_circle_rounded
-                                            : Icons.radio_button_unchecked,
-                                        color: isSelected
-                                            ? appTheme.teal_A700
-                                            : appTheme.gray_200,
-                                        size: 22.0,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
                           ),
+                        );
+                      },
+                    ),
                   ),
 
                   // Bottom Action Bar
@@ -1771,9 +1771,9 @@ class _TravelInformationInputScreenState
   }
 
   Widget _buildArrivalDepartureSection(
-    BuildContext context,
-    TravelInformationInputViewModel viewModel,
-  ) {
+      BuildContext context,
+      TravelInformationInputViewModel viewModel,
+      ) {
     final arrivals = viewModel.uiState.arrivals;
     final departures = viewModel.uiState.departures;
     final transitCount = arrivals.length > departures.length
@@ -1886,7 +1886,158 @@ class _TravelInformationInputScreenState
 
           // START HEADER
           Text(
-              'START',
+            'START',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              fontFamily: 'Inter',
+              color: appTheme.teal_700,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 8.0),
+
+          // 1. ARRIVAL (START)
+          _buildTransitLegArrivalCard(
+            context: context,
+            viewModel: viewModel,
+            arrivalIndex: 0,
+            cardTitle: 'ARRIVAL',
+            isStartOrEnd: true,
+          ),
+
+          if (transitCount == 1) ...[
+            const SizedBox(height: 14.0),
+            _buildAddTransitMiddleButton(
+              onTap: () => _addArrivalAndDeparture(viewModel),
+            ),
+            const SizedBox(height: 14.0),
+            Divider(color: appTheme.gray_100, height: 1.0),
+            const SizedBox(height: 14.0),
+            // Bottom END
+            Text(
+              'END',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                fontFamily: 'Inter',
+                color: appTheme.teal_700,
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(height: 8.0),
+            _buildTransitLegDepartureCard(
+              context: context,
+              viewModel: viewModel,
+              departureIndex: 0,
+              cardTitle: 'DEPARTURE',
+              minAllowedDate: DateTime.tryParse(arrivals[0].date),
+              minAllowedDateString: arrivals[0].date,
+              minAllowedTimeString: arrivals[0].time,
+              constraintLabel:
+              'Departure time cannot be earlier than arrival time (${arrivals[0].time}).',
+              isStartOrEnd: true,
+            ),
+          ] else ...[
+            // Intermediate Transits: Transit 1 to Transit N-1
+            for (int i = 0; i < transitCount - 1; i++) ...[
+              const SizedBox(height: 14.0),
+              Divider(color: appTheme.gray_100, height: 1.0),
+              const SizedBox(height: 14.0),
+
+              // TRANSIT HEADER with delete button
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'TRANSIT ${i + 1}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      fontFamily: 'Inter',
+                      color: appTheme.teal_700,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () => _removeArrivalAndDeparture(i + 1, viewModel),
+                    borderRadius: BorderRadius.circular(8.0),
+                    child: Padding(
+                      padding: const EdgeInsets.all(4.0),
+                      child: Icon(
+                        Icons.close_rounded,
+                        size: 18.0,
+                        color: appTheme.blue_gray_300,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8.0),
+
+              // DEPARTURE
+              _buildTransitLegDepartureCard(
+                context: context,
+                viewModel: viewModel,
+                departureIndex: i,
+                cardTitle: 'DEPARTURE (TRANSIT ${i + 1})',
+                minAllowedDate: i == 0
+                    ? DateTime.tryParse(arrivals[0].date)
+                    : DateTime.tryParse(arrivals[i].date),
+                minAllowedDateString: i == 0
+                    ? arrivals[0].date
+                    : arrivals[i].date,
+                minAllowedTimeString: i == 0
+                    ? arrivals[0].time
+                    : arrivals[i].time,
+                constraintLabel:
+                'Departure cannot be earlier than previous arrival.',
+              ),
+              const SizedBox(height: 12.0),
+
+              // ARRIVAL
+              _buildTransitLegArrivalCard(
+                context: context,
+                viewModel: viewModel,
+                arrivalIndex: i + 1,
+                cardTitle: 'ARRIVAL (TRANSIT ${i + 1})',
+                minAllowedDate: DateTime.tryParse(departures[i].date),
+                minAllowedDateString: departures[i].date,
+                minAllowedTimeString: departures[i].time,
+                constraintLabel: 'Arrival cannot be earlier than departure.',
+                autoSyncOnInvalid: true,
+              ),
+              const SizedBox(height: 12.0),
+
+              // TRANSIT JOURNEY CARD
+              _buildTransitConnectionCardFromPoints(
+                context: context,
+                viewModel: viewModel,
+                departurePoint: departures[i],
+                arrivalPoint: arrivals[i + 1],
+                journeyTitle: 'TRANSIT JOURNEY (Transit ${i + 1})',
+                syncArrivalIndex: i + 1,
+                originLabel: departures[i].location.isNotEmpty
+                    ? departures[i].location
+                    : 'Transit ${i + 1} Departure',
+                destinationLabel: arrivals[i + 1].location.isNotEmpty
+                    ? arrivals[i + 1].location
+                    : 'Transit ${i + 1} Arrival',
+              ),
+            ],
+
+            const SizedBox(height: 14.0),
+            // Middle Add Button
+            _buildAddTransitMiddleButton(
+              onTap: () => _addArrivalAndDeparture(viewModel),
+            ),
+            const SizedBox(height: 14.0),
+            Divider(color: appTheme.gray_100, height: 1.0),
+            const SizedBox(height: 14.0),
+
+            // Bottom END
+            Text(
+              'END',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
@@ -1897,176 +2048,25 @@ class _TravelInformationInputScreenState
             ),
             const SizedBox(height: 8.0),
 
-            // 1. ARRIVAL (START)
-            _buildTransitLegArrivalCard(
+            // Bottom DEPARTURE (END)
+            _buildTransitLegDepartureCard(
               context: context,
               viewModel: viewModel,
-              arrivalIndex: 0,
-              cardTitle: 'ARRIVAL',
+              departureIndex: transitCount - 1,
+              cardTitle: 'DEPARTURE (END)',
+              minAllowedDate: DateTime.tryParse(
+                arrivals[transitCount - 1].date,
+              ),
+              minAllowedDateString: arrivals[transitCount - 1].date,
+              minAllowedTimeString: arrivals[transitCount - 1].time,
+              constraintLabel:
+              'Final departure cannot be earlier than previous transit arrival.',
               isStartOrEnd: true,
             ),
-
-            if (transitCount == 1) ...[
-              const SizedBox(height: 14.0),
-              _buildAddTransitMiddleButton(
-                onTap: () => _addArrivalAndDeparture(viewModel),
-              ),
-              const SizedBox(height: 14.0),
-              Divider(color: appTheme.gray_100, height: 1.0),
-              const SizedBox(height: 14.0),
-              // Bottom END
-              Text(
-                'END',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  fontFamily: 'Inter',
-                  color: appTheme.teal_700,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              const SizedBox(height: 8.0),
-              _buildTransitLegDepartureCard(
-                context: context,
-                viewModel: viewModel,
-                departureIndex: 0,
-                cardTitle: 'DEPARTURE',
-                minAllowedDate: DateTime.tryParse(arrivals[0].date),
-                minAllowedDateString: arrivals[0].date,
-                minAllowedTimeString: arrivals[0].time,
-                constraintLabel:
-                    'Departure time cannot be earlier than arrival time (${arrivals[0].time}).',
-                isStartOrEnd: true,
-              ),
-            ] else ...[
-              // Intermediate Transits: Transit 1 to Transit N-1
-              for (int i = 0; i < transitCount - 1; i++) ...[
-                const SizedBox(height: 14.0),
-                Divider(color: appTheme.gray_100, height: 1.0),
-                const SizedBox(height: 14.0),
-
-                // TRANSIT HEADER with delete button
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'TRANSIT ${i + 1}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        fontFamily: 'Inter',
-                        color: appTheme.teal_700,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    InkWell(
-                      onTap: () => _removeArrivalAndDeparture(i + 1, viewModel),
-                      borderRadius: BorderRadius.circular(8.0),
-                      child: Padding(
-                        padding: const EdgeInsets.all(4.0),
-                        child: Icon(
-                          Icons.close_rounded,
-                          size: 18.0,
-                          color: appTheme.blue_gray_300,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8.0),
-
-                // DEPARTURE
-                _buildTransitLegDepartureCard(
-                  context: context,
-                  viewModel: viewModel,
-                  departureIndex: i,
-                  cardTitle: 'DEPARTURE (TRANSIT ${i + 1})',
-                  minAllowedDate: i == 0
-                      ? DateTime.tryParse(arrivals[0].date)
-                      : DateTime.tryParse(arrivals[i].date),
-                  minAllowedDateString: i == 0
-                      ? arrivals[0].date
-                      : arrivals[i].date,
-                  minAllowedTimeString: i == 0
-                      ? arrivals[0].time
-                      : arrivals[i].time,
-                  constraintLabel:
-                      'Departure cannot be earlier than previous arrival.',
-                ),
-                const SizedBox(height: 12.0),
-
-                // ARRIVAL
-                _buildTransitLegArrivalCard(
-                  context: context,
-                  viewModel: viewModel,
-                  arrivalIndex: i + 1,
-                  cardTitle: 'ARRIVAL (TRANSIT ${i + 1})',
-                  minAllowedDate: DateTime.tryParse(departures[i].date),
-                  minAllowedDateString: departures[i].date,
-                  minAllowedTimeString: departures[i].time,
-                  constraintLabel: 'Arrival cannot be earlier than departure.',
-                  autoSyncOnInvalid: true,
-                ),
-                const SizedBox(height: 12.0),
-
-                // TRANSIT JOURNEY CARD
-                _buildTransitConnectionCardFromPoints(
-                  context: context,
-                  viewModel: viewModel,
-                  departurePoint: departures[i],
-                  arrivalPoint: arrivals[i + 1],
-                  journeyTitle: 'TRANSIT JOURNEY (Transit ${i + 1})',
-                  syncArrivalIndex: i + 1,
-                  originLabel: departures[i].location.isNotEmpty
-                      ? departures[i].location
-                      : 'Transit ${i + 1} Departure',
-                  destinationLabel: arrivals[i + 1].location.isNotEmpty
-                      ? arrivals[i + 1].location
-                      : 'Transit ${i + 1} Arrival',
-                ),
-              ],
-
-              const SizedBox(height: 14.0),
-              // Middle Add Button
-              _buildAddTransitMiddleButton(
-                onTap: () => _addArrivalAndDeparture(viewModel),
-              ),
-              const SizedBox(height: 14.0),
-              Divider(color: appTheme.gray_100, height: 1.0),
-              const SizedBox(height: 14.0),
-
-              // Bottom END
-              Text(
-                'END',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  fontFamily: 'Inter',
-                  color: appTheme.teal_700,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              const SizedBox(height: 8.0),
-
-              // Bottom DEPARTURE (END)
-              _buildTransitLegDepartureCard(
-                context: context,
-                viewModel: viewModel,
-                departureIndex: transitCount - 1,
-                cardTitle: 'DEPARTURE (END)',
-                minAllowedDate: DateTime.tryParse(
-                  arrivals[transitCount - 1].date,
-                ),
-                minAllowedDateString: arrivals[transitCount - 1].date,
-                minAllowedTimeString: arrivals[transitCount - 1].time,
-                constraintLabel:
-                    'Final departure cannot be earlier than previous transit arrival.',
-                isStartOrEnd: true,
-              ),
-            ],
           ],
-        ),
-      );
+        ],
+      ),
+    );
   }
 
   Widget _buildAddTransitMiddleButton({
@@ -2134,8 +2134,8 @@ class _TravelInformationInputScreenState
     final arrival = arrivalIndex < arrivals.length
         ? arrivals[arrivalIndex]
         : (arrivals.isNotEmpty
-              ? arrivals.first
-              : const TransitPoint(id: 'arr_0'));
+        ? arrivals.first
+        : const TransitPoint(id: 'arr_0'));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2203,10 +2203,10 @@ class _TravelInformationInputScreenState
                     arrival.location.isNotEmpty
                         ? arrival.location
                         : _getArrivalPlaceholder(
-                            arrival.type,
-                            arrivalIndex,
-                            arrivals.length,
-                          ),
+                      arrival.type,
+                      arrivalIndex,
+                      arrivals.length,
+                    ),
                     style: TextStyle(
                       fontSize: 16.0,
                       fontWeight: arrival.location.isNotEmpty
@@ -2329,8 +2329,8 @@ class _TravelInformationInputScreenState
     final departure = departureIndex < departures.length
         ? departures[departureIndex]
         : (departures.isNotEmpty
-              ? departures.first
-              : const TransitPoint(id: 'dep_0'));
+        ? departures.first
+        : const TransitPoint(id: 'dep_0'));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2384,10 +2384,10 @@ class _TravelInformationInputScreenState
                     departure.location.isNotEmpty
                         ? departure.location
                         : _getDeparturePlaceholder(
-                            departure.type,
-                            departureIndex,
-                            departures.length,
-                          ),
+                      departure.type,
+                      departureIndex,
+                      departures.length,
+                    ),
                     style: TextStyle(
                       fontSize: 16.0,
                       fontWeight: departure.location.isNotEmpty
@@ -2515,7 +2515,7 @@ class _TravelInformationInputScreenState
     final depDate = departurePoint.date.isNotEmpty
         ? departurePoint.date
         : (viewModel.uiState.startDate?.toLocal().toString().split(' ')[0] ??
-              DateTime.now().toLocal().toString().split(' ')[0]);
+        DateTime.now().toLocal().toString().split(' ')[0]);
     final calculated = TransitScheduleHelper.calculateArrivalDateTime(
       departureDate: depDate,
       departureTimeStr: departurePoint.time,
@@ -2523,23 +2523,23 @@ class _TravelInformationInputScreenState
     );
     final isSynced =
         arrivalPoint.time == calculated['time'] &&
-        (arrivalPoint.date.isEmpty || arrivalPoint.date == calculated['date']);
+            (arrivalPoint.date.isEmpty || arrivalPoint.date == calculated['date']);
 
     final depLoc =
         originLabel ??
-        (departurePoint.location.isNotEmpty
-            ? departurePoint.location
-            : 'Departure Station');
+            (departurePoint.location.isNotEmpty
+                ? departurePoint.location
+                : 'Departure Station');
     final arrLoc =
         destinationLabel ??
-        (arrivalPoint.location.isNotEmpty
-            ? arrivalPoint.location
-            : 'Arrival Destination');
+            (arrivalPoint.location.isNotEmpty
+                ? arrivalPoint.location
+                : 'Arrival Destination');
 
     final isOvernight =
         departurePoint.date.isNotEmpty &&
-        arrivalPoint.date.isNotEmpty &&
-        departurePoint.date != arrivalPoint.date;
+            arrivalPoint.date.isNotEmpty &&
+            departurePoint.date != arrivalPoint.date;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
@@ -2849,9 +2849,9 @@ class _TravelInformationInputScreenState
   }
 
   Widget _buildHotelSection(
-    BuildContext context,
-    TravelInformationInputViewModel viewModel,
-  ) {
+      BuildContext context,
+      TravelInformationInputViewModel viewModel,
+      ) {
     final hotels = viewModel.uiState.hotels;
     final hasDestinations = viewModel.uiState.selectedDestinations.isNotEmpty;
 
@@ -3071,8 +3071,8 @@ class _TravelInformationInputScreenState
                       hintText: !hasDestinations
                           ? 'Select destination state(s) first...'
                           : (hotels.length > 1
-                                ? 'Hotel ${index + 1} name or area'
-                                : 'Hotel name or area (e.g. George Town)'),
+                          ? 'Hotel ${index + 1} name or area'
+                          : 'Hotel name or area (e.g. George Town)'),
                       hintStyle: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w400,
@@ -3439,7 +3439,7 @@ class _TravelInformationInputScreenState
     }
 
     final firstAllowed =
-        (minAllowedDate != null && minAllowedDate.isAfter(startDate))
+    (minAllowedDate != null && minAllowedDate.isAfter(startDate))
         ? minAllowedDate
         : startDate;
     final lastAllowed = endDate;
@@ -3584,7 +3584,7 @@ class _TravelInformationInputScreenState
         }
         if (otherDate != null) {
           final normalizedOther =
-              DateTime(otherDate.year, otherDate.month, otherDate.day);
+          DateTime(otherDate.year, otherDate.month, otherDate.day);
           if (checkDate.isAtSameMomentAs(normalizedOther)) {
             return false;
           }
@@ -3781,26 +3781,26 @@ class _TravelInformationInputScreenState
   }
 
   Future<void> _showTransitHubSelectionModal(
-    BuildContext context,
-    TravelInformationInputViewModel viewModel, {
-    required bool isArrival,
-    required int index,
-    bool isStartOrEnd = false,
-    String? connectedLocation,
-  }) {
+      BuildContext context,
+      TravelInformationInputViewModel viewModel, {
+        required bool isArrival,
+        required int index,
+        bool isStartOrEnd = false,
+        String? connectedLocation,
+      }) {
     final currentItem = isArrival
         ? (index < viewModel.uiState.arrivals.length
-              ? viewModel.uiState.arrivals[index]
-              : const TransitPoint(id: ''))
+        ? viewModel.uiState.arrivals[index]
+        : const TransitPoint(id: ''))
         : (index < viewModel.uiState.departures.length
-              ? viewModel.uiState.departures[index]
-              : const TransitPoint(id: ''));
+        ? viewModel.uiState.departures[index]
+        : const TransitPoint(id: ''));
 
     final currentSelected = currentItem.location;
     final String? lockedMode =
-        (isArrival &&
-            index > 0 &&
-            index - 1 < viewModel.uiState.departures.length)
+    (isArrival &&
+        index > 0 &&
+        index - 1 < viewModel.uiState.departures.length)
         ? viewModel.uiState.departures[index - 1].type
         : null;
 
@@ -3832,9 +3832,9 @@ class _TravelInformationInputScreenState
             // 1. Raw candidate hubs: destination-recommended + all available hubs
             final List<String> rawRecommended = destinations.isNotEmpty
                 ? getTransitHubSuggestions(
-                    destinations,
-                    transitType: activeMode,
-                  )
+              destinations,
+              transitType: activeMode,
+            )
                 : <String>[];
 
             final allHubsFull = getAllTransitHubs(transitType: activeMode);
@@ -3857,9 +3857,9 @@ class _TravelInformationInputScreenState
             }
 
             final List<String> recommendedHubs =
-                rawRecommended.where(isHubReachable).toList();
+            rawRecommended.where(isHubReachable).toList();
             final List<String> allHubs =
-                rawAll.where(isHubReachable).toList();
+            rawAll.where(isHubReachable).toList();
 
             bool matchQuery(String hub) {
               if (query.isEmpty) return true;
@@ -3893,11 +3893,11 @@ class _TravelInformationInputScreenState
             final String searchHint = isTrain
                 ? 'Search train station (e.g. KL Sentral, Ipoh)...'
                 : (isBus
-                      ? 'Search bus terminal (e.g. TBS, KL Sentral, Larkin)...'
-                      : 'Search airport or city (e.g. KLIA, Penang)...');
+                ? 'Search bus terminal (e.g. TBS, KL Sentral, Larkin)...'
+                : 'Search airport or city (e.g. KLIA, Penang)...');
 
             final bool hasExactMatch = filteredHubs.any(
-              (h) {
+                  (h) {
                 final hLow = h.toLowerCase();
                 if (hLow == query) return true;
                 final normQ = query.replaceAll('central', 'sentral');
@@ -3994,7 +3994,7 @@ class _TravelInformationInputScreenState
                                 icon: Icons.flight_rounded,
                                 label: 'Flight',
                                 isSelected:
-                                    activeMode.toLowerCase() == 'flight',
+                                activeMode.toLowerCase() == 'flight',
                                 isEnabled: isFlightEnabled,
                                 onTap: () {
                                   if (!isFlightEnabled) {
@@ -4200,300 +4200,300 @@ class _TravelInformationInputScreenState
                   Expanded(
                     child: (filteredHubs.isEmpty && !canAddCustom)
                         ? Center(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.alt_route_rounded,
+                              size: 48,
+                              color: appTheme.blue_gray_300,
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              (connectedLocation != null && connectedLocation.trim().isNotEmpty)
+                                  ? 'No direct $typeLabel routes available ${isArrival ? "from" : "to"}\n"$connectedLocation"'
+                                  : (destinations.isNotEmpty
+                                  ? 'No $typeLabel found for ${destinations.join(", ")}'
+                                  : 'No $typeLabel options found'),
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                height: 1.4,
+                                fontFamily: 'Inter',
+                                color: appTheme.blue_gray_300,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                        : ListView(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20.0,
+                        vertical: 12.0,
+                      ),
+                      children: [
+                        // Route connectivity hint banner (only when selecting arrival with a known departure)
+                        if (isArrival && connectedLocation != null && connectedLocation.trim().isNotEmpty) ...[
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 12.0),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12.0,
+                              vertical: 8.0,
+                            ),
+                            decoration: BoxDecoration(
+                              color: appTheme.teal_50,
+                              borderRadius: BorderRadius.circular(8.0),
+                              border: Border.all(
+                                color: appTheme.teal_A700.withValues(alpha: 0.25),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.alt_route_rounded,
+                                  size: 16,
+                                  color: appTheme.teal_A700,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Direct routes departing from: $connectedLocation',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w600,
+                                      fontFamily: 'Inter',
+                                      color: appTheme.teal_A700,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+
+                        // Custom entry option
+                        if (canAddCustom) ...[
+                          InkWell(
+                            onTap: () {
+                              final customName = searchQuery.trim();
+                              final explicitErr = viewModel
+                                  .validateExplicitWord(customName);
+                              if (explicitErr != null) {
+                                ScaffoldMessenger.of(
+                                  context,
+                                ).showSnackBar(
+                                  SnackBar(
+                                    content: Text(explicitErr),
+                                    backgroundColor: appTheme.redButton,
+                                    behavior: SnackBarBehavior.floating,
+                                    duration: const Duration(seconds: 2),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              if (isArrival && connectedLocation != null && connectedLocation.trim().isNotEmpty) {
+                                final fromLoc = connectedLocation;
+                                final toLoc = customName;
+                                final routeOk = TransitScheduleHelper.isRouteAvailable(
+                                  transitType: activeMode,
+                                  fromLocation: fromLoc,
+                                  toLocation: toLoc,
+                                );
+                                if (!routeOk) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('No direct $activeMode route available from "$connectedLocation" to "$customName"'),
+                                      backgroundColor: appTheme.redButton,
+                                      behavior: SnackBarBehavior.floating,
+                                      duration: const Duration(seconds: 3),
+                                    ),
+                                  );
+                                  return;
+                                }
+                              }
+
+                              if (isArrival) {
+                                viewModel.updateArrivalHub(
+                                  index,
+                                  type: activeMode,
+                                  location: customName,
+                                );
+                              } else {
+                                viewModel.updateDepartureHub(
+                                  index,
+                                  type: activeMode,
+                                  location: customName,
+                                );
+                              }
+                              Navigator.pop(context);
+                            },
+                            borderRadius: BorderRadius.circular(12.0),
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 12.0),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14.0,
+                                vertical: 12.0,
+                              ),
+                              decoration: BoxDecoration(
+                                color: appTheme.teal_50,
+                                borderRadius: BorderRadius.circular(12.0),
+                                border: Border.all(
+                                  color: appTheme.teal_A700,
+                                  width: 1.0,
+                                ),
+                              ),
+                              child: Row(
                                 children: [
                                   Icon(
-                                    Icons.alt_route_rounded,
-                                    size: 48,
-                                    color: appTheme.blue_gray_300,
+                                    Icons.add_location_alt_rounded,
+                                    size: 20,
+                                    color: appTheme.teal_A700,
                                   ),
-                                  const SizedBox(height: 10),
-                                  Text(
-                                    (connectedLocation != null && connectedLocation.trim().isNotEmpty)
-                                        ? 'No direct $typeLabel routes available ${isArrival ? "from" : "to"}\n"$connectedLocation"'
-                                        : (destinations.isNotEmpty
-                                            ? 'No $typeLabel found for ${destinations.join(", ")}'
-                                            : 'No $typeLabel options found'),
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: 13.5,
-                                      height: 1.4,
-                                      fontFamily: 'Inter',
-                                      color: appTheme.blue_gray_300,
+                                  const SizedBox(width: 10.0),
+                                  Expanded(
+                                    child: Text(
+                                      'Use "${searchQuery.trim()}" as $typeLabel',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        fontFamily: 'Inter',
+                                        color: appTheme.teal_A700,
+                                      ),
                                     ),
+                                  ),
+                                  Icon(
+                                    Icons.arrow_forward_ios_rounded,
+                                    size: 14,
+                                    color: appTheme.teal_A700,
                                   ),
                                 ],
                               ),
                             ),
-                          )
-                        : ListView(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20.0,
-                              vertical: 12.0,
-                            ),
-                            children: [
-                              // Route connectivity hint banner (only when selecting arrival with a known departure)
-                              if (isArrival && connectedLocation != null && connectedLocation.trim().isNotEmpty) ...[
-                                Container(
-                                  margin: const EdgeInsets.only(bottom: 12.0),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12.0,
-                                    vertical: 8.0,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: appTheme.teal_50,
-                                    borderRadius: BorderRadius.circular(8.0),
-                                    border: Border.all(
-                                      color: appTheme.teal_A700.withValues(alpha: 0.25),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.alt_route_rounded,
-                                        size: 16,
-                                        color: appTheme.teal_A700,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          'Direct routes departing from: $connectedLocation',
-                                          style: TextStyle(
-                                            fontSize: 11.5,
-                                            fontWeight: FontWeight.w600,
-                                            fontFamily: 'Inter',
-                                            color: appTheme.teal_A700,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-
-                              // Custom entry option
-                              if (canAddCustom) ...[
-                                InkWell(
-                                  onTap: () {
-                                    final customName = searchQuery.trim();
-                                    final explicitErr = viewModel
-                                        .validateExplicitWord(customName);
-                                    if (explicitErr != null) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text(explicitErr),
-                                          backgroundColor: appTheme.redButton,
-                                          behavior: SnackBarBehavior.floating,
-                                          duration: const Duration(seconds: 2),
-                                        ),
-                                      );
-                                      return;
-                                    }
-
-                                    if (isArrival && connectedLocation != null && connectedLocation.trim().isNotEmpty) {
-                                      final fromLoc = connectedLocation;
-                                      final toLoc = customName;
-                                      final routeOk = TransitScheduleHelper.isRouteAvailable(
-                                        transitType: activeMode,
-                                        fromLocation: fromLoc,
-                                        toLocation: toLoc,
-                                      );
-                                      if (!routeOk) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            content: Text('No direct $activeMode route available from "$connectedLocation" to "$customName"'),
-                                            backgroundColor: appTheme.redButton,
-                                            behavior: SnackBarBehavior.floating,
-                                            duration: const Duration(seconds: 3),
-                                          ),
-                                        );
-                                        return;
-                                      }
-                                    }
-
-                                    if (isArrival) {
-                                      viewModel.updateArrivalHub(
-                                        index,
-                                        type: activeMode,
-                                        location: customName,
-                                      );
-                                    } else {
-                                      viewModel.updateDepartureHub(
-                                        index,
-                                        type: activeMode,
-                                        location: customName,
-                                      );
-                                    }
-                                    Navigator.pop(context);
-                                  },
-                                  borderRadius: BorderRadius.circular(12.0),
-                                  child: Container(
-                                    margin: const EdgeInsets.only(bottom: 12.0),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 14.0,
-                                      vertical: 12.0,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: appTheme.teal_50,
-                                      borderRadius: BorderRadius.circular(12.0),
-                                      border: Border.all(
-                                        color: appTheme.teal_A700,
-                                        width: 1.0,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          Icons.add_location_alt_rounded,
-                                          size: 20,
-                                          color: appTheme.teal_A700,
-                                        ),
-                                        const SizedBox(width: 10.0),
-                                        Expanded(
-                                          child: Text(
-                                            'Use "${searchQuery.trim()}" as $typeLabel',
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w600,
-                                              fontFamily: 'Inter',
-                                              color: appTheme.teal_A700,
-                                            ),
-                                          ),
-                                        ),
-                                        Icon(
-                                          Icons.arrow_forward_ios_rounded,
-                                          size: 14,
-                                          color: appTheme.teal_A700,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-
-                              if (filteredRecommended.isNotEmpty) ...[
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 10.0),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.star_rounded,
-                                        size: 14,
-                                        color: appTheme.teal_A700,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        destinations.isNotEmpty
-                                            ? 'RECOMMENDED FOR ${destinations.join(", ").toUpperCase()}'
-                                            : 'RECOMMENDED $typeLabel'.toUpperCase(),
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w800,
-                                          fontFamily: 'Inter',
-                                          color: appTheme.teal_A700,
-                                          letterSpacing: 0.8,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                ...filteredRecommended.map((hub) {
-                                  final isSelected = currentSelected == hub;
-                                  return Padding(
-                                    padding: const EdgeInsets.only(bottom: 8.0),
-                                    child: _buildTransitHubModalItem(
-                                      transitHub: hub,
-                                      transitType: activeMode,
-                                      isSelected: isSelected,
-                                      isRecommended: true,
-                                      onTap: () {
-                                        if (isArrival) {
-                                          viewModel.updateArrivalHub(
-                                            index,
-                                            type: activeMode,
-                                            location: hub,
-                                          );
-                                        } else {
-                                          viewModel.updateDepartureHub(
-                                            index,
-                                            type: activeMode,
-                                            location: hub,
-                                          );
-                                        }
-                                        Navigator.pop(context);
-                                      },
-                                    ),
-                                  );
-                                }),
-                                if (filteredAll.isNotEmpty) ...[
-                                  const SizedBox(height: 8.0),
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 10.0),
-                                    child: Text(
-                                      'OTHER AVAILABLE ${typeLabel.toUpperCase()}S',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w800,
-                                        fontFamily: 'Inter',
-                                        color: appTheme.blue_gray_300,
-                                        letterSpacing: 0.8,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ] else if (filteredAll.isNotEmpty) ...[
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 10.0),
-                                  child: Text(
-                                    'AVAILABLE ${typeLabel.toUpperCase()}S',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w800,
-                                      fontFamily: 'Inter',
-                                      color: appTheme.blue_gray_300,
-                                      letterSpacing: 0.8,
-                                    ),
-                                  ),
-                                ),
-                              ],
-
-                              // Remaining available hubs
-                              ...filteredAll.map((hub) {
-                                final isSelected = currentSelected == hub;
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 8.0),
-                                  child: _buildTransitHubModalItem(
-                                    transitHub: hub,
-                                    transitType: activeMode,
-                                    isSelected: isSelected,
-                                    onTap: () {
-                                      if (isArrival) {
-                                        viewModel.updateArrivalHub(
-                                          index,
-                                          type: activeMode,
-                                          location: hub,
-                                        );
-                                      } else {
-                                        viewModel.updateDepartureHub(
-                                          index,
-                                          type: activeMode,
-                                          location: hub,
-                                        );
-                                      }
-                                      Navigator.pop(context);
-                                    },
-                                  ),
-                                );
-                              }),
-                            ],
                           ),
+                        ],
+
+                        if (filteredRecommended.isNotEmpty) ...[
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 10.0),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.star_rounded,
+                                  size: 14,
+                                  color: appTheme.teal_A700,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  destinations.isNotEmpty
+                                      ? 'RECOMMENDED FOR ${destinations.join(", ").toUpperCase()}'
+                                      : 'RECOMMENDED $typeLabel'.toUpperCase(),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    fontFamily: 'Inter',
+                                    color: appTheme.teal_A700,
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          ...filteredRecommended.map((hub) {
+                            final isSelected = currentSelected == hub;
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 8.0),
+                              child: _buildTransitHubModalItem(
+                                transitHub: hub,
+                                transitType: activeMode,
+                                isSelected: isSelected,
+                                isRecommended: true,
+                                onTap: () {
+                                  if (isArrival) {
+                                    viewModel.updateArrivalHub(
+                                      index,
+                                      type: activeMode,
+                                      location: hub,
+                                    );
+                                  } else {
+                                    viewModel.updateDepartureHub(
+                                      index,
+                                      type: activeMode,
+                                      location: hub,
+                                    );
+                                  }
+                                  Navigator.pop(context);
+                                },
+                              ),
+                            );
+                          }),
+                          if (filteredAll.isNotEmpty) ...[
+                            const SizedBox(height: 8.0),
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 10.0),
+                              child: Text(
+                                'OTHER AVAILABLE ${typeLabel.toUpperCase()}S',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  fontFamily: 'Inter',
+                                  color: appTheme.blue_gray_300,
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ] else if (filteredAll.isNotEmpty) ...[
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 10.0),
+                            child: Text(
+                              'AVAILABLE ${typeLabel.toUpperCase()}S',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                fontFamily: 'Inter',
+                                color: appTheme.blue_gray_300,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ),
+                        ],
+
+                        // Remaining available hubs
+                        ...filteredAll.map((hub) {
+                          final isSelected = currentSelected == hub;
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8.0),
+                            child: _buildTransitHubModalItem(
+                              transitHub: hub,
+                              transitType: activeMode,
+                              isSelected: isSelected,
+                              onTap: () {
+                                if (isArrival) {
+                                  viewModel.updateArrivalHub(
+                                    index,
+                                    type: activeMode,
+                                    location: hub,
+                                  );
+                                } else {
+                                  viewModel.updateDepartureHub(
+                                    index,
+                                    type: activeMode,
+                                    location: hub,
+                                  );
+                                }
+                                Navigator.pop(context);
+                              },
+                            ),
+                          );
+                        }),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -4534,8 +4534,8 @@ class _TravelInformationInputScreenState
                   color: isSelected
                       ? appTheme.white_A700
                       : (isEnabled
-                            ? appTheme.blue_gray_300
-                            : appTheme.blue_gray_300.withValues(alpha: 0.6)),
+                      ? appTheme.blue_gray_300
+                      : appTheme.blue_gray_300.withValues(alpha: 0.6)),
                 ),
                 const SizedBox(width: 6.0),
                 Text(
@@ -4547,8 +4547,8 @@ class _TravelInformationInputScreenState
                     color: isSelected
                         ? appTheme.white_A700
                         : (isEnabled
-                              ? appTheme.gray_800
-                              : appTheme.blue_gray_300),
+                        ? appTheme.gray_800
+                        : appTheme.blue_gray_300),
                   ),
                 ),
                 if (!isEnabled) ...[
@@ -4585,15 +4585,15 @@ class _TravelInformationInputScreenState
           color: isSelected
               ? appTheme.gray_50_01
               : (isRecommended
-                    ? appTheme.teal_50.withValues(alpha: 0.35)
-                    : appTheme.white_A700),
+              ? appTheme.teal_50.withValues(alpha: 0.35)
+              : appTheme.white_A700),
           borderRadius: BorderRadius.circular(12.0),
           border: Border.all(
             color: isSelected
                 ? appTheme.teal_A700
                 : (isRecommended
-                      ? appTheme.teal_A700.withValues(alpha: 0.35)
-                      : appTheme.gray_100),
+                ? appTheme.teal_A700.withValues(alpha: 0.35)
+                : appTheme.gray_100),
             width: isSelected ? 1.5 : 1.0,
           ),
         ),
@@ -5068,12 +5068,12 @@ class _TripDateRangePickerDialogState
     final isEnd = _endDate != null && _isSameDay(_endDate!, cellDate);
     final hasRange =
         _startDate != null &&
-        _endDate != null &&
-        _endDate!.isAfter(_startDate!);
+            _endDate != null &&
+            _endDate!.isAfter(_startDate!);
     final isInRange =
         hasRange &&
-        cellDate.isAfter(_startDate!) &&
-        cellDate.isBefore(_endDate!);
+            cellDate.isAfter(_startDate!) &&
+            cellDate.isBefore(_endDate!);
     final isRangeStart = isStart && hasRange;
     final isRangeEnd = isEnd && hasRange;
 
@@ -5250,12 +5250,12 @@ class _TripDateRangePickerDialogState
             child: ElevatedButton(
               onPressed: canConfirm
                   ? () {
-                      final start = _startDate!;
-                      final end = _endDate ?? _startDate!;
-                      Navigator.of(
-                        context,
-                      ).pop(DateTimeRange(start: start, end: end));
-                    }
+                final start = _startDate!;
+                final end = _endDate ?? _startDate!;
+                Navigator.of(
+                  context,
+                ).pop(DateTimeRange(start: start, end: end));
+              }
                   : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: appTheme.teal_A700,
