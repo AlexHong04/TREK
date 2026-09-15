@@ -2005,7 +2005,8 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         !discount.isFinite ||
         tax > ExpenseTrackingService.maxSafeExpenseAmount ||
         discount > ExpenseTrackingService.maxSafeExpenseAmount ||
-        rounding.abs() > 1)
+        rounding.abs() > 1 ||
+        (discount != 0 && discount < 0.10))
       return;
     context.read<ActivityViewModel>().setDraftAdjustments(
       tax,
@@ -2038,9 +2039,10 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         !discount.isFinite ||
         tax > ExpenseTrackingService.maxSafeExpenseAmount ||
         discount > ExpenseTrackingService.maxSafeExpenseAmount ||
-        rounding.abs() > 1) {
+        rounding.abs() > 1 ||
+        (discount != 0 && discount < 0.10)) {
       _showValidationMessage(
-        'Enter valid tax and discount amounts. Rounding must be within -1.00 to 1.00.',
+        'Enter a valid discount. Discount must be 0.00 or at least RM0.10; rounding must be between -1.00 and 1.00.',
       );
       return;
     }
