@@ -245,6 +245,7 @@ class FinancialDashboardScreen extends StatelessWidget {
 
   Widget _buildSummaryCard(FinancialDashboardUiState uiState) {
     return Container(
+      key: const ValueKey('financial-summary-card'),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: appTheme.teal_A700,
@@ -307,14 +308,17 @@ class FinancialDashboardScreen extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          'For ${intl.DateFormat('d MMM, yyyy').format(uiState.selectedDate)}',
-          style: TextStyle(
-            color: appTheme.blue_gray_700,
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
+        Expanded(
+          child: Text(
+            'For ${intl.DateFormat('d MMM, yyyy').format(uiState.selectedDate)}',
+            style: TextStyle(
+              color: appTheme.blue_gray_700,
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
+        const SizedBox(width: 12),
         PopupMenuButton<DashboardFilter>(
           tooltip: 'Filter dashboard',
           onSelected: (filter) async {
@@ -520,23 +524,93 @@ class FinancialDashboardScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        SizedBox(
-          height: 155,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: categories
-                .map(
-                  (item) => Expanded(
-                    child: _ExpenseBars(
-                      category: item,
-                      maximumAmount: maximumAmount,
+        if (categories.isNotEmpty)
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final textScale = math.max(
+                1.0,
+                MediaQuery.textScalerOf(context).scale(11) / 11,
+              );
+              final chartWidth = math.max(
+                constraints.maxWidth,
+                categories.length * 160 * textScale,
+              );
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SingleChildScrollView(
+                    key: const ValueKey('expense-chart-scroll'),
+                    scrollDirection: Axis.horizontal,
+                    child: SizedBox(
+                      width: chartWidth,
+                      child: Column(
+                        children: [
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(minHeight: 130),
+                            child: Align(
+                              alignment: Alignment.bottomCenter,
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: categories
+                                    .map(
+                                      (item) => Expanded(
+                                        child: _ExpenseBars(
+                                          category: item,
+                                          maximumAmount: maximumAmount,
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                              ),
+                            ),
+                          ),
+                          Container(
+                            key: const ValueKey('expense-chart-baseline'),
+                            height: 1,
+                            color: appTheme.blue_gray_300,
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: categories
+                                .map(
+                                  (item) => Expanded(
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                      ),
+                                      child: Text(
+                                        item.name,
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          color: appTheme.gray_800,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                )
-                .toList(),
+                  if (chartWidth > constraints.maxWidth) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Swipe to view all categories',
+                      style: TextStyle(
+                        color: appTheme.blue_gray_700,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ],
+              );
+            },
           ),
-        ),
         const SizedBox(height: 18),
         Wrap(
           alignment: WrapAlignment.center,
@@ -711,6 +785,7 @@ class _CurrencyAmountPairText extends StatelessWidget {
   final TextStyle secondaryStyle;
   final CrossAxisAlignment crossAxisAlignment;
   final TextAlign textAlign;
+  final bool scaleDown;
 
   const _CurrencyAmountPairText({
     required this.primaryText,
@@ -719,6 +794,7 @@ class _CurrencyAmountPairText extends StatelessWidget {
     required this.secondaryStyle,
     this.crossAxisAlignment = CrossAxisAlignment.end,
     this.textAlign = TextAlign.end,
+    this.scaleDown = true,
   });
 
   @override
@@ -727,29 +803,23 @@ class _CurrencyAmountPairText extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: crossAxisAlignment,
       children: [
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            _displayMyrCode(primaryText),
-            maxLines: 1,
-            textAlign: textAlign,
-            style: primaryStyle,
-          ),
-        ),
+        _buildLine(_displayMyrCode(primaryText), primaryStyle),
         if (secondaryText != null) ...[
           const SizedBox(height: 2),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              '≈ ${_displayMyrCode(secondaryText!)}',
-              maxLines: 1,
-              textAlign: textAlign,
-              style: secondaryStyle,
-            ),
-          ),
+          _buildLine('≈ ${_displayMyrCode(secondaryText!)}', secondaryStyle),
         ],
       ],
     );
+  }
+
+  Widget _buildLine(String text, TextStyle style) {
+    final line = Text(
+      text,
+      maxLines: scaleDown ? 1 : null,
+      textAlign: textAlign,
+      style: style,
+    );
+    return scaleDown ? FittedBox(fit: BoxFit.scaleDown, child: line) : line;
   }
 }
 
@@ -1931,93 +2001,96 @@ class _SummaryRow extends StatelessWidget {
     final primaryAmountText = viewModel.formatPrimaryMoney(amount);
     final secondaryAmountText = viewModel.formatSecondaryMoney(amount);
     final amountColor = amount < 0 ? appTheme.errorRed : appTheme.white_A700;
-    return SizedBox(
-      height: secondaryAmountText == null ? 42 : 56,
-      child: Row(
-        children: [
-          Container(
-            width: 30,
-            height: 30,
+    final amountText = _CurrencyAmountPairText(
+      primaryText: primaryAmountText,
+      secondaryText: secondaryAmountText,
+      scaleDown: false,
+      primaryStyle: _amountStyle.copyWith(color: amountColor),
+      secondaryStyle: TextStyle(
+        color: amount < 0
+            ? appTheme.errorRed
+            : appTheme.white_A700.withValues(alpha: 0.88),
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+    final amountWidget = amount < 0
+        ? Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             decoration: BoxDecoration(
-              color: appTheme.white_A700.withValues(alpha: 0.20),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: appTheme.white_A700, size: 18),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(right: 10),
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  style: TextStyle(
-                    color: appTheme.white_A700,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+              color: appTheme.white_A700,
+              borderRadius: BorderRadius.circular(9),
+              border: Border.all(
+                color: appTheme.errorRed.withValues(alpha: 0.20),
               ),
             ),
-          ),
-          SizedBox(
-            width: 140,
-            child: amount < 0
-                ? Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: appTheme.white_A700,
-                      borderRadius: BorderRadius.circular(9),
-                      border: Border.all(
-                        color: appTheme.errorRed.withValues(alpha: 0.20),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.warning_amber_rounded,
-                          color: appTheme.errorRed,
-                          size: 17,
-                        ),
-                        const SizedBox(width: 5),
-                        Expanded(
-                          child: _CurrencyAmountPairText(
-                            primaryText: primaryAmountText,
-                            secondaryText: secondaryAmountText,
-                            primaryStyle: _amountStyle.copyWith(
-                              color: appTheme.errorRed,
-                            ),
-                            secondaryStyle: TextStyle(
-                              color: appTheme.errorRed,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: _CurrencyAmountPairText(
-                      primaryText: primaryAmountText,
-                      secondaryText: secondaryAmountText,
-                      primaryStyle: _amountStyle.copyWith(color: amountColor),
-                      secondaryStyle: TextStyle(
-                        color: appTheme.white_A700.withValues(alpha: 0.88),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-          ),
-        ],
+            child: Row(
+              children: [
+                Icon(
+                  Icons.warning_amber_rounded,
+                  color: appTheme.errorRed,
+                  size: 17,
+                ),
+                const SizedBox(width: 5),
+                Expanded(child: amountText),
+              ],
+            ),
+          )
+        : amountText;
+    final iconWidget = Container(
+      width: 30,
+      height: 30,
+      decoration: BoxDecoration(
+        color: appTheme.white_A700.withValues(alpha: 0.20),
+        shape: BoxShape.circle,
+      ),
+      child: Icon(icon, color: appTheme.white_A700, size: 18),
+    );
+    final labelWidget = Text(
+      label,
+      style: TextStyle(
+        color: appTheme.white_A700,
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        height: 1.3,
+      ),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final useStackedLayout =
+              constraints.maxWidth < 280 ||
+              MediaQuery.textScalerOf(context).scale(13) > 18;
+          if (useStackedLayout) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    iconWidget,
+                    const SizedBox(width: 10),
+                    Expanded(child: labelWidget),
+                  ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(left: 40, top: 8),
+                  child: SizedBox(width: double.infinity, child: amountWidget),
+                ),
+              ],
+            );
+          }
+          return Row(
+            children: [
+              iconWidget,
+              const SizedBox(width: 10),
+              Expanded(child: labelWidget),
+              const SizedBox(width: 12),
+              SizedBox(width: constraints.maxWidth * 0.43, child: amountWidget),
+            ],
+          );
+        },
       ),
     );
   }
@@ -2083,50 +2156,42 @@ class _ExpenseBars extends StatelessWidget {
       return math.max(8, 88 * amount / maximumAmount);
     }
 
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-              child: _AmountBar(
-                amount: category.budget,
-                height: barHeight(category.budget),
-                color: appTheme.blue_gray_700,
-              ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Expanded(
+            child: _AmountBar(
+              barKey: ValueKey('expense-budget-${category.name}'),
+              amount: category.budget,
+              height: barHeight(category.budget),
+              color: appTheme.blue_gray_700,
             ),
-            const SizedBox(width: 4),
-            Expanded(
-              child: _AmountBar(
-                amount: category.expense,
-                height: barHeight(category.expense),
-                color: expenseColor,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Text(
-          category.name,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: appTheme.gray_800,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
           ),
-        ),
-      ],
+          const SizedBox(width: 10),
+          Expanded(
+            child: _AmountBar(
+              barKey: ValueKey('expense-actual-${category.name}'),
+              amount: category.expense,
+              height: barHeight(category.expense),
+              color: expenseColor,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
 class _AmountBar extends StatelessWidget {
+  final Key barKey;
   final double amount;
   final double height;
   final Color color;
 
   const _AmountBar({
+    required this.barKey,
     required this.amount,
     required this.height,
     required this.color,
@@ -2154,6 +2219,7 @@ class _AmountBar extends StatelessWidget {
         _CurrencyAmountPairText(
           primaryText: primaryAmountText,
           secondaryText: secondaryAmountText,
+          scaleDown: false,
           textAlign: TextAlign.center,
           crossAxisAlignment: CrossAxisAlignment.center,
           primaryStyle: TextStyle(
@@ -2169,6 +2235,7 @@ class _AmountBar extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Container(
+          key: barKey,
           width: 12,
           height: height,
           decoration: BoxDecoration(
@@ -2198,12 +2265,14 @@ class _DotLegend extends StatelessWidget {
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 7),
-        Text(
-          label,
-          style: TextStyle(
-            color: appTheme.blue_gray_700,
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
+        Flexible(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: appTheme.blue_gray_700,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
       ],
