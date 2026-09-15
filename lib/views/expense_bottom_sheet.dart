@@ -2656,7 +2656,13 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     if (recordAnotherExpense) {
       _startAnotherExpenseForActivity();
     } else {
-      Navigator.pop(context);
+      // Keep the sheet open and show the refreshed recorded-expenses list.
+      setState(() {
+        _isRecordingNewExpense = false;
+        _showItemForm = false;
+        _editingItemIndex = null;
+        _hasUnfinishedItemFormChanges = false;
+      });
     }
   }
 
