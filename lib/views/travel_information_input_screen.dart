@@ -2347,25 +2347,13 @@ class _TravelInformationInputScreenState
         ),
         const SizedBox(height: 6.0),
         InkWell(
-          onTap: () {
-            String? connLoc;
-            if (!isStartOrEnd && departureIndex + 1 < viewModel.uiState.arrivals.length) {
-              final a = viewModel.uiState.arrivals[departureIndex + 1].location;
-              if (a.isNotEmpty) connLoc = a;
-            } else if (isStartOrEnd && viewModel.uiState.arrivals.isNotEmpty) {
-              final a = viewModel.uiState.arrivals.last.location;
-              if (a.isNotEmpty) connLoc = a;
-            }
-
-            _showTransitHubSelectionModal(
-              context,
-              viewModel,
-              isArrival: false,
-              index: departureIndex,
-              isStartOrEnd: isStartOrEnd,
-              connectedLocation: connLoc,
-            );
-          },
+          onTap: () => _showTransitHubSelectionModal(
+            context,
+            viewModel,
+            isArrival: false,
+            index: departureIndex,
+            isStartOrEnd: isStartOrEnd,
+          ),
           borderRadius: BorderRadius.circular(10.0),
           child: Container(
             width: double.infinity,
@@ -3858,15 +3846,13 @@ class _TravelInformationInputScreenState
             // 2. Filter candidate hubs by direct route availability
             // If connectedLocation is known, ONLY show destinations with valid direct routes
             bool isHubReachable(String hub) {
-              if (connectedLocation == null || connectedLocation.trim().isEmpty) {
+              if (!isArrival || connectedLocation == null || connectedLocation.trim().isEmpty) {
                 return true;
               }
-              final fromLoc = isArrival ? connectedLocation : hub;
-              final toLoc = isArrival ? hub : connectedLocation;
               return TransitScheduleHelper.isRouteAvailable(
                 transitType: activeMode,
-                fromLocation: fromLoc,
-                toLocation: toLoc,
+                fromLocation: connectedLocation,
+                toLocation: hub,
               );
             }
 
@@ -4249,8 +4235,8 @@ class _TravelInformationInputScreenState
                               vertical: 12.0,
                             ),
                             children: [
-                              // Route connectivity hint banner
-                              if (connectedLocation != null && connectedLocation.trim().isNotEmpty) ...[
+                              // Route connectivity hint banner (only when selecting arrival with a known departure)
+                              if (isArrival && connectedLocation != null && connectedLocation.trim().isNotEmpty) ...[
                                 Container(
                                   margin: const EdgeInsets.only(bottom: 12.0),
                                   padding: const EdgeInsets.symmetric(
@@ -4274,9 +4260,7 @@ class _TravelInformationInputScreenState
                                       const SizedBox(width: 8),
                                       Expanded(
                                         child: Text(
-                                          isArrival
-                                              ? 'Direct routes departing from: $connectedLocation'
-                                              : 'Direct routes arriving at: $connectedLocation',
+                                          'Direct routes departing from: $connectedLocation',
                                           style: TextStyle(
                                             fontSize: 11.5,
                                             fontWeight: FontWeight.w600,
@@ -4313,9 +4297,9 @@ class _TravelInformationInputScreenState
                                       return;
                                     }
 
-                                    if (connectedLocation != null && connectedLocation.trim().isNotEmpty) {
-                                      final fromLoc = isArrival ? connectedLocation : customName;
-                                      final toLoc = isArrival ? customName : connectedLocation;
+                                    if (isArrival && connectedLocation != null && connectedLocation.trim().isNotEmpty) {
+                                      final fromLoc = connectedLocation;
+                                      final toLoc = customName;
                                       final routeOk = TransitScheduleHelper.isRouteAvailable(
                                         transitType: activeMode,
                                         fromLocation: fromLoc,
@@ -4324,7 +4308,7 @@ class _TravelInformationInputScreenState
                                       if (!routeOk) {
                                         ScaffoldMessenger.of(context).showSnackBar(
                                           SnackBar(
-                                            content: Text('No direct $activeMode route available between "$connectedLocation" and "$customName"'),
+                                            content: Text('No direct $activeMode route available from "$connectedLocation" to "$customName"'),
                                             backgroundColor: appTheme.redButton,
                                             behavior: SnackBarBehavior.floating,
                                             duration: const Duration(seconds: 3),

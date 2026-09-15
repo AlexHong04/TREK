@@ -19,7 +19,7 @@ class WholeItineraryDetailScreen extends StatefulWidget {
 
   static Widget builder(BuildContext context) {
     final args =
-    ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
+        ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
 
     // For all plan screen
     final isReadOnly = args?['isReadOnly'] as bool? ?? false;
@@ -33,7 +33,7 @@ class WholeItineraryDetailScreen extends StatefulWidget {
         authService.currentUser?.personalConstraints
             .map((c) => '${c.category}: ${c.constraintName}')
             .toList() ??
-            [];
+        [];
 
     final rawArrivals = args?['arrivals'] as List?;
     final arrivals = rawArrivals
@@ -58,7 +58,8 @@ class WholeItineraryDetailScreen extends StatefulWidget {
         ); // changed this
         final resolvedTripId = tripId ?? trip?.tripId ?? '';
 
-        final isForeign = args?['isForeign'] as bool? ??
+        final isForeign =
+            args?['isForeign'] as bool? ??
             (profileService.preferredCurrency.trim().toUpperCase() != 'MYR');
 
         if (isReadOnly && (tripId != null || trip != null)) {
@@ -104,15 +105,15 @@ class _WholeItineraryDetailScreenState
   bool _isUncoveredWishlistExpanded = false;
 
   Future<void> _checkWishlistWarning(
-      WholeItineraryDetailViewModel viewModel,
-      ) async {
+    WholeItineraryDetailViewModel viewModel,
+  ) async {
     final wishlist = viewModel.uiState.wishlist;
 
     final hasWishlist = wishlist != null && wishlist.isNotEmpty;
 
     final hasUncoveredWishlist =
         hasWishlist &&
-            viewModel.uiState.wishlistItemsCoveredCount < wishlist.length;
+        viewModel.uiState.wishlistItemsCoveredCount < wishlist.length;
 
     final hasExtraBudgetNeeded =
         viewModel.uiState.estimatedExtraBudgetNeeded > 0;
@@ -128,10 +129,10 @@ class _WholeItineraryDetailScreenState
   }
 
   void _showActivityRemovedSnackBar(
-      BuildContext context,
-      String activityName, {
-        required bool isReadOnly,
-      }) {
+    BuildContext context,
+    String activityName, {
+    required bool isReadOnly,
+  }) {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -207,10 +208,10 @@ class _WholeItineraryDetailScreenState
   }
 
   void _showWishlistItemRemovedSnackBar(
-      BuildContext context,
-      String item, {
-        required bool isReadOnly,
-      }) {
+    BuildContext context,
+    String item, {
+    required bool isReadOnly,
+  }) {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -392,8 +393,8 @@ class _WholeItineraryDetailScreenState
   }
 
   Future<void> _showWishlistWarningDialog(
-      WholeItineraryDetailViewModel viewModel,
-      ) async {
+    WholeItineraryDetailViewModel viewModel,
+  ) async {
     if (_wishlistWarningShowing) return;
 
     _wishlistWarningShowing = true;
@@ -419,7 +420,7 @@ class _WholeItineraryDetailScreenState
 
       final hasUncoveredWishlist =
           hasWishlist &&
-              viewModel.uiState.wishlistItemsCoveredCount < wishlist.length;
+          viewModel.uiState.wishlistItemsCoveredCount < wishlist.length;
 
       final hasBudgetShortfall =
           viewModel.uiState.estimatedExtraBudgetNeeded > 0;
@@ -448,22 +449,22 @@ class _WholeItineraryDetailScreenState
           hasUncoveredWishlist: hasUncoveredWishlist,
           symbol: viewModel.preferredCurrency,
           warningText:
-          'Insufficient top-up amount will trigger '
+              'Insufficient top-up amount will trigger '
               'alternative recommendation directly.',
           validateTopUpAmount:
               ({
-            String? symbol,
-            required String value,
-            double? minTopUp,
-            required double shortageAmount,
-          }) {
-            return viewModel.validateTopUpAmount(
-              symbol: symbol,
-              value: value,
-              minTopUp: hasUncoveredWishlist ? null : validationMinTopUp,
-              shortageAmount: validationShortageAmount,
-            );
-          },
+                String? symbol,
+                required String value,
+                double? minTopUp,
+                required double shortageAmount,
+              }) {
+                return viewModel.validateTopUpAmount(
+                  symbol: symbol,
+                  value: value,
+                  minTopUp: hasUncoveredWishlist ? null : validationMinTopUp,
+                  shortageAmount: validationShortageAmount,
+                );
+              },
 
           onCancel: () {},
 
@@ -488,7 +489,7 @@ class _WholeItineraryDetailScreenState
   Widget build(BuildContext context) {
     final viewModel = context.watch<WholeItineraryDetailViewModel>();
     final args =
-    ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     final isReadOnly = args?['isReadOnly'] as bool? ?? false;
 
     return Scaffold(
@@ -525,9 +526,9 @@ class _WholeItineraryDetailScreenState
   }
 
   Widget _buildOverviewCard(
-      WholeItineraryDetailViewModel viewModel, {
-        required bool isReadOnly,
-      }) {
+    WholeItineraryDetailViewModel viewModel, {
+    required bool isReadOnly,
+  }) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16.0),
@@ -680,7 +681,7 @@ class _WholeItineraryDetailScreenState
             ],
           ),
           if ((viewModel.uiState.wishlist == null ||
-              viewModel.uiState.wishlist!.isEmpty) &&
+                  viewModel.uiState.wishlist!.isEmpty) &&
               (viewModel.spentBudget > viewModel.totalBudget ||
                   viewModel.uiState.estimatedExtraBudgetNeeded > 0)) ...[
             const SizedBox(height: 8.0),
@@ -749,7 +750,7 @@ class _WholeItineraryDetailScreenState
                 onTap: () {
                   setState(() {
                     _isUncoveredWishlistExpanded =
-                    !_isUncoveredWishlistExpanded;
+                        !_isUncoveredWishlistExpanded;
                   });
                 },
                 borderRadius: BorderRadius.circular(6.0),
@@ -974,9 +975,9 @@ class _WholeItineraryDetailScreenState
   }
 
   Widget _buildLocationHeader(
-      WholeItineraryDetailViewModel viewModel, {
-        required bool isReadOnly,
-      }) {
+    WholeItineraryDetailViewModel viewModel, {
+    required bool isReadOnly,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8.0),
       child: Text(
@@ -992,10 +993,10 @@ class _WholeItineraryDetailScreenState
   }
 
   Widget _buildTimeline(
-      BuildContext context,
-      WholeItineraryDetailViewModel viewModel, {
-        required bool isReadOnly,
-      }) {
+    BuildContext context,
+    WholeItineraryDetailViewModel viewModel, {
+    required bool isReadOnly,
+  }) {
     if (viewModel.uiState.isLoading) {
       return Center(
         child: CircularProgressIndicator(color: appTheme.teal_A700),
@@ -1062,10 +1063,10 @@ class _WholeItineraryDetailScreenState
 
       final bool isLast =
           i == activities.length - 1 ||
-              (i + 1 < activities.length &&
-                  (activities[i + 1].date.day != actDate.day ||
-                      activities[i + 1].date.month != actDate.month ||
-                      activities[i + 1].date.year != actDate.year));
+          (i + 1 < activities.length &&
+              (activities[i + 1].date.day != actDate.day ||
+                  activities[i + 1].date.month != actDate.month ||
+                  activities[i + 1].date.year != actDate.year));
 
       children.add(
         _buildTimelineItem(
@@ -1076,7 +1077,7 @@ class _WholeItineraryDetailScreenState
           isReadOnly: isReadOnly,
           onRemove: () async {
             final activityName =
-            (activity.destination as String?)?.isNotEmpty == true
+                (activity.destination as String?)?.isNotEmpty == true
                 ? activity.destination as String
                 : 'Activity';
             final confirmed = await showConfirmRemoveActivityDialog(
@@ -1184,9 +1185,9 @@ class _WholeItineraryDetailScreenState
   }
 
   Widget _buildBottomSection(
-      BuildContext context,
-      WholeItineraryDetailViewModel viewModel,
-      ) {
+    BuildContext context,
+    WholeItineraryDetailViewModel viewModel,
+  ) {
     final bool needsTopUp = viewModel.needsTopUp;
 
     return Container(
@@ -1254,64 +1255,65 @@ class _WholeItineraryDetailScreenState
                     ),
                   ),
                   const SizedBox(width: 12),
-                ] else if (viewModel.hasUncoveredWishlist) ...[
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: appTheme.white_A700,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: appTheme.teal_A700,
-                          width: 1.5,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: appTheme.teal_50,
-                            offset: const Offset(0, 4),
-                            blurRadius: 6,
-                          ),
-                        ],
-                      ),
-                      child: Material(
-                        color: appTheme.transparentCustom,
-                        borderRadius: BorderRadius.circular(16),
-                        child: InkWell(
-                          onTap: (viewModel.uiState.isLoading ||
-                              viewModel.uiState.isRegeneratingPlan)
-                              ? null
-                              : () => viewModel.generateItinerary(
-                            suppressWarning: false,
-                          ),
-                          borderRadius: BorderRadius.circular(16),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.auto_awesome_rounded,
-                                  size: 20,
-                                  color: appTheme.teal_A700,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Regenerate',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w700,
-                                    fontFamily: 'Inter',
-                                    color: appTheme.teal_A700,
-                                  ).copyWith(height: 22 / 18),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
                 ],
+                // else if (viewModel.hasUncoveredWishlist) ...[
+                //   Expanded(
+                //     child: Container(
+                //       decoration: BoxDecoration(
+                //         color: appTheme.white_A700,
+                //         borderRadius: BorderRadius.circular(16),
+                //         border: Border.all(
+                //           color: appTheme.teal_A700,
+                //           width: 1.5,
+                //         ),
+                //         boxShadow: [
+                //           BoxShadow(
+                //             color: appTheme.teal_50,
+                //             offset: const Offset(0, 4),
+                //             blurRadius: 6,
+                //           ),
+                //         ],
+                //       ),
+                //       child: Material(
+                //         color: appTheme.transparentCustom,
+                //         borderRadius: BorderRadius.circular(16),
+                //         child: InkWell(
+                //           onTap: (viewModel.uiState.isLoading ||
+                //               viewModel.uiState.isRegeneratingPlan)
+                //               ? null
+                //               : () => viewModel.generateItinerary(
+                //             suppressWarning: false,
+                //           ),
+                //           borderRadius: BorderRadius.circular(16),
+                //           child: Padding(
+                //             padding: const EdgeInsets.symmetric(vertical: 16),
+                //             child: Row(
+                //               mainAxisAlignment: MainAxisAlignment.center,
+                //               children: [
+                //                 Icon(
+                //                   Icons.auto_awesome_rounded,
+                //                   size: 20,
+                //                   color: appTheme.teal_A700,
+                //                 ),
+                //                 const SizedBox(width: 8),
+                //                 Text(
+                //                   'Regenerate',
+                //                   style: TextStyle(
+                //                     fontSize: 18,
+                //                     fontWeight: FontWeight.w700,
+                //                     fontFamily: 'Inter',
+                //                     color: appTheme.teal_A700,
+                //                   ).copyWith(height: 22 / 18),
+                //                 ),
+                //               ],
+                //             ),
+                //           ),
+                //         ),
+                //       ),
+                //     ),
+                //   ),
+                //   const SizedBox(width: 12),
+                // ],
                 // Right: Confirm Button
                 Expanded(
                   child: Container(
@@ -1322,12 +1324,12 @@ class _WholeItineraryDetailScreenState
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: viewModel.canConfirmItinerary
                           ? [
-                        BoxShadow(
-                          color: appTheme.teal_50,
-                          offset: const Offset(0, 4),
-                          blurRadius: 6,
-                        ),
-                      ]
+                              BoxShadow(
+                                color: appTheme.teal_50,
+                                offset: const Offset(0, 4),
+                                blurRadius: 6,
+                              ),
+                            ]
                           : null,
                     ),
                     child: Material(
@@ -1336,110 +1338,106 @@ class _WholeItineraryDetailScreenState
                       child: InkWell(
                         onTap: viewModel.canConfirmItinerary
                             ? () async {
-                          // Wishlist does NOT block confirm; only check if actually overspent
-                          // if (viewModel.spentBudget >
-                          //     viewModel.totalBudget) {
-                          //   await _showWishlistWarningDialog(
-                          //     viewModel,
-                          //   );
-                          //   return;
-                          // }
-                          final wishlist =
-                              viewModel.uiState.wishlist;
+                                // Wishlist does NOT block confirm; only check if actually overspent
+                                // if (viewModel.spentBudget >
+                                //     viewModel.totalBudget) {
+                                //   await _showWishlistWarningDialog(
+                                //     viewModel,
+                                //   );
+                                //   return;
+                                // }
+                                final wishlist = viewModel.uiState.wishlist;
 
-                          final hasUncoveredWishlist =
-                              wishlist != null &&
-                                  wishlist.isNotEmpty &&
-                                  viewModel
-                                      .uiState
-                                      .wishlistItemsCoveredCount <
-                                      wishlist.length;
+                                final hasUncoveredWishlist =
+                                    wishlist != null &&
+                                    wishlist.isNotEmpty &&
+                                    viewModel
+                                            .uiState
+                                            .wishlistItemsCoveredCount <
+                                        wishlist.length;
 
-                          final isOverBudget =
-                              viewModel.spentBudget >
-                                  viewModel.totalBudget;
+                                final isOverBudget =
+                                    viewModel.spentBudget >
+                                    viewModel.totalBudget;
 
-                          // if (isOverBudget ||
-                          //     hasUncoveredWishlist) {
-                          //   await _showWishlistWarningDialog(
-                          //     viewModel,
-                          //   );
-                          //   return;
-                          // }
+                                // if (isOverBudget ||
+                                //     hasUncoveredWishlist) {
+                                //   await _showWishlistWarningDialog(
+                                //     viewModel,
+                                //   );
+                                //   return;
+                                // }
 
-                          bool confirmedWishlist = false;
+                                bool confirmedWishlist = false;
 
-                          if (hasUncoveredWishlist &&
-                              !isOverBudget) {
-                            await showInitialUncoveredWishlistConfirmation(
-                              context: context,
-                              onConfirm: () {
-                                confirmedWishlist = true;
-                              },
-                              onCancel: () {
-                                confirmedWishlist = false;
-                              },
-                            );
+                                if (hasUncoveredWishlist && !isOverBudget) {
+                                  await showInitialUncoveredWishlistConfirmation(
+                                    context: context,
+                                    onConfirm: () {
+                                      confirmedWishlist = true;
+                                    },
+                                    onCancel: () {
+                                      confirmedWishlist = false;
+                                    },
+                                  );
 
-                            if (!confirmedWishlist) {
-                              return;
-                            }
-                          }
+                                  if (!confirmedWishlist) {
+                                    return;
+                                  }
+                                }
 
-                          if (!context.mounted) return;
+                                if (!context.mounted) return;
 
-                          showDialog(
-                            context: context,
-                            barrierDismissible: false,
-                            builder: (BuildContext context) {
-                              return const Center(
-                                child: CircularProgressIndicator(),
-                              );
-                            },
-                          );
+                                showDialog(
+                                  context: context,
+                                  barrierDismissible: false,
+                                  builder: (BuildContext context) {
+                                    return const Center(
+                                      child: CircularProgressIndicator(),
+                                    );
+                                  },
+                                );
 
-                          final errorMsg = await viewModel
-                              .confirmItinerary();
+                                final errorMsg = await viewModel
+                                    .confirmItinerary();
 
-                          if (context.mounted) {
-                            Navigator.of(context).pop();
-                          }
+                                if (context.mounted) {
+                                  Navigator.of(context).pop();
+                                }
 
-                          if (errorMsg == null && context.mounted) {
-                            showThreeSecondMessage(
-                              context,
-                              'Itinerary saved to database successfully!',
-                              isError: false,
-                            );
-                            Navigator.pushNamedAndRemoveUntil(
-                              context,
-                              AppRoutes.homeScreen,
-                                  (route) => false,
-                            );
-                          } else if (errorMsg != null &&
-                              context.mounted) {
-                            showDialog(
-                              context: context,
-                              builder: (_) => AlertDialog(
-                                title: const Text('Save Failed'),
-                                content: Text(errorMsg),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.pop(context),
-                                    child: const Text('OK'),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }
-                        }
+                                if (errorMsg == null && context.mounted) {
+                                  showThreeSecondMessage(
+                                    context,
+                                    'Itinerary saved to database successfully!',
+                                    isError: false,
+                                  );
+                                  Navigator.pushNamedAndRemoveUntil(
+                                    context,
+                                    AppRoutes.homeScreen,
+                                    (route) => false,
+                                  );
+                                } else if (errorMsg != null &&
+                                    context.mounted) {
+                                  showDialog(
+                                    context: context,
+                                    builder: (_) => AlertDialog(
+                                      title: const Text('Save Failed'),
+                                      content: Text(errorMsg),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context),
+                                          child: const Text('OK'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }
+                              }
                             : null,
                         borderRadius: BorderRadius.circular(16),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 16,
-                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
@@ -1468,16 +1466,16 @@ class _WholeItineraryDetailScreenState
   }
 
   Widget _buildActivityCard(
-      BuildContext context,
-      WholeItineraryDetailViewModel viewModel,
-      dynamic activity,
-      ) {
+    BuildContext context,
+    WholeItineraryDetailViewModel viewModel,
+    dynamic activity,
+  ) {
     // Check if the activity has been cleared (empty slot state)
     if (activity.status == 'empty' ||
         (activity.destination.isEmpty && activity.description.isEmpty)) {
       final isSlotRegenerating =
           viewModel.uiState.regeneratingSlotId == activity.activitiesId ||
-              viewModel.uiState.isRegeneratingPlan;
+          viewModel.uiState.isRegeneratingPlan;
 
       return Container(
         width: double.infinity,
@@ -1513,9 +1511,9 @@ class _WholeItineraryDetailScreenState
                   ),
                   onPressed: () async {
                     final confirmed =
-                    await showConfirmGenerateAlternativeDialog(
-                      context: context,
-                    );
+                        await showConfirmGenerateAlternativeDialog(
+                          context: context,
+                        );
                     if (!confirmed) return;
                     await viewModel.generateAlternativeActivity(
                       slotActivityId: activity.activitiesId,
@@ -1572,42 +1570,42 @@ class _WholeItineraryDetailScreenState
             ),
             child: activity.activityImgUrl.isNotEmpty
                 ? (activity.activityImgUrl.startsWith('http')
-                ? Image.network(
-              activity.activityImgUrl,
-              height: 192,
-              width: double.infinity,
-              fit: BoxFit.cover,
-              loadingBuilder: (context, child, progress) {
-                if (progress == null) return child;
-                return Container(
-                  height: 192,
-                  width: double.infinity,
-                  color: appTheme.gray_200,
-                  child: const Center(
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                    ),
-                  ),
-                );
-              },
-              errorBuilder: (context, error, stackTrace) =>
-                  Container(
-                    height: 192,
-                    width: double.infinity,
-                    color: appTheme.gray_200,
-                    child: Icon(
-                      Icons.broken_image_outlined,
-                      size: 40,
-                      color: appTheme.blue_gray_300,
-                    ),
-                  ),
-            )
-                : Image.asset(
-              activity.activityImgUrl,
-              height: 192,
-              width: double.infinity,
-              fit: BoxFit.cover,
-            ))
+                      ? Image.network(
+                          activity.activityImgUrl,
+                          height: 192,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          loadingBuilder: (context, child, progress) {
+                            if (progress == null) return child;
+                            return Container(
+                              height: 192,
+                              width: double.infinity,
+                              color: appTheme.gray_200,
+                              child: const Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            );
+                          },
+                          errorBuilder: (context, error, stackTrace) =>
+                              Container(
+                                height: 192,
+                                width: double.infinity,
+                                color: appTheme.gray_200,
+                                child: Icon(
+                                  Icons.broken_image_outlined,
+                                  size: 40,
+                                  color: appTheme.blue_gray_300,
+                                ),
+                              ),
+                        )
+                      : Image.asset(
+                          activity.activityImgUrl,
+                          height: 192,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                        ))
                 : const SizedBox.shrink(),
           ),
           Padding(
@@ -1751,7 +1749,7 @@ class _WholeItineraryDetailScreenState
         borderRadius: BorderRadius.circular(14),
       ),
       child:
-      child ??
+          child ??
           Text(
             label ?? '',
             style: TextStyle(
