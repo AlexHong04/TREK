@@ -46,7 +46,7 @@ class DeleteAccountConfirmationScreen extends StatelessWidget {
                 if (state.errorMessage != null)
                   AuthMessage(message: state.errorMessage),
                 const SizedBox(height: 26),
-                FilledButton.icon(
+                FilledButton(
                   onPressed: state.isDeleting || state.isCancelling
                       ? null
                       : () => _showFinalDialog(context, viewModel),
@@ -58,16 +58,9 @@ class DeleteAccountConfirmationScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(13),
                     ),
                   ),
-                  icon: state.isDeleting
-                      ? SizedBox.square(
-                    dimension: 19,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: appTheme.white_A700,
-                    ),
-                  )
-                      : const Icon(Icons.delete_forever_outlined),
-                  label: const Text('Confirm Deletion'),
+                  child: Text(
+                    state.isDeleting ? 'Scheduling…' : 'Confirm Deletion',
+                  ),
                 ),
                 const SizedBox(height: 10),
                 TextButton(

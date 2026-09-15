@@ -78,10 +78,9 @@ class VerificationGateScreen extends StatelessWidget {
                       : () => Navigator.pushNamed(context, '/forgotPassword'),
                   child: const Text('Reset Password'),
                 ),
-                TextButton.icon(
+                TextButton(
                   onPressed: state.isBusy ? null : viewModel.logout,
-                  icon: const Icon(Icons.logout_outlined),
-                  label: const Text('Logout'),
+                  child: const Text('Logout'),
                 ),
               ],
             ),

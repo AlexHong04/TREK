@@ -104,7 +104,7 @@ class PersonalConstraintManagementScreen extends StatelessWidget {
                     const SizedBox(height: 14),
                   ],
                   const SizedBox(height: 10),
-                  FilledButton.icon(
+                  FilledButton(
                     onPressed: state.isSaving ||
                         state.isOffline ||
                         state.options.any((option) => option.id.isEmpty)
@@ -118,16 +118,7 @@ class PersonalConstraintManagementScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(13),
                       ),
                     ),
-                    icon: state.isSaving
-                        ? SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: appTheme.white_A700,
-                      ),
-                    )
-                        : const Icon(Icons.save_outlined),
-                    label: const Text('Save'),
+                    child: Text(state.isSaving ? 'Saving…' : 'Save'),
                   ),
                 ],
               ),

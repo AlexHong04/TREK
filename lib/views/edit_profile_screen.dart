@@ -118,7 +118,7 @@ class EditProfileScreen extends StatelessWidget {
                       onChanged: viewModel.onCurrencyChanged,
                     ),
                     const SizedBox(height: 42),
-                    FilledButton.icon(
+                    FilledButton(
                       onPressed:
                       state.isSaving || state.isOffline ? null : viewModel.save,
                       style: FilledButton.styleFrom(
@@ -129,16 +129,7 @@ class EditProfileScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(13),
                         ),
                       ),
-                      icon: state.isSaving
-                          ? SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: appTheme.white_A700,
-                        ),
-                      )
-                          : const Icon(Icons.save_outlined),
-                      label: const Text('Save'),
+                      child: Text(state.isSaving ? 'Saving…' : 'Save'),
                     ),
                   ],
                 ),

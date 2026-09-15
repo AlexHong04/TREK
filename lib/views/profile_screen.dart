@@ -301,7 +301,7 @@ class ProfileScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    FilledButton.icon(
+                    FilledButton(
                       onPressed: state.isBusy
                           ? null
                           : () => _confirmLogout(context, viewModel),
@@ -313,16 +313,9 @@ class ProfileScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(13),
                         ),
                       ),
-                      icon: state.isLoggingOut
-                          ? SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: appTheme.white_A700,
-                        ),
-                      )
-                          : const Icon(Icons.logout_outlined),
-                      label: const Text('Logout'),
+                      child: Text(
+                        state.isLoggingOut ? 'Logging Out…' : 'Logout',
+                      ),
                     ),
                   ],
                 ),

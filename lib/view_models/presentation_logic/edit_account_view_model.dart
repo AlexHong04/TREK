@@ -55,9 +55,16 @@ class EditAccountViewModel extends ChangeNotifier {
     _notify();
   }
 
-  Future<void> linkGoogle() async {
+  Future<void> linkGoogle({required String currentPassword}) async {
     if (_uiState.isBusy || !_requireOnline()) return;
     if (_uiState.hasGoogleIdentity) return;
+    if (_uiState.hasPasswordSignIn && currentPassword.isEmpty) {
+      _uiState = _uiState.copyWith(
+        errorMessage: 'Current password is required to link Google.',
+      );
+      _notify();
+      return;
+    }
 
     final attempt = ++_googleLinkAttempt;
     _uiState = _uiState.copyWith(
@@ -69,7 +76,7 @@ class EditAccountViewModel extends ChangeNotifier {
     try {
       // This only opens Google's OAuth page. Completion arrives later through
       // Supabase's deep-link/auth-state listener.
-      await _authService.linkGoogle();
+      await _authService.linkGoogle(currentPassword: currentPassword);
     } on NetworkUnavailableException {
       if (_disposed || attempt != _googleLinkAttempt) return;
       _showOfflineError(isLinkingGoogle: true);
@@ -94,6 +101,21 @@ class EditAccountViewModel extends ChangeNotifier {
       _uiState = _uiState.copyWith(
         isLinkingGoogle: false,
         errorMessage: 'Another Google account action is already in progress.',
+      );
+      _notify();
+    } on IncorrectCurrentPasswordException {
+      if (_disposed || attempt != _googleLinkAttempt) return;
+      _uiState = _uiState.copyWith(
+        isLinkingGoogle: false,
+        errorMessage: 'Current password is incorrect.',
+      );
+      _notify();
+    } on RecentAuthenticationRequiredException {
+      if (_disposed || attempt != _googleLinkAttempt) return;
+      _uiState = _uiState.copyWith(
+        isLinkingGoogle: false,
+        errorMessage:
+        'Sign in with Google again before linking another sign-in method.',
       );
       _notify();
     } catch (_) {
@@ -148,11 +170,17 @@ class EditAccountViewModel extends ChangeNotifier {
 
   void onNewEmailChanged(String value) {
     final error = _emailTouched ? InputValidator.validateEmail(value) : null;
+    final emailChanged = InputValidator.normalizeEmail(value).toLowerCase() !=
+        _uiState.accountEmail.trim().toLowerCase();
+    final shouldClearPassword = _uiState.isEmailVerified || !emailChanged;
     _uiState = _uiState.copyWith(
       newEmail: value,
       emailChangeRequested: false,
       newEmailError: error,
+      currentPassword:
+      shouldClearPassword ? '' : _uiState.currentPassword,
       clearNewEmailError: error == null,
+      clearCurrentPasswordError: shouldClearPassword,
       clearErrorMessage: true,
       clearSuccessMessage: true,
     );
@@ -211,22 +239,34 @@ class EditAccountViewModel extends ChangeNotifier {
       return;
     }
     _emailTouched = true;
-    final emailError = InputValidator.validateEmail(_uiState.newEmail);
-    final passwordError = _requiredPasswordError();
-    if (emailError != null || passwordError != null) {
+    final normalizedEmail = InputValidator.normalizeEmail(_uiState.newEmail);
+    final emailError = InputValidator.validateEmail(normalizedEmail);
+    if (emailError != null) {
       _uiState = _uiState.copyWith(
         newEmailError: emailError,
-        currentPasswordError: passwordError,
-        clearNewEmailError: emailError == null,
-        clearCurrentPasswordError: passwordError == null,
+        clearCurrentPasswordError: true,
       );
       _notify();
       return;
     }
-    if (InputValidator.normalizeEmail(_uiState.newEmail).toLowerCase() ==
-        _uiState.accountEmail.toLowerCase()) {
+    if (normalizedEmail.toLowerCase() ==
+        _uiState.accountEmail.trim().toLowerCase()) {
       _uiState = _uiState.copyWith(
         newEmailError: 'Enter a different email address.',
+        currentPassword: '',
+        clearCurrentPasswordError: true,
+      );
+      _notify();
+      return;
+    }
+
+    final requiresPassword =
+        !_uiState.isEmailVerified && _uiState.hasPasswordSignIn;
+    final passwordError = _requiredPasswordError(required: requiresPassword);
+    if (passwordError != null) {
+      _uiState = _uiState.copyWith(
+        currentPasswordError: passwordError,
+        clearNewEmailError: true,
       );
       _notify();
       return;
@@ -241,9 +281,8 @@ class EditAccountViewModel extends ChangeNotifier {
     _notify();
     try {
       await _authService.changeAccountEmail(
-        newEmail: InputValidator.normalizeEmail(_uiState.newEmail),
-        currentPassword:
-        _uiState.hasPasswordSignIn ? _uiState.currentPassword : null,
+        newEmail: normalizedEmail,
+        currentPassword: requiresPassword ? _uiState.currentPassword : null,
       );
       if (_disposed) return;
       _uiState = _uiState.copyWith(
@@ -305,21 +344,20 @@ class EditAccountViewModel extends ChangeNotifier {
     _notify();
   }
 
-  Future<void> unlinkGoogle() async {
+  Future<void> unlinkGoogle({required String currentPassword}) async {
     if (_uiState.isGoogleManagedAccount) return;
     if (_uiState.isBusy || !_requireOnline()) return;
-    final passwordError = _requiredPasswordError();
-    if (passwordError != null) {
-      _uiState = _uiState.copyWith(currentPasswordError: passwordError);
+    if (_uiState.hasPasswordSignIn && currentPassword.isEmpty) {
+      _uiState = _uiState.copyWith(
+        errorMessage: 'Current password is required to unlink Google.',
+      );
       _notify();
       return;
     }
     if (!_uiState.canUnlinkGoogle) {
       _uiState = _uiState.copyWith(
         errorMessage: _uiState.hasPasswordSignIn
-            ? !_uiState.isEmailVerified
-            ? 'Verify your account email before unlinking Google.'
-            : 'Email/password sign-in is ready, but Supabase requires at least two linked identities before Google can be unlinked.'
+            ? 'Email/password sign-in is ready, but Supabase requires at least two linked identities before Google can be unlinked.'
             : 'Set a password before unlinking Google.',
       );
       _notify();
@@ -335,7 +373,7 @@ class EditAccountViewModel extends ChangeNotifier {
     _notify();
     try {
       await _authService.unlinkGoogle(
-        currentPassword: _uiState.currentPassword,
+        currentPassword: currentPassword,
       );
       if (_disposed || attempt != _googleUnlinkAttempt) return;
       _syncAccount(notify: false);
@@ -354,7 +392,7 @@ class EditAccountViewModel extends ChangeNotifier {
       if (_disposed || attempt != _googleUnlinkAttempt) return;
       _uiState = _uiState.copyWith(
         isUnlinkingGoogle: false,
-        currentPasswordError: 'Current password is incorrect.',
+        errorMessage: 'Current password is incorrect.',
       );
     } on MissingEmailIdentityForGoogleUnlinkException {
       if (_disposed || attempt != _googleUnlinkAttempt) return;
@@ -368,7 +406,7 @@ class EditAccountViewModel extends ChangeNotifier {
       _uiState = _uiState.copyWith(
         isUnlinkingGoogle: false,
         errorMessage:
-        'Google cannot be unlinked until another verified sign-in method is available.',
+        'Google cannot be unlinked until another sign-in method is available.',
       );
     } on GoogleIdentityOperationInProgressException {
       if (_disposed || attempt != _googleUnlinkAttempt) return;
@@ -388,7 +426,7 @@ class EditAccountViewModel extends ChangeNotifier {
 
   /// The screen owns the first destructive warning. Call this only after that
   /// dialog has been accepted.
-  Future<void> requestDeletion() async {
+  Future<void> requestDeletion({String? currentPassword}) async {
     if (_uiState.isBusy ||
         (_uiState.isEmailVerified &&
             _uiState.deletionCooldownSeconds > 0) ||
@@ -398,11 +436,12 @@ class EditAccountViewModel extends ChangeNotifier {
     // A verified account confirms deletion through its one-time email link.
     // Only an unverified account, which skips that email step, needs immediate
     // password/OAuth reauthentication here.
-    final passwordError = _uiState.isEmailVerified
-        ? null
-        : _requiredPasswordError();
-    if (passwordError != null) {
-      _uiState = _uiState.copyWith(currentPasswordError: passwordError);
+    final requiresPassword =
+        !_uiState.isEmailVerified && _uiState.hasPasswordSignIn;
+    if (requiresPassword && (currentPassword ?? '').isEmpty) {
+      _uiState = _uiState.copyWith(
+        errorMessage: 'Current password is required to delete the account.',
+      );
       _notify();
       return;
     }
@@ -415,10 +454,7 @@ class EditAccountViewModel extends ChangeNotifier {
     _notify();
     try {
       final ready = await _authService.requestAccountDeletion(
-        currentPassword: !_uiState.isEmailVerified &&
-            _uiState.hasPasswordSignIn
-            ? _uiState.currentPassword
-            : null,
+        currentPassword: requiresPassword ? currentPassword : null,
       );
       if (_disposed) return;
       _uiState = _uiState.copyWith(
@@ -444,7 +480,7 @@ class EditAccountViewModel extends ChangeNotifier {
       if (_disposed) return;
       _uiState = _uiState.copyWith(
         isRequestingDeletion: false,
-        currentPasswordError: 'Current password is incorrect.',
+        errorMessage: 'Current password is incorrect.',
       );
     } on RecentAuthenticationRequiredException {
       if (_disposed) return;
@@ -464,8 +500,8 @@ class EditAccountViewModel extends ChangeNotifier {
     _notify();
   }
 
-  String? _requiredPasswordError() {
-    if (!_uiState.hasPasswordSignIn) return null;
+  String? _requiredPasswordError({required bool required}) {
+    if (!required) return null;
     _passwordTouched = true;
     return _uiState.currentPassword.isEmpty
         ? 'Current password is required.'
@@ -508,13 +544,6 @@ class EditAccountViewModel extends ChangeNotifier {
     final user = _authService.currentUser;
     final info = _authService.accountInfo;
     if (user == null || info == null) return;
-    final emailWasChanged = _uiState.accountEmail.isNotEmpty &&
-        _uiState.accountEmail.trim().toLowerCase() !=
-            user.email.trim().toLowerCase();
-    final emailChangeMessage = emailWasChanged
-        ? _authService.consumeSessionMessage() ??
-        'The email changed to ${user.email} successfully.'
-        : null;
     final shouldReplaceDraft = _uiState.accountEmail.isEmpty ||
         _uiState.newEmail == _uiState.accountEmail;
     final googleWasJustLinked =
@@ -522,11 +551,10 @@ class EditAccountViewModel extends ChangeNotifier {
     _uiState = _uiState.copyWith(
       accountEmail: user.email,
       newEmail: shouldReplaceDraft ? user.email : _uiState.newEmail,
-      emailChangeRequested:
-      emailWasChanged ? false : _uiState.emailChangeRequested,
-      successMessage: emailChangeMessage,
       googleEmail: info.googleEmail,
       isEmailVerified: user.isEmailVerified,
+      currentPassword:
+      user.isEmailVerified ? '' : _uiState.currentPassword,
       hasPasswordSignIn: info.hasPasswordSignIn,
       hasEmailIdentity: info.hasEmailIdentity,
       hasGoogleIdentity: info.hasGoogleIdentity,
@@ -542,6 +570,7 @@ class EditAccountViewModel extends ChangeNotifier {
       isOffline: _authService.isOffline,
       isLoading: false,
       clearGoogleEmail: info.googleEmail == null,
+      clearCurrentPasswordError: user.isEmailVerified,
     );
     if (googleWasJustLinked) {
       _uiState = _uiState.copyWith(successMessage: 'Google account linked.');

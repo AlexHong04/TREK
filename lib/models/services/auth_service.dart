@@ -5,9 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../utils/input_validator.dart';
 import '../../utils/network_error.dart';
-import '../../utils/preference_keys.dart';
 import '../entities/user.dart';
-import '../local_data_source/notification_source.dart';
 import '../repository/i_auth_repository.dart';
 import '../repository/i_user_repository.dart';
 import 'i_auth_service.dart';
@@ -15,7 +13,6 @@ import 'i_auth_service.dart';
 class AuthService extends ChangeNotifier implements IAuthService {
   final IAuthRepository _authRepository;
   final IUserRepository _userRepository;
-  final NotificationSource _notificationSource = NotificationSource();
 
   User? _currentUser;
   AccountInfo? _accountInfo;
@@ -121,24 +118,11 @@ class AuthService extends ChangeNotifier implements IAuthService {
       if (authUser == null) {
         throw StateError('Registration completed without an Auth session.');
       }
-      // Queue the one-off user guide here rather than in the registration form.
-      // This is the only place that knows a brand-new account now exists, and it
-      // runs before _loadAuthenticatedAccount() flips the destination and the
-      // app routes the new tourist to the Home screen.
-      try {
-        final preferences = await SharedPreferences.getInstance();
-        await preferences.setBool(PreferenceKeys.userGuidePending, true);
-        debugPrint('[UserGuide] queued after registration.');
-      } catch (error) {
-        // A missing guide is never a reason to fail a successful registration.
-        debugPrint('[UserGuide] could not queue the guide: $error');
-      }
       await _loadAuthenticatedAccount(authUser);
-      // Cooldowns belong to the email address that requested them. Do not carry
-      // an older account's saved countdown into this newly registered account -
-      // a stale deletion cooldown would otherwise block this account from ever
-      // requesting its own confirmation email.
-      await _clearAllEmailCooldowns();
+      // A verification cooldown belongs to the email address that requested
+      // it. Do not carry an older account's saved countdown into this newly
+      // registered account.
+      await _clearEmailCooldown(EmailActionType.verification);
       // Registration no longer sends a verification email automatically. The
       // 60-second resend timer therefore starts only after the user explicitly
       // presses Verify email on Profile or the verification gate.
@@ -188,15 +172,22 @@ class AuthService extends ChangeNotifier implements IAuthService {
   Future<void> signInWithGoogle() => _authRepository.signInWithGoogle();
 
   @override
-  Future<void> linkGoogle() async {
+  Future<void> linkGoogle({required String currentPassword}) async {
     if (_googleIdentityMutationInProgress) {
       throw const GoogleIdentityOperationInProgressException();
     }
-    _requireCurrentUser();
+    final user = _requireCurrentUser();
     final info = _requireAccountInfo();
     if (info.hasGoogleIdentity) return;
     _googleIdentityMutationInProgress = true;
     try {
+      // Linking creates a new permanent sign-in method, so an old unlocked
+      // session is not sufficient proof of account ownership.
+      await _reauthenticateForSensitiveAction(
+        info: info,
+        user: user,
+        currentPassword: currentPassword,
+      );
       await _authRepository.linkGoogleIdentity();
     } on RepositoryIdentityAlreadyLinkedException {
       throw const GoogleIdentityAlreadyLinkedException();
@@ -335,11 +326,17 @@ class AuthService extends ChangeNotifier implements IAuthService {
       throw const GoogleManagedAccountException();
     }
 
-    await _reauthenticateForSensitiveAction(
-      info: info,
-      user: user,
-      currentPassword: currentPassword,
-    );
+    // An unverified account cannot rely on an email-confirmation step at its
+    // current address, so it must prove ownership with recent authentication.
+    // A verified account is protected by the confirmation link(s) sent by the
+    // email-change flow and does not need to enter its password here.
+    if (!user.isEmailVerified) {
+      await _reauthenticateForSensitiveAction(
+        info: info,
+        user: user,
+        currentPassword: currentPassword,
+      );
+    }
 
     try {
       await _runEmailRequest(
@@ -439,12 +436,11 @@ class AuthService extends ChangeNotifier implements IAuthService {
     } on RepositoryAccountDeletionNotConfirmedException {
       throw const AccountDeletionNotConfirmedException();
     }
-    // The server has disabled the account and scheduled its hard deletion.
-    // Local cleanup failures must not turn that successful request into an error.
+    // The server-side deletion is already complete. From this point, local
+    // cleanup failures must not turn a successful deletion into an error.
     // Store the message before sign-out emits the signed-out event and creates
     // the next LoginViewModel, which consumes this one-time message.
-    _sessionMessage =
-    'Your account is disabled and scheduled for permanent deletion in 30 days.';
+    _sessionMessage = 'Your account has been deleted successfully.';
     try {
       await _userRepository.clearCachedUserProfile(user.authId);
     } catch (_) {
@@ -453,7 +449,7 @@ class AuthService extends ChangeNotifier implements IAuthService {
     try {
       await _authRepository.signOut();
     } catch (_) {
-      // The account has already been disabled server-side.
+      // The Auth user has already been removed server-side.
     }
     await _clearSessionState(clearCache: false);
   }
@@ -481,14 +477,6 @@ class AuthService extends ChangeNotifier implements IAuthService {
       await _checkPasswordRecoveryStatus();
       await _checkDeviceEmailLoginStatus();
       return;
-    }
-    // Email-change confirmation can complete in a browser or on another
-    // device. Refresh Auth first so the following profile load sees the new
-    // authoritative email immediately instead of waiting for another login.
-    try {
-      await _authRepository.refreshSession();
-    } on NetworkUnavailableException {
-      _setOffline(true);
     }
     await refreshCurrentUser();
   }
@@ -521,15 +509,7 @@ class AuthService extends ChangeNotifier implements IAuthService {
         // session and a later cleanup attempt can remove the stale files.
       }
     }
-    try {
-      await _notificationSource.cancelAllNotifications();
-    } catch (error) {
-      debugPrint('Unable to clear local notifications during logout: $error');
-    }
     await _clearSessionState(clearCache: false);
-    // A cooldown belongs to the account that triggered it, so it must not
-    // follow the device into the next session.
-    await _clearAllEmailCooldowns();
     if (signOutFailure != null) throw signOutFailure;
   }
 
@@ -736,20 +716,9 @@ class AuthService extends ChangeNotifier implements IAuthService {
     // A sign-out or account switch may have happened while the profile was
     // loading. Never publish data from that stale Auth session.
     if (_authRepository.currentUser?.id != authUser.id) return;
-    final authoritativeEmail = authUser.email.trim();
-    final pendingTarget = _pendingEmailChangeTarget;
-    final authHasConfirmedPendingChange = pendingTarget != null &&
-        authoritativeEmail.toLowerCase() == pendingTarget;
-    final synchronizedProfile = authHasConfirmedPendingChange &&
-        profile.email.trim().toLowerCase() !=
-            authoritativeEmail.toLowerCase()
-        ? profile.copyWith(email: authoritativeEmail)
-        : profile;
     _currentUser = access == null
-        ? synchronizedProfile
-        : synchronizedProfile.copyWith(
-      hasPasswordSignIn: access.hasPasswordSignIn,
-    );
+        ? profile
+        : profile.copyWith(hasPasswordSignIn: access.hasPasswordSignIn);
     final accountEmailChanged = previousUser != null &&
         previousUser.email.toLowerCase() != _currentUser!.email.toLowerCase();
     await _completePendingEmailChangeIfNeeded(
@@ -1013,23 +982,14 @@ class AuthService extends ChangeNotifier implements IAuthService {
     }
   }
 
-  /// Drops every locally cached cooldown.
-  ///
-  /// A cooldown belongs to the email address that triggered it, so it must not
-  /// survive an account change: a stale deletion or password-recovery countdown
-  /// saved by a previous account would otherwise block the next account from
-  /// ever requesting that email. The server still enforces its own limit, so
-  /// clearing this can never be used to bypass it.
-  Future<void> _clearAllEmailCooldowns() async {
-    _emailCooldownUntil.clear();
+  Future<void> _clearEmailCooldown(EmailActionType action) async {
+    _emailCooldownUntil.remove(action);
     _ensureEmailCooldownTimer();
     try {
       final preferences = await SharedPreferences.getInstance();
-      for (final action in EmailActionType.values) {
-        await preferences.remove('trek.email_cooldown.${action.name}');
-      }
+      await preferences.remove('trek.email_cooldown.${action.name}');
     } catch (_) {
-      // The in-memory map is already cleared.
+      // The in-memory timer is already cleared for the new account.
     }
   }
 
@@ -1116,7 +1076,7 @@ class AuthService extends ChangeNotifier implements IAuthService {
       return;
     }
     _pendingEmailChangeTarget = null;
-    _sessionMessage = 'The email changed to ${user.email} successfully.';
+    _sessionMessage = 'Email changed successfully to ${user.email}.';
     try {
       final preferences = await SharedPreferences.getInstance();
       await preferences.remove('trek.pending_email_change');

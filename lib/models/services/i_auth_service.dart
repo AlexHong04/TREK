@@ -50,8 +50,7 @@ class AccountInfo {
   bool get canUnlinkGoogle =>
       hasGoogleIdentity &&
           hasPasswordSignIn &&
-          hasEmailIdentity &&
-          isEmailVerified;
+          hasEmailIdentity;
 
   /// Google created this Auth user and remains its only linked identity.
   bool get isGoogleManagedAccount => hasGoogleIdentity && !hasEmailIdentity;
@@ -93,7 +92,7 @@ abstract interface class IAuthService implements Listenable {
 
   Future<void> signInWithGoogle();
 
-  Future<void> linkGoogle();
+  Future<void> linkGoogle({required String currentPassword});
 
   Future<void> sendMagicLinkForLockedAccount({required String email});
 
