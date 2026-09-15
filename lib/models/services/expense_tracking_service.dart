@@ -28,6 +28,9 @@ String? _validateExpenseItemName(String value) {
   if (!RegExp(r'^[A-Za-z0-9 -]+$').hasMatch(trimmed)) {
     return 'Item name may only contain letters, numbers, spaces, and dashes.';
   }
+  if (trimmed.contains('--')) {
+    return 'Item name cannot contain repeated dashes.';
+  }
   return _validateExpenseText('Item name', trimmed);
 }
 
@@ -65,8 +68,8 @@ String? _validateOptionalExpenseTextSymbols(String fieldName, String value) {
   if (!RegExp(r"^[A-Za-z0-9 .,!?&'()/-]+$").hasMatch(value)) {
     return "$fieldName contains an unsupported symbol. Use only . , ! ? & ' ( ) / or -.";
   }
-  if (RegExp(r"([^A-Za-z0-9\s])\1{3,}").hasMatch(value)) {
-    return '$fieldName cannot contain the same symbol more than 3 times in a row.';
+  if (RegExp(r"([^A-Za-z0-9\s])\1").hasMatch(value)) {
+    return '$fieldName cannot contain repeated symbols.';
   }
   return null;
 }
@@ -84,6 +87,10 @@ class _ExtractedReceiptItem {
 }
 
 class ExpenseTrackingService implements IExpenseTrackingService {
+  // Double-precision calculations can safely represent whole cents below 2^53.
+  // This is a calculation-safety bound, not a spending-policy limit.
+  static const double maxSafeExpenseAmount = 90071992547409.91;
+
   final IItineraryRepository _itineraryRepository;
   final IBudgetService _budgetService;
   final IExpenseRepository _expenseRepository;
@@ -1763,10 +1770,12 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     double discountAmount,
     double roundingAmount,
   ) {
-    if (discountAmount < 0 || discountAmount > 99999) {
-      throw ArgumentError('Discount must be between 0 and 99,999.');
+    if (!discountAmount.isFinite ||
+        discountAmount < 0 ||
+        discountAmount > maxSafeExpenseAmount) {
+      throw ArgumentError('Enter a valid discount amount.');
     }
-    if (roundingAmount.abs() > 1) {
+    if (!roundingAmount.isFinite || roundingAmount.abs() > 1) {
       throw ArgumentError('Rounding must be between -1.00 and 1.00.');
     }
   }
@@ -1795,33 +1804,32 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       if (item.quantity <= 0) {
         throw ArgumentError('Item quantity must be greater than zero.');
       }
-      if (item.quantity > 9999) {
-        throw ArgumentError('Item quantity cannot exceed 9,999.');
-      }
-
-      if (item.unitPrice < 0.10) {
+      if (!item.unitPrice.isFinite || item.unitPrice < 0.10) {
         throw ArgumentError('Item unit price must be at least 0.10.');
       }
-      if (item.unitPrice > 99999) {
-        throw ArgumentError('Unit price cannot exceed 99,999.');
-      }
-      if (item.quantity * item.unitPrice > 999999) {
-        throw ArgumentError('Item subtotal cannot exceed 999,999.');
+      if (item.unitPrice > maxSafeExpenseAmount ||
+          !item.subtotal.isFinite ||
+          item.quantity * item.unitPrice > maxSafeExpenseAmount) {
+        throw ArgumentError('Item amount is too large to calculate safely.');
       }
     }
   }
 
   void validateTotalAmount(double totalAmount) {
-    if (totalAmount <= 0 || totalAmount > 999999) {
+    if (!totalAmount.isFinite ||
+        totalAmount <= 0 ||
+        totalAmount > maxSafeExpenseAmount) {
       throw ArgumentError(
-        'Amount must be a positive number within the allowed transaction limit.',
+        'Enter a positive amount that can be calculated safely.',
       );
     }
   }
 
   void validateTaxAmount(double taxAmount) {
-    if (taxAmount < 0 || taxAmount > 99999) {
-      throw ArgumentError('Tax amount must be between 0 and 99,999.');
+    if (!taxAmount.isFinite ||
+        taxAmount < 0 ||
+        taxAmount > maxSafeExpenseAmount) {
+      throw ArgumentError('Enter a valid tax and service charges amount.');
     }
   }
 
@@ -1988,6 +1996,15 @@ class ExpenseTrackingService implements IExpenseTrackingService {
 
     if (!success) {
       throw Exception('Update overspend details failed: $success');
+    }
+
+    if (activities.isEmpty) {
+      return ExpenseProcessingResult.withinBudget;
+    }
+
+    if (totalAllocatedBudget == 0.00 ||
+        remainingBudget >= totalAllocatedBudget) {
+      return ExpenseProcessingResult.withinBudget;
     }
 
     // Check critical overspend

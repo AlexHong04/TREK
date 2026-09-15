@@ -30,6 +30,7 @@ class WholeItineraryUiState {
   final List<TransitPoint> arrivals;
   final List<TransitPoint> departures;
   final List<HotelStay> hotels;
+  final bool isForeign;
 
   String? get arrivalLocation =>
       arrivals.isNotEmpty ? arrivals.first.location : null;
@@ -68,6 +69,7 @@ class WholeItineraryUiState {
     this.arrivals = const [],
     this.departures = const [],
     this.hotels = const [],
+    this.isForeign = false,
     String? hotelLocation,
     String? hotelCheckInTime,
     String? hotelCheckOutTime,
@@ -127,6 +129,7 @@ class WholeItineraryUiState {
     List<TransitPoint>? arrivals,
     List<TransitPoint>? departures,
     List<HotelStay>? hotels,
+    bool? isForeign,
     String? arrivalLocation,
     String? arrivalTime,
     String? departureLocation,
@@ -216,6 +219,7 @@ class WholeItineraryUiState {
       arrivals: resolvedArrivals ?? this.arrivals,
       departures: resolvedDepartures ?? this.departures,
       hotels: resolvedHotels ?? this.hotels,
+      isForeign: isForeign ?? this.isForeign,
     );
   }
 }

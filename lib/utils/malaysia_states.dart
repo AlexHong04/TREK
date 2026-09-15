@@ -354,8 +354,8 @@ List<String> getTransitHubSuggestions(
     }
   }
 
-  // 2. If no destination matched, supply default major hubs
-  if (results.isEmpty) {
+  // 2. If no destination was provided and no hubs found, supply default major hubs
+  if (destinations.isEmpty && results.isEmpty) {
     results.addAll(defaultList);
   }
 

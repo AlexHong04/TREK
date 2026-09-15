@@ -21,6 +21,7 @@ abstract interface class IItineraryService {
     List<TransitPoint>? arrivals,
     List<TransitPoint>? departures,
     List<HotelStay>? hotels,
+    bool isForeign = false,
     String? arrivalLocation,
     String? arrivalTime,
     String? departureLocation,
@@ -167,14 +168,18 @@ abstract interface class IBudgetService {
 
   Future<int> calculateSufficientDays(String tripId, String currentActivityId);
 
-  Future<double> reconcileDayBudget({
-    required String tripId,
-    required String dayTripId,
-    required DateTime date,
-    required Map<String, double> activitySpentMap,
-  });
-
   Future<double> reconcileTripOverspend({required String tripId});
+
+  /// Recomputes the trip balance from the recorded expenses
+  /// (`total_budget - SUM(expenses)`) and repairs `remaining_balance` when it
+  /// has drifted from that authoritative value.
+  ///
+  /// Unlike the overspend columns, the balance was previously only ever adjusted
+  /// incrementally (`deductRemainingBudget` subtracts, `topUpBudget` adds), so an
+  /// expense that is later edited or removed left it permanently wrong - and
+  /// every remaining-budget decision reads it. Returns the reconciled figures.
+  Future<({double totalBudget, double totalSpent, double remainingBalance})>
+  reconcileTripBalance({required String tripId});
 }
 
 enum ExpenseProcessingResult {

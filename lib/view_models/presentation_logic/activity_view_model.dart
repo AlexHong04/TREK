@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -41,6 +42,13 @@ class ActivityViewModel extends ChangeNotifier {
   final LocationSource _locationSource = LocationSource();
   final ExpenseDraftLocalDataSource _expenseDraftLocalDataSource =
       ExpenseDraftLocalDataSource();
+  Future<void> _pendingManualDraftSave = Future<void>.value();
+  Map<String, dynamic> _expenseDraftFormFields = {};
+  int _expenseDraftRestoreVersion = 0;
+
+  Map<String, dynamic> get expenseDraftFormFields =>
+      Map<String, dynamic>.from(_expenseDraftFormFields);
+  int get expenseDraftRestoreVersion => _expenseDraftRestoreVersion;
 
   ActivityViewModel({
     IItineraryService? itineraryService,
@@ -92,6 +100,7 @@ class ActivityViewModel extends ChangeNotifier {
   }
 
   void selectActivityForExpense(Activity activity) {
+    _expenseDraftFormFields = {};
     _uiState = _uiState.copyWith(
       selectedActivity: activity,
       currentActivityId: activity.activitiesId,
@@ -141,6 +150,10 @@ class ActivityViewModel extends ChangeNotifier {
       final recordedExpenses = await _expenseRepository.getExpensesByActivityId(
         selectedActivity.activitiesId,
       );
+      if (_uiState.selectedActivity?.activitiesId !=
+          selectedActivity.activitiesId) {
+        return;
+      }
 
       _uiState = _uiState.copyWith(
         recordedExpenses: recordedExpenses,
@@ -152,6 +165,10 @@ class ActivityViewModel extends ChangeNotifier {
         unawaited(_clearManualExpenseDraftForSelectedActivity());
       }
     } catch (error) {
+      if (_uiState.selectedActivity?.activitiesId !=
+          selectedActivity.activitiesId) {
+        return;
+      }
       _uiState = _uiState.copyWith(
         recordedExpenses: const [],
         isLoadingRecordedExpenses: false,
@@ -191,7 +208,7 @@ class ActivityViewModel extends ChangeNotifier {
 
   void addExpenseItem(ExpenseItem item) {
     _updateDraftExpenseItems([..._uiState.draftExpenseItems, item]);
-    unawaited(_saveManualExpenseDraftForSelectedActivity());
+    _queueManualExpenseDraftSave();
   }
 
   void updateExpenseItem(int index, ExpenseItem item) {
@@ -203,7 +220,7 @@ class ActivityViewModel extends ChangeNotifier {
     final updatedItems = [..._uiState.draftExpenseItems];
     updatedItems[index] = item;
     _updateDraftExpenseItems(updatedItems);
-    unawaited(_saveManualExpenseDraftForSelectedActivity());
+    _queueManualExpenseDraftSave();
   }
 
   void removeExpenseItem(int index) {
@@ -218,13 +235,34 @@ class ActivityViewModel extends ChangeNotifier {
         .map((ocrIndex) => ocrIndex > index ? ocrIndex - 1 : ocrIndex)
         .toSet();
     _updateDraftExpenseItems(updatedItems, ocrItemIndexes: updatedOcrIndexes);
-    unawaited(_saveManualExpenseDraftForSelectedActivity());
+    _queueManualExpenseDraftSave();
+  }
+
+  Future<void> resetExpenseFormDetails() async {
+    _expenseDraftFormFields = {};
+    _uiState = _uiState.copyWith(
+      draftExpenseItems: const [],
+      draftTaxAmount: 0.0,
+      draftDiscountAmount: 0.0,
+      draftRoundingAmount: 0.0,
+      draftAutoRounding: false,
+      draftTotalAmount: 0.0,
+      paymentMethod: '',
+      originalCurrency: _expenseCurrency,
+      receiptLocalPath: '',
+      clearOcrData: true,
+      ocrDraftItemIndexes: const {},
+      draftTaxFromOcr: false,
+      errorMessage: '',
+      successMessage: '',
+    );
+    notifyListeners();
+    await _clearManualExpenseDraftForSelectedActivity();
   }
 
   /// Removes only unsaved draft items after the tourist agrees to replace them
   /// with OCR results. Confirmed Expense records are never changed here.
   void clearDraftExpenseItemsForOcr() {
-    unawaited(_clearManualExpenseDraftForSelectedActivity());
     _uiState = _uiState.copyWith(
       draftExpenseItems: const [],
       draftTaxAmount: 0.0,
@@ -238,6 +276,7 @@ class ActivityViewModel extends ChangeNotifier {
       successMessage: '',
     );
     notifyListeners();
+    _queueManualExpenseDraftSave();
   }
 
   void setDraftAdjustments(
@@ -269,6 +308,7 @@ class ActivityViewModel extends ChangeNotifier {
       successMessage: '',
     );
     notifyListeners();
+    _queueManualExpenseDraftSave();
   }
 
   void setDraftAutoRounding(bool enabled, {double manualRounding = 0.0}) {
@@ -291,6 +331,7 @@ class ActivityViewModel extends ChangeNotifier {
       errorMessage: '',
     );
     notifyListeners();
+    _queueManualExpenseDraftSave();
   }
 
   double _fiveSenRounding(
@@ -377,6 +418,12 @@ class ActivityViewModel extends ChangeNotifier {
       successMessage: '',
     );
     notifyListeners();
+    _queueManualExpenseDraftSave();
+  }
+
+  void saveExpenseDraftFormFields(Map<String, dynamic> fields) {
+    _expenseDraftFormFields = Map<String, dynamic>.from(fields);
+    _queueManualExpenseDraftSave();
   }
 
   Future<bool> takeReceiptPhoto() async {
@@ -402,6 +449,7 @@ class ActivityViewModel extends ChangeNotifier {
         clearOcrData: true,
       );
       notifyListeners();
+      _queueManualExpenseDraftSave();
       return true;
     } catch (error) {
       _uiState = _uiState.copyWith(
@@ -436,6 +484,7 @@ class ActivityViewModel extends ChangeNotifier {
         clearOcrData: true,
       );
       notifyListeners();
+      _queueManualExpenseDraftSave();
       return true;
     } catch (error) {
       _uiState = _uiState.copyWith(
@@ -448,7 +497,6 @@ class ActivityViewModel extends ChangeNotifier {
   }
 
   void removeReceiptAndOcrData() {
-    unawaited(_clearManualExpenseDraftForSelectedActivity());
     _uiState = _uiState.copyWith(
       receiptLocalPath: '',
       clearOcrData: true,
@@ -464,6 +512,36 @@ class ActivityViewModel extends ChangeNotifier {
       successMessage: '',
     );
     notifyListeners();
+    _queueManualExpenseDraftSave();
+  }
+
+  /// Discards a scan that was not applied without changing manual draft items.
+  void discardPendingReceiptScan({required String originalCurrency}) {
+    _uiState = _uiState.copyWith(
+      receiptLocalPath: '',
+      clearOcrData: true,
+      originalCurrency: originalCurrency,
+      errorMessage: '',
+      successMessage: '',
+    );
+    notifyListeners();
+    _queueManualExpenseDraftSave();
+  }
+
+  /// A rescan is provisional until the tourist applies it. Restore the
+  /// previously applied receipt and OCR metadata if they reject the rescan.
+  void restoreExpenseScanState(ActivityUiState previousState) {
+    if (_uiState.selectedActivity?.activitiesId !=
+        previousState.selectedActivity?.activitiesId) {
+      return;
+    }
+    _uiState = previousState.copyWith(
+      isScanningReceipt: false,
+      errorMessage: '',
+      successMessage: '',
+    );
+    notifyListeners();
+    _queueManualExpenseDraftSave();
   }
 
   /// Replaces the current unsaved items with all item rows detected by OCR.
@@ -509,7 +587,7 @@ class ActivityViewModel extends ChangeNotifier {
         ocrItemIndexes: const {0},
         taxFromOcr: _uiState.ocrExtractedTax != null,
       );
-      unawaited(_clearManualExpenseDraftForSelectedActivity());
+      _queueManualExpenseDraftSave();
       return 1;
     }
 
@@ -525,7 +603,7 @@ class ActivityViewModel extends ChangeNotifier {
       ),
       taxFromOcr: _uiState.ocrExtractedTax != null || inferredTax > 0,
     );
-    unawaited(_clearManualExpenseDraftForSelectedActivity());
+    _queueManualExpenseDraftSave();
     return expenseItems.length;
   }
 
@@ -1025,6 +1103,7 @@ class ActivityViewModel extends ChangeNotifier {
             ? null
             : _uiState.receiptLocalPath,
       );
+      _expenseDraftFormFields = {};
       await _clearManualExpenseDraftForSelectedActivity();
 
       final updatedTrip = await _budgetService.deductRemainingBudget(
@@ -1143,30 +1222,82 @@ class ActivityViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  bool get _hasReceiptOrOcrDraft =>
-      _uiState.receiptLocalPath.isNotEmpty ||
-      _uiState.ocrRawText.isNotEmpty ||
-      _uiState.ocrDraftItemIndexes.isNotEmpty;
-
   String get _manualDraftUserId => _authService.currentUserId ?? '';
 
-  bool get _canUseManualExpenseDraft =>
-      !_hasReceiptOrOcrDraft && _uiState.recordedExpenses.isEmpty;
+  bool get _canUseManualExpenseDraft => _uiState.recordedExpenses.isEmpty;
 
-  Future<void> _saveManualExpenseDraftForSelectedActivity() async {
+  void _queueManualExpenseDraftSave() {
     final selectedActivity = _uiState.selectedActivity;
     if (selectedActivity == null) return;
+    final userId = _manualDraftUserId;
+    final tripId = _uiState.tripId;
+    final activityId = selectedActivity.activitiesId;
+    final canSaveDraft = _canUseManualExpenseDraft;
+    final state = _uiState;
+    final fields = Map<String, dynamic>.from(_expenseDraftFormFields);
+    final draft = <String, dynamic>{
+      'version': 1,
+      'items': state.draftExpenseItems.map((item) => item.toJson()).toList(),
+      'tax': state.draftTaxAmount,
+      'discount': state.draftDiscountAmount,
+      'rounding': state.draftRoundingAmount,
+      'autoRounding': state.draftAutoRounding,
+      'paymentMethod': state.paymentMethod,
+      'receiptLocalPath': state.receiptLocalPath,
+      'ocrRawText': state.ocrRawText,
+      'ocrMerchantName': state.ocrMerchantName,
+      'ocrTransactionDateTime': state.ocrTransactionDateTime?.toIso8601String(),
+      'ocrExtractedTotal': state.ocrExtractedTotal,
+      'ocrExtractedTax': state.ocrExtractedTax,
+      'ocrExtractedDiscount': state.ocrExtractedDiscount,
+      'ocrExtractedRounding': state.ocrExtractedRounding,
+      'ocrItemLines': state.ocrItemLines,
+      'ocrDraftItemIndexes': state.ocrDraftItemIndexes.toList(),
+      'draftTaxFromOcr': state.draftTaxFromOcr,
+      'form': fields,
+    };
+    final hasContent =
+        state.draftExpenseItems.isNotEmpty ||
+        state.receiptLocalPath.isNotEmpty ||
+        state.paymentMethod.isNotEmpty ||
+        state.draftTaxAmount != 0 ||
+        state.draftDiscountAmount != 0 ||
+        state.draftRoundingAmount != 0 ||
+        fields['showItemForm'] == true ||
+        fields['showAdjustments'] == true ||
+        (fields['taxText'] as String? ?? '').isNotEmpty ||
+        (fields['discountText'] as String? ?? '').isNotEmpty ||
+        (fields['roundingText'] as String? ?? '').isNotEmpty;
 
-    if (!_canUseManualExpenseDraft) {
-      await _clearManualExpenseDraftForSelectedActivity();
-      return;
-    }
-
-    await _expenseDraftLocalDataSource.saveDraftItems(
-      userId: _manualDraftUserId,
-      tripId: _uiState.tripId,
-      activityId: selectedActivity.activitiesId,
-      items: _uiState.draftExpenseItems.map((item) => item.toJson()).toList(),
+    _pendingManualDraftSave = _pendingManualDraftSave
+        .catchError((Object error) {
+          debugPrint('[ExpenseDraft] Unable to save manual draft: $error');
+        })
+        .then((_) async {
+          if (canSaveDraft && hasContent) {
+            await _expenseDraftLocalDataSource.saveFullDraft(
+              userId: userId,
+              tripId: tripId,
+              activityId: activityId,
+              draft: draft,
+            );
+          } else {
+            await _expenseDraftLocalDataSource.clearFullDraft(
+              userId: userId,
+              tripId: tripId,
+              activityId: activityId,
+            );
+          }
+          await _expenseDraftLocalDataSource.clearDraftItems(
+            userId: userId,
+            tripId: tripId,
+            activityId: activityId,
+          );
+        });
+    unawaited(
+      _pendingManualDraftSave.catchError((Object error) {
+        debugPrint('[ExpenseDraft] Unable to save manual draft: $error');
+      }),
     );
   }
 
@@ -1175,6 +1306,95 @@ class ActivityViewModel extends ChangeNotifier {
     if (selectedActivity == null || !_canUseManualExpenseDraft) return;
 
     final activityId = selectedActivity.activitiesId;
+    try {
+      await _pendingManualDraftSave;
+    } catch (error) {
+      debugPrint('[ExpenseDraft] Pending save failed before restore: $error');
+    }
+    final fullDraft = await _expenseDraftLocalDataSource.loadFullDraft(
+      userId: _manualDraftUserId,
+      tripId: _uiState.tripId,
+      activityId: activityId,
+    );
+    if (fullDraft != null) {
+      if (_uiState.selectedActivity?.activitiesId != activityId ||
+          !_canUseManualExpenseDraft ||
+          _uiState.draftExpenseItems.isNotEmpty ||
+          _uiState.receiptLocalPath.isNotEmpty ||
+          _uiState.paymentMethod.isNotEmpty ||
+          _expenseDraftFormFields.isNotEmpty) {
+        return;
+      }
+      try {
+        final items = (fullDraft['items'] as List? ?? const [])
+            .whereType<Map>()
+            .map(
+              (item) => ExpenseItem.fromJson(Map<String, dynamic>.from(item)),
+            )
+            .toList();
+        final receiptPath = fullDraft['receiptLocalPath'] as String? ?? '';
+        final validReceiptPath =
+            receiptPath.isNotEmpty && await File(receiptPath).exists()
+            ? receiptPath
+            : '';
+        if (_uiState.selectedActivity?.activitiesId != activityId) return;
+        _expenseDraftFormFields = Map<String, dynamic>.from(
+          fullDraft['form'] as Map? ?? const {},
+        );
+        final tax = (fullDraft['tax'] as num?)?.toDouble() ?? 0;
+        final discount = (fullDraft['discount'] as num?)?.toDouble() ?? 0;
+        final rounding = (fullDraft['rounding'] as num?)?.toDouble() ?? 0;
+        _uiState = _uiState.copyWith(
+          draftExpenseItems: items,
+          draftTaxAmount: tax,
+          draftDiscountAmount: discount,
+          draftRoundingAmount: rounding,
+          draftAutoRounding: fullDraft['autoRounding'] == true,
+          draftTotalAmount: _expenseTrackingService.calculateTotalExpense(
+            items,
+            tax,
+            discount,
+            rounding,
+          ),
+          paymentMethod: fullDraft['paymentMethod'] as String? ?? '',
+          receiptLocalPath: validReceiptPath,
+          ocrRawText: validReceiptPath.isEmpty
+              ? ''
+              : fullDraft['ocrRawText'] as String? ?? '',
+          ocrMerchantName: validReceiptPath.isEmpty
+              ? ''
+              : fullDraft['ocrMerchantName'] as String? ?? '',
+          ocrTransactionDateTime: validReceiptPath.isEmpty
+              ? null
+              : DateTime.tryParse(
+                  fullDraft['ocrTransactionDateTime'] as String? ?? '',
+                ),
+          ocrExtractedTotal: (fullDraft['ocrExtractedTotal'] as num?)
+              ?.toDouble(),
+          ocrExtractedTax: (fullDraft['ocrExtractedTax'] as num?)?.toDouble(),
+          ocrExtractedDiscount: (fullDraft['ocrExtractedDiscount'] as num?)
+              ?.toDouble(),
+          ocrExtractedRounding: (fullDraft['ocrExtractedRounding'] as num?)
+              ?.toDouble(),
+          ocrItemLines: (fullDraft['ocrItemLines'] as List? ?? const [])
+              .whereType<String>()
+              .toList(),
+          ocrDraftItemIndexes: validReceiptPath.isEmpty
+              ? const {}
+              : (fullDraft['ocrDraftItemIndexes'] as List? ?? const [])
+                    .whereType<int>()
+                    .toSet(),
+          draftTaxFromOcr:
+              validReceiptPath.isNotEmpty &&
+              fullDraft['draftTaxFromOcr'] == true,
+        );
+        _expenseDraftRestoreVersion++;
+        notifyListeners();
+        return;
+      } catch (error) {
+        debugPrint('[ExpenseDraft] Error restoring full draft: $error');
+      }
+    }
     final itemsJson = await _expenseDraftLocalDataSource.loadDraftItems(
       userId: _manualDraftUserId,
       tripId: _uiState.tripId,
@@ -1193,6 +1413,7 @@ class ActivityViewModel extends ChangeNotifier {
           .map((itemJson) => ExpenseItem.fromJson(itemJson))
           .toList();
       _updateDraftExpenseItems(restoredItems);
+      _queueManualExpenseDraftSave();
     } catch (error) {
       debugPrint('[ExpenseDraft] Error restoring manual draft: $error');
       await _clearManualExpenseDraftForSelectedActivity();
@@ -1202,11 +1423,25 @@ class ActivityViewModel extends ChangeNotifier {
   Future<void> _clearManualExpenseDraftForSelectedActivity() async {
     final selectedActivity = _uiState.selectedActivity;
     if (selectedActivity == null) return;
+    final userId = _manualDraftUserId;
+    final tripId = _uiState.tripId;
+    final activityId = selectedActivity.activitiesId;
+
+    try {
+      await _pendingManualDraftSave;
+    } catch (error) {
+      debugPrint('[ExpenseDraft] Pending save failed before clear: $error');
+    }
 
     await _expenseDraftLocalDataSource.clearDraftItems(
-      userId: _manualDraftUserId,
-      tripId: _uiState.tripId,
-      activityId: selectedActivity.activitiesId,
+      userId: userId,
+      tripId: tripId,
+      activityId: activityId,
+    );
+    await _expenseDraftLocalDataSource.clearFullDraft(
+      userId: userId,
+      tripId: tripId,
+      activityId: activityId,
     );
   }
 
@@ -1813,6 +2048,10 @@ class ActivityViewModel extends ChangeNotifier {
     return null;
   }
 
+  double roundCurrency(double value) {
+    return double.parse(value.toStringAsFixed(2));
+  }
+
   Future<bool> topUpBudget(double additionalAmount) async {
     debugPrint("Top up Budget");
     if (additionalAmount <= 0) {
@@ -1846,12 +2085,11 @@ class ActivityViewModel extends ChangeNotifier {
           activityId,
         );
 
+        final roundAdditionalAmount = roundCurrency(additionalAmount);
+
         // Calculate the NEW shortage.
         final double newShortageAmount =
-            (_uiState.shortageAmount - additionalAmount).clamp(
-              0.0,
-              double.infinity,
-            );
+            _uiState.shortageAmount - roundAdditionalAmount;
 
         debugPrint('========== TOP UP ==========');
         debugPrint('Previous shortage: ${_uiState.shortageAmount}');
@@ -2287,21 +2525,35 @@ class ActivityViewModel extends ChangeNotifier {
   }
 
   // weisong
-  // Reconciles EVERY trip day against real spending, persists each day's net
-  // overspend (which clears stale day values), and publishes the authoritative
-  // whole-trip overspentBudget to the top card.
+  // Reconciles the whole trip against real spending, in one pass:
+  //   - persists each day's net overspend (clearing stale day values)
+  //   - repairs `remaining_balance` when it has drifted from
+  //     `total_budget - SUM(expenses)`, which the incremental deduct/top-up
+  //     updates cannot detect on their own
+  //   - publishes the authoritative overspentBudget and budget figures to the UI
   Future<void> reconcileTripOverspend() async {
     if (_uiState.tripId.isEmpty) return;
     try {
       final totalTripOverspent = await _budgetService.reconcileTripOverspend(
         tripId: _uiState.tripId,
       );
+      final balance = await _budgetService.reconcileTripBalance(
+        tripId: _uiState.tripId,
+      );
+
       debugPrint(
         '>>> [DEBUG reconcileTripOverspend] Reconciled total overspent: '
         '${totalTripOverspent.toStringAsFixed(2)}',
       );
 
-      _uiState = _uiState.copyWith(overspentBudget: totalTripOverspent);
+      _uiState = _uiState.copyWith(
+        overspentBudget: totalTripOverspent,
+        totalBudget: balance.totalBudget,
+        // remainingBudget is a derived getter (totalBudget - spentBudget), so
+        // keeping spentBudget in step makes the on-screen figure match the
+        // reconciled DB balance.
+        spentBudget: balance.totalSpent,
+      );
       notifyListeners();
     } catch (e) {
       debugPrint('Error reconciling trip overspend: $e');

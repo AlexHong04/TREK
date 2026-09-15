@@ -112,6 +112,8 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     final dLower = destinationName.toLowerCase().trim();
     final descLower = description.toLowerCase().trim();
 
+    if (wLower.isEmpty || (dLower.isEmpty && descLower.isEmpty)) return false;
+
     if (dLower.contains(wLower) || wLower.contains(dLower)) return true;
     if (descLower.contains(wLower)) return true;
 
@@ -125,14 +127,21 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     }
 
     final tokens = wLower
-        .split(RegExp(r'[\s,]+'))
-        .where((t) => t.length >= 3)
+        .split(RegExp(r'[\s,./\-_()]+'))
+        .where((t) => t.length >= 2)
         .toList();
-    if (tokens.length >= 2) {
+    if (tokens.isNotEmpty) {
       final matchedTokens = tokens
-          .where((t) => dLower.contains(t) || cleanD.contains(t))
+          .where((t) =>
+              dLower.contains(t) ||
+              cleanD.contains(t) ||
+              descLower.contains(t))
           .length;
-      if (matchedTokens >= 2) return true;
+      if (tokens.length == 1) {
+        if (matchedTokens == 1) return true;
+      } else if (matchedTokens >= 2 || (matchedTokens * 2 >= tokens.length)) {
+        return true;
+      }
     }
 
     return false;
@@ -190,6 +199,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
     List<TransitPoint>? arrivals,
     List<TransitPoint>? departures,
     List<HotelStay>? hotels,
+    bool isForeign = false,
     String? arrivalLocation,
     String? arrivalTime,
     String? departureLocation,
@@ -209,6 +219,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
       arrivals: arrivals ?? _uiState.arrivals,
       departures: departures ?? _uiState.departures,
       hotels: hotels ?? _uiState.hotels,
+      isForeign: isForeign,
       arrivalLocation: arrivalLocation ?? _uiState.arrivalLocation,
       arrivalTime: arrivalTime ?? _uiState.arrivalTime,
       departureLocation: departureLocation ?? _uiState.departureLocation,
@@ -250,6 +261,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
         arrivals: _uiState.arrivals,
         departures: _uiState.departures,
         hotels: _uiState.hotels,
+        isForeign: _uiState.isForeign,
         arrivalLocation: arrivalLocation ?? _uiState.arrivalLocation,
         arrivalTime: arrivalTime ?? _uiState.arrivalTime,
         departureLocation: departureLocation ?? _uiState.departureLocation,
@@ -295,6 +307,7 @@ class WholeItineraryDetailViewModel extends ChangeNotifier {
       arrivals: _uiState.arrivals,
       departures: _uiState.departures,
       hotels: _uiState.hotels,
+      isForeign: _uiState.isForeign,
       arrivalLocation: _uiState.arrivalLocation,
       arrivalTime: _uiState.arrivalTime,
       departureLocation: _uiState.departureLocation,

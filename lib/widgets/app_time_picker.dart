@@ -243,16 +243,27 @@ class _AppTimePickerDialogState extends State<_AppTimePickerDialog> {
               child: Row(
                 children: [
                   Expanded(
-                    child: _TimePickerActionButton(
-                      label: 'Cancel',
-                      backgroundColor: appTheme.errorRed,
-                      onPressed: () => Navigator.pop(context),
+                    child: SizedBox(
+                      height: 44,
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: appTheme.blue_gray_700,
+                          side: BorderSide(color: appTheme.gray_200),
+                          shape: const StadiumBorder(),
+                          textStyle: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        child: const Text('Cancel'),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: _TimePickerActionButton(
-                      label: 'OK',
+                      label: 'Confirm',
                       backgroundColor: appTheme.teal_A700,
                       onPressed: () => Navigator.pop(context, _pendingTime),
                     ),
