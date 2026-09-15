@@ -245,6 +245,7 @@ class FinancialDashboardScreen extends StatelessWidget {
 
   Widget _buildSummaryCard(FinancialDashboardUiState uiState) {
     return Container(
+      key: const ValueKey('financial-summary-card'),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: appTheme.teal_A700,
@@ -307,14 +308,17 @@ class FinancialDashboardScreen extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          'For ${intl.DateFormat('d MMM, yyyy').format(uiState.selectedDate)}',
-          style: TextStyle(
-            color: appTheme.blue_gray_700,
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
+        Expanded(
+          child: Text(
+            'For ${intl.DateFormat('d MMM, yyyy').format(uiState.selectedDate)}',
+            style: TextStyle(
+              color: appTheme.blue_gray_700,
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
+        const SizedBox(width: 12),
         PopupMenuButton<DashboardFilter>(
           tooltip: 'Filter dashboard',
           onSelected: (filter) async {
@@ -520,23 +524,79 @@ class FinancialDashboardScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        SizedBox(
-          height: 155,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: categories
-                .map(
-                  (item) => Expanded(
-                    child: _ExpenseBars(
-                      category: item,
-                      maximumAmount: maximumAmount,
-                    ),
+        if (categories.isNotEmpty)
+          LayoutBuilder(
+            builder: (context, constraints) {
+              return Stack(
+                key: const ValueKey('expense-chart'),
+                children: [
+                  Column(
+                    children: [
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 130),
+                        child: Align(
+                          alignment: Alignment.bottomCenter,
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: categories
+                                .map(
+                                  (item) => Expanded(
+                                    child: _ExpenseBars(
+                                      category: item,
+                                      maximumAmount: maximumAmount,
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: categories
+                            .map(
+                              (item) => Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                  ),
+                                  child: Text(
+                                    item.name,
+                                    key: ValueKey(
+                                      'expense-category-${item.name}',
+                                    ),
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: appTheme.gray_800,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ],
                   ),
-                )
-                .toList(),
+                  for (var index = 1; index < categories.length; index++)
+                    Positioned(
+                      left:
+                          constraints.maxWidth * index / categories.length -
+                          0.5,
+                      top: 0,
+                      bottom: 0,
+                      width: 1,
+                      child: ColoredBox(
+                        key: ValueKey('expense-category-divider-$index'),
+                        color: appTheme.blue_gray_300,
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
-        ),
         const SizedBox(height: 18),
         Wrap(
           alignment: WrapAlignment.center,
@@ -711,14 +771,17 @@ class _CurrencyAmountPairText extends StatelessWidget {
   final TextStyle secondaryStyle;
   final CrossAxisAlignment crossAxisAlignment;
   final TextAlign textAlign;
+  final bool scaleDown;
 
   const _CurrencyAmountPairText({
+    super.key,
     required this.primaryText,
     required this.secondaryText,
     required this.primaryStyle,
     required this.secondaryStyle,
     this.crossAxisAlignment = CrossAxisAlignment.end,
     this.textAlign = TextAlign.end,
+    this.scaleDown = true,
   });
 
   @override
@@ -727,29 +790,23 @@ class _CurrencyAmountPairText extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: crossAxisAlignment,
       children: [
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            _displayMyrCode(primaryText),
-            maxLines: 1,
-            textAlign: textAlign,
-            style: primaryStyle,
-          ),
-        ),
+        _buildLine(_displayMyrCode(primaryText), primaryStyle),
         if (secondaryText != null) ...[
           const SizedBox(height: 2),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              '≈ ${_displayMyrCode(secondaryText!)}',
-              maxLines: 1,
-              textAlign: textAlign,
-              style: secondaryStyle,
-            ),
-          ),
+          _buildLine('≈ ${_displayMyrCode(secondaryText!)}', secondaryStyle),
         ],
       ],
     );
+  }
+
+  Widget _buildLine(String text, TextStyle style) {
+    final line = Text(
+      text,
+      maxLines: scaleDown ? 1 : null,
+      textAlign: textAlign,
+      style: style,
+    );
+    return scaleDown ? FittedBox(fit: BoxFit.scaleDown, child: line) : line;
   }
 }
 
@@ -1931,95 +1988,148 @@ class _SummaryRow extends StatelessWidget {
     final primaryAmountText = viewModel.formatPrimaryMoney(amount);
     final secondaryAmountText = viewModel.formatSecondaryMoney(amount);
     final amountColor = amount < 0 ? appTheme.errorRed : appTheme.white_A700;
-    return SizedBox(
-      height: secondaryAmountText == null ? 42 : 56,
-      child: Row(
-        children: [
-          Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              color: appTheme.white_A700.withValues(alpha: 0.20),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: appTheme.white_A700, size: 18),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(right: 10),
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  style: TextStyle(
-                    color: appTheme.white_A700,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          SizedBox(
-            width: 140,
-            child: amount < 0
-                ? Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: appTheme.white_A700,
-                      borderRadius: BorderRadius.circular(9),
-                      border: Border.all(
-                        color: appTheme.errorRed.withValues(alpha: 0.20),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.warning_amber_rounded,
-                          color: appTheme.errorRed,
-                          size: 17,
-                        ),
-                        const SizedBox(width: 5),
-                        Expanded(
-                          child: _CurrencyAmountPairText(
-                            primaryText: primaryAmountText,
-                            secondaryText: secondaryAmountText,
-                            primaryStyle: _amountStyle.copyWith(
-                              color: appTheme.errorRed,
-                            ),
-                            secondaryStyle: TextStyle(
-                              color: appTheme.errorRed,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: _CurrencyAmountPairText(
-                      primaryText: primaryAmountText,
-                      secondaryText: secondaryAmountText,
-                      primaryStyle: _amountStyle.copyWith(color: amountColor),
-                      secondaryStyle: TextStyle(
-                        color: appTheme.white_A700.withValues(alpha: 0.88),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-          ),
-        ],
+    final amountText = _CurrencyAmountPairText(
+      key: ValueKey('summary-amount-$label'),
+      primaryText: primaryAmountText,
+      secondaryText: secondaryAmountText,
+      primaryStyle: _amountStyle.copyWith(color: amountColor),
+      secondaryStyle: TextStyle(
+        color: amount < 0
+            ? appTheme.errorRed
+            : appTheme.white_A700.withValues(alpha: 0.88),
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
       ),
     );
+    final amountWidget = amount < 0
+        ? Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: BoxDecoration(
+              color: appTheme.white_A700,
+              borderRadius: BorderRadius.circular(9),
+              border: Border.all(
+                color: appTheme.errorRed.withValues(alpha: 0.20),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.warning_amber_rounded,
+                  color: appTheme.errorRed,
+                  size: 17,
+                ),
+                const SizedBox(width: 5),
+                Expanded(child: amountText),
+              ],
+            ),
+          )
+        : amountText;
+    final iconWidget = Container(
+      width: 30,
+      height: 30,
+      decoration: BoxDecoration(
+        color: appTheme.white_A700.withValues(alpha: 0.20),
+        shape: BoxShape.circle,
+      ),
+      child: Icon(icon, color: appTheme.white_A700, size: 18),
+    );
+    final labelWidget = Text(
+      label,
+      style: TextStyle(
+        color: appTheme.white_A700,
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        height: 1.3,
+      ),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // Reserve enough space for the full currency/amount line, including
+          // the negative balance badge's padding and warning icon.
+          final primaryWidth = _measureTextWidth(
+            context,
+            _displayMyrCode(primaryAmountText),
+            amountText.primaryStyle,
+          );
+          final secondaryWidth = secondaryAmountText == null
+              ? 0.0
+              : _measureTextWidth(
+                  context,
+                  '≈ ${_displayMyrCode(secondaryAmountText)}',
+                  amountText.secondaryStyle,
+                );
+          final requiredAmountWidth =
+              math.max(primaryWidth, secondaryWidth) +
+              (amount < 0 ? 38 : 0) +
+              2;
+          final amountWidth = math.max(
+            constraints.maxWidth * 0.43,
+            requiredAmountWidth,
+          );
+          final textScale = MediaQuery.textScalerOf(context).scale(13) / 13;
+          final useStackedLayout =
+              constraints.maxWidth < 280 ||
+              textScale > 1.38 ||
+              amountWidth > constraints.maxWidth - 52 - 100 * textScale;
+          if (useStackedLayout) {
+            final leadingInset =
+                requiredAmountWidth <= constraints.maxWidth - 40 ? 40.0 : 0.0;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    iconWidget,
+                    const SizedBox(width: 10),
+                    Expanded(child: labelWidget),
+                  ],
+                ),
+                Padding(
+                  padding: EdgeInsets.only(left: leadingInset, top: 8),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: SizedBox(
+                      width: math.min(
+                        amountWidth,
+                        constraints.maxWidth - leadingInset,
+                      ),
+                      child: amountWidget,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }
+          return Row(
+            children: [
+              iconWidget,
+              const SizedBox(width: 10),
+              Expanded(child: labelWidget),
+              const SizedBox(width: 12),
+              SizedBox(width: amountWidth, child: amountWidget),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  double _measureTextWidth(BuildContext context, String text, TextStyle style) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: DefaultTextStyle.of(context).style.merge(style),
+      ),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+    )..layout();
+    final width = painter.width.ceilToDouble();
+    painter.dispose();
+    return width;
   }
 
   TextStyle get _amountStyle => TextStyle(
@@ -2057,7 +2167,7 @@ class _LegendChip extends StatelessWidget {
               children: [
                 Container(width: 8, height: 8, color: color),
                 const SizedBox(width: 10),
-                Text(label),
+                Flexible(child: Text(label)),
               ],
             ),
           ),
@@ -2083,50 +2193,42 @@ class _ExpenseBars extends StatelessWidget {
       return math.max(8, 88 * amount / maximumAmount);
     }
 
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-              child: _AmountBar(
-                amount: category.budget,
-                height: barHeight(category.budget),
-                color: appTheme.blue_gray_700,
-              ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Expanded(
+            child: _AmountBar(
+              barKey: ValueKey('expense-budget-${category.name}'),
+              amount: category.budget,
+              height: barHeight(category.budget),
+              color: appTheme.blue_gray_700,
             ),
-            const SizedBox(width: 4),
-            Expanded(
-              child: _AmountBar(
-                amount: category.expense,
-                height: barHeight(category.expense),
-                color: expenseColor,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Text(
-          category.name,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: appTheme.gray_800,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
           ),
-        ),
-      ],
+          const SizedBox(width: 6),
+          Expanded(
+            child: _AmountBar(
+              barKey: ValueKey('expense-actual-${category.name}'),
+              amount: category.expense,
+              height: barHeight(category.expense),
+              color: expenseColor,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
 class _AmountBar extends StatelessWidget {
+  final Key barKey;
   final double amount;
   final double height;
   final Color color;
 
   const _AmountBar({
+    required this.barKey,
     required this.amount,
     required this.height,
     required this.color,
@@ -2154,6 +2256,7 @@ class _AmountBar extends StatelessWidget {
         _CurrencyAmountPairText(
           primaryText: primaryAmountText,
           secondaryText: secondaryAmountText,
+          scaleDown: false,
           textAlign: TextAlign.center,
           crossAxisAlignment: CrossAxisAlignment.center,
           primaryStyle: TextStyle(
@@ -2169,6 +2272,7 @@ class _AmountBar extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Container(
+          key: barKey,
           width: 12,
           height: height,
           decoration: BoxDecoration(
@@ -2198,12 +2302,14 @@ class _DotLegend extends StatelessWidget {
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 7),
-        Text(
-          label,
-          style: TextStyle(
-            color: appTheme.blue_gray_700,
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
+        Flexible(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: appTheme.blue_gray_700,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
       ],
@@ -2284,9 +2390,11 @@ class _BreakdownRow extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 9),
-                Text(
-                  category.name,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
+                Flexible(
+                  child: Text(
+                    category.name,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
                 ),
               ],
             ),

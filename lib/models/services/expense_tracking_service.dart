@@ -1772,8 +1772,9 @@ class ExpenseTrackingService implements IExpenseTrackingService {
   ) {
     if (!discountAmount.isFinite ||
         discountAmount < 0 ||
-        discountAmount > maxSafeExpenseAmount) {
-      throw ArgumentError('Enter a valid discount amount.');
+        discountAmount > maxSafeExpenseAmount ||
+        (discountAmount != 0 && discountAmount < 0.10)) {
+      throw ArgumentError('Discount must be 0.00 or at least RM0.10.');
     }
     if (!roundingAmount.isFinite || roundingAmount.abs() > 1) {
       throw ArgumentError('Rounding must be between -1.00 and 1.00.');
@@ -2104,7 +2105,7 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     debugPrint("🔥 calculateOverspendPercentage CALLED");
 
     // final double allocatedBudget = currentActivity.allocatedBudget;
-    final double allocatedBudget = currentActivity.allocatedBudget <= 0
+    final double allocatedBudget = currentActivity.allocatedBudget <= 10
         ? 10.0
         : currentActivity.allocatedBudget;
 

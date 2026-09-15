@@ -537,16 +537,7 @@ class ItineraryService implements IItineraryService {
               ? arrivalTime
               : '09:00 AM');
 
-      final String rawStartTime;
-      if (!isForeign &&
-          departures != null &&
-          departures.isNotEmpty &&
-          departures.first.location.trim().isNotEmpty &&
-          departures.first.time.trim().isNotEmpty) {
-        rawStartTime = departures.first.time;
-      } else {
-        rawStartTime = rawArrivalTime;
-      }
+      final String rawStartTime = rawArrivalTime;
       final int expectedDay1StartMinutes =
           _timeToMinutes(rawStartTime, 9 * 60);
 
@@ -558,19 +549,7 @@ class ItineraryService implements IItineraryService {
               ? departureTime
               : '09:00 PM');
 
-      final String rawEndTime;
-      if (!isForeign) {
-        if (departures != null &&
-            departures.length > 1 &&
-            departures.last.location.trim().isNotEmpty &&
-            departures.last.time.trim().isNotEmpty) {
-          rawEndTime = departures.last.time;
-        } else {
-          rawEndTime = '09:00 PM';
-        }
-      } else {
-        rawEndTime = rawDepartureTime;
-      }
+      final String rawEndTime = rawDepartureTime;
       final int expectedLastDayEndMinutes =
           _timeToMinutes(rawEndTime, 21 * 60);
 
@@ -674,10 +653,15 @@ class ItineraryService implements IItineraryService {
             ? (rawMinPrice != null && rawMinPrice > 0 ? rawMinPrice : 8.0)
             : rawAllocated;
 
-        final double? minPriceLocal =
+        double? minPriceLocal =
             isRestaurant && (rawMinPrice == null || rawMinPrice <= 0.0)
                 ? 5.0
                 : rawMinPrice;
+
+        // Ensure minimum floor price never exceeds allocated budget
+        if (minPriceLocal != null && minPriceLocal > allocatedBudget && allocatedBudget > 0) {
+          minPriceLocal = allocatedBudget;
+        }
 
         final destName = item['destination'] as String? ?? 'Activity';
         final imageKeyword = item['imageKeyword'] as String? ?? destName;
@@ -1683,13 +1667,32 @@ class ItineraryService implements IItineraryService {
         } catch (_) {}
       }
 
-      final double allocatedBudget =
+      final rawAllocated =
           (item?['allocatedBudget'] as num?)?.toDouble() ?? 0.0;
       final category =
           (item?['activityCategory'] as String?) ??
           (slot.activityCategory.isNotEmpty
               ? slot.activityCategory
               : 'Attraction');
+      final isRestaurant = category.toLowerCase() == 'restaurant';
+
+      final rawMinPrice = item?['minPrice'] != null
+          ? (item?['minPrice'] as num).toDouble()
+          : null;
+
+      final double allocatedBudget = (isRestaurant && rawAllocated <= 0.0)
+          ? (rawMinPrice != null && rawMinPrice > 0 ? rawMinPrice : 8.0)
+          : rawAllocated;
+
+      double? minPriceLocal =
+          isRestaurant && (rawMinPrice == null || rawMinPrice <= 0.0)
+              ? 5.0
+              : rawMinPrice;
+
+      // Ensure minimum floor price never exceeds allocated budget
+      if (minPriceLocal != null && minPriceLocal > allocatedBudget && allocatedBudget > 0) {
+        minPriceLocal = allocatedBudget;
+      }
 
       resultActivities.add(
         Activity(
@@ -1700,6 +1703,7 @@ class ItineraryService implements IItineraryService {
           activityImgUrl: imgUrl,
           date: slot.date,
           allocatedBudget: allocatedBudget,
+          minAllocatedBudget: minPriceLocal,
           overspendAmount: allocatedBudget > 0 ? 0 : null,
           status: 'pending',
           startTime:

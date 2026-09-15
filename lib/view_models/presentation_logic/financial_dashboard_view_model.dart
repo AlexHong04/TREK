@@ -713,22 +713,35 @@ class DashboardDonutChartPainter extends CustomPainter {
           ..strokeWidth = 1.2,
       );
 
+      // Extremely long currency labels must fit inside the paint area before
+      // clamping their position; otherwise the clamp's upper bound is invalid.
+      final labelScale = math.min(
+        1.0,
+        math.min(
+          math.max(1.0, size.width - 8) / textPainter.width,
+          math.max(1.0, size.height - 8) / textPainter.height,
+        ),
+      );
+      final labelSize = textPainter.size * labelScale;
       final desiredOffset = _labelOffset(
         anchor: labelAnchor,
         direction: direction,
-        textSize: textPainter.size,
+        textSize: labelSize,
       );
-      textPainter.paint(
-        canvas,
-        Offset(
-          desiredOffset.dx
-              .clamp(4, size.width - textPainter.width - 4)
-              .toDouble(),
-          desiredOffset.dy
-              .clamp(4, size.height - textPainter.height - 4)
-              .toDouble(),
-        ),
+      final labelOffset = Offset(
+        desiredOffset.dx
+            .clamp(4, math.max(4.0, size.width - labelSize.width - 4))
+            .toDouble(),
+        desiredOffset.dy
+            .clamp(4, math.max(4.0, size.height - labelSize.height - 4))
+            .toDouble(),
       );
+      canvas.save();
+      canvas.translate(labelOffset.dx, labelOffset.dy);
+      canvas.scale(labelScale);
+      textPainter.paint(canvas, Offset.zero);
+      canvas.restore();
+      textPainter.dispose();
       startAngle += sweep;
     }
   }

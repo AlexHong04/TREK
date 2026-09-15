@@ -27,6 +27,7 @@ class CustomTextField extends StatefulWidget {
   final List<TextInputFormatter>? inputFormatters;
   final FocusNode? focusNode;
   final String? errorText;
+  final String? warningText;
   final int errorMaxLines;
   final Widget? bottomWidget;
   final Widget? suffixIcon;
@@ -57,6 +58,7 @@ class CustomTextField extends StatefulWidget {
     this.inputFormatters,
     this.focusNode,
     this.errorText,
+    this.warningText,
     this.errorMaxLines = 3,
     this.bottomWidget,
     this.suffixIcon,
@@ -186,15 +188,30 @@ class _CustomTextFieldState extends State<CustomTextField> {
                     : appTheme.gray_200,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12.0),
-                  borderSide: BorderSide(color: appTheme.gray_200, width: 1.0),
+                  borderSide: BorderSide(
+                    color: (widget.warningText != null && widget.warningText!.trim().isNotEmpty)
+                        ? const Color(0xFFFCD34D)
+                        : appTheme.gray_200,
+                    width: 1.0,
+                  ),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12.0),
-                  borderSide: BorderSide(color: appTheme.gray_200, width: 1.0),
+                  borderSide: BorderSide(
+                    color: (widget.warningText != null && widget.warningText!.trim().isNotEmpty)
+                        ? const Color(0xFFFCD34D)
+                        : appTheme.gray_200,
+                    width: (widget.warningText != null && widget.warningText!.trim().isNotEmpty) ? 1.2 : 1.0,
+                  ),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12.0),
-                  borderSide: BorderSide(color: appTheme.teal_A700, width: 1.0),
+                  borderSide: BorderSide(
+                    color: (widget.warningText != null && widget.warningText!.trim().isNotEmpty)
+                        ? const Color(0xFFD97706)
+                        : appTheme.teal_A700,
+                    width: 1.5,
+                  ),
                 ),
                 disabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12.0),
@@ -218,6 +235,51 @@ class _CustomTextFieldState extends State<CustomTextField> {
               validator: widget.validator,
             ),
           ),
+          if (widget.warningText != null &&
+              widget.warningText!.trim().isNotEmpty &&
+              (widget.errorText == null || widget.errorText!.isEmpty)) ...[
+            const SizedBox(height: 8.0),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12.0,
+                vertical: 8.0,
+              ),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(10.0),
+                border: Border.all(
+                  color: const Color(0xFFFDE68A),
+                  width: 1.0,
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.only(top: 1.5),
+                    child: Icon(
+                      Icons.info_outline_rounded,
+                      size: 15.0,
+                      color: Color(0xFFD97706),
+                    ),
+                  ),
+                  const SizedBox(width: 8.0),
+                  Expanded(
+                    child: Text(
+                      widget.warningText!,
+                      style: const TextStyle(
+                        fontSize: 12.0,
+                        fontFamily: 'Inter',
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFFB45309),
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           if (widget.bottomWidget != null) ...[
             const SizedBox(height: 12.0),
             widget.bottomWidget!,

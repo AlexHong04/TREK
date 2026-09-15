@@ -2005,7 +2005,8 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         !discount.isFinite ||
         tax > ExpenseTrackingService.maxSafeExpenseAmount ||
         discount > ExpenseTrackingService.maxSafeExpenseAmount ||
-        rounding.abs() > 1)
+        rounding.abs() > 1 ||
+        (discount != 0 && discount < 0.10))
       return;
     context.read<ActivityViewModel>().setDraftAdjustments(
       tax,
@@ -2038,9 +2039,10 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
         !discount.isFinite ||
         tax > ExpenseTrackingService.maxSafeExpenseAmount ||
         discount > ExpenseTrackingService.maxSafeExpenseAmount ||
-        rounding.abs() > 1) {
+        rounding.abs() > 1 ||
+        (discount != 0 && discount < 0.10)) {
       _showValidationMessage(
-        'Enter valid tax and discount amounts. Rounding must be within -1.00 to 1.00.',
+        'Enter a valid discount. Discount must be 0.00 or at least RM0.10; rounding must be between -1.00 and 1.00.',
       );
       return;
     }
@@ -2235,10 +2237,9 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
 
     final uiState = viewModel.uiState;
     if (uiState.errorMessage.isNotEmpty) {
-      if (hadAppliedReceipt) {
-        viewModel.restoreExpenseScanState(stateBeforeScan);
-      }
-      _showValidationMessage(uiState.errorMessage);
+      final scanError = uiState.errorMessage;
+      rejectScan();
+      _showValidationMessage(scanError);
       return;
     }
 
@@ -2655,7 +2656,13 @@ class _ExpenseBottomSheetState extends State<ExpenseBottomSheet> {
     if (recordAnotherExpense) {
       _startAnotherExpenseForActivity();
     } else {
-      Navigator.pop(context);
+      // Keep the sheet open and show the refreshed recorded-expenses list.
+      setState(() {
+        _isRecordingNewExpense = false;
+        _showItemForm = false;
+        _editingItemIndex = null;
+        _hasUnfinishedItemFormChanges = false;
+      });
     }
   }
 
