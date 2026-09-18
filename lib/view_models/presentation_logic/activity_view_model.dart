@@ -2163,8 +2163,6 @@ class ActivityViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Snapshot the original allocated budget BEFORE processExpense() runs
-      // the reallocation, which modifies allocatedBudget in the DB.
       final currentActivity = _uiState.activities.firstWhere(
         (a) => a.activitiesId == _uiState.currentActivityId,
         orElse: () => _uiState.selectedActivity ?? _uiState.activities.first,
@@ -2200,9 +2198,7 @@ class ActivityViewModel extends ChangeNotifier {
         _uiState.currentActivityId,
       );
 
-      // Compute exceeded amount using the ORIGINAL allocated budget
-      // (before reallocation modified it in the DB), so the figure
-      // matches what the user saw on screen.
+      // Compute exceeded amount
       final double activitySpent =
           _uiState.activitySpentMap[_uiState.currentActivityId] ?? 0.0;
       var exceededAmount = activitySpent - originalAllocatedBudget;
