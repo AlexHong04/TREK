@@ -21,7 +21,7 @@ class OpenRouteServiceApiConfig {
 
   /// Default OpenRouteService public developer key.
   static String _currentApiKey =
-      'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImUwNmY1MGVkY2Y1NTQzZTJiZGRkMTAwMWJlOWU1ZmE0IiwiaCI6Im11cm11cjY0In0=';
+      'YOUR_OPEN_ROUTE_SERVICE_API_KEY_HERE';
 
   /// Set or update the API Key in memory and persistence.
   static Future<void> setApiKey(String key) async {
