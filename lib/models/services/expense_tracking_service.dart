@@ -2070,8 +2070,6 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     Activity currentActivity,
     double overspentAmount,
   ) async {
-    debugPrint("Reallocating budget...");
-
     final List<Activity> modifiedActivities = await _budgetService
         .reallocateBudget(tripId, currentActivity, overspentAmount);
 
@@ -2083,8 +2081,6 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     Activity currentActivity,
     double overspentAmount,
   ) async {
-    debugPrint("🔥 calculateOverspendPercentage CALLED");
-
     // final double allocatedBudget = currentActivity.allocatedBudget;
     final double allocatedBudget = currentActivity.allocatedBudget <= 10
         ? 10.0
