@@ -2159,8 +2159,6 @@ class ActivityViewModel extends ChangeNotifier {
   }
 
   Future<void> handleExpenseSubmission() async {
-    debugPrint("zq handleExpenseSubmission");
-
     _uiState = _uiState.copyWith(isLoading: true);
     notifyListeners();
 
@@ -2173,27 +2171,15 @@ class ActivityViewModel extends ChangeNotifier {
       );
       final double originalAllocatedBudget = currentActivity.allocatedBudget;
 
-      debugPrint(
-        '[handleExpenseSubmission] Original allocated budget for '
-        '${currentActivity.activitiesId}: RM${originalAllocatedBudget.toStringAsFixed(2)}',
-      );
-
       final response = await _expenseTrackingService.processExpense(
         tripId: _uiState.tripId,
         currentActivityId: _uiState.currentActivityId,
       );
 
-      debugPrint("result: ${response}");
-
       await refreshSpentAmounts();
 
-      // Re-fetch activities from the DB so the UI picks up the reallocated
-      // allocatedBudget values that processExpense() / reallocateBudget()
-      // just wrote.
       await refreshActivitiesFromDb();
 
-      // Reconciles the current day's budget in the DB and updates the
-      // trip-level overspentBudget from the reconciled data (authoritative).
       await evaluateDayOverspend(
         dayTripId: currentActivity.dayTripId,
         date: currentActivity.date,
@@ -2222,24 +2208,7 @@ class ActivityViewModel extends ChangeNotifier {
       var exceededAmount = activitySpent - originalAllocatedBudget;
       if (exceededAmount < 0) exceededAmount = 0.0;
 
-      debugPrint(
-        '[handleExpenseSubmission] Exceeded = spent($activitySpent) - '
-        'originalBudget($originalAllocatedBudget) = $exceededAmount',
-      );
-      // final days = await _itineraryService.getDaysByTripId(_uiState.tripId);
-      //
-      // double overspend = 0.00;
-      //
-      // for (var day in days) {
-      //   overspend += day.overspendAmount!;
-      // }
-
       _uiState = _uiState.copyWith(
-        // NOTE: overspentBudget is intentionally left untouched here - it was
-        // already set by evaluateDayOverspend() from the reconciled DB days.
-        // Re-writing it with a stale/pre-reconcile value caused the OVERSPENT
-        // card to jump to an incorrect figure after expense submission.
-        // overspentBudget: overspend,
         shortageAmount: shortageAmount,
         sufficientDays: sufficientDays,
         exceededAmount: exceededAmount,

@@ -1908,26 +1908,18 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       totalActivityExpense += expense.totalAmount;
     }
 
-    debugPrint('Total activity expense: RM$totalActivityExpense');
-
     double totalAllocatedBudget = 0.00;
 
     for (final activity in activities) {
       totalAllocatedBudget += activity.allocatedBudget;
     }
 
-    debugPrint("total allocated budget: ${totalAllocatedBudget}");
-
     final double remainingBudget = currentTrip.remainingBalance ?? 0.00;
-
-    debugPrint("remaining budget: ${remainingBudget}");
 
     // Get current activity
     final currentActivity = await _itineraryRepository.getCurrentActivity(
       currentActivityId,
     );
-
-    debugPrint("activity allocated budget: ${currentActivity.allocatedBudget}");
 
     // Get current day
     final currentDay = await _itineraryRepository.getCurrentDay(
@@ -1941,8 +1933,6 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       totalActivityExpense,
     );
 
-    debugPrint("Is overspend: $isOverspend");
-
     if (!isOverspend) {
       return ExpenseProcessingResult.withinBudget;
     }
@@ -1950,12 +1940,6 @@ class ExpenseTrackingService implements IExpenseTrackingService {
     // Calculate overspent amount
     final double overspentAmount =
         totalActivityExpense - currentActivity.allocatedBudget;
-    // final double previousActivityOverspend =
-    //     currentActivity.overspendAmount ?? 0.0;
-    // final double overspendIncrease =
-    //     overspentAmount - previousActivityOverspend;
-
-    debugPrint("Overspent amount: $overspentAmount");
 
     // Update current activity
     final updatedActivity = currentActivity.copyWith(
@@ -1963,7 +1947,6 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       isOverspend: true,
     );
 
-    debugPrint("updated activity overspend ${updatedActivity.overspendAmount}");
     // Update current day
     final existingCategories =
         currentDay.overspendCategory
@@ -1993,8 +1976,6 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       updatedActivity,
     );
 
-    debugPrint("Update overspend details success: $success");
-
     if (!success) {
       throw Exception('Update overspend details failed: $success');
     }
@@ -2014,8 +1995,6 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       remainingBudget,
     );
 
-    debugPrint("Is critical: $isCritical");
-
     if (isCritical) {
       final success = await _itineraryRepository.updateCriticalDetails(tripId);
       if (success) {
@@ -2024,30 +2003,7 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       throw Exception('Update critical details failed: $success');
     }
 
-    // A slot with NO allocated budget was never funded - free landmarks are
-    // generated at 0.0, and transportation frequently comes back as 0 too. So
-    // spending on it is UNPLANNED spend rather than a budget breach, and the
-    // activity-level machinery is a poor fit for it: the "threshold" is only an
-    // artefact of flooring a zero allocation to RM10 (giving an RM11.50 limit),
-    // and acting on it would re-allocate future restaurants or re-plan the whole
-    // trip over what is often a RM1 fare.
-    //
-    // The spend has ALREADY been taken out of the trip's balance by
-    // deductRemainingBudget() when the expense was confirmed, so absorbing it
-    // here is all that is needed: leave the future allocations untouched and let
-    // the regular near/over-budget notification tell the tourist.
-    //
-    // This sits after the trip-level critical check on purpose, so a genuinely
-    // unaffordable trip is never hidden - it just cannot be escalated by an
-    // unfunded slot on its own.
     if (currentActivity.allocatedBudget <= 0) {
-      debugPrint(
-        'Zero-allocated slot overspent by '
-        'RM${overspentAmount.toStringAsFixed(2)} - absorbed from trip slack '
-        '(buffer RM${(remainingBudget - totalAllocatedBudget).toStringAsFixed(2)}). '
-        'No reallocation or re-plan.',
-      );
-
       return ExpenseProcessingResult.withinBudget;
     }
 
@@ -2056,8 +2012,6 @@ class ExpenseTrackingService implements IExpenseTrackingService {
       currentActivity,
       overspentAmount,
     );
-
-    debugPrint("Is above threshold: $isAboveThreshold");
 
     // Above threshold - trigger recommendation
     if (isAboveThreshold) {
