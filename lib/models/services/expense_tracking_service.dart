@@ -2090,10 +2090,6 @@ class ExpenseTrackingService implements IExpenseTrackingService {
         ? 10.0
         : currentActivity.allocatedBudget;
 
-    debugPrint("allocated budget: ${allocatedBudget}");
-    debugPrint("current activity: ${currentActivity.activitiesId}");
-    debugPrint("current activity: ${currentActivity.description}");
-
     double overspendThresholdPercentage;
 
     if (allocatedBudget <= 100.0) {
