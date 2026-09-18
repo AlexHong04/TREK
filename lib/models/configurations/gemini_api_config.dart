@@ -53,7 +53,7 @@ class GeminiReceiptParseResult {
 class GeminiApiConfig {
   // Gemini API Key
   static const String _apiKey =
-      'AQ.Ab8RN6Lymr_XH98EC38B2Po-XWNQmqksO4uCMLPgzCfWmCHSPA';
+      'YOUR_GOOGLE_GEMINI_API_KEY_HERE';
 
   static late final GenerativeModel _model;
 

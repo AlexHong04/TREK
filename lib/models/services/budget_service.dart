@@ -347,9 +347,6 @@ class BudgetService implements IBudgetService {
 
     final double storedBalance = trip.remainingBalance ?? 0.0;
 
-    // Defensive: with no activities there is nothing to verify the balance
-    // against, and summing an empty set would wrongly restore the full budget
-    // even when orphaned expenses still exist. Leave the stored value alone.
     if (activities.isEmpty) {
       debugPrint(
         '[reconcileTripBalance] No activities for trip $tripId - '
@@ -375,19 +372,6 @@ class BudgetService implements IBudgetService {
 
     final double authoritativeBalance = trip.totalBudget - totalSpent;
     final double drift = storedBalance - authoritativeBalance;
-
-    debugPrint('========== TRIP BALANCE RECONCILIATION ==========');
-    debugPrint('Trip: $tripId');
-    debugPrint(
-      'Total budget:          RM ${trip.totalBudget.toStringAsFixed(2)}',
-    );
-    debugPrint('Total spent:           RM ${totalSpent.toStringAsFixed(2)}');
-    debugPrint('Stored balance:        RM ${storedBalance.toStringAsFixed(2)}');
-    debugPrint(
-      'Authoritative balance: RM ${authoritativeBalance.toStringAsFixed(2)}',
-    );
-    debugPrint('Drift: RM ${drift.toStringAsFixed(2)}');
-    debugPrint('==================================================');
 
     // Only write when the stored value is actually out of sync.
     if (drift.abs() > 0.001) {
