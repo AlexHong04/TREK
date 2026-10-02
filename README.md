@@ -33,8 +33,8 @@
 ## 📱 UI Showcase & Screens
 
 <div align="center">
-  <img src="assets/trek_ui_showcase.jpg" alt="TREK UI Showcase Mockup" width="100%" style="border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.25);"/>
-  <p><em>Figure 1: High-fidelity mobile interface showcase of TREK — Home & Ongoing Trip, Daily Activity Timeline, and Financial Budget Dashboard with OCR scanner.</em></p>
+  <img src="assets/trek_ui_showcase.jpg" alt="TREK UI Showcase Mockup" width="100%" style="border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.12);"/>
+  <p><em>Figure 1: High-fidelity mobile interface showcase of TREK — 01. Home & Ongoing Trip, 02. Travel Information Input, and 03. Daily Activity Schedule with Budget Tracking.</em></p>
 </div>
 
 > [!TIP]
@@ -44,10 +44,11 @@
 
 ### 📱 Core Screen Highlights
 
-| 01 • Trip Dashboard | 02 • Activity Timeline | 03 • Expense & OCR Tracker |
+| 01 • Home Dashboard | 02 • Travel Information Input | 03 • Daily Activity Schedule |
 | :---: | :---: | :---: |
-| <img src="assets/header_logo.png" width="120" /><br/>**Ongoing Itinerary Card** | ⏱️ **Day-by-Day Timeline** | 💳 **Real-time Budgeting** |
-| • Quick status indicators (`Ongoing`, `Active`)<br/>• Dual-currency estimation (MYR ⇄ JPY)<br/>• "Start Plan" & "Plan New" instant actions<br/>• Personalized user greeting & stats | • Multi-day interactive switcher<br/>• Transit duration & mode badges (Walking, Train)<br/>• Activity booking status & ticket IDs<br/>• Integrated OSM route check | • Dynamic budget consumption progress bar<br/>• Categorized expenses (Food, Transport, Stay)<br/>• **Google ML Kit OCR** receipt digitizer<br/>• Smart overspend alerts |
+| 🏠 **Trip Hub & Greetings** | 📝 **AI Travel Configurator** | ⏱️ **Daily Schedule & Budget** |
+| • Personalized greeting (`Hi, Alex`)<br/>• **Active Plan Card** with `Ongoing` tag<br/>• Dual-currency display (`MYR 4,500 ≈ JPY 150,000`)<br/>• Direct actions: **Start Plan** & **Plan New** | • Destination input with GPS pin<br/>• Date range selector (e.g. 7 Days)<br/>• Currency & total budget limit setup<br/>• Wishlist chips & transit/hotel details<br/>• **"Generate Itinerary with AI"** CTA | • Day switcher (`Day 1 of 7 • Oct 12`)<br/>• Real-time **Budget Progress Bar** (`28% used`)<br/>• Metric stats (`Spent`, `Remaining`, `Overspent`)<br/>• Day timeline cards with time badges & tags |
+
 
 ---
 
