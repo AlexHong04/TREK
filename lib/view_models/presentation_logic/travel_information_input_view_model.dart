@@ -1100,7 +1100,9 @@ class TravelInformationInputViewModel extends ChangeNotifier {
       );
       notifyListeners();
 
-      if (updatedDepartures[index].type.toLowerCase() == 'bus' &&
+      // Bus: road routing. Train: the real KTMB train closest to this time.
+      final legType = updatedDepartures[index].type.toLowerCase();
+      if ((legType == 'bus' || legType == 'train') &&
           targetArrIndex < _uiState.arrivals.length) {
         syncLegArrivalWithDepartureDurationAsync(targetArrIndex);
       }
@@ -1150,6 +1152,8 @@ class TravelInformationInputViewModel extends ChangeNotifier {
             fromLocation: prevDep.location,
             toLocation: curArr.location,
             selectedDestinations: _uiState.selectedDestinations,
+            departureDate: prevDep.date,
+            departureTimeStr: prevDep.time,
           );
       final calc = TransitScheduleHelper.calculateArrivalDateTime(
         departureDate: prevDep.date,
@@ -1440,6 +1444,29 @@ class TravelInformationInputViewModel extends ChangeNotifier {
           if (!isAvailable) {
             return 'Transit ${i + 1}: No direct $mode route available from "$depLoc" to "$arrLoc". Please select a connected route or change transit mode.';
           }
+        }
+      }
+    }
+
+    // 4c. Continuity: you can only leave from where you arrived. Each transit
+    // arrival must be followed by a departure from the same area (e.g. arrive
+    // at Penang Airport -> next departure must also be in Penang). The Start
+    // arrival (landing in Malaysia) is not checked, because the traveller
+    // tours the chosen destinations between landing and the first transit.
+    // Unknown places are skipped rather than rejected.
+    for (int i = 1; i < transitCount; i++) {
+      if (i < arrivals.length && i < departures.length) {
+        final arrLoc = arrivals[i].location.trim();
+        final depLoc = departures[i].location.trim();
+        if (arrLoc.isEmpty || depLoc.isEmpty) continue;
+        if (TransitScheduleHelper.isSameTravelArea(arrLoc, depLoc) == false) {
+          final isEnd = i == transitCount - 1;
+          final next = isEnd ? 'End Departure' : 'Transit ${i + 1} departure';
+          final arrArea = TransitScheduleHelper.travelArea(arrLoc);
+          final depArea = TransitScheduleHelper.travelArea(depLoc);
+          return 'Transit $i arrives at "$arrLoc" ($arrArea), but your $next '
+              'leaves from "$depLoc" ($depArea). Choose a departure hub in '
+              '$arrArea, or add a transit leg that takes you to $depArea.';
         }
       }
     }

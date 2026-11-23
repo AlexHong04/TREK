@@ -8,6 +8,7 @@ import '../entities/future_suggestion.dart';
 import '../../view_models/ui_state/travel_information_ui_state.dart';
 import '../configurations/gemini_api_config.dart';
 import '../configurations/google_places_api_config.dart';
+import '../configurations/free_place_search_config.dart';
 import '../configurations/image_resolver_config.dart';
 import '../repository/itinerary_repository.dart';
 import '../repository/i_itinerary_repository.dart';
@@ -1861,6 +1862,12 @@ class ItineraryService implements IItineraryService {
     String query, {
     List<String>? destinations,
   }) async {
+    if (!GooglePlacesApiConfig.isConfigured) {
+      return FreePlaceSearchConfig.getAutocompleteSuggestions(
+        query,
+        destinations: destinations,
+      );
+    }
     return await GooglePlacesApiConfig.getAutocompleteSuggestions(
       query,
       destinations: destinations,
@@ -1872,6 +1879,12 @@ class ItineraryService implements IItineraryService {
     String query, {
     List<String>? destinations,
   }) async {
+    if (!GooglePlacesApiConfig.isConfigured) {
+      return FreePlaceSearchConfig.getAirportAutocompleteSuggestions(
+        query,
+        destinations: destinations,
+      );
+    }
     return await GooglePlacesApiConfig.getAirportAutocompleteSuggestions(
       query,
       destinations: destinations,
@@ -1883,6 +1896,12 @@ class ItineraryService implements IItineraryService {
     String query, {
     List<String>? destinations,
   }) async {
+    if (!GooglePlacesApiConfig.isConfigured) {
+      return FreePlaceSearchConfig.getHotelAutocompleteSuggestions(
+        query,
+        destinations: destinations,
+      );
+    }
     return await GooglePlacesApiConfig.getHotelAutocompleteSuggestions(
       query,
       destinations: destinations,

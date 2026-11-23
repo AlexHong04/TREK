@@ -8,14 +8,17 @@ class SupabaseConfig {
   static const String passwordResetCallbackUrl =
       'io.supabase.trek://reset-password-callback/';
 
-  static Future<void> initialize() async {
-    const supabaseUrl = 'https://viworhiiejptvsjajgit.supabase.co';
-    const supabaseAnonKey =
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpd29yaGlpZWpwdHZzamFqZ2l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMTQ2NTksImV4cCI6MjEwMTU5MDY1OX0.pKPZa9Ihu4YbpXvl8sBiXcD_fZ7KviDvx8oFUox5_rc';
+  static const String url = 'https://viworhiiejptvsjajgit.supabase.co';
+  static const String anonKey =
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpd29yaGlpZWpwdHZzamFqZ2l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMTQ2NTksImV4cCI6MjEwMTU5MDY1OX0.pKPZa9Ihu4YbpXvl8sBiXcD_fZ7KviDvx8oFUox5_rc';
 
+  /// Base URL of this project's Edge Functions.
+  static const String functionsUrl = '$url/functions/v1';
+
+  static Future<void> initialize() async {
     await Supabase.initialize(
-      url: supabaseUrl,
-      publishableKey: supabaseAnonKey,
+      url: url,
+      publishableKey: anonKey,
     );
 
     client = Supabase.instance.client;

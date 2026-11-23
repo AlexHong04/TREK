@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import 'app_secrets.dart';
+
 /// Thrown when the Google Places API returns REQUEST_DENIED or similar
 /// non-recoverable API-level errors (e.g. key not enabled).
 class PlacesApiDeniedException implements Exception {
@@ -13,12 +15,11 @@ class PlacesApiDeniedException implements Exception {
 }
 
 class GooglePlacesApiConfig {
-  // Google Places API Key.
-  static const String _apiKey = 'YOUR_GOOGLE_PLACE_API_KEY_HERE';
+  // Google Places API Key, injected at build time (see AppSecrets).
+  static const String _apiKey = AppSecrets.googlePlacesApiKey;
 
-  /// Check if the API key has been properly configured.
-  static bool get isConfigured =>
-      _apiKey.isNotEmpty && !_apiKey.startsWith('YOUR_');
+  /// Check if the API key has been supplied.
+  static bool get isConfigured => _apiKey.isNotEmpty;
 
   /// Searches for a place by name/query using the Google Places (New) Text Search API.
   /// Returns the first matching result object, or null if no matches or not configured.
@@ -140,7 +141,7 @@ class GooglePlacesApiConfig {
     return null;
   }
 
-  static bool _isSecondaryTextInDestinations(
+  static bool isSecondaryTextInDestinations(
     String secondaryText,
     List<String> destinations,
   ) {
@@ -257,7 +258,7 @@ class GooglePlacesApiConfig {
           (structured?['secondaryText']?['text'] as String? ?? '').toLowerCase();
 
       if (allowedDestinations != null && allowedDestinations.isNotEmpty) {
-        if (!_isSecondaryTextInDestinations(secondaryText, allowedDestinations)) {
+        if (!isSecondaryTextInDestinations(secondaryText, allowedDestinations)) {
           continue;
         }
       }
@@ -537,7 +538,7 @@ class GooglePlacesApiConfig {
                       .toLowerCase();
 
               if (allowedDestinations != null && allowedDestinations.isNotEmpty) {
-                if (!_isSecondaryTextInDestinations(
+                if (!isSecondaryTextInDestinations(
                   secondaryText,
                   allowedDestinations,
                 )) {
@@ -573,7 +574,7 @@ class GooglePlacesApiConfig {
                       .toLowerCase();
 
               if (allowedDestinations != null && allowedDestinations.isNotEmpty) {
-                if (!_isSecondaryTextInDestinations(
+                if (!isSecondaryTextInDestinations(
                   secondaryText,
                   allowedDestinations,
                 )) {
@@ -723,7 +724,7 @@ class GooglePlacesApiConfig {
                       .toLowerCase();
 
               if (allowedDestinations != null && allowedDestinations.isNotEmpty) {
-                if (!_isSecondaryTextInDestinations(
+                if (!isSecondaryTextInDestinations(
                   secondaryText,
                   allowedDestinations,
                 )) {
@@ -761,7 +762,7 @@ class GooglePlacesApiConfig {
                       .toLowerCase();
 
               if (allowedDestinations != null && allowedDestinations.isNotEmpty) {
-                if (!_isSecondaryTextInDestinations(
+                if (!isSecondaryTextInDestinations(
                   secondaryText,
                   allowedDestinations,
                 )) {

@@ -7,9 +7,10 @@ import 'package:provider/provider.dart';
 import 'theme/app_theme.dart';
 import 'utils/network_error.dart';
 import 'utils/input_validator.dart';
+import 'utils/ktmb_schedule.dart';
 
 import 'models/configurations/supabase_config.dart';
-import 'models/configurations/gemini_api_config.dart';
+import 'models/configurations/app_secrets.dart';
 
 import 'models/repository/auth_repository.dart';
 import 'models/repository/i_auth_repository.dart';
@@ -44,6 +45,7 @@ import 'views/travel_information_input_screen.dart';
 import 'views/activity_screen.dart';
 import 'views/financial_dashboard_screen.dart';
 import 'views/all_plans_screen.dart';
+import 'views/guest_preview_screen.dart';
 
 class AppRoutes {
   static const String loginScreen = '/login';
@@ -64,6 +66,7 @@ class AppRoutes {
   static const String financialDashboardScreen = '/financialDashboardScreen';
   static const String tripSummaryScreen = '/tripSummaryScreen';
   static const String allPlansScreen = '/allPlansScreen';
+  static const String guestPreviewScreen = '/guest';
   static const String initialRoute = loginScreen;
 }
 
@@ -94,8 +97,10 @@ Future<void> main() async {
   // Initialize Supabase config
   await SupabaseConfig.initialize();
 
-  // Initialize Gemini config
-  GeminiApiConfig.initialize();
+  // Bundled KTMB train timetable (offline; falls back to estimates if missing)
+  await KtmbSchedule.load();
+
+  AppSecrets.warnAboutMissingKeys();
 
   final IAuthRepository authRepository = AuthRepository(
     SupabaseConfig.client,
@@ -276,6 +281,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         AppRoutes.financialDashboardScreen: (context) =>
             FinancialDashboardScreen.builder(context),
         AppRoutes.allPlansScreen: (context) => AllPlansScreen.builder(context),
+        AppRoutes.guestPreviewScreen: (context) =>
+            GuestPreviewScreen.builder(context),
       },
     );
   }

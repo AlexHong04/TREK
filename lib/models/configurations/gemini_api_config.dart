@@ -2,9 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:Trek/models/configurations/google_places_api_config.dart';
 import 'package:http/http.dart' as http;
-import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter/foundation.dart';
 import '../entities/future_suggestion.dart';
+import 'app_secrets.dart';
+import 'supabase_config.dart';
+import 'image_resolver_config.dart';
 import '../../view_models/ui_state/travel_information_ui_state.dart';
 
 class GeminiApiRequestException implements Exception {
@@ -51,14 +53,30 @@ class GeminiReceiptParseResult {
 }
 
 class GeminiApiConfig {
-  // Gemini API Key
-  static const String _apiKey =
-      'YOUR_GOOGLE_GENERATIVE_AI_API_KEY_HERE'; // Replace with your
+  static const String _model = 'gemini-3.5-flash-lite';
 
-  static late final GenerativeModel _model;
+  // Optional Gemini key for LOCAL DEVELOPMENT ONLY (see AppSecrets). When it is
+  // empty - the normal case, and always for release builds - requests go
+  // through the `gemini-proxy` Supabase Edge Function, which holds the real
+  // key on the server so it never ships inside the app.
+  static const String _apiKey = AppSecrets.geminiApiKey;
 
-  static void initialize() {
-    _model = GenerativeModel(model: 'gemini-3.5-flash-lite', apiKey: _apiKey);
+  /// True when calls are routed through the Supabase Edge Function.
+  static bool get usesProxy => _apiKey.isEmpty;
+
+  static String get _generateContentUrl => usesProxy
+      ? '${SupabaseConfig.functionsUrl}/gemini-proxy?model=$_model'
+      : 'https://generativelanguage.googleapis.com/v1beta/models/$_model:generateContent?key=$_apiKey';
+
+  static Map<String, String> _requestHeaders() {
+    final headers = {'Content-Type': 'application/json'};
+    if (usesProxy) {
+      // The function only accepts a signed-in user's access token.
+      headers['apikey'] = SupabaseConfig.anonKey;
+      headers['Authorization'] =
+          'Bearer ${SupabaseConfig.client.auth.currentSession?.accessToken ?? SupabaseConfig.anonKey}';
+    }
+    return headers;
   }
 
   static String _formatTo24Hour(String? timeStr, String default24H) {
@@ -124,9 +142,9 @@ $receiptText
       final response = await http
           .post(
             Uri.parse(
-              'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=$_apiKey',
+              _generateContentUrl,
             ),
-            headers: {'Content-Type': 'application/json'},
+            headers: _requestHeaders(),
             body: jsonEncode({
               'contents': [
                 {
@@ -569,12 +587,12 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
     while (retries > 0) {
       try {
         final url = Uri.parse(
-          'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=$_apiKey',
+          _generateContentUrl,
         );
 
         final response = await http.post(
           url,
-          headers: {'Content-Type': 'application/json'},
+          headers: _requestHeaders(),
           body: jsonEncode({
             "contents": [
               {
@@ -674,12 +692,12 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
     ''';
 
     final url = Uri.parse(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=$_apiKey',
+      _generateContentUrl,
     );
 
     final response = await http.post(
       url,
-      headers: {'Content-Type': 'application/json'},
+      headers: _requestHeaders(),
       body: jsonEncode({
         "contents": [
           {
@@ -754,12 +772,12 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
     ''';
 
     final url = Uri.parse(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=$_apiKey',
+      _generateContentUrl,
     );
 
     final response = await http.post(
       url,
-      headers: {'Content-Type': 'application/json'},
+      headers: _requestHeaders(),
       body: jsonEncode({
         "contents": [
           {
@@ -925,13 +943,13 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
     ''';
 
     final url = Uri.parse(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=$_apiKey',
+      _generateContentUrl,
     );
 
     try {
       final response = await http.post(
         url,
-        headers: {'Content-Type': 'application/json'},
+        headers: _requestHeaders(),
         body: jsonEncode({
           "contents": [
             {
@@ -1002,13 +1020,13 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
     ''';
 
     final url = Uri.parse(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=$_apiKey',
+      _generateContentUrl,
     );
 
     try {
       final response = await http.post(
         url,
-        headers: {'Content-Type': 'application/json'},
+        headers: _requestHeaders(),
         body: jsonEncode({
           "contents": [
             {
@@ -1119,13 +1137,13 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
     ''';
 
     final url = Uri.parse(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=$_apiKey',
+      _generateContentUrl,
     );
 
     try {
       final response = await http.post(
         url,
-        headers: {'Content-Type': 'application/json'},
+        headers: _requestHeaders(),
         body: jsonEncode({
           "contents": [
             {
@@ -1277,13 +1295,13 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
     ''';
 
     final url = Uri.parse(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=$_apiKey',
+      _generateContentUrl,
     );
 
     try {
       final response = await http.post(
         url,
-        headers: {'Content-Type': 'application/json'},
+        headers: _requestHeaders(),
         body: jsonEncode({
           "contents": [
             {
@@ -1323,13 +1341,25 @@ ${resolvedHotels.asMap().entries.map((e) => '      * Hotel ${e.key + 1}: ${e.val
                       return item;
                     }
 
-                    // if the image url does not exist then get the url from google place
+                    // Image lookup: Google Places photo when a key is set,
+                    // otherwise (or if it has no photo) the free Wikipedia ->
+                    // Wikimedia Commons -> LoremFlickr chain.
                     try {
-                      final url =
-                          await GooglePlacesApiConfig.searchPlacePhotoUrl(
-                            tripDestination,
-                          );
-                      item['activityImgUrl'] = url ?? '';
+                      String? url;
+                      if (GooglePlacesApiConfig.isConfigured) {
+                        url = await GooglePlacesApiConfig.searchPlacePhotoUrl(
+                          tripDestination,
+                        );
+                      }
+                      if (url == null || url.isEmpty) {
+                        final resolved = await ImageResolverConfig.resolveImage(
+                          keyword: tripDestination,
+                          fallbackTitle: tripDestination,
+                          lockIndex: tripDestination.hashCode.abs() % 1000,
+                        );
+                        url = resolved.imageUrl;
+                      }
+                      item['activityImgUrl'] = url;
                     } catch (e) {
                       debugPrint(
                         'Error fetching place photo for $tripDestination: $e',

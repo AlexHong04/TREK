@@ -2351,13 +2351,24 @@ class _TravelInformationInputScreenState
         ),
         const SizedBox(height: 6.0),
         InkWell(
-          onTap: () => _showTransitHubSelectionModal(
-            context,
-            viewModel,
-            isArrival: false,
-            index: departureIndex,
-            isStartOrEnd: isStartOrEnd,
-          ),
+          onTap: () {
+            // A transit departure must leave from where the previous transit
+            // arrived, so only offer hubs in that same area.
+            final arrivals = viewModel.uiState.arrivals;
+            String? sameAreaAs;
+            if (departureIndex >= 1 && departureIndex < arrivals.length) {
+              final prev = arrivals[departureIndex].location;
+              if (prev.trim().isNotEmpty) sameAreaAs = prev;
+            }
+            _showTransitHubSelectionModal(
+              context,
+              viewModel,
+              isArrival: false,
+              index: departureIndex,
+              isStartOrEnd: isStartOrEnd,
+              sameAreaAs: sameAreaAs,
+            );
+          },
           borderRadius: BorderRadius.circular(10.0),
           child: Container(
             width: double.infinity,
@@ -2492,8 +2503,166 @@ class _TravelInformationInputScreenState
             ),
           ],
         ),
+        ..._buildTrainDepartureSuggestions(
+          viewModel: viewModel,
+          departureIndex: departureIndex,
+          departure: departure,
+          minAllowedDateString: minAllowedDateString,
+          minAllowedTimeString: minAllowedTimeString,
+        ),
       ],
     );
+  }
+
+  /// Real KTMB departures (from the bundled timetable) for the train leg that
+  /// starts at [departure] and ends at the next arrival, shown as tappable
+  /// chips under the date/time row. Empty when the leg is not a train, the
+  /// stations are not filled in yet, or no direct train runs that day.
+  List<Widget> _buildTrainDepartureSuggestions({
+    required TravelInformationInputViewModel viewModel,
+    required int departureIndex,
+    required TransitPoint departure,
+    String? minAllowedDateString,
+    String? minAllowedTimeString,
+  }) {
+    final arrivals = viewModel.uiState.arrivals;
+    final nextIndex = departureIndex + 1;
+    if (departure.type.toLowerCase() != 'train' || nextIndex >= arrivals.length) {
+      return const [];
+    }
+    final destination = arrivals[nextIndex].location;
+    if (departure.location.isEmpty ||
+        destination.isEmpty ||
+        departure.date.isEmpty) {
+      return const [];
+    }
+
+    final trains = TransitScheduleHelper.getTrainDepartures(
+      fromLocation: departure.location,
+      toLocation: destination,
+      date: departure.date,
+    );
+    if (trains.isEmpty) return const [];
+
+    // Same rule as the time picker: nothing earlier than the previous arrival.
+    int? earliestMinutes;
+    var allBlocked = false;
+    if (minAllowedTimeString != null && minAllowedTimeString.isNotEmpty) {
+      final minMinutes = _parseTimeToMinutes(minAllowedTimeString);
+      final chosenD = DateTime.tryParse(departure.date);
+      final minD = DateTime.tryParse(minAllowedDateString ?? '');
+      if (minMinutes != null) {
+        if (chosenD != null && minD != null) {
+          final cDay = DateTime(chosenD.year, chosenD.month, chosenD.day);
+          final mDay = DateTime(minD.year, minD.month, minD.day);
+          if (cDay.isAtSameMomentAs(mDay)) {
+            earliestMinutes = minMinutes;
+          } else if (cDay.isBefore(mDay)) {
+            allBlocked = true;
+          }
+        } else {
+          earliestMinutes = minMinutes;
+        }
+      }
+    }
+
+    final chips = <Widget>[];
+    final seen = <String>{};
+    for (final train in trains) {
+      final timeLabel = TransitScheduleHelper.minutesToTimeString(
+        train.departMinutes,
+      );
+      if (!seen.add('$timeLabel|${train.durationMinutes}|${train.routeId}')) {
+        continue;
+      }
+      final enabled =
+          !allBlocked &&
+          (earliestMinutes == null || train.departMinutes >= earliestMinutes);
+      final selected = departure.time == timeLabel;
+      final duration = TransitScheduleHelper.formatDuration(
+        train.durationMinutes,
+      );
+      final nextDay = train.arriveDayOffset > 0
+          ? ' (+${train.arriveDayOffset}d)'
+          : '';
+
+      chips.add(
+        Opacity(
+          opacity: enabled ? 1.0 : 0.4,
+          child: InkWell(
+            onTap: enabled
+                ? () => viewModel.updateDepartureTime(departureIndex, timeLabel)
+                : null,
+            borderRadius: BorderRadius.circular(10.0),
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 10.0,
+                vertical: 6.0,
+              ),
+              decoration: BoxDecoration(
+                color: selected
+                    ? appTheme.teal_A700.withValues(alpha: 0.12)
+                    : appTheme.gray_50_01,
+                borderRadius: BorderRadius.circular(10.0),
+                border: Border.all(
+                  color: selected ? appTheme.teal_A700 : appTheme.gray_200,
+                  width: selected ? 1.4 : 1.0,
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    timeLabel,
+                    style: TextStyle(
+                      fontSize: 13.0,
+                      fontWeight: FontWeight.w700,
+                      fontFamily: 'Inter',
+                      color: appTheme.gray_800,
+                    ),
+                  ),
+                  Text(
+                    '$duration$nextDay · ${train.routeLabel}',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontFamily: 'Inter',
+                      color: appTheme.blue_gray_300,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return [
+      const SizedBox(height: 10.0),
+      Text(
+        'KTMB TRAINS ON THIS DATE',
+        style: TextStyle(
+          fontSize: 10.5,
+          fontWeight: FontWeight.w700,
+          fontFamily: 'Inter',
+          color: appTheme.blue_gray_300,
+          letterSpacing: 0.5,
+        ),
+      ),
+      const SizedBox(height: 6.0),
+      SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            for (var i = 0; i < chips.length; i++) ...[
+              if (i > 0) const SizedBox(width: 8.0),
+              chips[i],
+            ],
+          ],
+        ),
+      ),
+    ];
   }
 
   Widget _buildTransitConnectionCardFromPoints({
@@ -3795,6 +3964,7 @@ class _TravelInformationInputScreenState
     required int index,
     bool isStartOrEnd = false,
     String? connectedLocation,
+    String? sameAreaAs,
   }) {
     final currentItem = isArrival
         ? (index < viewModel.uiState.arrivals.length
@@ -3866,10 +4036,20 @@ class _TravelInformationInputScreenState
               );
             }
 
+            // Departures: only hubs in the area where the traveller arrived.
+            // Hubs whose area is unknown are kept rather than hidden.
+            bool isInArrivalArea(String hub) =>
+                sameAreaAs == null ||
+                TransitScheduleHelper.isSameTravelArea(hub, sameAreaAs) != false;
+
             final List<String> recommendedHubs = rawRecommended
                 .where(isHubReachable)
+                .where(isInArrivalArea)
                 .toList();
-            final List<String> allHubs = rawAll.where(isHubReachable).toList();
+            final List<String> allHubs = rawAll
+                .where(isHubReachable)
+                .where(isInArrivalArea)
+                .toList();
 
             bool matchQuery(String hub) {
               if (query.isEmpty) return true;

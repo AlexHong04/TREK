@@ -55,6 +55,15 @@ app.*.map.json
 /android/gradle.properties
 *.properties
 
+# Local secrets (API keys) - copy env.example.json to env.json and fill it in
+env.json
+*.env.json
+
+# Supabase CLI local state / secrets
+supabase/.temp/
+supabase/.env
+supabase/functions/.env
+
 # Local chat/export files
 *.md
 assets/splash.mp4

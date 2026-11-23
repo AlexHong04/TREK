@@ -1,8 +1,18 @@
+import 'dart:math' as math;
+
 import '../models/configurations/openrouteservice_api_config.dart';
+import 'ktmb_schedule.dart';
 
 /// Helper utility for realistic Malaysia transit journey schedules, travel durations,
 /// and automatic departure/arrival date-time adjustments.
 class TransitScheduleHelper {
+  /// True when [code] (e.g. an IATA code like "pen") appears as a whole word.
+  /// A plain `contains` wrongly matched inside longer words - "kua" in
+  /// "Kuala Terengganu", "pen" in "Penang Sentral" - and so returned the wrong
+  /// airport or coordinates.
+  static bool _hasCode(String lowerText, String code) =>
+      RegExp('\\b$code\\b').hasMatch(lowerText);
+
   /// Extract a standardized region/state from a hub location string.
   static String extractRegion(String location) {
     final l = location.toLowerCase();
@@ -84,7 +94,7 @@ class TransitScheduleHelper {
     }
     if (l.contains('sabah') ||
         l.contains('kinabalu') ||
-        l.contains('bki') ||
+        _hasCode(l, 'bki') ||
         l.contains('sandakan') ||
         l.contains('tawau') ||
         l.contains('inanam')) {
@@ -92,13 +102,32 @@ class TransitScheduleHelper {
     }
     if (l.contains('sarawak') ||
         l.contains('kuching') ||
-        l.contains('kch') ||
+        _hasCode(l, 'kch') ||
         l.contains('miri') ||
         l.contains('sibu') ||
         l.contains('bintulu')) {
       return 'Sarawak';
     }
     return '';
+  }
+
+  /// Coarse "area" used to decide whether two hubs are in the same place.
+  /// Singapore is merged with Johor because JB Sentral and Woodlands CIQ are
+  /// one connected crossing.
+  static String travelArea(String location) {
+    final region = extractRegion(location);
+    return region == 'Singapore' ? 'Johor' : region;
+  }
+
+  /// Whether two hubs are in the same travel area (e.g. KLIA and KL Sentral).
+  ///
+  /// Returns null when either place's region cannot be worked out, so callers
+  /// can stay lenient instead of rejecting something they simply don't know.
+  static bool? isSameTravelArea(String a, String b) {
+    final areaA = travelArea(a);
+    final areaB = travelArea(b);
+    if (areaA.isEmpty || areaB.isEmpty) return null;
+    return areaA == areaB;
   }
 
   /// Returns estimated direct rail travel duration in minutes
@@ -961,85 +990,85 @@ class TransitScheduleHelper {
             (l.contains('international') || l.contains('airport')))) {
       return 'KUL';
     }
-    if (l.contains('subang') || l.contains('szb') || l.contains('abdul aziz')) {
+    if (l.contains('subang') || _hasCode(l, 'szb') || l.contains('abdul aziz')) {
       return 'SZB';
     }
-    if (l.contains('penang') || l.contains('pen') || l.contains('bayan lepas')) {
+    if (l.contains('penang') || _hasCode(l, 'pen') || l.contains('bayan lepas')) {
       return 'PEN';
     }
-    if (l.contains('langkawi') || l.contains('lgk')) {
+    if (l.contains('langkawi') || _hasCode(l, 'lgk')) {
       return 'LGK';
     }
     if (l.contains('senai') ||
-        l.contains('jhb') ||
+        _hasCode(l, 'jhb') ||
         (l.contains('johor') && l.contains('airport'))) {
       return 'JHB';
     }
     if (l.contains('kota bharu') ||
-        l.contains('kbr') ||
+        _hasCode(l, 'kbr') ||
         l.contains('ismail petra')) {
       return 'KBR';
     }
     if (l.contains('kuala terengganu') ||
-        l.contains('tgg') ||
+        _hasCode(l, 'tgg') ||
         l.contains('mahmud')) {
       return 'TGG';
     }
     if (l.contains('alor setar') ||
-        l.contains('aor') ||
+        _hasCode(l, 'aor') ||
         l.contains('abdul halim')) {
       return 'AOR';
     }
     if (l.contains('kuantan') ||
-        l.contains('kua') ||
+        _hasCode(l, 'kua') ||
         l.contains('ahmad shah')) {
       return 'KUA';
     }
-    if (l.contains('ipoh') || l.contains('iph') || l.contains('azlan shah')) {
+    if (l.contains('ipoh') || _hasCode(l, 'iph') || l.contains('azlan shah')) {
       return 'IPH';
     }
     if (l.contains('melaka') ||
-        l.contains('mkz') ||
+        _hasCode(l, 'mkz') ||
         l.contains('malacca airport')) {
       return 'MKZ';
     }
-    if (l.contains('tioman') || l.contains('tod')) {
+    if (l.contains('tioman') || _hasCode(l, 'tod')) {
       return 'TOD';
     }
-    if (l.contains('redang') || l.contains('rdn')) {
+    if (l.contains('redang') || _hasCode(l, 'rdn')) {
       return 'RDN';
     }
-    if (l.contains('pangkor') || l.contains('pkg')) {
+    if (l.contains('pangkor') || _hasCode(l, 'pkg')) {
       return 'PKG';
     }
-    if (l.contains('kinabalu') || l.contains('bki')) {
+    if (l.contains('kinabalu') || _hasCode(l, 'bki')) {
       return 'BKI';
     }
-    if (l.contains('tawau') || l.contains('twu')) {
+    if (l.contains('tawau') || _hasCode(l, 'twu')) {
       return 'TWU';
     }
-    if (l.contains('sandakan') || l.contains('sdk')) {
+    if (l.contains('sandakan') || _hasCode(l, 'sdk')) {
       return 'SDK';
     }
-    if (l.contains('lahad datu') || l.contains('ldu')) {
+    if (l.contains('lahad datu') || _hasCode(l, 'ldu')) {
       return 'LDU';
     }
-    if (l.contains('labuan') || l.contains('lbu')) {
+    if (l.contains('labuan') || _hasCode(l, 'lbu')) {
       return 'LBU';
     }
-    if (l.contains('kuching') || l.contains('kch')) {
+    if (l.contains('kuching') || _hasCode(l, 'kch')) {
       return 'KCH';
     }
-    if (l.contains('miri') || l.contains('myy')) {
+    if (l.contains('miri') || _hasCode(l, 'myy')) {
       return 'MYY';
     }
-    if (l.contains('sibu') || l.contains('sbw')) {
+    if (l.contains('sibu') || _hasCode(l, 'sbw')) {
       return 'SBW';
     }
-    if (l.contains('bintulu') || l.contains('btu')) {
+    if (l.contains('bintulu') || _hasCode(l, 'btu')) {
       return 'BTU';
     }
-    if (l.contains('mulu') || l.contains('mzv')) {
+    if (l.contains('mulu') || _hasCode(l, 'mzv')) {
       return 'MZV';
     }
     return null;
@@ -1127,6 +1156,35 @@ class TransitScheduleHelper {
     if (_flightPairDurations.containsKey(key2)) return _flightPairDurations[key2];
 
     return null;
+  }
+
+  /// Great-circle distance in kilometres between two [lat, lng] points.
+  static double haversineKm(List<double> a, List<double> b) {
+    const earthRadiusKm = 6371.0;
+    double rad(double deg) => deg * math.pi / 180.0;
+    final dLat = rad(b[0] - a[0]);
+    final dLng = rad(b[1] - a[1]);
+    final h =
+        math.pow(math.sin(dLat / 2), 2) +
+        math.cos(rad(a[0])) *
+            math.cos(rad(b[0])) *
+            math.pow(math.sin(dLng / 2), 2);
+    return 2 * earthRadiusKm * math.asin(math.sqrt(h));
+  }
+
+  /// Block-time estimate (minutes) from distance: ~35 min for taxi, take-off,
+  /// climb and landing plus cruise at ~800 km/h, rounded to 5 minutes.
+  /// Calibrated against the airline timetable in [_flightPairDurations]
+  /// (e.g. KUL-PEN 60, KUL-KCH 105, KUL-BKI 155).
+  /// Returns null when either location has no known coordinates.
+  static int? _estimateFlightMinutesByDistance(String from, String to) {
+    final a = getHubCoordinates(from);
+    final b = getHubCoordinates(to);
+    if (a == null || b == null) return null;
+    final km = haversineKm(a, b);
+    if (km < 20) return null; // same airport / bad match
+    final raw = 35 + (km / 800.0) * 60.0;
+    return ((raw / 5).round() * 5).clamp(30, 300);
   }
 
   /// Checks whether a valid direct transit route exists between [fromLocation] and [toLocation]
@@ -1288,7 +1346,17 @@ class TransitScheduleHelper {
         return directFlightMin;
       }
 
-      // 1b. Region-level fallback based on airline averages
+      // 1b. Distance-based estimate from airport coordinates (works for any
+      // pair that is missing from the timetable above).
+      final distanceMin = _estimateFlightMinutesByDistance(
+        fromLocation ?? '',
+        toLocation ?? '',
+      );
+      if (distanceMin != null) {
+        return distanceMin;
+      }
+
+      // 1c. Region-level fallback based on airline averages
       final isFromEast = fromRegion == 'Sabah' || fromRegion == 'Sarawak';
       final isToEast = toRegion == 'Sabah' || toRegion == 'Sarawak';
 
@@ -1308,6 +1376,15 @@ class TransitScheduleHelper {
 
     // 2. TRAIN (KTMB ETS / Intercity / Komuter / Shuttle Tebrau)
     if (mode == 'train') {
+      // 2a-0. Bundled official KTMB timetable (fastest service on the pair).
+      final scheduled = KtmbSchedule.instance?.typicalDurationMinutes(
+        fromLocation ?? '',
+        toLocation ?? '',
+      );
+      if (scheduled != null && scheduled > 0) {
+        return scheduled;
+      }
+
       // 2a. Direct station pair matching using KTMB GTFS timetables
       final stationDuration = _getGtfsStationPairDuration(
         fromLocation ?? '',
@@ -1512,61 +1589,61 @@ class TransitScheduleHelper {
     if (l.contains('klia') || (l.contains('kuala lumpur') && l.contains('international'))) {
       return [2.7456, 101.7072]; // KLIA / KLIA2
     }
-    if (l.contains('subang') || l.contains('szb')) {
+    if (l.contains('subang') || _hasCode(l, 'szb')) {
       return [3.1306, 101.5489]; // Subang Airport (SZB)
     }
-    if (l.contains('pen') || (l.contains('penang') && l.contains('airport'))) {
+    if (_hasCode(l, 'pen') || (l.contains('penang') && l.contains('airport'))) {
       return [5.2971, 100.2769]; // Penang Airport (PEN)
     }
-    if (l.contains('lgk') || (l.contains('langkawi') && l.contains('airport'))) {
+    if (_hasCode(l, 'lgk') || (l.contains('langkawi') && l.contains('airport'))) {
       return [6.3297, 99.7287]; // Langkawi Airport (LGK)
     }
-    if (l.contains('jhb') || (l.contains('senai') && l.contains('airport'))) {
+    if (_hasCode(l, 'jhb') || (l.contains('senai') && l.contains('airport'))) {
       return [1.6413, 103.6698]; // Senai Airport (JHB)
     }
-    if (l.contains('bki') || (l.contains('kinabalu') && l.contains('airport'))) {
+    if (_hasCode(l, 'bki') || (l.contains('kinabalu') && l.contains('airport'))) {
       return [5.9372, 116.0512]; // Kota Kinabalu Airport (BKI)
     }
-    if (l.contains('kch') || (l.contains('kuching') && l.contains('airport'))) {
+    if (_hasCode(l, 'kch') || (l.contains('kuching') && l.contains('airport'))) {
       return [1.4847, 110.3472]; // Kuching Airport (KCH)
     }
-    if (l.contains('kbr') || (l.contains('ismail petra') && l.contains('airport'))) {
+    if (_hasCode(l, 'kbr') || (l.contains('ismail petra') && l.contains('airport'))) {
       return [6.1664, 102.2933]; // Kota Bharu Airport (KBR)
     }
-    if (l.contains('tgg') || (l.contains('mahmud') && l.contains('airport'))) {
+    if (_hasCode(l, 'tgg') || (l.contains('mahmud') && l.contains('airport'))) {
       return [5.3826, 103.1030]; // Kuala Terengganu Airport (TGG)
     }
-    if (l.contains('aor') || (l.contains('abdul halim') && l.contains('airport'))) {
+    if (_hasCode(l, 'aor') || (l.contains('abdul halim') && l.contains('airport'))) {
       return [6.1897, 100.3986]; // Alor Setar Airport (AOR)
     }
-    if (l.contains('kua') || (l.contains('ahmad shah') && l.contains('airport'))) {
+    if (_hasCode(l, 'kua') || (l.contains('ahmad shah') && l.contains('airport'))) {
       return [3.7792, 103.2094]; // Kuantan Airport (KUA)
     }
-    if (l.contains('iph') || (l.contains('azlan shah') && l.contains('airport'))) {
+    if (_hasCode(l, 'iph') || (l.contains('azlan shah') && l.contains('airport'))) {
       return [4.5680, 101.0919]; // Ipoh Airport (IPH)
     }
-    if (l.contains('twu') || (l.contains('tawau') && l.contains('airport'))) {
+    if (_hasCode(l, 'twu') || (l.contains('tawau') && l.contains('airport'))) {
       return [4.3202, 118.1213]; // Tawau Airport (TWU)
     }
-    if (l.contains('sdk') || (l.contains('sandakan') && l.contains('airport'))) {
+    if (_hasCode(l, 'sdk') || (l.contains('sandakan') && l.contains('airport'))) {
       return [5.9008, 118.0594]; // Sandakan Airport (SDK)
     }
-    if (l.contains('myy') || (l.contains('miri') && l.contains('airport'))) {
+    if (_hasCode(l, 'myy') || (l.contains('miri') && l.contains('airport'))) {
       return [4.3220, 113.9870]; // Miri Airport (MYY)
     }
-    if (l.contains('sbw') || (l.contains('sibu') && l.contains('airport'))) {
+    if (_hasCode(l, 'sbw') || (l.contains('sibu') && l.contains('airport'))) {
       return [2.2612, 111.9856]; // Sibu Airport (SBW)
     }
-    if (l.contains('btu') || (l.contains('bintulu') && l.contains('airport'))) {
+    if (_hasCode(l, 'btu') || (l.contains('bintulu') && l.contains('airport'))) {
       return [3.1239, 113.0205]; // Bintulu Airport (BTU)
     }
-    if (l.contains('lbu') || (l.contains('labuan') && l.contains('airport'))) {
+    if (_hasCode(l, 'lbu') || (l.contains('labuan') && l.contains('airport'))) {
       return [5.3007, 115.2503]; // Labuan Airport (LBU)
     }
-    if (l.contains('mzv') || (l.contains('mulu') && l.contains('airport'))) {
+    if (_hasCode(l, 'mzv') || (l.contains('mulu') && l.contains('airport'))) {
       return [4.0489, 114.8118]; // Mulu Airport (MZV)
     }
-    if (l.contains('ldu') || (l.contains('lahad datu') && l.contains('airport'))) {
+    if (_hasCode(l, 'ldu') || (l.contains('lahad datu') && l.contains('airport'))) {
       return [5.0322, 118.3242]; // Lahad Datu Airport (LDU)
     }
 
@@ -1728,7 +1805,23 @@ class TransitScheduleHelper {
     String? fromLocation,
     String? toLocation,
     List<String>? selectedDestinations,
+    String? departureDate,
+    String? departureTimeStr,
   }) async {
+    // Trains: when the traveller has picked a departure date and time, use the
+    // real KTMB train that leaves closest to that time.
+    if (transitType.toLowerCase() == 'train') {
+      final train = closestTrainDeparture(
+        fromLocation: fromLocation ?? '',
+        toLocation: toLocation ?? '',
+        departureDate: departureDate,
+        departureTimeStr: departureTimeStr,
+      );
+      if (train != null && train.durationMinutes > 0) {
+        return train.durationMinutes;
+      }
+    }
+
     if (transitType.toLowerCase() == 'bus') {
       try {
         final startCoords = getHubCoordinates(fromLocation ?? '');
@@ -1833,7 +1926,68 @@ class TransitScheduleHelper {
   }
 
   /// Recommended realistic departure schedules based on typical Malaysia timetables.
+  /// Only trains have real timetable data - see [getTrainDepartureTimes].
   static List<String> getPopularScheduleDepartureTimes(String transitType) {
     return const [];
+  }
+
+  /// Real KTMB trains between two stations on [date] (ISO `yyyy-MM-dd`),
+  /// earliest first. Empty when the timetable is unavailable, a station is
+  /// unknown, or no direct train runs that day.
+  static List<TrainDeparture> getTrainDepartures({
+    required String fromLocation,
+    required String toLocation,
+    required String date,
+  }) {
+    final schedule = KtmbSchedule.instance;
+    final parsed = DateTime.tryParse(date);
+    if (schedule == null || parsed == null) return const [];
+    return schedule.departures(
+      from: fromLocation,
+      to: toLocation,
+      date: parsed,
+    );
+  }
+
+  /// The departure times (formatted like "09:00 AM") of the real trains
+  /// returned by [getTrainDepartures] - ready to offer as suggestions.
+  static List<String> getTrainDepartureTimes({
+    required String fromLocation,
+    required String toLocation,
+    required String date,
+  }) {
+    final seen = <String>{};
+    return [
+      for (final d in getTrainDepartures(
+        fromLocation: fromLocation,
+        toLocation: toLocation,
+        date: date,
+      ))
+        if (seen.add(minutesToTimeString(d.departMinutes)))
+          minutesToTimeString(d.departMinutes),
+    ];
+  }
+
+  /// The real train leaving closest to the chosen time, or null.
+  static TrainDeparture? closestTrainDeparture({
+    required String fromLocation,
+    required String toLocation,
+    String? departureDate,
+    String? departureTimeStr,
+  }) {
+    final schedule = KtmbSchedule.instance;
+    final date = DateTime.tryParse(departureDate ?? '');
+    if (schedule == null ||
+        date == null ||
+        departureTimeStr == null ||
+        departureTimeStr.trim().isEmpty) {
+      return null;
+    }
+    return schedule.closestDeparture(
+      from: fromLocation,
+      to: toLocation,
+      date: date,
+      timeMinutes: parseTimeToMinutes(departureTimeStr),
+    );
   }
 }

@@ -13,12 +13,14 @@ class LoginScreen extends StatefulWidget {
   final VoidCallback? onLoginSuccess;
   final VoidCallback? onRegister;
   final VoidCallback? onForgotPassword;
+  final VoidCallback? onExploreAsGuest;
 
   const LoginScreen({
     super.key,
     this.onLoginSuccess,
     this.onRegister,
     this.onForgotPassword,
+    this.onExploreAsGuest,
   });
 
   static Widget builder(
@@ -26,6 +28,7 @@ class LoginScreen extends StatefulWidget {
         VoidCallback? onLoginSuccess,
         VoidCallback? onRegister,
         VoidCallback? onForgotPassword,
+        VoidCallback? onExploreAsGuest,
       }) {
     final argument = ModalRoute.of(context)?.settings.arguments;
     return LoginViewModelScope(
@@ -34,6 +37,7 @@ class LoginScreen extends StatefulWidget {
         onLoginSuccess: onLoginSuccess,
         onRegister: onRegister,
         onForgotPassword: onForgotPassword,
+        onExploreAsGuest: onExploreAsGuest,
       ),
     );
   }
@@ -136,6 +140,14 @@ class _LoginScreenState extends State<LoginScreen>
               '/register',
               arguments: state.email,
             );
+          }
+        }
+
+        void openGuestPreview() {
+          if (widget.onExploreAsGuest != null) {
+            widget.onExploreAsGuest!();
+          } else {
+            Navigator.pushNamed(context, '/guest');
           }
         }
 
@@ -277,6 +289,12 @@ class _LoginScreenState extends State<LoginScreen>
                             ),
                           ),
                         ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton.icon(
+                        onPressed: state.isLoading ? null : openGuestPreview,
+                        icon: const Icon(Icons.explore_outlined, size: 20),
+                        label: const Text('Explore as a guest'),
                       ),
                     ],
                   ),
